@@ -1,4 +1,4 @@
-﻿# multi_pair_scanner.py - Multi-Pair Crypto Scanner
+# multi_pair_scanner.py - Multi-Pair Crypto Scanner
 import time
 from binance.client import Client
 from strategy import check_breakout_enhanced, get_strategy_confidence, analyze_pair_strength
@@ -18,7 +18,7 @@ class CryptoPairScanner:
         Get all USDT trading pairs with minimum 24h volume
         """
         try:
-            print(f"🔍 Fetching all USDT pairs with volume > ${min_volume_24h:,.0f}...")
+            print(f"?? Fetching all USDT pairs with volume > ${min_volume_24h:,.0f}...")
             ticker_24h = self.client.get_ticker()
             
             usdt_pairs = []
@@ -45,11 +45,11 @@ class CryptoPairScanner:
             # Sort by 24h volume (highest first)
             usdt_pairs.sort(key=lambda x: x['volume_24h'], reverse=True)
             
-            print(f"📊 Found {len(usdt_pairs)} qualifying USDT pairs")
+            print(f"?? Found {len(usdt_pairs)} qualifying USDT pairs")
             return usdt_pairs
             
         except Exception as e:
-            print(f"❌ Error fetching USDT pairs: {e}")
+            print(f"? Error fetching USDT pairs: {e}")
             return []
 
     def get_selected_pairs(self):
@@ -68,7 +68,7 @@ class CryptoPairScanner:
             {'symbol': 'XRPUSDT', 'category': 'Large Cap', 'base_qty': 20, 'risk_multiplier': 0.8},
             {'symbol': 'DOTUSDT', 'category': 'Large Cap', 'base_qty': 2, 'risk_multiplier': 0.8},
             {'symbol': 'AVAXUSDT', 'category': 'Large Cap', 'base_qty': 0.5, 'risk_multiplier': 0.8},
-            {'symbol': 'MATICUSDT', 'category': 'Large Cap', 'base_qty': 20, 'risk_multiplier': 0.8},
+            {'symbol': 'POLYUSDT', 'category': 'Large Cap', 'base_qty': 20, 'risk_multiplier': 0.8},
             
             # Mid cap with strong fundamentals
             {'symbol': 'LINKUSDT', 'category': 'Mid Cap', 'base_qty': 1, 'risk_multiplier': 0.7},
@@ -91,7 +91,7 @@ class CryptoPairScanner:
             {'symbol': 'SHIBUSDT', 'category': 'Meme', 'base_qty': 2000000, 'risk_multiplier': 0.4},
         ]
         
-        print(f"📋 Selected {len(selected_pairs)} curated crypto pairs across {len(set([p['category'] for p in selected_pairs]))} categories")
+        print(f"?? Selected {len(selected_pairs)} curated crypto pairs across {len(set([p['category'] for p in selected_pairs]))} categories")
         return selected_pairs
 
     def get_custom_pairs(self, symbols):
@@ -115,7 +115,7 @@ class CryptoPairScanner:
                 'risk_multiplier': 0.8
             })
         
-        print(f"🎯 Created custom pair list with {len(custom_pairs)} symbols")
+        print(f"?? Created custom pair list with {len(custom_pairs)} symbols")
         return custom_pairs
 
     def _estimate_base_quantity(self, symbol, price):
@@ -181,7 +181,7 @@ class CryptoPairScanner:
             return result
             
         except Exception as e:
-            print(f"❌ Error analyzing {symbol}: {e}")
+            print(f"? Error analyzing {symbol}: {e}")
             return None
 
     def _calculate_scan_score(self, decision, confidence, analysis):
@@ -219,7 +219,7 @@ class CryptoPairScanner:
         """
         Scan multiple pairs concurrently for trading opportunities
         """
-        print(f"🔍 Scanning {len(pairs_list)} pairs for opportunities...")
+        print(f"?? Scanning {len(pairs_list)} pairs for opportunities...")
         start_time = datetime.now()
         
         opportunities = []
@@ -242,14 +242,14 @@ class CryptoPairScanner:
                         opportunities.append(result)
                 except Exception as e:
                     failed_scans.append(pair['symbol'])
-                    print(f"⚠️ Failed to scan {pair['symbol']}: {e}")
+                    print(f"?? Failed to scan {pair['symbol']}: {e}")
         
         # Sort by scan score (best opportunities first)
         opportunities.sort(key=lambda x: x['scan_score'], reverse=True)
         
         scan_duration = (datetime.now() - start_time).total_seconds()
         
-        print(f"✅ Scan completed in {scan_duration:.1f}s")
+        print(f"? Scan completed in {scan_duration:.1f}s")
         print(f"   Successful: {len(opportunities)}")
         print(f"   Failed: {len(failed_scans)}")
         
@@ -298,14 +298,14 @@ class CryptoPairScanner:
         Display scan results in formatted tables
         """
         print(f"\n{'='*85}")
-        print(f"📊 CRYPTO PAIR SCAN RESULTS - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"?? CRYPTO PAIR SCAN RESULTS - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"{'='*85}")
         
         # Filter for trading opportunities
         trading_opps = self.filter_opportunities(opportunities, min_confidence=0.5)
         
         if trading_opps:
-            print(f"\n🎯 TOP TRADING OPPORTUNITIES ({len(trading_opps)} found):")
+            print(f"\n?? TOP TRADING OPPORTUNITIES ({len(trading_opps)} found):")
             print(f"{'Symbol':<12} {'Price':<12} {'Signal':<10} {'Conf':<6} {'Score':<6} {'2h Chg':<8} {'Vol':<6} {'Category':<10}")
             print("-" * 85)
             
@@ -321,7 +321,7 @@ class CryptoPairScanner:
                 
                 print(f"{symbol:<12} {price:<12} {signal:<10} {confidence:<6} {score:<6} {change_2h:<8} {volume_ratio:<6} {category:<10}")
         else:
-            print("\n😴 No trading opportunities found meeting criteria")
+            print("\n?? No trading opportunities found meeting criteria")
 
     def save_scan_results(self, opportunities, filename=None):
         """
@@ -352,7 +352,7 @@ class CryptoPairScanner:
                 'opportunities': serializable_data
             }, f, indent=2, default=str)
         
-        print(f"💾 Scan results saved to {filename}")
+        print(f"?? Scan results saved to {filename}")
         return filename
 
 # Convenience functions for different scan modes
