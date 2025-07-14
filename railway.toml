@@ -2,4 +2,9 @@
 builder = "nixpacks"
 
 [deploy]
+# Use your main advanced dashboard instead of the simple railway_bot.py
 startCommand = "streamlit run dashboard.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true --server.enableCORS=false --server.enableXsrfProtection=false"
+
+[environment]
+# Ensure Railway uses the correct dashboard
+MAIN_DASHBOARD = "dashboard.py"
