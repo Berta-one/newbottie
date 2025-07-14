@@ -1,82 +1,159 @@
-
 import streamlit as st
 import pandas as pd
-from datetime import datetime
-from utils import get_demo_portfolio, simulate_market_analysis
+import plotly.express as px
+import os, time
+from dotenv import load_dotenv
+from bot_controller import BotController
 
 st.set_page_config(page_title="Bottie", layout="wide", initial_sidebar_state="expanded")
 
-# Initialize session state defaults
-if "selected_profile" not in st.session_state:
-    st.session_state.selected_profile = "AUTO"
+PIN_REQUIRED = "1234"  # Set your dashboard PIN here
 
-# Overview tab function
-def render_overview_tab(portfolio, gbp_rate, market_condition, condition_score, avg_volatility):
-    total_usd = sum(coin['usd_value'] for coin in portfolio.values())
-    total_gbp = total_usd * gbp_rate
+def load_logs(log_file, max_lines=200):
+    if os.path.exists(log_file):
+        with open(log_file, 'r', encoding='utf-8') as f:
+            return f.readlines()[-max_lines:]
+    return ["No logs found."]
 
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("💷 Portfolio Value", f"£{total_gbp:,.2f}")
-    with col2:
-        condition_color = "🟢" if condition_score > 0.6 else "🟡" if condition_score > 0.4 else "🔴"
-        st.metric(f"{condition_color} Market", market_condition.replace('_', ' ').title())
-    with col3:
-        volatility_level = "High" if avg_volatility > 3 else "Medium" if avg_volatility > 1.5 else "Low"
-        st.metric("📈 Volatility", f"{avg_volatility:.1f}%")
-    with col4:
-        if st.session_state.selected_profile != "AUTO":
-            profile = st.session_state.selected_profile
-        elif market_condition == "BULL_TRENDING":
-            profile = "Aggressive" if avg_volatility > 2.5 else "Swing"
-        elif market_condition == "BEAR_TRENDING":
-            profile = "Conservative"
-        elif market_condition == "HIGH_VOLATILITY":
-            profile = "Scalping"
+def get_tailscale_ip():
+    import subprocess
+    try:
+        output = subprocess.check_output("tailscale ip -4", shell=True, text=True).strip()
+        return output.splitlines()[0]
+    except:
+        return "Unavailable"
+
+def color_line(line):
+    if "error" in line.lower():
+        return f":red[{line.strip()}]"
+    elif any(x in line.lower() for x in ["profit", "+"]):
+        return f":green[{line.strip()}]"
+    return f"{line.strip()}"
+
+def show_logs():
+    st.header("📡 Live Bot Logs")
+    refresh = st.slider("🔁 Refresh every", 2, 10, 5)
+    lines = load_logs("logs/console_output.log")
+    log_output = "\n".join([color_line(l) for l in lines])
+    st.markdown(log_output)
+    # Heartbeat check
+    if os.path.exists("logs/console_output.log"):
+        with open("logs/console_output.log", "r", encoding="utf-8") as f:
+            last_lines = f.readlines()[-10:]
+        heartbeat_found = any("heartbeat" in l.lower() for l in last_lines)
+        if heartbeat_found:
+            st.success("Bot heartbeat detected ✅")
         else:
-            profile = "Balanced"
-        st.metric("🎯 Active Profile", profile)
+            st.warning("No recent heartbeat detected ⚠️")
+    else:
+        st.warning("Log file not found.")
+    time.sleep(refresh)
+    st.rerun()
 
-# Portfolio tab function
-def render_portfolio_tab(portfolio, gbp_rate, selected_pairs):
-    st.subheader("💼 Portfolio Holdings")
-    total_usd = sum(coin['usd_value'] for coin in portfolio.values())
+def show_performance():
+    st.header("📊 Performance Overview")
+    log_path = "logs/single_pair_performance.json"
 
-    for category, assets in selected_pairs.items():
-        st.markdown(f"### 📊 {category} Pairs")
-        for asset in assets:
-            if asset not in portfolio:
-                continue
-            data = portfolio[asset]
-            col1, col2, col3, col4, col5, col6 = st.columns(6)
-            with col1: st.write(f"**{asset}**")
-            with col2: st.write(f"{data['balance']:.4f}")
-            with col3: st.write(f"${data['price_usd']:.4f}")
-            with col4: st.write(f"${data['usd_value']:.2f}")
-            with col5: st.write(f"£{data['gbp_value']:.2f}")
-            with col6: st.write(f"{(data['usd_value'] / total_usd * 100):.1f}%")
+    try:
+        df = pd.read_json(log_path, lines=True)
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        df = df.sort_values('timestamp')
+    except Exception as e:
+        st.warning(f"No trade data found. {e}")
+        return
 
-# Risk profile tab
-def render_risk_profile_tab():
-    st.subheader("🛡️ Risk Profile Settings")
-    selected = st.radio("Choose a Risk Profile Override", ["AUTO", "Aggressive", "Swing", "Balanced", "Conservative", "Scalping"])
-    st.session_state.selected_profile = selected
-    st.success(f"Active Profile: {selected}")
+    if df.empty:
+        st.info("No trades yet.")
+    else:
+        df['cumulative_pnl'] = df['pnl_percent'].cumsum()
+        fig = px.line(df, x='timestamp', y='cumulative_pnl', title="Cumulative P&L")
+        st.plotly_chart(fig, use_container_width=True)
 
-# Main layout with tabs
-def main():
-    portfolio, gbp_rate = get_demo_portfolio()
-    market_condition, condition_score, avg_volatility = simulate_market_analysis(portfolio)
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Trades", len(df))
+        win_rate = (df['pnl_percent'] > 0).mean() * 100
+        col2.metric("Win Rate", f"{win_rate:.1f}%")
+        col3.metric("Total P&L", f"{df['pnl_percent'].sum():+.2f}%")
 
-    from utils import SELECTED_PAIRS
+        with st.expander("📋 Recent Trades"):
+            recent_df = df[['timestamp', 'symbol', 'pnl_percent', 'reason', 'confidence']].tail(20).copy()
+            recent_df['timestamp'] = recent_df['timestamp'].dt.strftime('%Y-%m-%d %H:%M')
+            st.dataframe(recent_df, use_container_width=True)
 
-    tab1, tab2, tab3 = st.tabs(["🏠 Overview", "💼 Portfolio", "🛡️ Risk Profiles"])
-    with tab1:
-        render_overview_tab(portfolio, gbp_rate, market_condition, condition_score, avg_volatility)
-    with tab2:
-        render_portfolio_tab(portfolio, gbp_rate, SELECTED_PAIRS)
-    with tab3:
-        render_risk_profile_tab()
+def dashboard():
+    ts_ip = get_tailscale_ip()
+    remote_url = f"http://{ts_ip}:8501" if ts_ip != "Unavailable" else "Unavailable"
+    controller = BotController()
+    st.sidebar.markdown(f"**Tailscale IP:** `{ts_ip}`")
+    st.sidebar.text_input("🔗 Access URL", value=remote_url, key="url", label_visibility="collapsed")
+    st.sidebar.download_button("📥 Download Logs", data="\n".join(load_logs("logs/console_output.log")), file_name="console_output.log")
+
+    st.sidebar.subheader("🤖 Bot Status")
+    if controller.is_running():
+        st.sidebar.success("🟢 Bot is running")
+        if st.sidebar.button("🛑 Stop Bot"):
+            controller.stop()
+            st.sidebar.info("Bot stopped.")
+    else:
+        st.sidebar.warning("🔴 Bot is stopped")
+        if st.sidebar.button("▶️ Start Bot"):
+            if controller.start():
+                st.sidebar.success("Bot started.")
+            else:
+                st.sidebar.error("Failed to start bot.")
+
+    if st.sidebar.button("🔄 Refresh Dashboard"):
+        st.rerun()
+
+    st.title("🤖 Crypto Trading Bot Dashboard")
+    tabs = st.tabs(["📊 Performance", "📡 Logs", "⚙️ Settings", "🧠 Strategy", "💓 Health"])
+
+    with tabs[0]:
+        show_performance()
+    with tabs[1]:
+        show_logs()
+    with tabs[2]:
+        st.header("⚙️ Settings")
+        st.write("Configure your bot settings here.")
+        # Add more settings as needed
+    with tabs[3]:
+        st.header("🧠 Strategy Selection")
+        strategy_mode = st.radio("Select Strategy Mode", ["Automated", "Manual"], key="strategy_mode")
+        if strategy_mode == "Automated":
+            st.success("Automated strategy enabled.")
+            # Add automated strategy controls/info here
+        else:
+            st.info("Manual strategy enabled. You can place trades manually.")
+            # Add manual trading controls here
+    with tabs[4]:
+        st.header("💓 Bot Health & Connection")
+        # Heartbeat status is also shown in logs, but summarize here
+        if os.path.exists("logs/console_output.log"):
+            with open("logs/console_output.log", "r", encoding="utf-8") as f:
+                last_lines = f.readlines()[-10:]
+            heartbeat_found = any("heartbeat" in l.lower() for l in last_lines)
+            if heartbeat_found:
+                st.success("Bot heartbeat detected ✅")
+            else:
+                st.warning("No recent heartbeat detected ⚠️")
+        else:
+            st.warning("Log file not found.")
 
 if __name__ == "__main__":
-    main()
+    st.set_page_config(page_title="Bot Dashboard", layout="wide")
+
+    if "authenticated" not in st.session_state:
+        st.session_state.authenticated = False
+
+    if not st.session_state.authenticated:
+        st.title("🔐 Enter Dashboard PIN")
+        user_pin = st.text_input("PIN", type="password")
+
+        if user_pin == PIN_REQUIRED:
+            st.session_state.authenticated = True
+            st.success("Access granted")
+            st.rerun()
+        elif user_pin:
+            st.error("Incorrect PIN")
+    else:
+        dashboard()
