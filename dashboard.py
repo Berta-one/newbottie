@@ -1,9 +1,9 @@
-# portfolio_trading_bot.py - Complete Multi-Coin Portfolio Trading Bot (Never Stops)
+# dashboard.py - Railway Compatible Portfolio Trading Bot (Fixed Threading Issues)
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import os, time, json, requests, threading
+import os, time, json, requests
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import numpy as np
@@ -27,8 +27,6 @@ if 'password_authenticated' not in st.session_state:
     st.session_state['password_authenticated'] = False
 if 'bot_running' not in st.session_state:
     st.session_state['bot_running'] = False
-if 'stop_bot' not in st.session_state:
-    st.session_state['stop_bot'] = False
 if 'last_opportunities' not in st.session_state:
     st.session_state['last_opportunities'] = []
 if 'selected_strategy' not in st.session_state:
@@ -37,16 +35,12 @@ if 'strategy_mode' not in st.session_state:
     st.session_state['strategy_mode'] = 'Automatic'
 if 'max_trade_percent' not in st.session_state:
     st.session_state['max_trade_percent'] = 5.0
-if 'trade_history' not in st.session_state:
-    st.session_state['trade_history'] = []
-if 'bot_thread' not in st.session_state:
-    st.session_state['bot_thread'] = None
-if 'bot_status' not in st.session_state:
-    st.session_state['bot_status'] = "Stopped"
 if 'scan_count' not in st.session_state:
     st.session_state['scan_count'] = 0
 if 'last_scan_time' not in st.session_state:
     st.session_state['last_scan_time'] = None
+if 'last_portfolio_scan' not in st.session_state:
+    st.session_state['last_portfolio_scan'] = None
 
 # Check for Binance library
 try:
@@ -210,172 +204,58 @@ def scan_portfolio_opportunities(portfolio):
     opportunities.sort(key=lambda x: x['confidence'], reverse=True)
     return opportunities
 
-class ContinuousTradingBot:
-    """Continuous trading bot that never stops"""
-    
-    def __init__(self):
-        self.running = False
-        self.scan_interval = 30
+def perform_scan():
+    """Perform a single scan (Railway compatible - no threading)"""
+    try:
+        # Update scan count
+        st.session_state['scan_count'] += 1
+        st.session_state['last_scan_time'] = datetime.now()
         
-    def continuous_scan(self):
-        """Continuous scanning function that runs in background"""
-        try:
-            self.running = True
-            st.session_state['bot_status'] = "Running"
-            
-            # Log that thread started
-            self.save_scan_log({
-                'timestamp': datetime.now().isoformat(),
-                'event': 'continuous_scan_started',
-                'status': 'thread_active'
-            })
-            
-            while not st.session_state.get('stop_bot', False) and self.running:
-                try:
-                    # Update scan count
-                    st.session_state['scan_count'] += 1
-                    st.session_state['last_scan_time'] = datetime.now()
-                    
-                    # Log each scan attempt
-                    self.save_scan_log({
-                        'timestamp': datetime.now().isoformat(),
-                        'event': 'scan_attempt',
-                        'scan_number': st.session_state['scan_count'],
-                        'status': 'starting'
-                    })
-                    
-                    # Get portfolio
-                    portfolio, gbp_rate = get_real_portfolio()
-                    
-                    if portfolio:
-                        # Scan for opportunities
-                        opportunities = scan_portfolio_opportunities(portfolio)
-                        st.session_state['last_opportunities'] = opportunities
-                        
-                        # Log successful scan
-                        scan_log = {
-                            'timestamp': datetime.now().isoformat(),
-                            'scan_count': st.session_state['scan_count'],
-                            'portfolio_assets': len(portfolio),
-                            'opportunities_found': len(opportunities),
-                            'status': 'success'
-                        }
-                        
-                        # Save scan log
-                        self.save_scan_log(scan_log)
-                    else:
-                        # Log portfolio fetch failure
-                        self.save_scan_log({
-                            'timestamp': datetime.now().isoformat(),
-                            'scan_count': st.session_state['scan_count'],
-                            'status': 'portfolio_fetch_failed'
-                        })
-                    
-                    # Wait before next scan (non-blocking)
-                    for i in range(self.scan_interval):
-                        if st.session_state.get('stop_bot', False):
-                            break
-                        time.sleep(1)
-                    
-                except Exception as scan_error:
-                    # Log individual scan error but continue
-                    error_log = {
-                        'timestamp': datetime.now().isoformat(),
-                        'scan_count': st.session_state['scan_count'],
-                        'error': str(scan_error),
-                        'error_type': type(scan_error).__name__,
-                        'status': 'scan_error'
-                    }
-                    self.save_scan_log(error_log)
-                    
-                    # Wait 10 seconds on error then retry
-                    time.sleep(10)
-            
-        except Exception as thread_error:
-            # Log thread-level error
-            self.save_scan_log({
-                'timestamp': datetime.now().isoformat(),
-                'event': 'thread_error',
-                'error': str(thread_error),
-                'error_type': type(thread_error).__name__,
-                'status': 'thread_failed'
-            })
+        # Log scan attempt
+        log_scan_event('scan_attempt', {
+            'scan_number': st.session_state['scan_count'],
+            'timestamp': datetime.now().isoformat()
+        })
         
-        finally:
-            # Bot stopped
-            self.running = False
-            st.session_state['bot_status'] = "Stopped"
-            st.session_state['bot_running'] = False
+        # Get portfolio
+        portfolio, gbp_rate = get_real_portfolio()
+        
+        if portfolio:
+            # Scan for opportunities
+            opportunities = scan_portfolio_opportunities(portfolio)
+            st.session_state['last_opportunities'] = opportunities
+            st.session_state['last_portfolio_scan'] = portfolio
             
-            # Log thread exit
-            self.save_scan_log({
-                'timestamp': datetime.now().isoformat(),
-                'event': 'continuous_scan_stopped',
-                'final_scan_count': st.session_state.get('scan_count', 0),
-                'status': 'thread_ended'
+            # Log successful scan
+            log_scan_event('scan_success', {
+                'scan_count': st.session_state['scan_count'],
+                'portfolio_assets': len(portfolio),
+                'opportunities_found': len(opportunities)
             })
-    
-    def save_scan_log(self, log_data):
-        """Save scan logs to file"""
-        try:
-            create_log_directories()
-            log_file = 'logs/continuous_scan.log'
             
-            with open(log_file, 'a') as f:
-                f.write(f"{json.dumps(log_data)}\n")
-        except:
-            pass
-    
-    def start(self):
-        """Start the continuous bot"""
-        if not self.running:
-            try:
-                # Reset stop flag
-                st.session_state['stop_bot'] = False
-                st.session_state['bot_running'] = True
-                st.session_state['bot_status'] = "Starting..."
-                
-                # Start thread with error handling
-                thread = threading.Thread(target=self.continuous_scan, daemon=True)
-                thread.start()
-                st.session_state['bot_thread'] = thread
-                
-                # Give thread a moment to start
-                time.sleep(0.5)
-                
-                # Log the start attempt
-                self.save_scan_log({
-                    'timestamp': datetime.now().isoformat(),
-                    'event': 'bot_start_attempt',
-                    'thread_alive': thread.is_alive(),
-                    'status': 'initiated'
-                })
-                
-                return True
-            except Exception as e:
-                # Log startup error
-                self.save_scan_log({
-                    'timestamp': datetime.now().isoformat(),
-                    'event': 'bot_start_error',
-                    'error': str(e),
-                    'status': 'failed'
-                })
-                st.session_state['bot_running'] = False
-                st.session_state['bot_status'] = f"Failed: {str(e)}"
-                return False
+            return True
+        else:
+            log_scan_event('scan_failed', {'reason': 'portfolio_fetch_failed'})
+            return False
+            
+    except Exception as e:
+        log_scan_event('scan_error', {'error': str(e)})
         return False
-    
-    def stop(self):
-        """Stop the continuous bot"""
-        st.session_state['stop_bot'] = True
-        st.session_state['bot_running'] = False
-        self.running = False
 
-# Global bot instance
-if 'trading_bot' not in st.session_state:
-    st.session_state['trading_bot'] = ContinuousTradingBot()
-
-trading_bot = st.session_state['trading_bot']
+def log_scan_event(event_type, data):
+    """Log scan events to file"""
+    try:
+        create_log_directories()
+        log_entry = {
+            'timestamp': datetime.now().isoformat(),
+            'event': event_type,
+            'data': data
+        }
+        
+        with open('logs/portfolio_scans.log', 'a') as f:
+            f.write(f"{json.dumps(log_entry)}\n")
+    except:
+        pass  # Silent fail for logging
 
 def render_portfolio_overview(portfolio, gbp_rate):
     """Render portfolio overview tab"""
@@ -405,13 +285,14 @@ def render_portfolio_overview(portfolio, gbp_rate):
     
     st.divider()
     
+    # Bot status section
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         if st.session_state['bot_running']:
-            st.metric("🤖 Bot Status", "🟢 Running", "Active")
+            st.metric("🤖 Bot Status", "🟢 Running", "Auto-Scan Active")
         else:
-            st.metric("🤖 Bot Status", "🔴 Stopped", "Inactive")
+            st.metric("🤖 Bot Status", "🔴 Stopped", "Manual Only")
     
     with col2:
         st.metric("🔍 Total Scans", st.session_state['scan_count'])
@@ -429,6 +310,7 @@ def render_portfolio_overview(portfolio, gbp_rate):
     
     st.divider()
     
+    # Portfolio breakdown table
     portfolio_data = []
     for asset, data in portfolio.items():
         portfolio_data.append({
@@ -444,6 +326,7 @@ def render_portfolio_overview(portfolio, gbp_rate):
     df = pd.DataFrame(portfolio_data)
     st.dataframe(df, use_container_width=True, hide_index=True)
     
+    # Portfolio distribution chart
     if len(portfolio) > 1:
         fig = px.pie(
             values=[data['usd_value'] for data in portfolio.values()],
@@ -461,14 +344,32 @@ def render_market_indicators(portfolio):
         st.warning("No portfolio data available.")
         return
     
-    if st.session_state['bot_running']:
-        st.success("🤖 Bot is continuously scanning your portfolio...")
-        if st.session_state['last_scan_time']:
-            time_diff = datetime.now() - st.session_state['last_scan_time']
-            st.info(f"⏰ Last scan: {time_diff.seconds} seconds ago")
-    else:
-        st.warning("🤖 Bot is stopped. Start the bot to scan for opportunities.")
+    # Scan controls
+    col1, col2, col3 = st.columns(3)
     
+    with col1:
+        if st.button("🔄 Scan Now", type="primary"):
+            with st.spinner("Scanning portfolio for opportunities..."):
+                if perform_scan():
+                    st.success("✅ Scan completed!")
+                else:
+                    st.error("❌ Scan failed!")
+                st.rerun()
+    
+    with col2:
+        if st.session_state['bot_running']:
+            st.success("🟢 Auto-scan: ON")
+        else:
+            st.info("⏸️ Auto-scan: OFF")
+    
+    with col3:
+        if st.session_state['last_scan_time']:
+            time_since = (datetime.now() - st.session_state['last_scan_time']).seconds
+            st.metric("Seconds ago", time_since)
+    
+    st.divider()
+    
+    # Display opportunities
     opportunities = st.session_state.get('last_opportunities', [])
     
     if opportunities:
@@ -490,21 +391,13 @@ def render_market_indicators(portfolio):
                     st.metric("Volume Ratio", f"{opp['volume_ratio']:.2f}x")
                     st.metric("Signal Strength", opp['signal'])
     else:
-        if st.session_state['bot_running']:
-            st.info("🔍 No trading opportunities found at this time. Bot continues scanning...")
-        else:
-            st.info("ℹ️ Start the bot to scan for trading opportunities.")
-    
-    if st.button("🔄 Manual Scan Now"):
-        with st.spinner("Scanning portfolio..."):
-            opportunities = scan_portfolio_opportunities(portfolio)
-            st.session_state['last_opportunities'] = opportunities
-            st.rerun()
+        st.info("🔍 No trading opportunities found. Try scanning again or wait for market movements.")
 
 def render_performance_tab():
     """Render performance tab"""
     st.subheader("📈 Trading Performance")
     
+    # Load trade history from file if exists
     trade_file = "logs/trades.csv"
     if os.path.exists(trade_file):
         df = pd.read_csv(trade_file)
@@ -526,6 +419,7 @@ def render_performance_tab():
                 avg_trade = df['change_pct'].mean()
                 st.metric("Avg Trade", f"{avg_trade:+.2f}%")
             
+            # Performance chart
             if 'timestamp' in df.columns:
                 df['timestamp'] = pd.to_datetime(df['timestamp'])
                 df['cumulative_pnl'] = df['change_pct'].cumsum()
@@ -534,6 +428,7 @@ def render_performance_tab():
                              title="Cumulative P&L Over Time")
                 st.plotly_chart(fig, use_container_width=True)
             
+            # Recent trades table
             st.subheader("Recent Trades")
             st.dataframe(df.tail(10), use_container_width=True)
         else:
@@ -541,7 +436,8 @@ def render_performance_tab():
     else:
         st.info("No trade history file found. Start trading to see performance metrics.")
     
-    st.subheader("🔍 Bot Scanning Statistics")
+    # Bot scanning statistics
+    st.subheader("🔍 Scanning Statistics")
     col1, col2, col3 = st.columns(3)
     
     with col1:
@@ -549,10 +445,10 @@ def render_performance_tab():
     
     with col2:
         if st.session_state['last_scan_time']:
-            runtime = datetime.now() - st.session_state['last_scan_time']
-            st.metric("Runtime", f"{runtime.seconds // 3600}h {(runtime.seconds % 3600) // 60}m")
+            time_since = (datetime.now() - st.session_state['last_scan_time']).seconds
+            st.metric("Last Scan", f"{time_since}s ago")
         else:
-            st.metric("Runtime", "0h 0m")
+            st.metric("Last Scan", "Never")
     
     with col3:
         opportunities = len(st.session_state.get('last_opportunities', []))
@@ -565,6 +461,19 @@ def render_logs_tab():
     col1, col2 = st.columns(2)
     
     with col1:
+        st.subheader("Scan Logs")
+        
+        scan_log_file = "logs/portfolio_scans.log"
+        if os.path.exists(scan_log_file):
+            with open(scan_log_file, 'r', encoding='utf-8') as f:
+                scan_logs = f.readlines()[-50:]
+            
+            scan_text = "".join(scan_logs)
+            st.text_area("Recent Scan Events", scan_text, height=400)
+        else:
+            st.info("No scan log file found.")
+    
+    with col2:
         st.subheader("Console Output")
         
         log_file = "logs/console_output.log"
@@ -576,23 +485,11 @@ def render_logs_tab():
             st.text_area("Recent Console Output", log_text, height=400)
         else:
             st.info("No console log file found.")
-    
-    with col2:
-        st.subheader("Scan Logs")
         
-        scan_log_file = "logs/continuous_scan.log"
-        if os.path.exists(scan_log_file):
-            with open(scan_log_file, 'r', encoding='utf-8') as f:
-                scan_logs = f.readlines()[-50:]
-            
-            scan_text = "".join(scan_logs)
-            st.text_area("Recent Scan Logs", scan_text, height=400)
-        else:
-            st.info("No scan log file found.")
-        
+        # Download button
         if st.button("📥 Download All Logs"):
             all_logs = ""
-            for log_file in ["logs/console_output.log", "logs/continuous_scan.log"]:
+            for log_file in ["logs/portfolio_scans.log", "logs/console_output.log"]:
                 if os.path.exists(log_file):
                     with open(log_file, 'r', encoding='utf-8') as f:
                         all_logs += f"\n=== {log_file} ===\n"
@@ -615,33 +512,26 @@ def render_settings_tab():
         st.subheader("🤖 Bot Control")
         
         if st.session_state['bot_running']:
-            st.success("✅ Bot is RUNNING continuously")
-            st.info(f"🔍 Completed {st.session_state['scan_count']} scans")
+            st.success("✅ Auto-scan is ENABLED")
+            st.info("Page automatically scans every 30 seconds")
             
-            if st.button("🛑 Stop Bot", type="secondary"):
-                trading_bot.stop()
-                st.success("Bot stop signal sent")
-                time.sleep(1)
+            if st.button("⏸️ Disable Auto-Scan", type="secondary"):
+                st.session_state['bot_running'] = False
+                st.success("Auto-scan disabled")
                 st.rerun()
         else:
-            st.warning("⏹️ Bot is STOPPED")
+            st.warning("⏸️ Auto-scan is DISABLED")
+            st.info("Use manual 'Scan Now' button in Market Indicators")
             
-            if st.button("▶️ Start Continuous Bot", type="primary"):
-                if trading_bot.start():
-                    st.success("🚀 Continuous bot started!")
-                    time.sleep(1)
-                    st.rerun()
-                else:
-                    st.error("❌ Failed to start bot")
+            if st.button("▶️ Enable Auto-Scan", type="primary"):
+                st.session_state['bot_running'] = True
+                st.success("✅ Auto-scan enabled!")
+                st.rerun()
         
         st.markdown("---")
-        st.subheader("⚙️ Bot Configuration")
+        st.subheader("⚙️ Configuration")
         
-        new_interval = st.slider("Scan Interval (seconds)", 10, 300, trading_bot.scan_interval, 10)
-        if new_interval != trading_bot.scan_interval:
-            trading_bot.scan_interval = new_interval
-            st.info(f"Scan interval updated to {new_interval} seconds")
-        
+        # Max trade percentage
         max_trade_percent = st.slider(
             "Max Trade Size (% of Portfolio)", 
             1.0, 20.0, 
@@ -651,6 +541,7 @@ def render_settings_tab():
         st.session_state['max_trade_percent'] = max_trade_percent
         st.info(f"Current max trade per deal: {max_trade_percent:.1f}% of portfolio value.")
         
+        # Password change
         st.markdown("---")
         st.subheader("🔐 Change Dashboard Password")
         new_password = st.text_input("New Password", type="password")
@@ -664,6 +555,7 @@ def render_settings_tab():
     with col2:
         st.subheader("📊 System Status")
         
+        # API connection status
         client = get_binance_client()
         if client:
             st.success("✅ Binance API Connected")
@@ -672,22 +564,25 @@ def render_settings_tab():
         else:
             st.error("❌ Binance API Not Connected")
         
+        # System info
         st.write(f"**Min Balance Filter:** ${MIN_BALANCE_USD}")
         st.write(f"**Current Time:** {datetime.now().strftime('%H:%M:%S')}")
         
+        # Manual operations
         st.markdown("---")
-        st.subheader("💓 Bot Health")
+        st.subheader("🔧 Manual Operations")
         
-        if st.session_state['bot_running']:
-            st.success("🟢 Bot is healthy and running")
-            if st.session_state['last_scan_time']:
-                time_since_scan = (datetime.now() - st.session_state['last_scan_time']).seconds
-                if time_since_scan < 60:
-                    st.success(f"✅ Last scan: {time_since_scan}s ago")
+        if st.button("🔄 Manual Scan"):
+            with st.spinner("Scanning..."):
+                if perform_scan():
+                    st.success("✅ Manual scan completed!")
                 else:
-                    st.warning(f"⚠️ Last scan: {time_since_scan}s ago (may be stuck)")
-        else:
-            st.error("🔴 Bot is not running")
+                    st.error("❌ Manual scan failed!")
+        
+        if st.button("🧹 Clear Scan Count"):
+            st.session_state['scan_count'] = 0
+            st.session_state['last_scan_time'] = None
+            st.success("Scan count reset to 0")
         
         if st.button("🔄 Refresh All Data"):
             st.rerun()
@@ -741,6 +636,7 @@ def render_health_tab():
     """Render health tab"""
     st.subheader("💓 Bot Health & Status")
     
+    # Connection status
     client = get_binance_client()
     if client:
         st.success("✅ Binance API Connection: Healthy")
@@ -751,12 +647,12 @@ def render_health_tab():
     
     with col1:
         if st.session_state['bot_running']:
-            st.success("🟢 Bot Status: RUNNING")
+            st.success("🟢 Auto-Scan: ENABLED")
         else:
-            st.error("🔴 Bot Status: STOPPED")
+            st.error("🔴 Auto-Scan: DISABLED")
     
     with col2:
-        st.metric("Continuous Scans", st.session_state['scan_count'])
+        st.metric("Portfolio Scans", st.session_state['scan_count'])
     
     with col3:
         if st.session_state['last_scan_time']:
@@ -765,67 +661,14 @@ def render_health_tab():
         else:
             st.metric("Seconds Since Scan", "Never")
     
-    # Thread diagnostics
-    st.subheader("🔧 Thread Diagnostics")
-    
-    thread = st.session_state.get('bot_thread')
-    if thread:
-        st.info(f"📍 Thread exists: {thread}")
-        st.info(f"🔄 Thread alive: {thread.is_alive()}")
-        st.info(f"🆔 Thread name: {thread.name}")
-    else:
-        st.warning("⚠️ No thread found in session state")
-    
-    # Bot instance diagnostics
-    if 'trading_bot' in st.session_state:
-        bot = st.session_state['trading_bot']
-        st.info(f"🤖 Bot instance running flag: {bot.running}")
-        st.info(f"⏱️ Bot scan interval: {bot.scan_interval} seconds")
-    else:
-        st.error("❌ No bot instance found")
-    
-    # Session state diagnostics
-    st.subheader("📊 Session State Debug")
-    debug_info = {
-        'bot_running': st.session_state.get('bot_running', 'Not set'),
-        'stop_bot': st.session_state.get('stop_bot', 'Not set'),
-        'scan_count': st.session_state.get('scan_count', 'Not set'),
-        'bot_status': st.session_state.get('bot_status', 'Not set'),
-        'last_scan_time': str(st.session_state.get('last_scan_time', 'Never'))
-    }
-    
-    for key, value in debug_info.items():
-        st.text(f"{key}: {value}")
-    
-    # Recent scan logs
-    st.subheader("📋 Recent Scan Logs (Last 10)")
-    scan_log_file = "logs/continuous_scan.log"
-    if os.path.exists(scan_log_file):
-        try:
-            with open(scan_log_file, 'r', encoding='utf-8') as f:
-                logs = f.readlines()[-10:]
-            
-            for log_line in logs:
-                try:
-                    log_data = json.loads(log_line)
-                    event = log_data.get('event', log_data.get('status', 'unknown'))
-                    timestamp = log_data.get('timestamp', 'unknown')
-                    st.text(f"{timestamp}: {event}")
-                except:
-                    st.text(log_line.strip())
-        except Exception as e:
-            st.error(f"Error reading logs: {e}")
-    else:
-        st.warning("No scan log file found")
-    
+    # System health checks
     health_checks = {
         "API Keys Configured": bool(API_KEY and API_SECRET),
         "Environment File Loaded": os.path.exists('.env'),
         "Log Directory Exists": os.path.exists('logs'),
         "Trading Mode": "Testnet" if USE_TESTNET else "Live",
         "Binance Library Available": BINANCE_AVAILABLE,
-        "Bot Thread Active": st.session_state.get('bot_thread') is not None,
-        "Continuous Scanning": st.session_state['bot_running']
+        "Auto-Scan Status": "Enabled" if st.session_state['bot_running'] else "Disabled"
     }
     
     st.subheader("✅ System Health Checks")
@@ -840,70 +683,34 @@ def render_health_tab():
     
     st.write(f"**Last Health Check:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
-    st.subheader("🔧 Continuous Bot Diagnostics")
-    
-    if st.session_state['bot_running']:
-        st.success("✅ Continuous bot is running in background thread")
-        st.info("🔄 Bot will scan every 30 seconds automatically")
-        st.info("🛡️ Bot has error recovery and will never stop unless manually stopped")
-        
-        if st.session_state['last_scan_time']:
-            time_since = (datetime.now() - st.session_state['last_scan_time']).seconds
-            if time_since < 60:
-                st.success(f"🕐 Bot is active - last scan {time_since} seconds ago")
-            else:
-                st.warning(f"⚠️ Bot may be stuck - last scan {time_since} seconds ago")
+    # Recent scan activity
+    st.subheader("📋 Recent Scan Activity")
+    scan_log_file = "logs/portfolio_scans.log"
+    if os.path.exists(scan_log_file):
+        try:
+            with open(scan_log_file, 'r', encoding='utf-8') as f:
+                logs = f.readlines()[-10:]
+            
+            for log_line in logs:
+                try:
+                    log_data = json.loads(log_line)
+                    event = log_data.get('event', 'unknown')
+                    timestamp = log_data.get('timestamp', 'unknown')
+                    st.text(f"{timestamp}: {event}")
+                except:
+                    st.text(log_line.strip())
+        except Exception as e:
+            st.error(f"Error reading scan logs: {e}")
     else:
-        st.warning("⏹️ Continuous bot is not running")
-        st.info("Click 'Start Continuous Bot' in Settings to begin 24/7 scanning")
-
-def validate_environment():
-    """Validate environment configuration"""
-    issues = []
-    
-    if not API_KEY:
-        issues.append("BINANCE_API_KEY not set")
-    if not API_SECRET:
-        issues.append("BINANCE_API_SECRET not set")
-    if not BINANCE_AVAILABLE:
-        issues.append("python-binance library not installed")
-    
-    return issues
-
-def get_bot_statistics():
-    """Get comprehensive bot statistics"""
-    return {
-        'running': st.session_state.get('bot_running', False),
-        'scan_count': st.session_state.get('scan_count', 0),
-        'last_scan': st.session_state.get('last_scan_time'),
-        'opportunities': len(st.session_state.get('last_opportunities', [])),
-        'status': st.session_state.get('bot_status', 'Unknown')
-    }
-
-def log_bot_event(event_type, message, data=None):
-    """Log bot events for debugging"""
-    try:
-        create_log_directories()
-        log_entry = {
-            'timestamp': datetime.now().isoformat(),
-            'event_type': event_type,
-            'message': message,
-            'data': data,
-            'bot_stats': get_bot_statistics()
-        }
-        
-        with open('logs/bot_events.log', 'a') as f:
-            f.write(f"{json.dumps(log_entry)}\n")
-    except Exception:
-        pass  # Silent fail for logging
+        st.warning("No scan log file found")
 
 def main():
     """Main application function"""
     try:
         st.title("🎯 Multi-Coin Portfolio Trading Bot")
-        st.caption("Continuous 24/7 scanning of your cryptocurrency holdings for trading opportunities")
+        st.caption("Continuous scanning of your cryptocurrency holdings for trading opportunities")
         
-        # --- Password Protection ---
+        # Password Protection
         if not st.session_state['password_authenticated']:
             st.subheader("🔒 Enter Dashboard Password")
             input_password = st.text_input("Password", type="password")
@@ -918,35 +725,29 @@ def main():
             if not st.session_state['password_authenticated']:
                 st.stop()
         
-        # --- Main Dashboard ---
-        
         # Sidebar controls
-        st.sidebar.title("🎛️ Continuous Bot Controls")
+        st.sidebar.title("🎛️ Bot Controls")
         
-        # Continuous bot status in sidebar
+        # Auto-scan status in sidebar
         if st.session_state['bot_running']:
-            st.sidebar.success("🟢 Bot Running Continuously")
+            st.sidebar.success("🟢 Auto-Scan: ON")
             st.sidebar.info(f"🔍 Scans completed: {st.session_state['scan_count']}")
             
             if st.session_state['last_scan_time']:
                 time_since = (datetime.now() - st.session_state['last_scan_time']).seconds
                 st.sidebar.write(f"⏰ Last scan: {time_since}s ago")
-            
-            # Emergency stop
-            if st.sidebar.button("🚨 EMERGENCY STOP", type="secondary"):
-                trading_bot.stop()
-                st.sidebar.warning("🛑 Emergency stop activated!")
-                st.rerun()
         else:
-            st.sidebar.warning("🔴 Bot Stopped")
-            
-            # Quick start
-            if st.sidebar.button("🚀 Start Continuous Bot", type="primary"):
-                if trading_bot.start():
-                    st.sidebar.success("✅ Bot started!")
-                    st.rerun()
+            st.sidebar.warning("🔴 Auto-Scan: OFF")
+            st.sidebar.info("Enable in Settings tab")
+        
+        # Quick scan button in sidebar
+        if st.sidebar.button("🔄 Quick Scan", type="primary"):
+            with st.spinner("Scanning..."):
+                if perform_scan():
+                    st.sidebar.success("✅ Scan completed!")
                 else:
-                    st.sidebar.error("❌ Failed to start")
+                    st.sidebar.error("❌ Scan failed!")
+                st.rerun()
         
         # Bot statistics in sidebar
         st.sidebar.markdown("---")
@@ -957,9 +758,9 @@ def main():
         st.sidebar.metric("🔄 Total Scans", st.session_state['scan_count'])
         
         if st.session_state['bot_running']:
-            st.sidebar.metric("⚡ Status", "RUNNING", "24/7 Active")
+            st.sidebar.metric("⚡ Status", "AUTO-SCAN", "Active")
         else:
-            st.sidebar.metric("⏹️ Status", "STOPPED", "Inactive")
+            st.sidebar.metric("⚡ Status", "MANUAL", "Manual Only")
         
         # Navigation
         selected_tab = st.sidebar.radio(
@@ -992,28 +793,25 @@ def main():
         elif selected_tab == "Health":
             render_health_tab()
         
-        # Auto-refresh indicator
+        # Auto-refresh when auto-scan is enabled
         if st.session_state['bot_running']:
             st.sidebar.markdown("---")
-            st.sidebar.info("🔄 Page auto-refreshes every 30s while bot runs")
+            st.sidebar.info("🔄 Auto-refreshing every 30s")
             
-            # Auto-refresh when bot is running
+            # Perform automatic scan every 30 seconds
             time.sleep(30)
+            perform_scan()
             st.rerun()
         
     except Exception as e:
         st.error(f"Application Error: {e}")
         st.info("Please check your configuration and try again.")
-        
-        # Even on error, try to keep bot running
-        if st.session_state.get('bot_running', False):
-            st.warning("Bot continues running despite dashboard error")
 
 # Initialize log directories on startup
 create_log_directories()
 
 # Log dashboard startup
-log_bot_event('startup', 'Dashboard initialized', {
+log_scan_event('dashboard_startup', {
     'testnet': USE_TESTNET,
     'api_configured': bool(API_KEY and API_SECRET),
     'binance_available': BINANCE_AVAILABLE
