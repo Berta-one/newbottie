@@ -325,17 +325,18 @@ def render_overview_tab(portfolio, gbp_rate, market_condition, condition_score, 
     """Render the main overview tab"""
     total_usd = sum(coin['usd_value'] for coin in portfolio.values())
     total_gbp = total_usd * gbp_rate
-    col1, col2, col3, col4 = st.columns(4)
+    st.markdown("## 💷 Portfolio Overview")
+    col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("💷 Portfolio Value", f"£{total_gbp:,.2f}")
+        st.metric("Total Value (GBP)", f"£{total_gbp:,.2f}")
+        st.metric("Total Value (USD)", f"${total_usd:,.2f}")
     with col2:
         condition_color = "🟢" if condition_score > 0.6 else "🟡" if condition_score > 0.4 else "🔴"
         st.metric(f"{condition_color} Market", market_condition.replace('_', ' ').title())
-    with col3:
         volatility_level = "High" if avg_volatility > 3 else "Medium" if avg_volatility > 1.5 else "Low"
-        st.metric("📈 Volatility", f"{avg_volatility:.1f}%")
-    # Risk profile selection (automatic/manual)
-    with col4:
+        st.metric("Volatility", f"{avg_volatility:.1f}% ({volatility_level})")
+    with col3:
+        # Risk profile selection logic
         profile_auto = None
         if market_condition == "BULL_TRENDING":
             profile_auto = "Aggressive" if avg_volatility > 2.5 else "Swing"
@@ -345,34 +346,54 @@ def render_overview_tab(portfolio, gbp_rate, market_condition, condition_score, 
             profile_auto = "Scalping"
         else:
             profile_auto = "Balanced"
-        # Selector for risk profile
         risk_profiles = [p['name'] for p in risk_manager.risk_profiles.values()]
         selected_profile = st.selectbox(
-            "Risk Profile (auto or manual)",
+            "Risk Profile (auto/manual override)",
             options=["Automatic"] + risk_profiles,
             index=0,
             help="Default is automatic selection based on market. Choose to override."
         )
         if selected_profile == "Automatic":
             profile = profile_auto
+            st.caption(f"Automatic: {profile_auto} profile selected based on market conditions.")
         else:
             profile = selected_profile
-        st.metric("🎯 Active Profile", profile)
+            st.caption(f"Manual: {selected_profile} profile selected by user.")
+        st.metric("Active Profile", profile)
     st.divider()
-    # Portfolio overview table (all assets inline)
-    st.subheader("💼 Portfolio Holdings")
-    portfolio_data = []
+    st.markdown("### My Assets")
+    # Asset table styled like screenshot
+    asset_rows = []
     for asset, data in portfolio.items():
-        portfolio_data.append({
-            'Asset': asset,
-            'Balance': f"{data['balance']:.4f}",
-            'Price (USD)': f"${data['price_usd']:.2f}",
-            'Value (USD)': f"${data['usd_value']:.2f}",
-            'Value (GBP)': f"£{data['gbp_value']:.2f}",
-            'Today\'s PnL': "-"  # Placeholder, add real PnL if available
+        # Placeholder for icon, could use emoji or blank
+        icon = "🪙" if asset not in ["BTC", "ETH", "SOL", "XRP", "ADA"] else {
+            "BTC": "₿", "ETH": "Ξ", "SOL": "◎", "XRP": "✕", "ADA": "₳"
+        }[asset]
+        asset_rows.append({
+            "": icon,
+            "Coin": asset,
+            "Amount": f"{data['balance']:.8f}",
+            "Value (USD)": f"${data['usd_value']:.2f}",
+            "Coin Price": f"${data['price_usd']:.2f}",
+            "Value (GBP)": f"£{data['gbp_value']:.2f}",
+            "Today's PnL": "-"  # Placeholder, add real PnL if available
         })
-    df = pd.DataFrame(portfolio_data)
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    df = pd.DataFrame(asset_rows)
+    st.dataframe(
+        df,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "": st.column_config.Column(width="small"),
+            "Coin": st.column_config.Column(width="medium"),
+            "Amount": st.column_config.Column(width="large"),
+            "Value (USD)": st.column_config.Column(width="medium"),
+            "Coin Price": st.column_config.Column(width="medium"),
+            "Value (GBP)": st.column_config.Column(width="medium"),
+            "Today's PnL": st.column_config.Column(width="medium")
+        }
+    )
+    st.caption("All assets shown inline. Risk profiles are now in a separate tab.")
 
 def render_portfolio_tab(portfolio, gbp_rate):
     st.subheader("💼 Portfolio Holdings")
