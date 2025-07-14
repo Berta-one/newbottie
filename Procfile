@@ -1,1 +1,1 @@
-web: streamlit run trading_bot.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true
+web: streamlit run main.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true
