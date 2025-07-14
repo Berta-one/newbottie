@@ -1,3 +1,109 @@
+# --- Strategy Selection Logic ---
+def select_strategy(market_condition, user_selected_strategy=None):
+    """
+    Selects the strategy to use based on user selection or market conditions.
+    If user_selected_strategy is None or 'Automatic', auto-selects based on market.
+    """
+    # If user selects a strategy, use it
+    if user_selected_strategy and user_selected_strategy != 'Automatic':
+        return user_selected_strategy
+
+    # Auto-selection logic
+    if market_condition == 'BULL_TRENDING':
+        return 'Swing'
+    elif market_condition == 'BEAR_TRENDING':
+        return 'Conservative'
+    elif market_condition == 'HIGH_VOLATILITY':
+        return 'Scalping'
+    elif market_condition == 'CONSOLIDATING':
+        return 'Scalping'
+    else:
+        return 'Balanced'
+
+# --- Strategy Implementations ---
+def strategy_breakout(klines):
+    """Enhanced 5% Breakout Strategy"""
+    # ...existing breakout logic...
+    from strategy import check_breakout_enhanced, get_strategy_confidence
+    signal = check_breakout_enhanced(klines)
+    confidence = get_strategy_confidence(klines)
+    return signal, confidence
+
+def strategy_ml_enhanced(klines):
+    """ML-Enhanced Strategy"""
+    return get_ml_enhanced_signal(klines)
+
+def strategy_scalping(klines):
+    """Scalping Strategy: Looks for quick 2-3% moves, high volume, short hold"""
+    df = pd.DataFrame(klines, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_volume', 'trades', 'taker_buy_base', 'taker_buy_quote', 'ignore'])
+    df = df.astype({'open': float, 'high': float, 'low': float, 'close': float, 'volume': float})
+    current_price = df['close'].iloc[-1]
+    price_30m_ago = df['close'].iloc[-30] if len(df) >= 30 else df['close'].iloc[0]
+    price_change = ((current_price - price_30m_ago) / price_30m_ago) * 100
+    avg_vol_10 = df['volume'].rolling(10).mean().iloc[-1]
+    current_vol = df['volume'].iloc[-1]
+    volume_ratio = current_vol / avg_vol_10 if avg_vol_10 > 0 else 1
+    signal = 'HOLD'
+    confidence = 0.5
+    if price_change >= 2.5 and volume_ratio > 1.5:
+        signal = 'BUY_LONG'
+        confidence = 0.85
+    elif price_change <= -2.5 and volume_ratio > 1.5:
+        signal = 'BUY_SHORT'
+        confidence = 0.85
+    return signal, confidence
+
+def strategy_swing(klines):
+    """Swing Strategy: Looks for 10-20% moves over longer periods"""
+    df = pd.DataFrame(klines, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume', 'close_time', 'quote_volume', 'trades', 'taker_buy_base', 'taker_buy_quote', 'ignore'])
+    df = df.astype({'open': float, 'high': float, 'low': float, 'close': float, 'volume': float})
+    current_price = df['close'].iloc[-1]
+    price_6h_ago = df['close'].iloc[-360] if len(df) >= 360 else df['close'].iloc[0]
+    price_change = ((current_price - price_6h_ago) / price_6h_ago) * 100
+    signal = 'HOLD'
+    confidence = 0.5
+    if price_change >= 10:
+        signal = 'BUY_LONG'
+        confidence = 0.75
+    elif price_change <= -10:
+        signal = 'BUY_SHORT'
+        confidence = 0.75
+    return signal, confidence
+
+def strategy_conservative(klines):
+    """Conservative Strategy: Only trades on high confidence, small moves"""
+    signal, confidence = strategy_breakout(klines)
+    if confidence < 0.8:
+        return 'HOLD', confidence
+    return signal, confidence
+
+def strategy_balanced(klines):
+    """Balanced Strategy: Standard breakout, moderate confidence"""
+    return strategy_breakout(klines)
+
+def strategy_aggressive(klines):
+    """Aggressive Strategy: Trades on lower confidence, larger moves"""
+    signal, confidence = strategy_breakout(klines)
+    if confidence > 0.6:
+        return signal, confidence
+    return 'HOLD', confidence
+
+def get_strategy_signal(klines, market_condition, user_selected_strategy=None):
+    """
+    Main entry: returns signal/confidence for the selected or auto strategy.
+    """
+    strategy_map = {
+        'Breakout': strategy_breakout,
+        'ML Enhanced': strategy_ml_enhanced,
+        'Scalping': strategy_scalping,
+        'Swing': strategy_swing,
+        'Conservative': strategy_conservative,
+        'Balanced': strategy_balanced,
+        'Aggressive': strategy_aggressive,
+    }
+    selected = select_strategy(market_condition, user_selected_strategy)
+    func = strategy_map.get(selected, strategy_balanced)
+    return func(klines)
 # enhanced_ml_strategy.py - ML-Enhanced Trading Strategy
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier

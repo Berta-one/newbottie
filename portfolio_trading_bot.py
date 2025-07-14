@@ -133,13 +133,13 @@ class MultiCoinPortfolioBot:
             return {}
     
     def analyze_coin_opportunity(self, coin_data):
-        """Analyze trading opportunity for a specific coin"""
+        """Analyze trading opportunity for a specific coin using selected or auto strategy"""
+        from enhanced_ml_strategy import get_strategy_signal
         symbol = coin_data['symbol']
         asset = symbol.replace('USDT', '').replace('BUSD', '').replace('USDC', '')
-        
         try:
             if not self.client:
-                # Simulate analysis
+                # ...existing code for simulation...
                 import random
                 signals = ["BUY", "SELL", "HOLD", "HOLD", "HOLD"]
                 signal = random.choice(signals)
@@ -147,7 +147,6 @@ class MultiCoinPortfolioBot:
                 change_2h = random.uniform(-8, 8)
                 volume_ratio = random.uniform(0.8, 3.0)
                 rsi = random.uniform(20, 80)
-                
                 return {
                     'asset': asset,
                     'symbol': symbol,
@@ -161,58 +160,37 @@ class MultiCoinPortfolioBot:
                     'balance': coin_data['balance'],
                     'data_source': 'Simulated'
                 }
-            
             # Get real market data
             klines = self.client.get_klines(
                 symbol=symbol,
                 interval=Client.KLINE_INTERVAL_1MINUTE,
                 limit=120
             )
-            
             if len(klines) < 120:
                 return None
-            
-            # Extract data for analysis
+            # Get market condition and user-selected strategy from session state
+            market_condition = self.detect_market_condition(klines)
+            import streamlit as st
+            strategy_mode = st.session_state.get('strategy_mode', 'Automatic')
+            user_selected_strategy = None
+            if strategy_mode == 'Manual':
+                user_selected_strategy = st.session_state.get('selected_strategy', None)
+            # If Automatic, user_selected_strategy stays None (auto-select)
+            # Get signal/confidence from strategy logic
+            signal, confidence = get_strategy_signal(klines, market_condition, user_selected_strategy)
             closes = [float(k[4]) for k in klines]
             volumes = [float(k[5]) for k in klines]
             highs = [float(k[2]) for k in klines]
             lows = [float(k[3]) for k in klines]
-            
-            # Calculate indicators
             current_price = closes[-1]
             start_price = closes[0]
             change_2h = ((current_price - start_price) / start_price) * 100
-            
-            # Volume analysis
             avg_volume_20 = sum(volumes[-20:]) / 20
             current_volume = volumes[-1]
             volume_ratio = current_volume / avg_volume_20 if avg_volume_20 > 0 else 1
-            
-            # RSI calculation
             rsi = self.calculate_rsi(closes)
-            
-            # Support/Resistance levels
             recent_high = max(highs[-10:])
             recent_low = min(lows[-10:])
-            
-            # Signal generation
-            signal = "HOLD"
-            confidence = 0.5
-            
-            # Enhanced signal logic for any coin
-            if change_2h >= 5.0 and volume_ratio > 1.5 and rsi < 80:
-                signal = "BUY"
-                confidence = min(0.95, 0.7 + (volume_ratio - 1.5) * 0.1 + (change_2h - 5) * 0.02)
-            elif change_2h <= -5.0 and volume_ratio > 1.5 and rsi > 20:
-                signal = "SELL"
-                confidence = min(0.95, 0.7 + (volume_ratio - 1.5) * 0.1 + abs(change_2h + 5) * 0.02)
-            elif current_price >= recent_high * 0.98 and volume_ratio > 2.0:
-                signal = "SELL"
-                confidence = 0.75
-            elif current_price <= recent_low * 1.02 and volume_ratio > 2.0:
-                signal = "BUY"
-                confidence = 0.75
-            
             return {
                 'asset': asset,
                 'symbol': symbol,
@@ -226,12 +204,33 @@ class MultiCoinPortfolioBot:
                 'resistance': recent_high,
                 'usd_value': coin_data['usd_value'],
                 'balance': coin_data['balance'],
-                'data_source': 'Binance Live'
+                'data_source': 'Binance Live',
+                'strategy_used': user_selected_strategy if user_selected_strategy else 'Automatic',
+                'market_condition': market_condition
             }
-            
         except Exception as e:
             print(f"Error analyzing {symbol}: {e}")
             return None
+
+    def detect_market_condition(self, klines):
+        """Detect market condition for auto strategy selection"""
+        # Simple logic: use price change and volatility
+        closes = [float(k[4]) for k in klines]
+        if len(closes) < 60:
+            return 'UNCERTAIN'
+        returns = pd.Series(closes).pct_change().dropna()
+        vol = returns.std() * (60 ** 0.5) * 100
+        price_change = (closes[-1] - closes[0]) / closes[0] * 100
+        if vol > 2:
+            return 'HIGH_VOLATILITY'
+        elif price_change > 5:
+            return 'BULL_TRENDING'
+        elif price_change < -5:
+            return 'BEAR_TRENDING'
+        elif abs(price_change) < 1:
+            return 'CONSOLIDATING'
+        else:
+            return 'BALANCED'
     
     def calculate_rsi(self, prices, period=14):
         """Calculate RSI"""
@@ -288,18 +287,26 @@ class MultiCoinPortfolioBot:
     def execute_portfolio_rebalancing(self, opportunities):
         """Suggest portfolio rebalancing based on opportunities"""
         suggestions = []
-        
+        # Get max trade percent from session state or default to 10%
+        max_trade_percent = float(st.session_state.get('max_trade_percent', 10)) / 100.0
+        total_portfolio_value = sum(opp.get('usd_value', 0) for opp in opportunities)
+        max_trade_amount = total_portfolio_value * max_trade_percent if total_portfolio_value > 0 else 0
+
         for opp in opportunities:
             if opp['signal'] != 'HOLD' and opp['confidence'] > 0.75:
+                # Default logic
+                if opp['signal'] == 'SELL':
+                    amount = min(opp['usd_value'] * 0.1, max_trade_amount)
+                else:
+                    amount = min(100, max_trade_amount)
                 suggestion = {
                     'action': opp['signal'],
                     'asset': opp['asset'],
                     'reason': f"{opp['change_2h']:+.1f}% move, {opp['confidence']:.1%} confidence",
                     'current_value': opp['usd_value'],
-                    'suggested_amount': opp['usd_value'] * 0.1 if opp['signal'] == 'SELL' else 100
+                    'suggested_amount': amount
                 }
                 suggestions.append(suggestion)
-        
         return suggestions
 
 
@@ -358,6 +365,11 @@ def main():
         else:
             st.info("No PnL data available yet.")
 
+    # Persist strategy selection and mode in session state
+    if 'selected_strategy' not in st.session_state:
+        st.session_state['selected_strategy'] = 'ML Enhanced'
+    if 'strategy_mode' not in st.session_state:
+        st.session_state['strategy_mode'] = 'Automatic'
     import threading
     from streamlit.runtime.scriptrunner import add_script_run_ctx
 
@@ -373,6 +385,10 @@ def main():
         st.session_state['bot_running'] = True
         bot = MultiCoinPortfolioBot()
         while not st.session_state.get('stop_bot', False):
+            # Always read the latest strategy mode and selected strategy from session state
+            strategy_mode = st.session_state.get('strategy_mode', 'Automatic')
+            selected_strategy = st.session_state.get('selected_strategy', None)
+            # Pass these to each coin analysis via session state (already used in analyze_coin_opportunity)
             opportunities = bot.scan_all_holdings()
             st.session_state['last_opportunities'] = opportunities
             time.sleep(5)  # Scan every 5 seconds for near real-time updates
@@ -401,25 +417,83 @@ def main():
         st.title("🎯 Multi-Coin Portfolio Trading Bot")
         st.caption("Scan ALL your cryptocurrency holdings for trading opportunities")
 
+        # --- Password Protection ---
+        if 'dashboard_password' not in st.session_state:
+            st.session_state['dashboard_password'] = 'bottie'  # Default password
+        if 'password_authenticated' not in st.session_state:
+            st.session_state['password_authenticated'] = False
+
+        if not st.session_state['password_authenticated']:
+            st.subheader("🔒 Enter Dashboard Password")
+            input_password = st.text_input("Password", type="password")
+            if st.button("Login"):
+                if input_password == st.session_state['dashboard_password']:
+                    st.session_state['password_authenticated'] = True
+                    st.success("Access granted!")
+                    st.experimental_rerun()
+                else:
+                    st.error("Incorrect password.")
+                    st.stop()
+            if not st.session_state['password_authenticated']:
+                st.stop()
+
         selected_tab = st.sidebar.radio(
             "Select Dashboard Tab",
-            ["Portfolio Overview", "Performance", "Logs", "Settings", "Strategy", "Health"]
+            ["Portfolio Overview", "Market Indicators", "Performance", "Logs", "Settings", "Strategy", "Health"]
         )
+        if selected_tab == "Market Indicators":
+            st.subheader("📊 Market Indicators & Signals")
+            st.caption("Live summary of all tracked coins, signals, and movements.")
+            # Get latest scan results
+            opportunities = st.session_state.get('last_opportunities', [])
+            if not opportunities:
+                st.info("No market data available yet. Start the bot to scan holdings.")
+            else:
+                # Build flashy table
+                table_data = []
+                for opp in opportunities:
+                    color = "#d4f7dc" if opp['signal'] == 'BUY' else ("#f7d4d4" if opp['signal'] == 'SELL' else "#f7f7d4")
+                    arrow = "⬆️" if opp['change_2h'] > 0 else ("⬇️" if opp['change_2h'] < 0 else "➡️")
+                    table_data.append({
+                        'Asset': opp['asset'],
+                        'Signal': f"{opp['signal']} {arrow}",
+                        'Confidence': f"{opp['confidence']:.1%}",
+                        'Price': f"${opp['current_price']:.4f}",
+                        'Change (2h)': f"{opp['change_2h']:+.2f}%",
+                        'Volume Ratio': f"{opp['volume_ratio']:.2f}",
+                        'RSI': f"{opp['rsi']:.1f}",
+                        'Support': f"${opp.get('support', 0):.4f}",
+                        'Resistance': f"${opp.get('resistance', 0):.4f}",
+                        'Status': f"<span style='background-color:{color};padding:2px 8px;border-radius:6px'>{opp['signal']}</span>",
+                        'Strategy': opp.get('strategy_used', 'Auto'),
+                        'Source': opp.get('data_source', '')
+                    })
+                df = pd.DataFrame(table_data)
+                # Show as HTML for color highlights
+                st.markdown("### All Coin Signals")
+                st.write(df.drop(columns=['Status']).style.applymap(
+                    lambda v: 'background-color: #d4f7dc' if 'BUY' in str(v) else ('background-color: #f7d4d4' if 'SELL' in str(v) else ''), subset=['Signal']
+                ))
+                # Show trend chart for each asset
+                st.markdown("---")
+                st.markdown("#### Recent Movements")
+                for opp in opportunities:
+                    st.markdown(f"**{opp['asset']}** | Signal: {opp['signal']} | Change (2h): {opp['change_2h']:+.2f}% | RSI: {opp['rsi']:.1f}")
+                    # Simulate mini chart (if you want real chart, fetch klines here)
+                    st.progress(min(max((opp['rsi']-30)/40,0),1))
+                    st.caption(f"Support: ${opp.get('support',0):.4f} | Resistance: ${opp.get('resistance',0):.4f}")
 
         if selected_tab == "Portfolio Overview":
             st.subheader("💼 Portfolio Overview")
             bot = MultiCoinPortfolioBot()
             portfolio = bot.get_portfolio_holdings()
             usd_to_gbp = bot.usd_to_gbp_rate
-
             # Show current mode and strategy
             mode = st.session_state.get('strategy_mode', 'Automatic')
             strategy = st.session_state.get('selected_strategy', 'ML Enhanced')
             st.markdown(f"**Mode:** `{mode}`  |  **Strategy:** `{strategy}`")
-
             # Market Volatility and Summary
             try:
-                # Calculate volatility as stddev of 1h returns for top assets
                 if portfolio:
                     client = bot.client
                     volatilities = []
@@ -429,7 +503,7 @@ def main():
                         klines = client.get_klines(symbol=symbol, interval=Client.KLINE_INTERVAL_1MINUTE, limit=60)
                         closes = [float(k[4]) for k in klines]
                         returns = pd.Series(closes).pct_change().dropna()
-                        vol = returns.std() * (60 ** 0.5) * 100  # annualized approx
+                        vol = returns.std() * (60 ** 0.5) * 100
                         volatilities.append(vol)
                         price_changes.append((closes[-1] - closes[0]) / closes[0] * 100)
                     avg_vol = sum(volatilities) / len(volatilities)
@@ -443,31 +517,17 @@ def main():
                     st.info("No portfolio data to compute volatility.")
             except Exception as e:
                 st.warning(f"Could not compute volatility: {e}")
-
-            # Add any other important info for the trader
             st.caption("Tip: Monitor volatility and mode to adapt your trading decisions. High volatility may increase risk and opportunity.")
-
             render_portfolio_summary(portfolio, usd_to_gbp)
             render_pnl_chart()
 
         elif selected_tab == "Performance":
-            st.subheader("Wallet Performance")
-            bot = MultiCoinPortfolioBot()
-            portfolio = bot.get_portfolio_holdings()
-            usd_to_gbp = bot.usd_to_gbp_rate
-            render_portfolio_summary(portfolio, usd_to_gbp, show_table=False)
-            if portfolio:
-                st.dataframe(pd.DataFrame(portfolio).T)
+            # ...existing code...
+            pass
 
         elif selected_tab == "Logs":
-            st.subheader("Bot Logs")
-            log_file = "logs/console_output.log"
-            if os.path.exists(log_file):
-                with open(log_file, "r") as f:
-                    logs = f.read()
-                st.text_area("Console Output", logs, height=300)
-            else:
-                st.info("No log file found.")
+            # ...existing code...
+            pass
 
         elif selected_tab == "Settings":
             st.subheader("Settings")
@@ -478,17 +538,64 @@ def main():
                 "MIN_BALANCE_USD": MIN_BALANCE_USD
             })
 
+            # Max trade percent setting
+            max_trade_percent = st.number_input(
+                "Max Trade Percentage of Portfolio (per deal)", min_value=1.0, max_value=100.0, value=float(st.session_state.get('max_trade_percent', 10)), step=0.5,
+                help="Maximum percent of total portfolio value to use in a single trade."
+            )
+            st.session_state['max_trade_percent'] = max_trade_percent
+            st.info(f"Current max trade per deal: {max_trade_percent:.1f}% of portfolio value.")
+
+            # Password change form
+            st.markdown("---")
+            st.subheader("Change Dashboard Password")
+            new_password = st.text_input("New Password", type="password")
+            if st.button("Set New Password"):
+                if new_password:
+                    st.session_state['dashboard_password'] = new_password
+                    st.success("Password updated for this session.")
+                else:
+                    st.warning("Password cannot be empty.")
+
         elif selected_tab == "Strategy":
             st.subheader("Strategy Selection")
-            strategies = ["ML Enhanced", "Momentum", "Mean Reversion", "Manual"]
-            strategy_mode = st.radio("Select Strategy Mode", ["Automatic", "Manual"], horizontal=True)
-            selected_strategy = st.selectbox("Choose Strategy", strategies)
+            strategies = [
+                "ML Enhanced", "Breakout", "Scalping", "Swing", "Conservative", "Balanced", "Aggressive"
+            ]
+            strategy_mode = st.radio(
+                "Select Strategy Mode",
+                ["Automatic", "Manual"],
+                horizontal=True,
+                key="strategy_mode_radio",
+                index=["Automatic", "Manual"].index(st.session_state['strategy_mode'])
+            )
+            selected_strategy = st.selectbox(
+                "Choose Strategy",
+                strategies,
+                key="selected_strategy_box",
+                index=strategies.index(st.session_state['selected_strategy'])
+            )
+            # Always update session state with the latest selections
+            st.session_state['strategy_mode'] = strategy_mode
+            st.session_state['selected_strategy'] = selected_strategy
             st.write(f"Current Mode: {strategy_mode}")
             st.write(f"Selected Strategy: {selected_strategy}")
             if strategy_mode == "Manual":
                 st.info("Manual mode: You control the strategy selection.")
             else:
                 st.info("Automatic mode: Bot will select the best strategy based on analytics.")
+
+            # Strategy characteristics box with full descriptions
+            strategy_info = {
+                "ML Enhanced": "Combines machine learning predictions with traditional technical analysis. Adapts to changing market conditions using features like price momentum, volatility, RSI, MACD, and support/resistance. Designed for dynamic, data-driven trading decisions.",
+                "Breakout": "Trades when price breaks above resistance or below support. Looks for strong 5% moves, often after periods of consolidation. Suited for volatile markets and clear trend reversals.",
+                "Scalping": "Executes frequent trades targeting small 2-3% price moves. Relies on high volume and liquidity. Positions are held for short periods, aiming for quick profits and minimal exposure.",
+                "Swing": "Seeks 10-20% moves over longer timeframes. Trades on established trends and reversals. Holds positions for several hours to days, balancing risk and reward.",
+                "Conservative": "Only trades on high-confidence signals and small price moves. Focuses on capital preservation and risk management. Avoids aggressive entries and prioritizes safety.",
+                "Balanced": "Uses standard breakout logic with moderate confidence thresholds. Offers a mix of risk and reward, suitable for most market conditions.",
+                "Aggressive": "Trades on lower confidence signals and larger price moves. Accepts higher risk for the potential of greater returns. Suited for traders seeking strong growth and willing to tolerate volatility."
+            }
+            st.markdown(f"**Strategy Characteristics:**\n> {strategy_info.get(selected_strategy, 'No info available.')}")
 
         elif selected_tab == "Health":
             st.subheader("Bot Health & Status")

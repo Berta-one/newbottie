@@ -1,9 +1,12 @@
+
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 import os, time
 from dotenv import load_dotenv
 from bot_controller import BotController
+
+load_dotenv()
 
 st.set_page_config(page_title="Bottie", layout="wide", initial_sidebar_state="expanded")
 
