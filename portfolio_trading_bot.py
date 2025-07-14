@@ -23,6 +23,37 @@ USE_TESTNET = os.getenv("USE_TESTNET", "True").lower() == "true"
 MIN_BALANCE_USD = float(os.getenv("MIN_BALANCE_USD", "10"))
 
 class MultiCoinPortfolioBot:
+    def get_stablecoin_swap_opportunities(self):
+        """Scan for arbitrage or swap opportunities between USDT, BUSD, USDC"""
+        if not self.client:
+            return []
+        stablecoins = ['USDT', 'BUSD', 'USDC']
+        balances = self.get_portfolio_holdings()
+        swaps = []
+        # Get prices for all stablecoin pairs
+        pairs = [('USDT', 'BUSD'), ('USDT', 'USDC'), ('BUSD', 'USDC')]
+        for base, quote in pairs:
+            symbol = f"{base}{quote}"
+            reverse_symbol = f"{quote}{base}"
+            try:
+                price = None
+                if symbol in [t['symbol'] for t in self.client.get_all_tickers()]:
+                    price = float(self.client.get_symbol_ticker(symbol=symbol)['price'])
+                elif reverse_symbol in [t['symbol'] for t in self.client.get_all_tickers()]:
+                    price = 1 / float(self.client.get_symbol_ticker(symbol=reverse_symbol)['price'])
+                if price and abs(price - 1) > 0.001:
+                    # Arbitrage or swap opportunity
+                    swaps.append({
+                        'pair': f"{base}/{quote}",
+                        'price': price,
+                        'action': 'Swap',
+                        'reason': f"Price deviation: {price:.4f}",
+                        'base_balance': balances.get(base, {}).get('balance', 0),
+                        'quote_balance': balances.get(quote, {}).get('balance', 0)
+                    })
+            except Exception as e:
+                continue
+        return swaps
     def __init__(self):
         self.client = None
         self.portfolio = {}
@@ -282,6 +313,26 @@ class MultiCoinPortfolioBot:
             abs(x['change_2h'])
         ), reverse=True)
         
+        # Also scan for stablecoin swap opportunities
+        stablecoin_swaps = self.get_stablecoin_swap_opportunities()
+        # Add stablecoin swaps to opportunities (as special entries)
+        for swap in stablecoin_swaps:
+            opportunities.append({
+                'asset': swap['pair'],
+                'signal': swap['action'],
+                'confidence': 1.0,
+                'current_price': swap['price'],
+                'change_2h': 0,
+                'volume_ratio': 1,
+                'rsi': 50,
+                'support': 0,
+                'resistance': 0,
+                'usd_value': swap['base_balance'],
+                'balance': swap['base_balance'],
+                'data_source': 'Stablecoin Swap',
+                'strategy_used': 'Stablecoin Arbitrage',
+                'market_condition': 'STABLE'
+            })
         return opportunities
     
     def execute_portfolio_rebalancing(self, opportunities):
