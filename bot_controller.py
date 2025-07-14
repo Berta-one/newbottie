@@ -847,3 +847,16 @@ def main():
 
 if __name__ == "__main__":
     main()
+    class BotController:
+    def __init__(self):
+        self.running = False
+
+    def start(self):
+        self.running = True
+        return True
+
+    def stop(self):
+        self.running = False
+
+    def is_running(self):
+        return self.running
