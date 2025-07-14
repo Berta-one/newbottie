@@ -2,9 +2,8 @@
 builder = "nixpacks"
 
 [deploy]
-# Run robust bot as primary service (never stops)
-startCommand = "python robust_bot.py"
+# Run hybrid bot (dashboard + background bot)
+startCommand = "streamlit run hybrid_bot.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true --server.enableCORS=false --server.enableXsrfProtection=false"
 
 [environment]
-BOT_MODE = "robust"
-RAILWAY_URL = "https://bottie-production.up.railway.app"
+BOT_MODE = "hybrid"
