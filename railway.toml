@@ -2,9 +2,9 @@
 builder = "nixpacks"
 
 [deploy]
-# Run both dashboard AND background bot simultaneously
-startCommand = "python background_bot.py & streamlit run dashboard.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true --server.enableCORS=false --server.enableXsrfProtection=false"
+# Run robust bot as primary service (never stops)
+startCommand = "python robust_bot.py"
 
 [environment]
-MAIN_DASHBOARD = "dashboard.py"
-BOT_MODE = "dual"
+BOT_MODE = "robust"
+RAILWAY_URL = "https://bottie-production.up.railway.app"
