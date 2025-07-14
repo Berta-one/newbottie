@@ -1,5 +1,6 @@
 
 # Updated dashboard.py with integrated overview, portfolio, manual override, and dedicated risk profile tab
+print("✅ New dashboard version loaded!")
 
 import streamlit as st
 import pandas as pd
