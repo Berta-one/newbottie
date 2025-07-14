@@ -1,7 +1,19 @@
+﻿def get_demo_portfolio():
+    """Get demo portfolio data"""
+    gbp_rate = get_gbp_exchange_rate()
+    portfolio = {
+        'BTC': {'balance': 0.15234, 'usd_value': 9890.45, 'symbol': 'BTCUSDT', 'price_usd': 64950.0},
+        'ETH': {'balance': 1.8945, 'usd_value': 4567.89, 'symbol': 'ETHUSDT', 'price_usd': 2410.50},
+        'SOL': {'balance': 45.67, 'usd_value': 2876.32, 'symbol': 'SOLUSDT', 'price_usd': 62.98},
+        'XRP': {'balance': 1250.0, 'usd_value': 743.75, 'symbol': 'XRPUSDT', 'price_usd': 0.595},
+        'ADA': {'balance': 2890.5, 'usd_value': 1234.56, 'symbol': 'ADAUSDT', 'price_usd': 0.427}
+    }
+    # Add GBP values
+    for asset in portfolio:
+        portfolio[asset]['gbp_value'] = portfolio[asset]['usd_value'] * gbp_rate
+    return portfolio, gbp_rate
 
-# Updated dashboard.py with integrated overview, portfolio, manual override, and dedicated risk profile tab
-print("✅ New dashboard version loaded!")
-
+# dashboard.py - Updated with Clean Tabbed Interface and Adaptive Risk Management
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -9,9 +21,11 @@ import os, json, time, socket, subprocess
 from datetime import datetime
 from dotenv import load_dotenv
 from bot_controller import BotController
+from binance_client import client as binance_client
 import requests
 import numpy as np
 
+# Check if we have Binance library
 try:
     from binance.client import Client
     BINANCE_AVAILABLE = True
@@ -21,18 +35,18 @@ except ImportError:
 load_dotenv()
 PIN_REQUIRED = os.getenv("DASHBOARD_PIN", "1234")
 
+# Session state controller
 if "controller" not in st.session_state:
     st.session_state.controller = BotController()
 controller = st.session_state.controller
 
+# PIN protection
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
-if 'override_profile' not in st.session_state:
-    st.session_state.override_profile = "Auto"
-
 class AdaptiveRiskManager:
     def __init__(self):
+        # Professional risk management rulesets
         self.risk_profiles = {
             "CONSERVATIVE": {
                 "name": "Conservative",
@@ -81,16 +95,26 @@ class AdaptiveRiskManager:
             }
         }
 
+# Initialize risk manager globally
 if 'risk_manager' not in st.session_state:
     st.session_state.risk_manager = AdaptiveRiskManager()
 risk_manager = st.session_state.risk_manager
 
+def get_tailscale_ip():
+    try:
+        output = subprocess.check_output("tailscale ip -4", shell=True, text=True).strip()
+        return output.splitlines()[0]
+    except:
+        return "Unavailable"
+
 def get_gbp_exchange_rate():
+    """Get live USD to GBP exchange rate"""
     try:
         apis = [
             "https://api.exchangerate-api.com/v4/latest/USD",
             "https://api.fxratesapi.com/latest?base=USD"
         ]
+        
         for api_url in apis:
             try:
                 response = requests.get(api_url, timeout=5)
@@ -100,103 +124,19 @@ def get_gbp_exchange_rate():
                         return data['rates']['GBP']
             except:
                 continue
+        
+        # Fallback rate
         return 0.79
     except:
         return 0.79
 
-def get_demo_portfolio():
-    gbp_rate = get_gbp_exchange_rate()
-    portfolio = {
-        'XRP': {'balance': 500.00000023, 'usd_value': 1482.85, 'symbol': 'XRPUSDT', 'price_usd': 2.98},
-        'SOL': {'balance': 7.69637064, 'usd_value': 1285.99, 'symbol': 'SOLUSDT', 'price_usd': 167.70},
-        'ETHW': {'balance': 0.74740045, 'usd_value': 1.15, 'symbol': 'ETHWUSDT', 'price_usd': 1.54},
-    }
-    for asset in portfolio:
-        portfolio[asset]['gbp_value'] = portfolio[asset]['usd_value'] * gbp_rate
-        portfolio[asset]['pnl_gbp'] = np.random.uniform(-20, 20)  # Simulated daily PnL in GBP
-    return portfolio, gbp_rate
-
-def simulate_market_analysis(portfolio):
-    avg_volatility = np.random.uniform(1.5, 3.5)
-    conditions = ["BULL_TRENDING", "BEAR_TRENDING", "CONSOLIDATING", "HIGH_VOLATILITY", "UNCERTAIN"]
-    market_condition = np.random.choice(conditions)
-    condition_score = np.random.uniform(0.3, 0.9)
-    return market_condition, condition_score, avg_volatility
-
-def render_dashboard_section(portfolio, gbp_rate, market_condition, condition_score, avg_volatility):
-    total_usd = sum(coin['usd_value'] for coin in portfolio.values())
-    total_gbp = total_usd * gbp_rate
-
-    st.subheader("📊 Market Overview")
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("💷 Portfolio Value", f"£{total_gbp:,.2f}")
-    with col2:
-        condition_color = "🟢" if condition_score > 0.6 else "🟡" if condition_score > 0.4 else "🔴"
-        st.metric(f"{condition_color} Market", market_condition.replace('_', ' ').title())
-    with col3:
-        st.metric("📈 Volatility", f"{avg_volatility:.1f}%")
-    with col4:
-        if st.session_state.override_profile != "Auto":
-            profile = st.session_state.override_profile
-        else:
-            if market_condition == "BULL_TRENDING":
-                profile = "Aggressive" if avg_volatility > 2.5 else "Swing"
-            elif market_condition == "BEAR_TRENDING":
-                profile = "Conservative"
-            elif market_condition == "HIGH_VOLATILITY":
-                profile = "Scalping"
-            else:
-                profile = "Balanced"
-        st.metric("🎯 Active Profile", profile)
-
-    st.divider()
-    st.subheader("💼 Portfolio Holdings")
-    df_data = []
-    total_usd = sum(coin['usd_value'] for coin in portfolio.values())
-    for asset, data in portfolio.items():
-        df_data.append({
-            "Asset": asset,
-            "Amount": f"{data['balance']:.6f}",
-            "Coin Price": f"${data['price_usd']:.2f}",
-            "Value (USD)": f"${data['usd_value']:.2f}",
-            "Value (GBP)": f"£{data['gbp_value']:.2f}",
-            "Today's PnL": f"{'+' if data['pnl_gbp'] >= 0 else '-'}£{abs(data['pnl_gbp']):.2f}"
-        })
-    st.dataframe(pd.DataFrame(df_data), use_container_width=True)
-
-def render_risk_profiles_tab():
-    st.subheader("🛡️ Professional Risk Profiles")
-    for key, profile in risk_manager.risk_profiles.items():
-        with st.expander(f"{profile['name']}"):
-            st.markdown(f"**Description:** {profile['description']}")
-            st.markdown(f"- **Take Profit:** {profile['take_profit']}%")
-            st.markdown(f"- **Stop Loss:** {profile['stop_loss']}%")
-            st.markdown(f"- **Trailing Stop:** {profile['trailing_stop']}%")
-            st.markdown(f"- **Max Hold:** {profile['max_hold_hours']} hours")
-            st.markdown(f"- **Confidence Threshold:** {profile['confidence_threshold']:.0%}")
-
-def render_settings_tab():
-    st.subheader("⚙️ Settings")
-    profile_names = ["Auto"] + [p["name"] for p in risk_manager.risk_profiles.values()]
-    selection = st.selectbox("🎯 Override Risk Profile", profile_names, index=0)
-    st.session_state.override_profile = selection
-
-def dashboard():
-    portfolio, gbp_rate = get_demo_portfolio()
-    market_condition, condition_score, avg_volatility = simulate_market_analysis(portfolio)
-    tab1, tab2 = st.tabs(["📋 Dashboard", "🧠 Risk Profiles"])
-    with tab1:
-        render_dashboard_section(portfolio, gbp_rate, market_condition, condition_score, avg_volatility)
-    with tab2:
-        render_risk_profiles_tab()
-        render_settings_tab()
-
 def main():
-    st.set_page_config(page_title="Adaptive Bot", layout="wide")
+    st.set_page_config(page_title="🎯 Adaptive Risk Management Bot", layout="wide")
+    
     if not st.session_state.authenticated:
-        st.title("🔐 Enter PIN")
+        st.title("🔐 Enter Dashboard PIN")
         user_pin = st.text_input("PIN", type="password")
+
         if user_pin == PIN_REQUIRED:
             st.session_state.authenticated = True
             st.success("Access granted")
@@ -204,8 +144,42 @@ def main():
         elif user_pin:
             st.error("Incorrect PIN")
     else:
-        st.title("📈 Adaptive Risk Management Bot")
-        dashboard()
+        st.title("🎯 Adaptive Risk Management Trading Bot")
+        st.caption("Professional, emotion-free trading with dynamic risk adjustment")
+        
+        # Use real or demo portfolio based on USE_TESTNET
+        use_testnet = os.getenv("USE_TESTNET", "True").lower() == "true"
+        portfolio, gbp_rate = get_demo_portfolio()
+        
+        # Simple status display
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("💷 Portfolio Value", f"£{sum(p['gbp_value'] for p in portfolio.values()):,.2f}")
+        
+        with col2:
+            st.metric("🎯 Mode", "TESTNET" if use_testnet else "LIVE")
+        
+        with col3:
+            st.metric("🪙 Assets", len(portfolio))
+        
+        with col4:
+            st.metric("⏰ Time", datetime.now().strftime("%H:%M:%S"))
+        
+        # Portfolio overview
+        st.subheader("💼 Portfolio Overview")
+        
+        portfolio_data = []
+        for asset, data in portfolio.items():
+            portfolio_data.append({
+                'Asset': asset,
+                'Balance': f"{data['balance']:.4f}",
+                'USD Value': f"${data['usd_value']:.2f}",
+                'GBP Value': f"£{data['gbp_value']:.2f}",
+            })
+        
+        df = pd.DataFrame(portfolio_data)
+        st.dataframe(df, use_container_width=True, hide_index=True)
 
 if __name__ == "__main__":
     main()
