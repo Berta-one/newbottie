@@ -80,6 +80,34 @@ def show_performance():
             recent_df['timestamp'] = recent_df['timestamp'].dt.strftime('%Y-%m-%d %H:%M')
             st.dataframe(recent_df, use_container_width=True)
 
+        # Live wallet display
+        st.subheader("💰 Live Wallet (Binance)")
+        try:
+            from binance.client import Client
+            import os
+            binance_api_key = os.getenv("BINANCE_API_KEY")
+            binance_api_secret = os.getenv("BINANCE_API_SECRET")
+            if binance_api_key and binance_api_secret:
+                client = Client(binance_api_key, binance_api_secret)
+                account_info = client.get_account()
+                balances = account_info['balances']
+                df_wallet = pd.DataFrame(balances)
+                df_wallet = df_wallet[df_wallet['free'].astype(float) > 0]
+                df_wallet['free'] = df_wallet['free'].astype(float)
+                df_wallet['locked'] = df_wallet['locked'].astype(float)
+                st.dataframe(df_wallet[['asset', 'free', 'locked']], use_container_width=True)
+                # Show total USDT and PnL if available
+                usdt_row = df_wallet[df_wallet['asset'] == 'USDT']
+                if not usdt_row.empty:
+                    st.metric("USDT Balance", usdt_row['free'].values[0])
+                else:
+                    st.info("No USDT balance found.")
+            else:
+                st.warning("Binance API keys not found in environment variables.")
+        except Exception as e:
+            st.error(f"Error fetching wallet: {e}")
+        st.info("If you see no wallet, check your API keys and Binance account.")
+
 def dashboard():
     ts_ip = get_tailscale_ip()
     remote_url = f"http://{ts_ip}:8501" if ts_ip != "Unavailable" else "Unavailable"
@@ -110,34 +138,90 @@ def dashboard():
 
     with tabs[0]:
         show_performance()
+        st.subheader("💰 Live Wallet (Binance)")
+        try:
+            from binance.client import Client
+            import os
+            binance_api_key = os.getenv("BINANCE_API_KEY")
+            binance_api_secret = os.getenv("BINANCE_API_SECRET")
+            if binance_api_key and binance_api_secret:
+                client = Client(binance_api_key, binance_api_secret)
+                account_info = client.get_account()
+                balances = account_info['balances']
+                df_wallet = pd.DataFrame(balances)
+                df_wallet['free'] = df_wallet['free'].astype(float)
+                df_wallet['locked'] = df_wallet['locked'].astype(float)
+                df_wallet = df_wallet[df_wallet['free'] > 0]
+                st.dataframe(df_wallet[['asset', 'free', 'locked']], use_container_width=True)
+                # Show total USDT and PnL if available
+                usdt_row = df_wallet[df_wallet['asset'] == 'USDT']
+                if not usdt_row.empty:
+                    st.metric("USDT Balance", usdt_row['free'].values[0])
+                else:
+                    st.info("No USDT balance found.")
+            else:
+                st.warning("Binance API keys not found in environment variables.")
+        except Exception as e:
+            st.error(f"Error fetching wallet: {e}")
+        st.info("If you see no wallet, check your API keys and Binance account.")
+
     with tabs[1]:
         show_logs()
+        st.info("Live logs from your bot will appear here. If empty, check your log file path and bot status.")
+
     with tabs[2]:
         st.header("⚙️ Settings")
-        st.write("Configure your bot settings here.")
-        # Add more settings as needed
+        trading_mode = st.radio("Trading Mode", ["Automated", "Manual"], key="settings_trading_mode")
+        risk_level = st.selectbox("Risk Level", ["Conservative", "Balanced", "Aggressive"], key="settings_risk_level")
+        log_retention = st.slider("Log Retention (days)", 1, 30, 7, key="settings_log_retention")
+        notification = st.multiselect("Notification Channels", ["Email", "Telegram"], key="settings_notification")
+        st.write(f"Current mode: {trading_mode}, Risk: {risk_level}, Log retention: {log_retention} days, Notification: {', '.join(notification) if notification else 'None'}")
+        st.info("Settings are for display only. To make changes, edit your config or .env file.")
+
     with tabs[3]:
-        st.header("🧠 Strategy Selection")
-        strategy_mode = st.radio("Select Strategy Mode", ["Automated", "Manual"], key="strategy_mode")
-        if strategy_mode == "Automated":
-            st.success("Automated strategy enabled.")
-            # Add automated strategy controls/info here
-        else:
-            st.info("Manual strategy enabled. You can place trades manually.")
-            # Add manual trading controls here
+        st.header("🧠 Strategy Selection & ML Status")
+        try:
+            from enhanced_ml_strategy import ml_strategy, get_ml_enhanced_signal
+            st.write("Current ML Model Path:", ml_strategy.model_path)
+            if ml_strategy.model:
+                st.success("ML model loaded and active.")
+            else:
+                st.warning("No ML model loaded. Using traditional strategy only.")
+            if st.button("Retrain ML Model"):
+                st.info("Retraining not implemented in dashboard. Use CLI or script.")
+            st.write("---")
+            st.write("Current ML-enhanced signal preview:")
+            klines_json = st.text_area("Paste klines JSON (list of lists, 120+ entries)", "", key="ml_klines_json")
+            import json
+            if klines_json:
+                try:
+                    user_klines = json.loads(klines_json)
+                    signal, confidence = get_ml_enhanced_signal(user_klines)
+                    st.metric("Signal", signal)
+                    st.metric("Confidence", f"{confidence:.2f}")
+                except Exception as e:
+                    st.error(f"Error parsing klines: {e}")
+            else:
+                st.info("Paste klines data above to preview ML signal.")
+        except Exception as e:
+            st.error(f"ML strategy not available: {e}")
+
     with tabs[4]:
         st.header("💓 Bot Health & Connection")
-        # Heartbeat status is also shown in logs, but summarize here
+        st.write("- Bot running status: ", "🟢 Running" if controller.is_running() else "🔴 Stopped")
         if os.path.exists("logs/console_output.log"):
             with open("logs/console_output.log", "r", encoding="utf-8") as f:
                 last_lines = f.readlines()[-10:]
             heartbeat_found = any("heartbeat" in l.lower() for l in last_lines)
+            st.write("Last 10 log lines:")
+            st.code("\n".join(last_lines))
             if heartbeat_found:
                 st.success("Bot heartbeat detected ✅")
             else:
                 st.warning("No recent heartbeat detected ⚠️")
         else:
             st.warning("Log file not found.")
+        st.info("If health info is missing, check your bot and log file paths.")
 
 if __name__ == "__main__":
     st.set_page_config(page_title="Bot Dashboard", layout="wide")
