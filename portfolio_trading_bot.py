@@ -1,4 +1,6 @@
 import os
+from dotenv import load_dotenv
+load_dotenv()
 import time
 import streamlit as st
 from datetime import datetime
@@ -356,75 +358,147 @@ def main():
         else:
             st.info("No PnL data available yet.")
 
-    while True:
-        try:
-            st.set_page_config(page_title="🎯 Multi-Coin Portfolio Bot", layout="wide")
-            st.title("🎯 Multi-Coin Portfolio Trading Bot")
-            st.caption("Scan ALL your cryptocurrency holdings for trading opportunities")
+    import threading
+    from streamlit.runtime.scriptrunner import add_script_run_ctx
 
-            selected_tab = st.sidebar.radio(
-                "Select Dashboard Tab",
-                ["Portfolio Overview", "Performance", "Logs", "Settings", "Strategy", "Health"]
-            )
+    # Shared state for bot running and thread
+    if 'bot_running' not in st.session_state:
+        st.session_state['bot_running'] = False
+    if 'bot_thread' not in st.session_state:
+        st.session_state['bot_thread'] = None
+    if 'stop_bot' not in st.session_state:
+        st.session_state['stop_bot'] = False
 
-            if selected_tab == "Portfolio Overview":
-                st.subheader("💼 Portfolio Overview")
-                bot = MultiCoinPortfolioBot()
-                portfolio = bot.get_portfolio_holdings()
-                usd_to_gbp = bot.usd_to_gbp_rate
-                render_portfolio_summary(portfolio, usd_to_gbp)
-                render_pnl_chart()
+    def run_bot_continuous():
+        st.session_state['bot_running'] = True
+        bot = MultiCoinPortfolioBot()
+        while not st.session_state.get('stop_bot', False):
+            opportunities = bot.scan_all_holdings()
+            st.session_state['last_opportunities'] = opportunities
+            time.sleep(5)  # Scan every 5 seconds for near real-time updates
+        st.session_state['bot_running'] = False
 
-            elif selected_tab == "Performance":
-                st.subheader("Wallet Performance")
-                bot = MultiCoinPortfolioBot()
-                portfolio = bot.get_portfolio_holdings()
-                usd_to_gbp = bot.usd_to_gbp_rate
-                render_portfolio_summary(portfolio, usd_to_gbp, show_table=False)
+    st.sidebar.markdown("---")
+    start_disabled = st.session_state.get('bot_running', False)
+    stop_disabled = not st.session_state.get('bot_running', False)
+    if st.sidebar.button("▶️ Start Bot", disabled=start_disabled):
+        st.session_state['stop_bot'] = False
+        bot_thread = threading.Thread(target=run_bot_continuous)
+        add_script_run_ctx(bot_thread)
+        bot_thread.start()
+        st.session_state['bot_thread'] = bot_thread
+        st.sidebar.success("Bot started!")
+    if st.sidebar.button("⏹️ Stop Bot", disabled=stop_disabled):
+        st.session_state['stop_bot'] = True
+        st.sidebar.info("Stopping bot...")
+    if st.session_state.get('bot_running', False):
+        st.sidebar.info("Bot is running continuously...")
+    elif 'last_opportunities' in st.session_state:
+        st.sidebar.success("Bot stopped. Results available.")
+
+    try:
+        st.set_page_config(page_title="🎯 Multi-Coin Portfolio Bot", layout="wide")
+        st.title("🎯 Multi-Coin Portfolio Trading Bot")
+        st.caption("Scan ALL your cryptocurrency holdings for trading opportunities")
+
+        selected_tab = st.sidebar.radio(
+            "Select Dashboard Tab",
+            ["Portfolio Overview", "Performance", "Logs", "Settings", "Strategy", "Health"]
+        )
+
+        if selected_tab == "Portfolio Overview":
+            st.subheader("💼 Portfolio Overview")
+            bot = MultiCoinPortfolioBot()
+            portfolio = bot.get_portfolio_holdings()
+            usd_to_gbp = bot.usd_to_gbp_rate
+
+            # Show current mode and strategy
+            mode = st.session_state.get('strategy_mode', 'Automatic')
+            strategy = st.session_state.get('selected_strategy', 'ML Enhanced')
+            st.markdown(f"**Mode:** `{mode}`  |  **Strategy:** `{strategy}`")
+
+            # Market Volatility and Summary
+            try:
+                # Calculate volatility as stddev of 1h returns for top assets
                 if portfolio:
-                    st.dataframe(pd.DataFrame(portfolio).T)
-
-            elif selected_tab == "Logs":
-                st.subheader("Bot Logs")
-                log_file = "logs/console_output.log"
-                if os.path.exists(log_file):
-                    with open(log_file, "r") as f:
-                        logs = f.read()
-                    st.text_area("Console Output", logs, height=300)
+                    client = bot.client
+                    volatilities = []
+                    price_changes = []
+                    for asset, data in list(portfolio.items())[:5]:
+                        symbol = data['symbol']
+                        klines = client.get_klines(symbol=symbol, interval=Client.KLINE_INTERVAL_1MINUTE, limit=60)
+                        closes = [float(k[4]) for k in klines]
+                        returns = pd.Series(closes).pct_change().dropna()
+                        vol = returns.std() * (60 ** 0.5) * 100  # annualized approx
+                        volatilities.append(vol)
+                        price_changes.append((closes[-1] - closes[0]) / closes[0] * 100)
+                    avg_vol = sum(volatilities) / len(volatilities)
+                    avg_change = sum(price_changes) / len(price_changes)
+                    st.info(f"**Market Volatility (1h, avg top assets):** {avg_vol:.2f}% | **Avg 1h Change:** {avg_change:+.2f}%")
+                    if avg_vol > 2:
+                        st.warning("High volatility: Consider risk management.")
+                    elif avg_vol < 0.5:
+                        st.info("Low volatility: Market is calm.")
                 else:
-                    st.info("No log file found.")
+                    st.info("No portfolio data to compute volatility.")
+            except Exception as e:
+                st.warning(f"Could not compute volatility: {e}")
 
-            elif selected_tab == "Settings":
-                st.subheader("Settings")
-                st.write("Configure bot settings here.")
-                st.write({
-                    "API_KEY": API_KEY,
-                    "USE_TESTNET": USE_TESTNET,
-                    "MIN_BALANCE_USD": MIN_BALANCE_USD
-                })
+            # Add any other important info for the trader
+            st.caption("Tip: Monitor volatility and mode to adapt your trading decisions. High volatility may increase risk and opportunity.")
 
-            elif selected_tab == "Strategy":
-                st.subheader("Strategy Selection")
-                strategies = ["ML Enhanced", "Momentum", "Mean Reversion", "Manual"]
-                strategy_mode = st.radio("Select Strategy Mode", ["Automatic", "Manual"], horizontal=True)
-                selected_strategy = st.selectbox("Choose Strategy", strategies)
-                st.write(f"Current Mode: {strategy_mode}")
-                st.write(f"Selected Strategy: {selected_strategy}")
-                if strategy_mode == "Manual":
-                    st.info("Manual mode: You control the strategy selection.")
-                else:
-                    st.info("Automatic mode: Bot will select the best strategy based on analytics.")
+            render_portfolio_summary(portfolio, usd_to_gbp)
+            render_pnl_chart()
 
-            elif selected_tab == "Health":
-                st.subheader("Bot Health & Status")
-                st.write("Binance API Connected:" if BINANCE_AVAILABLE and API_KEY and API_SECRET else "Not Connected")
-                st.write(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        elif selected_tab == "Performance":
+            st.subheader("Wallet Performance")
+            bot = MultiCoinPortfolioBot()
+            portfolio = bot.get_portfolio_holdings()
+            usd_to_gbp = bot.usd_to_gbp_rate
+            render_portfolio_summary(portfolio, usd_to_gbp, show_table=False)
+            if portfolio:
+                st.dataframe(pd.DataFrame(portfolio).T)
 
-            time.sleep(1)
-            st.rerun()
-        except Exception as e:
-            print(f"Error in main loop: {e}")
-            time.sleep(10)
+        elif selected_tab == "Logs":
+            st.subheader("Bot Logs")
+            log_file = "logs/console_output.log"
+            if os.path.exists(log_file):
+                with open(log_file, "r") as f:
+                    logs = f.read()
+                st.text_area("Console Output", logs, height=300)
+            else:
+                st.info("No log file found.")
+
+        elif selected_tab == "Settings":
+            st.subheader("Settings")
+            st.write("Configure bot settings here.")
+            st.write({
+                "API_KEY": API_KEY,
+                "USE_TESTNET": USE_TESTNET,
+                "MIN_BALANCE_USD": MIN_BALANCE_USD
+            })
+
+        elif selected_tab == "Strategy":
+            st.subheader("Strategy Selection")
+            strategies = ["ML Enhanced", "Momentum", "Mean Reversion", "Manual"]
+            strategy_mode = st.radio("Select Strategy Mode", ["Automatic", "Manual"], horizontal=True)
+            selected_strategy = st.selectbox("Choose Strategy", strategies)
+            st.write(f"Current Mode: {strategy_mode}")
+            st.write(f"Selected Strategy: {selected_strategy}")
+            if strategy_mode == "Manual":
+                st.info("Manual mode: You control the strategy selection.")
+            else:
+                st.info("Automatic mode: Bot will select the best strategy based on analytics.")
+
+        elif selected_tab == "Health":
+            st.subheader("Bot Health & Status")
+            st.write("Binance API Connected:" if BINANCE_AVAILABLE and API_KEY and API_SECRET else "Not Connected")
+            st.write(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+        # Remove sleep and rerun for more responsive UI
+    except Exception as e:
+        print(f"Error in main loop: {e}")
+        time.sleep(10)
 
 if __name__ == "__main__":
     main()
