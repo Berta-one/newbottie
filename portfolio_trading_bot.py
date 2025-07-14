@@ -88,48 +88,34 @@ class MultiCoinPortfolioBot:
             return False
     
     def get_portfolio_holdings(self):
-        """Get all coins in portfolio with significant balances"""
+        """Get all coins in portfolio with significant balances using Binance API only"""
         if not self.client:
-            # Return demo portfolio with more realistic values
-            return {
-                'BTC': {'balance': 0.15234, 'usd_value': 9890.45, 'symbol': 'BTCUSDT', 'price_usd': 64950.0},
-                'SOL': {'balance': 45.67, 'usd_value': 2876.32, 'symbol': 'SOLUSDT', 'price_usd': 62.98},
-                'XRP': {'balance': 1250.0, 'usd_value': 743.75, 'symbol': 'XRPUSDT', 'price_usd': 0.595},
-                'ETH': {'balance': 1.8945, 'usd_value': 4567.89, 'symbol': 'ETHUSDT', 'price_usd': 2410.50},
-                'ADA': {'balance': 2890.5, 'usd_value': 1234.56, 'symbol': 'ADAUSDT', 'price_usd': 0.427}
-            }
-        
+            st.error("❌ Binance API client not initialized. Check your API keys and network connection.")
+            return {}
         try:
             account = self.client.get_account()
             portfolio = {}
-            
             # Get all tickers for price calculation
             all_tickers = {t['symbol']: float(t['price']) for t in self.client.get_all_tickers()}
-            
             for balance in account['balances']:
                 asset = balance['asset']
                 free_balance = float(balance['free'])
                 locked_balance = float(balance['locked'])
                 total_balance = free_balance + locked_balance
-                
                 if total_balance > 0 and asset != 'USDT':
                     # Try different trading pairs to get USD value
                     symbol_usdt = f"{asset}USDT"
                     symbol_busd = f"{asset}BUSD"
                     symbol_usdc = f"{asset}USDC"
-                    
                     price_usd = 0
                     trading_symbol = None
-                    
                     for symbol in [symbol_usdt, symbol_busd, symbol_usdc]:
                         if symbol in all_tickers:
                             price_usd = all_tickers[symbol]
                             trading_symbol = symbol
                             break
-                    
                     if price_usd > 0:
                         usd_value = total_balance * price_usd
-                        
                         if usd_value >= MIN_BALANCE_USD:
                             portfolio[asset] = {
                                 'balance': total_balance,
@@ -139,9 +125,7 @@ class MultiCoinPortfolioBot:
                                 'usd_value': usd_value,
                                 'symbol': trading_symbol
                             }
-            
             return portfolio
-            
         except Exception as e:
             st.error(f"❌ Error fetching portfolio: {e}")
             return {}
@@ -316,197 +300,131 @@ class MultiCoinPortfolioBot:
         
         return suggestions
 
+
 def main():
-    st.set_page_config(page_title="🎯 Multi-Coin Portfolio Bot", layout="wide")
-    
-    st.title("🎯 Multi-Coin Portfolio Trading Bot")
-    st.caption("Scan ALL your cryptocurrency holdings for trading opportunities")
-    
-    # Initialize bot
-    if 'portfolio_bot' not in st.session_state:
-        st.session_state.portfolio_bot = MultiCoinPortfolioBot()
-    
-    bot = st.session_state.portfolio_bot
-    
-    # Update exchange rate periodically (every 5 minutes)
-    if 'last_fx_update' not in st.session_state or \
-       (datetime.now() - st.session_state.last_fx_update).total_seconds() > 300:
-        bot.update_gbp_rate()
-        st.session_state.last_fx_update = datetime.now()
-    
-    # Status bar
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        if bot.client:
-            st.metric("🟢 Connection", "Live", "Binance API")
-        else:
-            st.metric("🟡 Connection", "Demo", "Simulation Mode")
-    
-    with col2:
-        st.metric("💷 USD/GBP", f"{bot.usd_to_gbp_rate:.4f}", "Live Rate")
-    
-    with col3:
-        st.metric("🎯 Strategy", "Multi-Coin", "Portfolio Scan")
-    
-    with col4:
-        st.metric("⏰ Time", datetime.now().strftime("%H:%M:%S"), "Live")
-    
-    # Portfolio overview with GBP conversion
-    st.subheader("💼 Your Cryptocurrency Portfolio")
-    
-    portfolio = bot.get_portfolio_holdings()
-    
-    if portfolio:
-        # Calculate total values
+    def render_portfolio_summary(portfolio, usd_to_gbp, show_table=True):
+        if not portfolio:
+            st.warning("No portfolio data available. Check your Binance API keys and account.")
+            return
         total_usd = sum(coin['usd_value'] for coin in portfolio.values())
-        total_gbp = bot.get_portfolio_value_gbp(total_usd)
-        coin_count = len(portfolio)
-        
-        # Portfolio summary with prominent GBP display
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.metric("💷 Total Value (GBP)", f"£{total_gbp:,.2f}", 
-                     f"${total_usd:,.2f} USD")
-        
-        with col2:
-            st.metric("💰 USD Value", f"${total_usd:,.2f}", "USD")
-        
-        with col3:
-            st.metric("🪙 Assets", coin_count, "Cryptocurrencies")
-        
-        with col4:
-            if portfolio:
-                largest_holding = max(portfolio.values(), key=lambda x: x['usd_value'])
-                largest_asset = max(portfolio.keys(), key=lambda k: portfolio[k]['usd_value'])
-                st.metric("🥇 Largest", f"{largest_holding.get('balance', 0):.4f}", f"{largest_asset}")
-        
-        # Enhanced portfolio breakdown with GBP values
-        portfolio_data = []
-        for asset, data in portfolio.items():
-            gbp_value = bot.get_portfolio_value_gbp(data['usd_value'])
-            portfolio_data.append({
-                'Asset': asset,
-                'Balance': f"{data['balance']:.6f}",
-                'Price (USD)': f"${data.get('price_usd', 0):.4f}",
-                'USD Value': f"${data['usd_value']:.2f}",
-                'GBP Value': f"£{gbp_value:.2f}",
-                'Portfolio %': f"{(data['usd_value']/total_usd)*100:.1f}%"
-            })
-        
-        portfolio_df = pd.DataFrame(portfolio_data)
-        st.dataframe(portfolio_df, use_container_width=True)
-        
-        # Portfolio allocation chart
-        if len(portfolio) > 1:
-            chart_data = pd.DataFrame([
-                {'Asset': asset, 'Value': data['usd_value']}
-                for asset, data in portfolio.items()
-            ])
-            st.subheader("📊 Portfolio Allocation")
-            st.bar_chart(chart_data.set_index('Asset'))
-    
-    # Opportunity scanner
-    st.subheader("🔍 Live Opportunity Scanner")
-    
-    if st.button("🚀 Scan All Holdings for Opportunities") or 'last_scan' not in st.session_state:
-        with st.spinner("Analyzing all cryptocurrency holdings..."):
-            opportunities = bot.scan_all_holdings()
-            st.session_state.opportunities = opportunities
-            st.session_state.last_scan = datetime.now()
-    
-    # Display opportunities
-    if 'opportunities' in st.session_state and st.session_state.opportunities:
-        opportunities = st.session_state.opportunities
-        
-        st.subheader("🎯 Trading Opportunities Found")
-        
-        # Filter active opportunities
-        active_opps = [opp for opp in opportunities if opp['signal'] != 'HOLD']
-        
-        if active_opps:
-            st.success(f"Found {len(active_opps)} active trading opportunities!")
-            
-            # Display opportunities with GBP values
-            for i, opp in enumerate(active_opps[:10]):
-                with st.container():
-                    col1, col2, col3, col4, col5 = st.columns(5)
-                    
-                    with col1:
-                        signal_color = "🟢" if opp['signal'] == 'BUY' else "🔴"
-                        gbp_value = bot.get_portfolio_value_gbp(opp['usd_value'])
-                        st.metric(f"{signal_color} {opp['asset']}", 
-                                 f"${opp['current_price']:.4f}",
-                                 f"{opp['change_2h']:+.1f}%")
-                    
-                    with col2:
-                        st.metric("Signal", opp['signal'], 
-                                 f"Confidence: {opp['confidence']:.1%}")
-                    
-                    with col3:
-                        st.metric("Volume", f"{opp['volume_ratio']:.1f}x", "vs Average")
-                    
-                    with col4:
-                        rsi_status = "Overbought" if opp['rsi'] > 70 else "Oversold" if opp['rsi'] < 30 else "Neutral"
-                        st.metric("RSI", f"{opp['rsi']:.0f}", rsi_status)
-                    
-                    with col5:
-                        st.metric("Holdings", f"£{gbp_value:.0f}", 
-                                 f"{opp['balance']:.4f} {opp['asset']}")
-                
-                st.divider()
-        
-        else:
-            st.info("🕐 No active signals found. All holdings are in HOLD status.")
-        
-        # Portfolio rebalancing suggestions with GBP amounts
-        suggestions = bot.execute_portfolio_rebalancing(opportunities)
-        
-        if suggestions:
-            st.subheader("⚖️ Portfolio Rebalancing Suggestions")
-            
-            for suggestion in suggestions:
-                action_color = "🟢" if suggestion['action'] == 'BUY' else "🔴"
-                gbp_current = bot.get_portfolio_value_gbp(suggestion['current_value'])
-                gbp_suggested = bot.get_portfolio_value_gbp(suggestion['suggested_amount'])
-                
-                st.write(f"{action_color} **{suggestion['action']} {suggestion['asset']}**: {suggestion['reason']}")
-                st.write(f"   Current holding: £{gbp_current:.2f} (${suggestion['current_value']:.2f})")
-                st.write(f"   Suggested amount: £{gbp_suggested:.2f} (${suggestion['suggested_amount']:.2f})")
-    
-    # Exchange rate info
-    with st.expander("💷 Currency Information"):
-        st.info(f"""
-        **Current Exchange Rate:** 1 USD = {bot.usd_to_gbp_rate:.4f} GBP
-        
-        **Rate Source:** Live forex API (updates every 5 minutes)
-        
-        **Portfolio Display:**
-        - All values shown in both GBP and USD
-        - GBP is primary display currency
-        - Exchange rates updated automatically
-        """)
-    
-    # Configuration and settings
-    with st.expander("⚙️ Bot Configuration"):
-        st.json({
-            "Portfolio Scanning": "All holdings > $10 USD value",
-            "Currency Display": "GBP primary, USD secondary",
-            "Exchange Rate": f"1 USD = {bot.usd_to_gbp_rate:.4f} GBP",
-            "Supported Pairs": "USDT, BUSD, USDC trading pairs",
-            "Signal Threshold": "±5% price movement in 2 hours",
-            "Volume Confirmation": "1.5x average volume required",
-            "RSI Filters": "Avoid extreme overbought/oversold",
-            "Support/Resistance": "10-period high/low analysis",
-            "Concurrent Analysis": "Up to 5 coins simultaneously",
-            "Minimum Balance": f"${MIN_BALANCE_USD} USD equivalent",
-            "Rate Updates": "Every 5 minutes"
+        total_gbp = total_usd * usd_to_gbp
+        asset_count = len(portfolio)
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Total Value (USD)", f"${total_usd:,.2f}")
+        col2.metric("Total Value (GBP)", f"£{total_gbp:,.2f}")
+        col3.metric("Assets", asset_count)
+        if show_table:
+            st.markdown("### 🪙 Asset Breakdown")
+            portfolio_data = []
+            for asset, data in portfolio.items():
+                gbp_value = data['usd_value'] * usd_to_gbp
+                pct = (data['usd_value'] / total_usd) * 100 if total_usd else 0
+                portfolio_data.append({
+                    'Asset': asset,
+                    'Free': f"{data.get('free', data['balance']):.4f}",
+                    'Locked': f"{data.get('locked', 0):.4f}",
+                    'USD Value': f"${data['usd_value']:.2f}",
+                    'GBP Value': f"£{gbp_value:.2f}",
+                    '% of Portfolio': f"{pct:.2f}%"
+                })
+            df = pd.DataFrame(portfolio_data)
+            st.dataframe(df, use_container_width=True)
+        st.markdown("### 📊 Portfolio Allocation")
+        chart_data = pd.DataFrame({
+            'Asset': [a for a in portfolio.keys()],
+            'USD Value': [d['usd_value'] for d in portfolio.values()]
         })
-    
-    # Auto-refresh every 30 seconds
-    time.sleep(1)
-    st.rerun()
+        st.bar_chart(chart_data.set_index('Asset'))
+        return total_usd, total_gbp, asset_count
+
+    def render_pnl_chart():
+        pnl_file = "logs/single_pair_performance.json"
+        if os.path.exists(pnl_file):
+            try:
+                dfp = pd.read_json(pnl_file, lines=True)
+                dfp['timestamp'] = pd.to_datetime(dfp['timestamp'])
+                dfp = dfp.sort_values('timestamp')
+                if not dfp.empty:
+                    dfp['cumulative_pnl'] = dfp['pnl_percent'].cumsum()
+                    st.markdown("### 📈 Portfolio PnL (Cumulative)")
+                    import plotly.express as px
+                    fig = px.line(dfp, x='timestamp', y='cumulative_pnl', title="Cumulative PnL (%)")
+                    st.plotly_chart(fig, use_container_width=True)
+                    st.metric("Total PnL", f"{dfp['pnl_percent'].sum():+.2f}%")
+            except Exception as e:
+                st.warning(f"Could not load PnL data: {e}")
+        else:
+            st.info("No PnL data available yet.")
+
+    while True:
+        try:
+            st.set_page_config(page_title="🎯 Multi-Coin Portfolio Bot", layout="wide")
+            st.title("🎯 Multi-Coin Portfolio Trading Bot")
+            st.caption("Scan ALL your cryptocurrency holdings for trading opportunities")
+
+            selected_tab = st.sidebar.radio(
+                "Select Dashboard Tab",
+                ["Portfolio Overview", "Performance", "Logs", "Settings", "Strategy", "Health"]
+            )
+
+            if selected_tab == "Portfolio Overview":
+                st.subheader("💼 Portfolio Overview")
+                bot = MultiCoinPortfolioBot()
+                portfolio = bot.get_portfolio_holdings()
+                usd_to_gbp = bot.usd_to_gbp_rate
+                render_portfolio_summary(portfolio, usd_to_gbp)
+                render_pnl_chart()
+
+            elif selected_tab == "Performance":
+                st.subheader("Wallet Performance")
+                bot = MultiCoinPortfolioBot()
+                portfolio = bot.get_portfolio_holdings()
+                usd_to_gbp = bot.usd_to_gbp_rate
+                render_portfolio_summary(portfolio, usd_to_gbp, show_table=False)
+                if portfolio:
+                    st.dataframe(pd.DataFrame(portfolio).T)
+
+            elif selected_tab == "Logs":
+                st.subheader("Bot Logs")
+                log_file = "logs/console_output.log"
+                if os.path.exists(log_file):
+                    with open(log_file, "r") as f:
+                        logs = f.read()
+                    st.text_area("Console Output", logs, height=300)
+                else:
+                    st.info("No log file found.")
+
+            elif selected_tab == "Settings":
+                st.subheader("Settings")
+                st.write("Configure bot settings here.")
+                st.write({
+                    "API_KEY": API_KEY,
+                    "USE_TESTNET": USE_TESTNET,
+                    "MIN_BALANCE_USD": MIN_BALANCE_USD
+                })
+
+            elif selected_tab == "Strategy":
+                st.subheader("Strategy Selection")
+                strategies = ["ML Enhanced", "Momentum", "Mean Reversion", "Manual"]
+                strategy_mode = st.radio("Select Strategy Mode", ["Automatic", "Manual"], horizontal=True)
+                selected_strategy = st.selectbox("Choose Strategy", strategies)
+                st.write(f"Current Mode: {strategy_mode}")
+                st.write(f"Selected Strategy: {selected_strategy}")
+                if strategy_mode == "Manual":
+                    st.info("Manual mode: You control the strategy selection.")
+                else:
+                    st.info("Automatic mode: Bot will select the best strategy based on analytics.")
+
+            elif selected_tab == "Health":
+                st.subheader("Bot Health & Status")
+                st.write("Binance API Connected:" if BINANCE_AVAILABLE and API_KEY and API_SECRET else "Not Connected")
+                st.write(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+            time.sleep(1)
+            st.rerun()
+        except Exception as e:
+            print(f"Error in main loop: {e}")
+            time.sleep(10)
 
 if __name__ == "__main__":
     main()
