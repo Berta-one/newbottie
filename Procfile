@@ -1,1 +1,1 @@
-web: streamlit run portfolio_trading_bot.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true
+web: streamlit run adaptive_risk_system.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true
