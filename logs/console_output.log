@@ -1,0 +1,516 @@
+================================================================================
+🤖 Enhanced Single-Pair Bot Started - 2025-07-13 19:49:46.366277
+================================================================================
+🔧 Initializing Enhanced Single-Pair Trading Bot...
+📊 Configuration:
+   Symbol: BTCUSDT
+   Base Quantity: 0.001
+   Risk per Trade: 1.5%
+   ML Enhancement: ✅ Enabled
+   Strategy Comparison: ✅ Enabled
+   Paper Trading: ✅ Enabled
+   Scan Interval: 300s
+🧪 Running in TESTNET mode
+❌ Error getting account balance: APIError(code=-1021): Timestamp for this request was 1000ms ahead of the server's time.
+✅ Connected to Binance
+🕐 Server Time: 2025-07-13 19:49:31.604000
+💰 Account Balance: $0.00 USDT
+
+🎯 Starting Enhanced Trading Loop
+⏱️  Scan interval: 300 seconds
+────────────────────────────────────────────────────────────────────────────────
+
+🔄 [19:49:47] Loop #1
+📈 Market Analysis:
+   Price: $118876.9500
+   24h Change: +1.26%
+   Traditional: HOLD (conf: 0.80)
+   ML Enhanced: HOLD (conf: 0.80)
+   Volume Ratio: 1.07x
+   RSI: 23.4
+   Volatility: 0.0%
+   Market Structure: DOWNTREND
+⏱️  Waiting 300 seconds...
+
+🔄 [19:58:11] Loop #2
+❌ Error fetching market data: HTTPSConnectionPool(host='testnet.binance.vision', port=443): Read timed out. (read timeout=10)
+⚠️  Market data unavailable, skipping cycle
+
+🔄 [19:58:51] Loop #3
+📈 Market Analysis:
+   Price: $118992.5100
+   24h Change: +1.29%
+   Traditional: HOLD (conf: 0.85)
+   ML Enhanced: HOLD (conf: 0.85)
+   Volume Ratio: 0.13x
+   RSI: 61.6
+   Volatility: 0.0%
+   Market Structure: SIDEWAYS
+⏱️  Waiting 300 seconds...
+
+🔄 [20:03:52] Loop #4
+❌ Error fetching market data: HTTPSConnectionPool(host='testnet.binance.vision', port=443): Read timed out. (read timeout=10)
+⚠️  Market data unavailable, skipping cycle
+
+🔄 [20:04:32] Loop #5
+📈 Market Analysis:
+   Price: $119025.7700
+   24h Change: +1.27%
+   Traditional: HOLD (conf: 0.90)
+   ML Enhanced: HOLD (conf: 0.90)
+   Volume Ratio: 0.51x
+   RSI: 70.9
+   Volatility: 0.0%
+   Market Structure: UPTREND
+⏱️  Waiting 300 seconds...
+
+🔄 [20:09:32] Loop #6
+❌ Error fetching market data: HTTPSConnectionPool(host='testnet.binance.vision', port=443): Read timed out. (read timeout=10)
+⚠️  Market data unavailable, skipping cycle
+
+🔄 [20:10:12] Loop #7
+📈 Market Analysis:
+   Price: $118974.3200
+   24h Change: +1.16%
+   Traditional: HOLD (conf: 0.75)
+   ML Enhanced: HOLD (conf: 0.75)
+   Volume Ratio: 1.07x
+   RSI: 56.9
+   Volatility: 0.0%
+   Market Structure: SIDEWAYS
+⏱️  Waiting 300 seconds...
+
+🔄 [21:12:32] Loop #8
+❌ Error fetching market data: HTTPSConnectionPool(host='testnet.binance.vision', port=443): Read timed out. (read timeout=10)
+⚠️  Market data unavailable, skipping cycle
+
+🔄 [21:13:12] Loop #9
+📈 Market Analysis:
+   Price: $118946.8900
+   24h Change: +1.25%
+   Traditional: HOLD (conf: 0.85)
+   ML Enhanced: HOLD (conf: 0.85)
+   Volume Ratio: 0.80x
+   RSI: 37.6
+   Volatility: 0.0%
+   Market Structure: UPTREND
+⏱️  Waiting 300 seconds...
+================================================================================
+🤖 Enhanced Single-Pair Bot Started - 2025-07-13 21:14:38.421197
+================================================================================
+🔧 Initializing Enhanced Single-Pair Trading Bot...
+📊 Configuration:
+   Symbol: BTCUSDT
+   Base Quantity: 0.001
+   Risk per Trade: 1.5%
+   ML Enhancement: ✅ Enabled
+   Strategy Comparison: ✅ Enabled
+   Paper Trading: ✅ Enabled
+   Scan Interval: 300s
+🧪 Running in TESTNET mode
+❌ Error getting account balance: APIError(code=-1021): Timestamp for this request was 1000ms ahead of the server's time.
+✅ Connected to Binance
+🕐 Server Time: 2025-07-13 21:14:23.591000
+💰 Account Balance: $0.00 USDT
+
+🎯 Starting Enhanced Trading Loop
+⏱️  Scan interval: 300 seconds
+────────────────────────────────────────────────────────────────────────────────
+
+🔄 [21:14:39] Loop #1
+📈 Market Analysis:
+   Price: $118939.9900
+   24h Change: +1.26%
+   Traditional: HOLD (conf: 0.95)
+   ML Enhanced: HOLD (conf: 0.95)
+   Volume Ratio: 0.00x
+   RSI: 48.1
+   Volatility: 0.0%
+   Market Structure: UPTREND
+⏱️  Waiting 300 seconds...
+
+🛑 Received shutdown signal (2)
+
+🔄 Shutting down Enhanced Single-Pair Bot...
+📄 Session report saved to logs/session_report_20250713_211525.json
+✅ Bot shutdown complete
+
+🔄 Shutting down Enhanced Single-Pair Bot...
+📄 Session report saved to logs/session_report_20250713_211525.json
+✅ Bot shutdown complete
+
+🔄 Running bot at 2025-07-13 21:15:40
+
+🔄 Running bot at 2025-07-13 21:15:50
+
+🔄 Running bot at 2025-07-13 21:16:01
+
+🛑 Received shutdown signal (2)
+
+🔄 Shutting down Enhanced Single-Pair Bot...
+📄 Session report saved to logs/session_report_20250713_211607.json
+✅ Bot shutdown complete
+
+🔄 Shutting down Enhanced Single-Pair Bot...
+📄 Session report saved to logs/session_report_20250713_211607.json
+✅ Bot shutdown complete
+
+🔄 Running bot at 2025-07-13 21:16:11
+
+🔄 Running bot at 2025-07-13 21:16:22
+
+🔄 Running bot at 2025-07-13 21:16:32
+
+🔄 Running bot at 2025-07-13 21:16:42
+
+🔄 Running bot at 2025-07-13 21:16:52
+
+🔄 Running bot at 2025-07-13 21:17:03
+
+🔄 Running bot at 2025-07-13 21:17:13
+
+🔄 Running bot at 2025-07-13 21:17:23
+
+🔄 Running bot at 2025-07-13 21:17:34
+
+🔄 Running bot at 2025-07-13 21:17:44
+
+🔄 Running bot at 2025-07-13 21:17:55
+
+🔄 Running bot at 2025-07-13 21:18:05
+
+🔄 Running bot at 2025-07-13 21:18:15
+
+🔄 Running bot at 2025-07-13 21:18:26
+
+🔄 Running bot at 2025-07-13 21:18:36
+
+🔄 Running bot at 2025-07-13 21:18:47
+
+🔄 Running bot at 2025-07-13 21:18:57
+
+🔄 Running bot at 2025-07-13 21:19:07
+
+🔄 Running bot at 2025-07-13 21:19:17
+
+🔄 Running bot at 2025-07-13 21:19:28
+
+🔄 Running bot at 2025-07-13 21:19:38
+
+🔄 Running bot at 2025-07-13 21:19:48
+
+🔄 Running bot at 2025-07-13 21:19:58
+
+🔄 Running bot at 2025-07-13 21:20:08
+
+🔄 Running bot at 2025-07-13 21:20:19
+
+🔄 Running bot at 2025-07-13 21:20:29
+
+🔄 Running bot at 2025-07-13 21:20:40
+
+🔄 Running bot at 2025-07-13 21:20:50
+
+🔄 Running bot at 2025-07-13 21:21:00
+
+🔄 Running bot at 2025-07-13 21:21:10
+
+🔄 Running bot at 2025-07-13 21:21:21
+
+🔄 Running bot at 2025-07-13 21:21:32
+
+🔄 Running bot at 2025-07-13 21:21:42
+
+🔄 Running bot at 2025-07-13 21:21:52
+
+🔄 Running bot at 2025-07-13 21:22:03
+
+🔄 Running bot at 2025-07-13 21:22:13
+
+🔄 Running bot at 2025-07-13 21:22:24
+
+🔄 Running bot at 2025-07-13 21:22:34
+
+🔄 Running bot at 2025-07-13 21:22:44
+
+🔄 Running bot at 2025-07-13 21:22:54
+
+🔄 Running bot at 2025-07-13 21:23:05
+
+🔄 Running bot at 2025-07-13 21:23:15
+
+🔄 Running bot at 2025-07-13 21:23:26
+
+🔄 Running bot at 2025-07-13 21:23:36
+
+🔄 Running bot at 2025-07-13 21:23:46
+
+🔄 Running bot at 2025-07-13 21:23:56
+
+🔄 Running bot at 2025-07-13 21:24:06
+
+🔄 Running bot at 2025-07-13 21:24:17
+
+🔄 Running bot at 2025-07-13 21:24:27
+
+🔄 Running bot at 2025-07-13 21:24:37
+
+🔄 Running bot at 2025-07-13 21:24:47
+
+🔄 Running bot at 2025-07-13 21:24:58
+
+🔄 Running bot at 2025-07-13 21:25:08
+
+🔄 Running bot at 2025-07-13 21:25:18
+
+🔄 Running bot at 2025-07-13 21:25:28
+
+🔄 Running bot at 2025-07-13 21:25:39
+
+🔄 Running bot at 2025-07-13 21:25:49
+
+🔄 Running bot at 2025-07-13 21:25:59
+
+🔄 Running bot at 2025-07-13 21:26:09
+
+🔄 Running bot at 2025-07-13 21:26:19
+
+🔄 Running bot at 2025-07-13 21:26:30
+
+🔄 Running bot at 2025-07-13 21:26:40
+
+🔄 Running bot at 2025-07-13 21:26:50
+
+🔄 Running bot at 2025-07-13 21:27:00
+
+🔄 Running bot at 2025-07-13 21:27:11
+
+🔄 Running bot at 2025-07-13 21:27:21
+
+🔄 Running bot at 2025-07-13 21:27:31
+
+🔄 Running bot at 2025-07-13 21:27:42
+
+🔄 Running bot at 2025-07-13 21:27:52
+
+🔄 Running bot at 2025-07-13 21:28:02
+
+🔄 Running bot at 2025-07-13 21:28:12
+
+🔄 Running bot at 2025-07-13 21:28:23
+
+🔄 Running bot at 2025-07-13 21:28:33
+
+🔄 Running bot at 2025-07-13 21:28:43
+
+🔄 Running bot at 2025-07-13 21:28:53
+
+🔄 Running bot at 2025-07-13 21:29:04
+
+🔄 Running bot at 2025-07-13 21:29:14
+
+🔄 Running bot at 2025-07-13 21:29:24
+
+🔄 Running bot at 2025-07-13 21:29:34
+
+🔄 Running bot at 2025-07-13 21:29:45
+
+🔄 Running bot at 2025-07-13 21:29:55
+
+🔄 Running bot at 2025-07-13 21:30:05
+
+🔄 Running bot at 2025-07-13 21:30:16
+
+🔄 Running bot at 2025-07-13 21:30:26
+
+🔄 Running bot at 2025-07-13 21:30:36
+
+🔄 Running bot at 2025-07-13 21:30:46
+
+🔄 Running bot at 2025-07-13 21:30:57
+
+🔄 Running bot at 2025-07-13 21:31:07
+
+🔄 Running bot at 2025-07-13 21:31:17
+
+🔄 Running bot at 2025-07-13 21:31:27
+
+🔄 Running bot at 2025-07-13 21:31:38
+
+🔄 Running bot at 2025-07-13 21:31:48
+
+🔄 Running bot at 2025-07-13 21:31:58
+
+🔄 Running bot at 2025-07-13 21:32:09
+
+🔄 Running bot at 2025-07-13 21:32:19
+
+🔄 Running bot at 2025-07-13 21:32:29
+
+🔄 Running bot at 2025-07-13 21:32:39
+
+🔄 Running bot at 2025-07-13 21:32:50
+
+🔄 Running bot at 2025-07-13 21:33:00
+
+🔄 Running bot at 2025-07-13 21:33:10
+
+🔄 Running bot at 2025-07-13 21:33:20
+
+🔄 Running bot at 2025-07-13 21:33:31
+
+🔄 Running bot at 2025-07-13 21:33:41
+
+🔄 Running bot at 2025-07-13 21:33:51
+
+🔄 Running bot at 2025-07-13 21:34:01
+
+🔄 Running bot at 2025-07-13 21:34:12
+
+🔄 Running bot at 2025-07-13 21:34:22
+
+🔄 Running bot at 2025-07-13 21:34:32
+
+🔄 Running bot at 2025-07-13 21:34:42
+
+🔄 Running bot at 2025-07-13 21:34:52
+
+🔄 Running bot at 2025-07-13 21:35:03
+
+🔄 Running bot at 2025-07-13 21:35:13
+
+🔄 Running bot at 2025-07-13 21:35:23
+
+🔄 Running bot at 2025-07-13 21:35:34
+
+🔄 Running bot at 2025-07-13 21:35:44
+
+🔄 Running bot at 2025-07-13 21:35:54
+
+🔄 Running bot at 2025-07-13 21:36:04
+
+🔄 Running bot at 2025-07-13 21:36:15
+
+🔄 Running bot at 2025-07-13 21:36:25
+
+🔄 Running bot at 2025-07-13 21:36:36
+
+🔄 Running bot at 2025-07-13 21:36:46
+
+🔄 Running bot at 2025-07-13 21:36:56
+
+🔄 Running bot at 2025-07-13 21:37:06
+
+🔄 Running bot at 2025-07-13 21:37:17
+
+🔄 Running bot at 2025-07-13 21:37:27
+
+🔄 Running bot at 2025-07-13 21:37:37
+
+🔄 Running bot at 2025-07-13 21:37:47
+
+🔄 Running bot at 2025-07-13 21:37:58
+
+🔄 Running bot at 2025-07-13 21:38:08
+
+🔄 Running bot at 2025-07-13 21:38:18
+
+🔄 Running bot at 2025-07-13 21:38:28
+
+🔄 Running bot at 2025-07-13 21:38:39
+
+🔄 Running bot at 2025-07-13 21:38:49
+
+🔄 Running bot at 2025-07-13 21:38:59
+
+🔄 Running bot at 2025-07-13 21:39:10
+
+🔄 Running bot at 2025-07-13 21:39:20
+
+🔄 Running bot at 2025-07-13 21:39:30
+
+🔄 Running bot at 2025-07-13 21:39:41
+
+🔄 Running bot at 2025-07-13 21:39:51
+
+🔄 Running bot at 2025-07-13 21:40:01
+
+🔄 Running bot at 2025-07-13 21:40:11
+
+🔄 Running bot at 2025-07-13 21:40:22
+
+🔄 Running bot at 2025-07-13 21:40:32
+
+🔄 Running bot at 2025-07-13 21:40:43
+
+🔄 Running bot at 2025-07-13 21:40:53
+
+🔄 Running bot at 2025-07-13 21:41:03
+
+🔄 Running bot at 2025-07-13 21:41:13
+
+🔄 Running bot at 2025-07-13 21:41:24
+
+🔄 Running bot at 2025-07-13 21:41:34
+
+🔄 Running bot at 2025-07-13 21:41:44
+
+🔄 Running bot at 2025-07-13 21:41:54
+
+🔄 Running bot at 2025-07-13 21:42:05
+
+🔄 Running bot at 2025-07-13 21:42:15
+
+🔄 Running bot at 2025-07-13 21:42:25
+
+🔄 Running bot at 2025-07-13 21:42:36
+
+🔄 Running bot at 2025-07-13 21:42:46
+
+🔄 Running bot at 2025-07-13 21:42:56
+
+🔄 Running bot at 2025-07-13 21:43:06
+
+🔄 Running bot at 2025-07-13 21:43:17
+
+🔄 Running bot at 2025-07-13 21:43:27
+
+🔄 Running bot at 2025-07-13 21:43:37
+
+🔄 Running bot at 2025-07-13 21:43:48
+
+🔄 Running bot at 2025-07-13 21:43:58
+
+🔄 Running bot at 2025-07-13 21:44:08
+
+🔄 Running bot at 2025-07-13 21:44:19
+
+🔄 Running bot at 2025-07-13 21:44:29
+
+🔄 Running bot at 2025-07-13 21:44:39
+
+🔄 Running bot at 2025-07-13 21:44:49
+
+🔄 Running bot at 2025-07-13 21:45:00
+
+🔄 Running bot at 2025-07-13 21:45:10
+
+🔄 Running bot at 2025-07-13 21:45:20
+
+🔄 Running bot at 2025-07-13 21:45:31
+
+🔄 Running bot at 2025-07-13 21:45:41
+
+🔄 Running bot at 2025-07-13 21:45:51
+
+🔄 Running bot at 2025-07-13 21:46:01
+
+🔄 Running bot at 2025-07-13 21:46:11
+
+🔄 Running bot at 2025-07-13 21:46:22
+
+🔄 Running bot at 2025-07-13 21:46:33
+
+🔄 Running bot at 2025-07-13 21:46:43
+
+🔄 Running bot at 2025-07-13 21:46:53

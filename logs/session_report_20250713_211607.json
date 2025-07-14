@@ -1,0 +1,72 @@
+{
+  "session_info": {
+    "start_time": "2025-07-13T19:49:46.363765",
+    "end_time": "2025-07-13T21:16:07.697006",
+    "duration_hours": 1.4392592336111112,
+    "trade_symbol": "BTCUSDT",
+    "configuration": {
+      "use_ml_enhancement": true,
+      "strategy_comparison_mode": true,
+      "enable_paper_trading": true,
+      "risk_percentage": 0.015,
+      "base_trade_qty": 0.001
+    }
+  },
+  "performance_metrics": {
+    "total_pnl_percent": 0.0,
+    "winning_trades": 0,
+    "losing_trades": 0,
+    "total_trades": 0,
+    "max_drawdown": 0.0,
+    "current_drawdown": 0.0,
+    "peak_pnl": 0.0
+  },
+  "strategy_comparison": [
+    {
+      "timestamp": "2025-07-13T19:49:47.920952",
+      "traditional_signal": "HOLD",
+      "traditional_confidence": 0.7999999999999999,
+      "ml_signal": "HOLD",
+      "ml_confidence": 0.7999999999999999,
+      "agreement": true,
+      "confidence_diff": 0.0
+    },
+    {
+      "timestamp": "2025-07-13T19:58:51.990560",
+      "traditional_signal": "HOLD",
+      "traditional_confidence": 0.85,
+      "ml_signal": "HOLD",
+      "ml_confidence": 0.85,
+      "agreement": true,
+      "confidence_diff": 0.0
+    },
+    {
+      "timestamp": "2025-07-13T20:04:32.728496",
+      "traditional_signal": "HOLD",
+      "traditional_confidence": 0.8999999999999999,
+      "ml_signal": "HOLD",
+      "ml_confidence": 0.8999999999999999,
+      "agreement": true,
+      "confidence_diff": 0.0
+    },
+    {
+      "timestamp": "2025-07-13T20:10:13.456103",
+      "traditional_signal": "HOLD",
+      "traditional_confidence": 0.75,
+      "ml_signal": "HOLD",
+      "ml_confidence": 0.75,
+      "agreement": true,
+      "confidence_diff": 0.0
+    },
+    {
+      "timestamp": "2025-07-13T21:13:14.104276",
+      "traditional_signal": "HOLD",
+      "traditional_confidence": 0.85,
+      "ml_signal": "HOLD",
+      "ml_confidence": 0.85,
+      "agreement": true,
+      "confidence_diff": 0.0
+    }
+  ],
+  "final_position": null
+}

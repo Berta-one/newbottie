@@ -1,0 +1,36 @@
+{
+  "session_info": {
+    "start_time": "2025-07-13T21:14:38.408071",
+    "end_time": "2025-07-13T21:15:25.009262",
+    "duration_hours": 0.012944775277777779,
+    "trade_symbol": "BTCUSDT",
+    "configuration": {
+      "use_ml_enhancement": true,
+      "strategy_comparison_mode": true,
+      "enable_paper_trading": true,
+      "risk_percentage": 0.015,
+      "base_trade_qty": 0.001
+    }
+  },
+  "performance_metrics": {
+    "total_pnl_percent": 0.0,
+    "winning_trades": 0,
+    "losing_trades": 0,
+    "total_trades": 0,
+    "max_drawdown": 0.0,
+    "current_drawdown": 0.0,
+    "peak_pnl": 0.0
+  },
+  "strategy_comparison": [
+    {
+      "timestamp": "2025-07-13T21:14:39.961061",
+      "traditional_signal": "HOLD",
+      "traditional_confidence": 0.95,
+      "ml_signal": "HOLD",
+      "ml_confidence": 0.95,
+      "agreement": true,
+      "confidence_diff": 0.0
+    }
+  ],
+  "final_position": null
+}
