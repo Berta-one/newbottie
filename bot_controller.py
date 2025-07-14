@@ -455,6 +455,263 @@ class MultiCoinPortfolioBot:
             st.error(f"❌ Error fetching portfolio: {e}")
             return {}
 
+def render_overview_tab(bot, risk_manager, portfolio, market_condition, condition_score, avg_volatility, recommended_profile):
+    """Render the main overview tab with key metrics"""
+    
+    # Portfolio overview with GBP
+    total_usd = sum(coin['usd_value'] for coin in portfolio.values())
+    total_gbp = bot.get_portfolio_value_gbp(total_usd)
+    
+    # Key metrics in top row
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("💷 Portfolio Value", f"£{total_gbp:,.2f}")
+    
+    with col2:
+        condition_color = "🟢" if condition_score > 0.6 else "🟡" if condition_score > 0.4 else "🔴"
+        st.metric(f"{condition_color} Market", 
+                 market_condition.replace('_', ' ').title())
+    
+    with col3:
+        volatility_level = "High" if avg_volatility > 3 else "Medium" if avg_volatility > 1.5 else "Low"
+        st.metric("📈 Volatility", f"{avg_volatility:.1f}%")
+    
+    with col4:
+        st.metric("🎯 Active Profile", 
+                 risk_manager.risk_profiles[recommended_profile]['name'])
+    
+    st.divider()
+    
+    # Portfolio breakdown
+    st.subheader("💼 Portfolio Holdings")
+    
+    # Create portfolio table
+    portfolio_data = []
+    for asset, data in portfolio.items():
+        portfolio_data.append({
+            'Asset': asset,
+            'Balance': f"{data['balance']:.4f}",
+            'Price (USD)': f"${data['price_usd']:.4f}",
+            'Value (USD)': f"${data['usd_value']:.2f}",
+            'Value (GBP)': f"£{bot.get_portfolio_value_gbp(data['usd_value']):.2f}",
+            'Percentage': f"{(data['usd_value'] / total_usd * 100):.1f}%"
+        })
+    
+    df = pd.DataFrame(portfolio_data)
+    st.dataframe(df, use_container_width=True, hide_index=True)
+    
+    # Quick stats
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("🪙 Total Assets", len(portfolio))
+    with col2:
+        st.metric("💰 USD Value", f"${total_usd:,.2f}")
+    with col3:
+        st.metric("🔄 Exchange Rate", f"1 USD = £{bot.usd_to_gbp_rate:.4f}")
+
+def render_risk_management_tab(risk_manager, portfolio, market_condition, avg_volatility):
+    """Render the risk management details tab"""
+    
+    st.subheader("⚖️ Dynamic Risk Rules by Asset")
+    
+    for asset, data in portfolio.items():
+        confidence = np.random.uniform(0.6, 0.95)  # Simulated confidence
+        dynamic_rules = risk_manager.get_dynamic_rules(asset, confidence, market_condition, avg_volatility)
+        
+        with st.expander(f"{asset} ({data['symbol']}) - Current Rules"):
+            
+            # Asset info
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Current Price", f"${data['price_usd']:.4f}")
+                st.metric("Holdings", f"{data['balance']:.4f} {asset}")
+            with col2:
+                st.metric("USD Value", f"${data['usd_value']:.2f}")
+                st.metric("GBP Value", f"£{data['usd_value'] * 0.79:.2f}")
+            
+            st.divider()
+            
+            # Risk rules
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric("Take Profit", f"{dynamic_rules['take_profit']:.1f}%", 
+                         help="Profit target based on market conditions")
+                st.metric("Stop Loss", f"{dynamic_rules['stop_loss']:.1f}%",
+                         help="Maximum acceptable loss")
+            
+            with col2:
+                st.metric("Trailing Stop", f"{dynamic_rules['trailing_stop']:.1f}%",
+                         help="Trailing stop once in profit")
+                st.metric("Max Hold Time", f"{dynamic_rules['max_hold_hours']:.0f}h",
+                         help="Maximum time to hold position")
+            
+            with col3:
+                st.metric("Risk Profile", dynamic_rules['profile_used'],
+                         help="Selected based on market conditions")
+                st.metric("Risk Factor", f"{dynamic_rules['asset_risk_factor']:.2f}x",
+                         help="Asset-specific risk adjustment")
+            
+            # Additional details
+            st.caption(f"Confidence: {confidence:.1%} | Market Condition: {market_condition}")
+
+def render_profiles_tab(risk_manager):
+    """Render the risk profiles information tab"""
+    
+    st.subheader("📊 Professional Risk Management Profiles")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("### 🛡️ Available Profiles")
+        for profile_key, profile in risk_manager.risk_profiles.items():
+            with st.expander(f"{profile['name']} Profile"):
+                st.write(f"**Description:** {profile['description']}")
+                
+                metrics_col1, metrics_col2 = st.columns(2)
+                with metrics_col1:
+                    st.write(f"**Take Profit:** {profile['take_profit']}%")
+                    st.write(f"**Stop Loss:** {profile['stop_loss']}%")
+                with metrics_col2:
+                    st.write(f"**Trailing Stop:** {profile['trailing_stop']}%")
+                    st.write(f"**Max Hold:** {profile['max_hold_hours']} hours")
+                
+                st.write(f"**Min Confidence:** {profile['confidence_threshold']:.0%}")
+    
+    with col2:
+        st.markdown("### 🌍 Market Conditions")
+        
+        for condition, description in risk_manager.market_conditions.items():
+            condition_formatted = condition.replace('_', ' ').title()
+            
+            # Add icons for conditions
+            icon = "🟢" if "BULL" in condition else "🔴" if "BEAR" in condition else "🟡" if "VOLATILITY" in condition else "⚪" if "CONSOLIDATING" in condition else "❓"
+            
+            st.write(f"{icon} **{condition_formatted}:** {description}")
+        
+        st.divider()
+        
+        st.markdown("### 🧠 Auto-Selection Logic")
+        st.write("""
+        **The system automatically selects profiles based on:**
+        - Market volatility levels (ATR + standard deviation)
+        - Trend strength across portfolio
+        - Volume patterns and momentum
+        - Recent portfolio performance
+        - Asset-specific risk characteristics
+        """)
+
+def render_analytics_tab(portfolio, market_condition, avg_volatility):
+    """Render analytics and insights tab"""
+    
+    st.subheader("📈 Market Analysis & Insights")
+    
+    # Market condition details
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("### 🌐 Current Market State")
+        
+        condition_color = "success" if "BULL" in market_condition else "error" if "BEAR" in market_condition else "warning"
+        st.success(f"**Condition:** {market_condition.replace('_', ' ').title()}")
+        
+        st.info(f"**Average Volatility:** {avg_volatility:.2f}%")
+        
+        # Volatility classification
+        if avg_volatility > 4.0:
+            vol_class = "Very High - Consider scalping strategies"
+        elif avg_volatility > 3.0:
+            vol_class = "High - Use wider stops"
+        elif avg_volatility > 2.0:
+            vol_class = "Medium - Standard approach"
+        elif avg_volatility > 1.0:
+            vol_class = "Low - Consider range trading"
+        else:
+            vol_class = "Very Low - Markets may be ranging"
+        
+        st.write(f"**Volatility Assessment:** {vol_class}")
+    
+    with col2:
+        st.markdown("### 💡 Trading Insights")
+        
+        # Generate insights based on market condition
+        insights = []
+        
+        if market_condition == "BULL_TRENDING":
+            insights = [
+                "🟢 Consider swing trading strategies",
+                "📈 Trend following approaches favored",
+                "⏳ Longer hold times may be beneficial",
+                "🎯 Higher take profit targets appropriate"
+            ]
+        elif market_condition == "BEAR_TRENDING":
+            insights = [
+                "🔴 Focus on capital preservation",
+                "🛡️ Tighter stop losses recommended",
+                "⚡ Quick scalping may be safer",
+                "💰 Consider reducing position sizes"
+            ]
+        elif market_condition == "HIGH_VOLATILITY":
+            insights = [
+                "⚡ High frequency trading opportunities",
+                "🎯 Smaller, quicker profit targets",
+                "⏱️ Shorter hold times preferred",
+                "📊 Monitor closely for rapid changes"
+            ]
+        elif market_condition == "CONSOLIDATING":
+            insights = [
+                "📦 Range trading strategies favored",
+                "🔄 Buy support, sell resistance",
+                "⏳ Patience required for breakouts",
+                "📊 Volume confirmation important"
+            ]
+        else:  # UNCERTAIN
+            insights = [
+                "❓ Wait for clearer signals",
+                "🛡️ Conservative approach recommended",
+                "📊 Monitor multiple timeframes",
+                "⏳ Patience is key in uncertainty"
+            ]
+        
+        for insight in insights:
+            st.write(insight)
+    
+    st.divider()
+    
+    # Portfolio insights
+    st.markdown("### 💼 Portfolio Insights")
+    
+    # Calculate portfolio metrics
+    total_value = sum(coin['usd_value'] for coin in portfolio.values())
+    largest_holding = max(portfolio.items(), key=lambda x: x[1]['usd_value'])
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("Largest Holding", 
+                 f"{largest_holding[0]} ({largest_holding[1]['usd_value']/total_value*100:.1f}%)")
+    
+    with col2:
+        diversification = len(portfolio)
+        diversification_level = "High" if diversification >= 5 else "Medium" if diversification >= 3 else "Low"
+        st.metric("Diversification", f"{diversification_level} ({diversification} assets)")
+    
+    with col3:
+        # Risk assessment based on portfolio composition
+        risk_score = 0
+        for asset, data in portfolio.items():
+            weight = data['usd_value'] / total_value
+            if asset in ['BTC', 'ETH']:
+                risk_score += weight * 0.3  # Lower risk
+            elif asset in ['SOL', 'ADA', 'XRP']:
+                risk_score += weight * 0.6  # Medium risk
+            else:
+                risk_score += weight * 0.9  # Higher risk
+        
+        risk_level = "High" if risk_score > 0.7 else "Medium" if risk_score > 0.4 else "Low"
+        st.metric("Portfolio Risk", f"{risk_level} ({risk_score:.2f})")
+
 def main():
     st.set_page_config(page_title="🎯 Adaptive Risk Management Bot", layout="wide")
     
@@ -468,31 +725,7 @@ def main():
     bot = st.session_state.adaptive_bot
     risk_manager = bot.risk_manager
     
-    # Risk Profile Overview
-    st.subheader("⚙️ Professional Risk Management Profiles")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("### 📊 Available Risk Profiles")
-        for profile_key, profile in risk_manager.risk_profiles.items():
-            with st.expander(f"{profile['name']} Profile"):
-                st.write(f"**Description:** {profile['description']}")
-                st.write(f"**Take Profit:** {profile['take_profit']}%")
-                st.write(f"**Stop Loss:** {profile['stop_loss']}%")
-                st.write(f"**Trailing Stop:** {profile['trailing_stop']}%")
-                st.write(f"**Max Hold:** {profile['max_hold_hours']} hours")
-                st.write(f"**Min Confidence:** {profile['confidence_threshold']:.0%}")
-    
-    with col2:
-        st.markdown("### 🌍 Market Conditions")
-        for condition, description in risk_manager.market_conditions.items():
-            st.write(f"**{condition.replace('_', ' ').title()}:** {description}")
-    
-    # Live Market Analysis
-    st.subheader("📊 Live Market Condition Analysis")
-    
-    # Simulate market analysis for demo
+    # Get portfolio and market data
     portfolio = bot.get_portfolio_holdings()
     
     if portfolio:
@@ -526,76 +759,87 @@ def main():
         # Recommended profile
         recommended_profile = risk_manager.select_optimal_risk_profile(market_condition, avg_volatility)
         
-        # Display market analysis
-        col1, col2, col3, col4 = st.columns(4)
+        # Create tabs
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+            "🏠 Overview", 
+            "⚖️ Risk Management", 
+            "📊 Profiles", 
+            "📈 Analytics",
+            "⚙️ Settings"
+        ])
         
-        with col1:
-            condition_color = "🟢" if condition_score > 0.6 else "🟡" if condition_score > 0.4 else "🔴"
-            st.metric(f"{condition_color} Market Condition", 
-                     market_condition.replace('_', ' ').title(),
-                     f"Score: {condition_score:.2f}")
+        with tab1:
+            render_overview_tab(bot, risk_manager, portfolio, market_condition, condition_score, avg_volatility, recommended_profile)
         
-        with col2:
-            volatility_level = "High" if avg_volatility > 3 else "Medium" if avg_volatility > 1.5 else "Low"
-            st.metric("📈 Volatility", f"{avg_volatility:.1f}%", volatility_level)
+        with tab2:
+            render_risk_management_tab(risk_manager, portfolio, market_condition, avg_volatility)
         
-        with col3:
-            st.metric("🎯 Recommended Profile", 
-                     risk_manager.risk_profiles[recommended_profile]['name'],
-                     "Auto-Selected")
+        with tab3:
+            render_profiles_tab(risk_manager)
         
-        with col4:
-            st.metric("⏰ Last Update", 
-                     datetime.now().strftime("%H:%M:%S"), "Live")
+        with tab4:
+            render_analytics_tab(portfolio, market_condition, avg_volatility)
         
-        # Dynamic rules for each asset
-        st.subheader("⚖️ Dynamic Risk Rules by Asset")
-        
-        for asset, data in portfolio.items():
-            confidence = random.uniform(0.6, 0.95)  # Simulated confidence
-            dynamic_rules = risk_manager.get_dynamic_rules(asset, confidence, market_condition, avg_volatility)
+        with tab5:
+            st.subheader("⚙️ System Configuration")
             
-            with st.expander(f"{asset} - Dynamic Rules"):
-                col1, col2, col3 = st.columns(3)
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("### 🔧 Current Settings")
+                settings = {
+                    "Risk Management": "Adaptive, market-condition based",
+                    "Profiles Available": len(risk_manager.risk_profiles),
+                    "Market Analysis": "Multi-timeframe volatility + trend analysis",
+                    "Asset Adjustments": "BTC conservative, alts more aggressive",
+                    "Confidence Scaling": "Higher confidence = wider targets",
+                    "Emergency Stops": "25% circuit breaker on all positions",
+                    "Auto-Selection": "System chooses optimal profile automatically",
+                    "Update Frequency": "Real-time based on market conditions"
+                }
                 
-                with col1:
-                    st.metric("Take Profit", f"{dynamic_rules['take_profit']:.1f}%")
-                    st.metric("Stop Loss", f"{dynamic_rules['stop_loss']:.1f}%")
+                for key, value in settings.items():
+                    st.write(f"**{key}:** {value}")
+            
+            with col2:
+                st.markdown("### 🔗 Connection Status")
                 
-                with col2:
-                    st.metric("Trailing Stop", f"{dynamic_rules['trailing_stop']:.1f}%")
-                    st.metric("Max Hold", f"{dynamic_rules['max_hold_hours']:.0f}h")
+                # Connection info
+                if bot.client:
+                    st.success("✅ Binance API Connected")
+                    mode = "Testnet" if USE_TESTNET else "Live Trading"
+                    st.info(f"📡 Mode: {mode}")
+                else:
+                    st.error("❌ Binance API Not Connected")
                 
-                with col3:
-                    st.metric("Profile Used", dynamic_rules['profile_used'])
-                    st.metric("Risk Factor", f"{dynamic_rules['asset_risk_factor']:.2f}x")
-        
-        # Portfolio overview with GBP
-        total_usd = sum(coin['usd_value'] for coin in portfolio.values())
-        total_gbp = bot.get_portfolio_value_gbp(total_usd)
-        
-        st.subheader("💼 Portfolio Overview")
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("💷 Total Value (GBP)", f"£{total_gbp:,.2f}")
-        with col2:
-            st.metric("💰 Total Value (USD)", f"${total_usd:,.2f}")
-        with col3:
-            st.metric("🪙 Assets", len(portfolio))
+                st.write(f"**Exchange Rate:** 1 USD = £{bot.usd_to_gbp_rate:.4f}")
+                st.write(f"**Min Balance Filter:** ${MIN_BALANCE_USD}")
+                st.write(f"**Last Update:** {datetime.now().strftime('%H:%M:%S')}")
+                
+                # Manual refresh button
+                if st.button("🔄 Refresh Data"):
+                    st.rerun()
     
-    # Configuration
-    with st.expander("🔧 System Configuration"):
-        st.json({
-            "Risk Management": "Adaptive, market-condition based",
-            "Profiles Available": list(risk_manager.risk_profiles.keys()),
-            "Market Analysis": "Multi-timeframe volatility + trend analysis",
-            "Asset Adjustments": "BTC conservative, alts more aggressive",
-            "Confidence Scaling": "Higher confidence = wider targets",
-            "Emergency Stops": "25% circuit breaker on all positions",
-            "Auto-Selection": "System chooses optimal profile automatically",
-            "Update Frequency": "Real-time based on market conditions"
-        })
+    else:
+        st.warning("⚠️ No portfolio data available. Please check your Binance API connection.")
+        
+        with st.expander("🔧 Setup Instructions"):
+            st.markdown("""
+            ### Quick Setup:
+            1. **Get Binance API Keys:**
+               - Testnet: https://testnet.binance.vision/
+               - Live: https://www.binance.com/en/my/settings/api-management
+            
+            2. **Set Environment Variables:**
+               ```bash
+               BINANCE_API_KEY=your_key_here
+               BINANCE_API_SECRET=your_secret_here
+               USE_TESTNET=True
+               MIN_BALANCE_USD=10
+               ```
+            
+            3. **Restart the application**
+            """)
     
     # Auto-refresh every 30 seconds
     time.sleep(1)
