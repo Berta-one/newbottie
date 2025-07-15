@@ -414,12 +414,24 @@ def simulate_market_analysis(portfolio):
     
     return condition, score, volatility
 
-def render_overview_tab(portfolio, gbp_rate, market_condition, condition_score, avg_volatility):
-    """Render the main overview tab"""
+def render_portfolio_overview_tab(portfolio, gbp_rate, market_condition, condition_score, avg_volatility):
+    """Render portfolio overview tab - matching robust structure"""
+    st.header("💼 Portfolio Overview")
+    st.caption("Live portfolio analysis with dynamic risk management")
+    
+    if not portfolio:
+        st.warning("⚠️ No portfolio data available.")
+        if st.session_state['background_bot_running']:
+            st.info("Background bot is running. Portfolio data will appear after the first scan.")
+        else:
+            st.info("Start the background bot in Settings to begin scanning your portfolio.")
+        return
+    
+    # Calculate totals
     total_usd = sum(coin['usd_value'] for coin in portfolio.values())
     total_gbp = total_usd * gbp_rate
     
-    # Key metrics
+    # Key metrics - matching robust layout
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
@@ -448,14 +460,14 @@ def render_overview_tab(portfolio, gbp_rate, market_condition, condition_score, 
     
     st.divider()
     
-    # Portfolio breakdown
+    # Portfolio breakdown table
     st.subheader("💼 Portfolio Holdings")
     
     portfolio_data = []
     for asset, data in portfolio.items():
         portfolio_data.append({
             'Asset': asset,
-            'Balance': f"{data['balance']:.4f}",
+            'Balance': f"{data['balance']:.8f}".rstrip('0').rstrip('.'),
             'Price (USD)': f"${data['price_usd']:.4f}",
             'Value (USD)': f"${data['usd_value']:.2f}",
             'Value (GBP)': f"£{data['usd_value'] * gbp_rate:.2f}",
@@ -465,10 +477,46 @@ def render_overview_tab(portfolio, gbp_rate, market_condition, condition_score, 
     df = pd.DataFrame(portfolio_data)
     st.dataframe(df, use_container_width=True, hide_index=True)
 
-def render_performance_tab():
-    """Render performance analysis tab"""
-    st.subheader("📊 Trading Performance")
+def render_market_indicators_tab():
+    """Render market indicators tab - matching robust structure"""
+    st.header("📊 Market Indicators & Signals")
+    st.caption("Live summary of all tracked coins, signals, and movements.")
     
+    status = load_bot_status()
+    opportunities = status.get('opportunities', [])
+    
+    if st.session_state['background_bot_running']:
+        st.success("🤖 Background bot is continuously scanning your portfolio...")
+    else:
+        st.warning("🤖 Background bot is stopped. Start it in Settings to begin scanning.")
+    
+    if opportunities:
+        st.success(f"Found {len(opportunities)} trading opportunities!")
+        
+        for opp in opportunities:
+            with st.expander(f"🎯 {opp['asset']} - {opp['signal']} (Confidence: {opp['confidence']:.1%})"):
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.metric("Current Price", f"${opp['current_price']:.4f}")
+                    st.metric("2h Change", f"{opp['change_pct']:+.2f}%")
+                
+                with col2:
+                    st.metric("Your Balance", f"{opp['balance']:.6f} {opp['asset']}")
+                    st.metric("USD Value", f"${opp['usd_value']:.2f}")
+                
+                with col3:
+                    st.metric("Volume Ratio", f"{opp['volume_ratio']:.2f}x")
+                    st.metric("Signal Strength", opp['signal'])
+    else:
+        st.info("🔍 No trading opportunities found at this time.")
+
+def render_performance_tab():
+    """Render performance tab - enhanced version"""
+    st.header("📊 Performance")
+    st.caption("Trading performance metrics and live wallet")
+    
+    # Load trade data
     df = load_trade_data()
     
     if not df.empty:
@@ -502,69 +550,39 @@ def render_performance_tab():
             st.dataframe(recent_df, use_container_width=True, hide_index=True)
     else:
         st.info("No trade data available yet.")
-
-def render_risk_profiles_tab():
-    """Render risk profiles tab"""
-    st.subheader("🛡️ Risk Management Profiles")
     
-    st.markdown("### 📊 Available Risk Profiles")
-    
-    profiles = {
-        "Conservative": {
-            "description": "Low risk, stable returns",
-            "take_profit": "8%",
-            "stop_loss": "8%", 
-            "trailing_stop": "3%",
-            "max_hold": "24 hours",
-            "confidence_threshold": "75%"
-        },
-        "Balanced": {
-            "description": "Moderate risk, balanced approach",
-            "take_profit": "12%",
-            "stop_loss": "10%",
-            "trailing_stop": "4%",
-            "max_hold": "12 hours",
-            "confidence_threshold": "65%"
-        },
-        "Aggressive": {
-            "description": "Higher risk, higher potential returns",
-            "take_profit": "15%",
-            "stop_loss": "12%",
-            "trailing_stop": "5%",
-            "max_hold": "6 hours",
-            "confidence_threshold": "60%"
-        }
-    }
-    
-    col1, col2, col3 = st.columns(3)
-    
-    for i, (profile_name, profile) in enumerate(profiles.items()):
-        col = [col1, col2, col3][i]
-        with col:
-            with st.container():
-                st.markdown(f"#### {profile_name}")
-                st.markdown(f"**{profile['description']}**")
-                st.write(f"Take Profit: {profile['take_profit']}")
-                st.write(f"Stop Loss: {profile['stop_loss']}")
-                st.write(f"Trailing Stop: {profile['trailing_stop']}")
-                st.write(f"Max Hold: {profile['max_hold']}")
-                st.write(f"Min Confidence: {profile['confidence_threshold']}")
-    
-    st.divider()
-    
-    st.markdown("### 🧠 Auto-Selection Logic")
-    st.write("""
-    The system automatically selects profiles based on:
-    - Market volatility levels
-    - Trend strength across portfolio  
-    - Volume patterns and momentum
-    - Recent performance feedback
-    - Asset-specific risk characteristics
-    """)
+    # Live Wallet - matching robust structure
+    st.subheader("💰 Live Wallet (Binance)")
+    try:
+        if BINANCE_AVAILABLE and API_KEY and API_SECRET:
+            client = Client(API_KEY, API_SECRET)
+            if USE_TESTNET:
+                client.API_URL = "https://testnet.binance.vision/api"
+            
+            account_info = client.get_account()
+            balances = account_info['balances']
+            df_wallet = pd.DataFrame(balances)
+            df_wallet['free'] = df_wallet['free'].astype(float)
+            df_wallet['locked'] = df_wallet['locked'].astype(float)
+            df_wallet = df_wallet[df_wallet['free'] > 0]
+            st.dataframe(df_wallet[['asset', 'free', 'locked']], use_container_width=True)
+            
+            # Show total USDT
+            usdt_row = df_wallet[df_wallet['asset'] == 'USDT']
+            if not usdt_row.empty:
+                st.metric("USDT Balance", usdt_row['free'].values[0])
+            else:
+                st.info("No USDT balance found.")
+        else:
+            st.warning("Binance API keys not found in environment variables.")
+    except Exception as e:
+        st.error(f"Error fetching wallet: {e}")
+    st.info("If you see no wallet, check your API keys and Binance account.")
 
 def render_logs_tab():
-    """Render logs and monitoring tab"""
-    st.subheader("📡 Live Bot Logs")
+    """Render logs tab - matching robust structure"""
+    st.header("📡 Logs")
+    st.caption("Live logs from your bot will appear here")
     
     col1, col2 = st.columns([3, 1])
     
@@ -588,6 +606,174 @@ def render_logs_tab():
                 st.success(f"💓 Heartbeat active ({int(time_since_heartbeat)}s ago)")
             else:
                 st.warning(f"⚠️ Last heartbeat {int(time_since_heartbeat)}s ago")
+    else:
+        st.warning("🔴 Background bot is stopped")
+    
+    # Display logs with color coding
+    lines = load_logs("logs/console_output.log")
+    colored_logs = []
+    for line in lines:
+        colored_logs.append(color_line(line))
+    
+    log_output = "\n".join(colored_logs[-50:])  # Show last 50 lines
+    st.text_area("Recent Logs", log_output, height=400)
+    
+    st.info("Live logs from your bot will appear here. If empty, check your log file path and bot status.")
+
+def render_settings_tab():
+    """Render settings tab - matching robust structure"""
+    st.header("⚙️ Settings")
+    st.caption("Bot controls and configuration")
+    
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("### 🤖 Background Bot Control")
+        
+        if st.session_state['background_bot_running']:
+            st.success("✅ Background bot is RUNNING 24/7")
+            st.info("Bot scans every 30 seconds automatically")
+            
+            if st.button("🛑 Stop Background Bot", type="secondary"):
+                if stop_background_bot():
+                    st.success("Background bot stopped")
+                    st.rerun()
+        else:
+            st.warning("⏹️ Background bot is STOPPED")
+            
+            if st.button("▶️ Start Background Bot", type="primary"):
+                if start_background_bot():
+                    st.success("🚀 Background bot started!")
+                    st.rerun()
+        
+        # Password change
+        st.markdown("---")
+        st.subheader("🔐 Change Dashboard Password")
+        new_password = st.text_input("New Password", type="password")
+        if st.button("Set New Password"):
+            if new_password:
+                st.session_state['dashboard_password'] = new_password
+                st.success("Password updated.")
+            else:
+                st.warning("Password cannot be empty.")
+    
+    with col2:
+        # Trading mode settings - matching robust structure
+        st.subheader("🎛️ Trading Configuration")
+        trading_mode = st.radio("Trading Mode", ["Automated", "Manual"], key="settings_trading_mode")
+        risk_level = st.selectbox("Risk Level", ["Conservative", "Balanced", "Aggressive"], key="settings_risk_level")
+        log_retention = st.slider("Log Retention (days)", 1, 30, 7, key="settings_log_retention")
+        notification = st.multiselect("Notification Channels", ["Email", "Telegram"], key="settings_notification")
+        
+        st.write(f"Current mode: {trading_mode}, Risk: {risk_level}, Log retention: {log_retention} days")
+        st.write(f"Notifications: {', '.join(notification) if notification else 'None'}")
+        st.info("Settings are for display only. To make changes, edit your config or .env file.")
+
+def render_strategy_tab():
+    """Render strategy tab - matching robust structure"""
+    st.header("🧠 Strategy")
+    st.caption("Strategy selection & ML status")
+    
+    try:
+        # Try to import ML strategy
+        st.write("**Strategy Status:**")
+        st.info("Enhanced breakout strategy active with volume and time filters")
+        
+        st.markdown("---")
+        st.subheader("📊 Current Strategy Configuration")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write("**Breakout Threshold:** 5% price movement")
+            st.write("**Volume Confirmation:** 1.5x average required")
+            st.write("**Time Filtering:** Avoid low-volume hours")
+        
+        with col2:
+            st.write("**Confidence Threshold:** 65% minimum")
+            st.write("**Risk Management:** Dynamic position sizing")
+            st.write("**Stop Loss:** 8-15% based on confidence")
+        
+        st.markdown("---")
+        st.subheader("🎯 Signal Preview")
+        st.info("Strategy continuously analyzes your portfolio for trading opportunities.")
+        
+        # Show recent opportunities
+        status = load_bot_status()
+        opportunities = status.get('opportunities', [])
+        if opportunities:
+            st.success(f"Current opportunities found: {len(opportunities)}")
+            for opp in opportunities[:3]:  # Show top 3
+                st.write(f"• {opp['asset']}: {opp['signal']} (Confidence: {opp['confidence']:.1%})")
+        else:
+            st.write("No current opportunities detected.")
+            
+    except Exception as e:
+        st.error(f"Strategy module error: {e}")
+
+def render_health_tab():
+    """Render health tab - matching robust structure"""
+    st.header("💓 Health")
+    st.caption("Bot health & connection status")
+    
+    # Bot running status
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("🤖 Bot Status")
+        if st.session_state['background_bot_running']:
+            st.success("🟢 Bot is RUNNING")
+        else:
+            st.error("🔴 Bot is STOPPED")
+        
+        # API connection status
+        st.subheader("🔗 API Connection")
+        if BINANCE_AVAILABLE and API_KEY and API_SECRET:
+            st.success("✅ Binance API Connected")
+            mode = "Testnet" if USE_TESTNET else "Live Trading"
+            st.info(f"📡 Mode: {mode}")
+        else:
+            st.error("❌ Binance API Not Connected")
+    
+    with col2:
+        st.subheader("📊 Health Metrics")
+        status = load_bot_status()
+        
+        # Heartbeat info
+        if 'last_heartbeat' in status:
+            heartbeat_time = datetime.fromisoformat(status['last_heartbeat'])
+            time_since_heartbeat = (datetime.now() - heartbeat_time).total_seconds()
+            if time_since_heartbeat < 120:  # Within 2 minutes
+                st.success(f"💓 Heartbeat: Active ({int(time_since_heartbeat)}s ago)")
+            else:
+                st.warning(f"⚠️ Heartbeat: {int(time_since_heartbeat)}s ago")
+        else:
+            st.info("💓 Heartbeat: No data")
+        
+        # Scan stats
+        st.metric("Total Scans", status.get('scan_count', 0))
+        uptime = status.get('uptime_seconds', 0)
+        st.metric("Bot Uptime", f"{uptime // 3600:.0f}h {(uptime % 3600) // 60:.0f}m")
+    
+    # Log file check
+    st.subheader("📁 Log File Status")
+    if os.path.exists("logs/console_output.log"):
+        with open("logs/console_output.log", "r", encoding="utf-8") as f:
+            last_lines = f.readlines()[-10:]
+        
+        st.success("✅ Log file accessible")
+        heartbeat_found = any("heartbeat" in l.lower() for l in last_lines)
+        if heartbeat_found:
+            st.success("✅ Recent heartbeat detected in logs")
+        else:
+            st.warning("⚠️ No recent heartbeat in logs")
+        
+        # Show last few log lines
+        st.subheader("📝 Recent Log Activity")
+        st.code("\n".join([line.strip() for line in last_lines]))
+    else:
+        st.error("❌ Log file not found")
+    
+    st.info("If health info is missing, check your bot and log file paths.") heartbeat {int(time_since_heartbeat)}s ago")
     else:
         st.warning("🔴 Background bot is stopped")
     
@@ -672,34 +858,44 @@ def render_settings_tab():
 
 def dashboard():
     """Main dashboard function"""
-    # Sidebar controls
-    st.sidebar.title("🎛️ Dashboard Controls")
+    # Get Tailscale IP and setup sidebar controls like robust
+    ts_ip = get_tailscale_ip()
+    remote_url = f"http://{ts_ip}:8501" if ts_ip != "Unavailable" else "Unavailable"
     
-    # Bot status in sidebar
+    # Sidebar setup - matching robust structure
+    st.sidebar.markdown(f"**Tailscale IP:** `{ts_ip}`")
+    st.sidebar.text_input("🔗 Access URL", value=remote_url, key="url", label_visibility="collapsed")
+    st.sidebar.download_button("📥 Download Logs", data="\n".join(load_logs("logs/console_output.log")), file_name="console_output.log")
+
+    # Bot status in sidebar - matching robust structure
+    st.sidebar.subheader("🤖 Bot Status")
     if st.session_state['background_bot_running']:
-        st.sidebar.success("🟢 Background Bot: RUNNING")
-        status = load_bot_status()
-        st.sidebar.metric("Scans", status.get('scan_count', 0))
-        st.sidebar.metric("Opportunities", len(status.get('opportunities', [])))
+        st.sidebar.success("🟢 Bot is running")
+        if st.sidebar.button("🛑 Stop Bot"):
+            stop_background_bot()
+            st.sidebar.info("Bot stopped.")
     else:
-        st.sidebar.warning("🔴 Background Bot: STOPPED")
-        st.sidebar.info("Start in Settings tab")
-    
-    # Download logs
-    if st.sidebar.button("📥 Download Logs"):
-        logs = load_logs("logs/console_output.log")
-        st.sidebar.download_button(
-            "📄 console_output.log",
-            data="\n".join(logs),
-            file_name="console_output.log"
-        )
-    
+        st.sidebar.warning("🔴 Bot is stopped")
+        if st.sidebar.button("▶️ Start Bot"):
+            if start_background_bot():
+                st.sidebar.success("Bot started.")
+            else:
+                st.sidebar.error("Failed to start bot.")
+
+    if st.sidebar.button("🔄 Refresh Dashboard"):
+        st.rerun()
+
     # Auto-start background bot on first load if configured
     if not st.session_state['background_bot_running'] and BINANCE_AVAILABLE and API_KEY and API_SECRET:
         start_background_bot()
-        st.rerun()
+
+    # Sidebar navigation - matching robust structure exactly
+    selected_tab = st.sidebar.radio(
+        "Select Dashboard Tab",
+        ["Portfolio Overview", "Market Indicators", "Performance", "Logs", "Settings", "Strategy", "Health"]
+    )
     
-    # Main dashboard tabs
+    # Get portfolio data for all tabs
     status = load_bot_status()
     portfolio = status.get('portfolio', {})
     gbp_rate = get_gbp_exchange_rate()
@@ -709,33 +905,25 @@ def dashboard():
     else:
         market_condition, condition_score, avg_volatility = "UNCERTAIN", 0.5, 2.0
     
-    # Create tabs
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "🏠 Overview",
-        "📊 Performance", 
-        "🛡️ Risk Profiles",
-        "📡 Logs",
-        "⚙️ Settings"
-    ])
-    
-    with tab1:
-        render_overview_tab(portfolio, gbp_rate, market_condition, condition_score, avg_volatility)
-    
-    with tab2:
+    # Render selected tab - matching robust structure
+    if selected_tab == "Portfolio Overview":
+        render_portfolio_overview_tab(portfolio, gbp_rate, market_condition, condition_score, avg_volatility)
+    elif selected_tab == "Market Indicators":
+        render_market_indicators_tab()
+    elif selected_tab == "Performance":
         render_performance_tab()
-    
-    with tab3:
-        render_risk_profiles_tab()
-    
-    with tab4:
+    elif selected_tab == "Logs":
         render_logs_tab()
-    
-    with tab5:
+    elif selected_tab == "Settings":
         render_settings_tab()
+    elif selected_tab == "Strategy":
+        render_strategy_tab()
+    elif selected_tab == "Health":
+        render_health_tab()
 
 def main():
     """Main application entry point"""
-    st.set_page_config(page_title="🎯 Adaptive Risk Management Bot", layout="wide")
+    st.set_page_config(page_title="🤖 Crypto Trading Bot Dashboard", layout="wide")
     
     # Password authentication
     if not st.session_state['password_authenticated']:
@@ -754,9 +942,9 @@ def main():
         if not st.session_state['password_authenticated']:
             st.stop()
     
-    # Main dashboard
-    st.title("🎯 Adaptive Risk Management Trading Bot")
-    st.caption("Professional, emotion-free trading with dynamic risk adjustment")
+    # Main dashboard - matching robust title structure
+    st.title("🤖 Crypto Trading Bot Dashboard")
+    st.caption("Professional trading with 24/7 background scanning")
     
     dashboard()
 
