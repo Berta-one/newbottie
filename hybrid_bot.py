@@ -793,21 +793,7 @@ def render_manual_trading_tab():
     except Exception as e:
         st.error(f"❌ Failed to get account balance: {e}")
         return
-    # DEBUG SECTION - ADD THIS TEMPORARILY
-    st.write(f"**🔍 DEBUG INFO:**")
-    st.write(f"- USDT Balance: {usdt_balance}")
-    st.write(f"- Total Balances Found: {len(balances)}")
-    st.write(f"- Available Assets: {list(balances.keys())}")
-    
-    # Show all balances for debugging
-    if balances:
-        st.write("**All Account Balances:**")
-        for asset, balance in balances.items():
-            st.write(f"  - {asset}: Free={balance['free']}, Locked={balance['locked']}")
-    else:
-        st.write("**No balances found in account**")
-    
-    st.write("---")  # Separator line
+    # ...existing code...
     # Find this section in your render_manual_trading_tab() function and replace it:
 
     # Main trading interface
@@ -1219,13 +1205,27 @@ def log_manual_trade(order_result, use_stop_loss, stop_loss_pct, use_take_profit
     """Log manual trade to performance tracking"""
     
     try:
+        # Extract fill price for market orders
+        fill_price = 0.0
+        if order_result['status'] == 'FILLED':
+            # Market orders: price is in fills[0]['price']
+            fills = order_result.get('fills', [])
+            if fills and 'price' in fills[0]:
+                fill_price = float(fills[0]['price'])
+            else:
+                # Fallback to reported price if available
+                fill_price = float(order_result.get('price', 0))
+        else:
+            # For limit/pending orders, use reported price
+            fill_price = float(order_result.get('price', 0))
+
         trade_data = {
             'timestamp': datetime.now().isoformat(),
             'type': 'manual_trade',
             'symbol': order_result['symbol'],
             'side': order_result['side'],
             'quantity': float(order_result['executedQty']),
-            'price': float(order_result.get('price', 0)),
+            'price': fill_price,
             'order_id': order_result['orderId'],
             'status': order_result['status'],
             'stop_loss_enabled': use_stop_loss,
@@ -1234,11 +1234,11 @@ def log_manual_trade(order_result, use_stop_loss, stop_loss_pct, use_take_profit
             'take_profit_pct': take_profit_pct if use_take_profit else None,
             'trade_mode': 'testnet' if USE_TESTNET else 'live'
         }
-        
+
         # Log to manual trades file
         with open('logs/manual_trades.log', 'a') as f:
             f.write(f"{json.dumps(trade_data)}\n")
-            
+
     except Exception as e:
         st.error(f"Error logging trade: {e}")
 
@@ -1247,13 +1247,47 @@ def render_performance_tab():
     st.header("📊 Performance")
     st.caption("Trading performance metrics and live wallet")
     
-    # Load trade data
-    df = load_trade_data()
-    
+    # Load trade data from both manual and bot logs
+    df_bot = load_trade_data()
+    manual_log_path = "logs/manual_trades.log"
+    manual_trades = []
+    if os.path.exists(manual_log_path):
+        with open(manual_log_path, "r") as f:
+            for line in f:
+                try:
+                    manual_trades.append(json.loads(line))
+                except:
+                    pass
+    df_manual = pd.DataFrame(manual_trades)
+    # Combine both
+    if not df_bot.empty and not df_manual.empty:
+        df_bot['source'] = 'Bot'
+        df_manual['source'] = 'Manual'
+        df = pd.concat([df_bot, df_manual], ignore_index=True, sort=False)
+    elif not df_bot.empty:
+        df_bot['source'] = 'Bot'
+        df = df_bot.copy()
+    elif not df_manual.empty:
+        df_manual['source'] = 'Manual'
+        df = df_manual.copy()
+    else:
+        df = pd.DataFrame()
+
     if not df.empty:
+        # Fill missing columns for display
+        if 'timestamp' in df.columns:
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+        if 'pnl_percent' not in df.columns:
+            df['pnl_percent'] = 0.0
+        if 'side' not in df.columns:
+            df['side'] = ''
+        if 'symbol' not in df.columns:
+            df['symbol'] = ''
+        if 'source' not in df.columns:
+            df['source'] = 'Unknown'
+
         # Performance metrics
         col1, col2, col3, col4 = st.columns(4)
-        
         with col1:
             st.metric("Total Trades", len(df))
         with col2:
@@ -1265,22 +1299,71 @@ def render_performance_tab():
         with col4:
             avg_pnl = df['pnl_percent'].mean() if 'pnl_percent' in df.columns else 0
             st.metric("Avg P&L", f"{avg_pnl:+.2f}%")
-        
+
         # Performance chart
-        if 'pnl_percent' in df.columns:
-            df['cumulative_pnl'] = df['pnl_percent'].cumsum()
-            fig = px.line(df, x='timestamp', y='cumulative_pnl', 
+        if 'pnl_percent' in df.columns and 'timestamp' in df.columns:
+            df_sorted = df.sort_values('timestamp')
+            df_sorted['cumulative_pnl'] = df_sorted['pnl_percent'].cumsum()
+            fig = px.line(df_sorted, x='timestamp', y='cumulative_pnl', color='source',
                          title="Cumulative P&L Performance")
             st.plotly_chart(fig, use_container_width=True)
-        
+
         # Recent trades
         with st.expander("📋 Recent Trades"):
-            recent_df = df.tail(10).copy()
+            recent_df = df.sort_values('timestamp').tail(10).copy()
             if 'timestamp' in recent_df.columns:
                 recent_df['timestamp'] = pd.to_datetime(recent_df['timestamp']).dt.strftime('%Y-%m-%d %H:%M')
-            st.dataframe(recent_df, use_container_width=True, hide_index=True)
+            # Add indicator column
+            if 'source' in recent_df.columns:
+                recent_df['Trade Type'] = recent_df['source']
+            st.dataframe(recent_df[['timestamp','symbol','side','quantity','price','pnl_percent','status','Trade Type']], use_container_width=True, hide_index=True)
+
+        # Open trades (if any) with Mark-to-Market P&L
+        if 'status' in df.columns:
+            open_trades = df[df['status'].str.lower().isin(['open','pending'])].copy()
+            if not open_trades.empty:
+                st.subheader("Open Trades (Mark-to-Market P&L)")
+                # Get current market prices for each symbol
+                if BINANCE_AVAILABLE and API_KEY and API_SECRET:
+                    try:
+                        client = Client(API_KEY, API_SECRET)
+                        if USE_TESTNET:
+                            client.API_URL = "https://testnet.binance.vision/api"
+                        mtm_pnl = []
+                        for idx, trade in open_trades.iterrows():
+                            symbol = trade.get('symbol','')
+                            side = trade.get('side','BUY')
+                            qty = float(trade.get('quantity',0))
+                            entry_price = float(trade.get('price',0))
+                            try:
+                                ticker = client.get_symbol_ticker(symbol=symbol)
+                                market_price = float(ticker['price'])
+                                if side.upper() == 'BUY':
+                                    pnl = (market_price - entry_price) / entry_price * 100
+                                else:
+                                    pnl = (entry_price - market_price) / entry_price * 100
+                            except:
+                                market_price = None
+                                pnl = None
+                            mtm_pnl.append({
+                                'timestamp': trade.get('timestamp',''),
+                                'symbol': symbol,
+                                'side': side,
+                                'quantity': qty,
+                                'entry_price': entry_price,
+                                'market_price': market_price,
+                                'mtm_pnl_percent': pnl,
+                                'status': trade.get('status',''),
+                                'source': trade.get('source','Unknown')
+                            })
+                        df_mtm = pd.DataFrame(mtm_pnl)
+                        st.dataframe(df_mtm[['timestamp','symbol','side','quantity','entry_price','market_price','mtm_pnl_percent','status','source']], use_container_width=True, hide_index=True)
+                    except Exception as e:
+                        st.error(f"Error fetching market prices for MTM P&L: {e}")
+                else:
+                    st.info("Binance API not available for Mark-to-Market calculation.")
     else:
-        st.info("No trade data available yet.")
+        st.info("No trade data available yet. If you have traded, check your logs for errors or format issues.")
     
     # Live Wallet
     st.subheader("💰 Live Wallet (Binance)")
