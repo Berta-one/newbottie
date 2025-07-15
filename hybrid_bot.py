@@ -773,7 +773,7 @@ def render_health_tab():
     else:
         st.error("❌ Log file not found")
     
-    st.info("If health info is missing, check your bot and log file paths.") heartbeat {int(time_since_heartbeat)}s ago")
+    st.info("If health info is missing, check your bot and log file paths.")
     else:
         st.warning("🔴 Background bot is stopped")
     
