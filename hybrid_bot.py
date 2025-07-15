@@ -327,16 +327,29 @@ class RobustBackgroundBot:
         }
 
         try:
+            # Debug: Log portfolio content and length
+            import logging
+            logging.basicConfig(filename='logs/console_output.log', level=logging.INFO, format='%(asctime)s %(message)s')
+            logging.info(f"[SAVE_STATUS] Saving portfolio with {len(portfolio)} assets. Portfolio keys: {list(portfolio.keys())}")
+            logging.info(f"[SAVE_STATUS] Opportunities: {len(opportunities)}")
             # Main status file for dashboard
-            with open(status_path, 'w') as f:
-                json.dump(status, f, indent=2)
-
+            try:
+                with open(status_path, 'w') as f:
+                    json.dump(status, f, indent=2)
+                logging.info(f"[SAVE_STATUS] Successfully wrote bot_status.json.")
+            except Exception as write_err:
+                logging.error(f"[SAVE_STATUS] Error writing bot_status.json: {write_err}")
             # Append to scan history
-            with open('logs/robust_bot_scans.log', 'a') as f:
-                f.write(f"{json.dumps(status)}\n")
-
+            try:
+                with open('logs/robust_bot_scans.log', 'a') as f:
+                    f.write(f"{json.dumps(status)}\n")
+            except Exception as scan_err:
+                logging.error(f"[SAVE_STATUS] Error writing robust_bot_scans.log: {scan_err}")
         except Exception as e:
             self.log_to_console(f"❌ Error saving status: {e}")
+            import logging
+            logging.basicConfig(filename='logs/console_output.log', level=logging.INFO, format='%(asctime)s %(message)s')
+            logging.error(f"[SAVE_STATUS] Exception: {e}")
     
     def run_continuous(self):
         """Main bot loop with robust error handling"""
@@ -545,11 +558,57 @@ def render_portfolio_overview_tab(portfolio, gbp_rate, market_condition, conditi
     
     if not portfolio:
         st.warning("⚠️ No portfolio data available.")
-        if st.session_state['background_bot_running']:
-            st.info("Background bot is running. Portfolio data will appear after the first scan.")
-        else:
-            st.info("Start the background bot in Settings to begin scanning your portfolio.")
+        # Show market analysis, strategy/risk info, and quick actions even if portfolio is empty
+        status = load_bot_status()
+        actual_strategy = status.get('latest_strategy', 'Breakout')
+        actual_risk = status.get('latest_risk_level', 'Balanced')
+        total_usd = 0.0
+        total_gbp = 0.0
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("💷 Portfolio Value", f"£{total_gbp:,.2f}")
+        with col2:
+            condition_color = "🟢" if condition_score > 0.6 else "🟡" if condition_score > 0.4 else "🔴"
+            st.metric(f"{condition_color} Market", market_condition.replace('_', ' ').title())
+        with col3:
+            volatility_level = "High" if avg_volatility > 3 else "Medium" if avg_volatility > 1.5 else "Low"
+            st.metric("📈 Volatility", f"{avg_volatility:.1f}%")
+        with col4:
+            # Select profile based on market condition (original logic)
+            if market_condition == "BULL_TRENDING":
+                profile = "Swing"
+            elif market_condition == "BEAR_TRENDING":
+                profile = "Conservative"
+            elif market_condition == "HIGH_VOLATILITY":
+                profile = "Scalping"
+            else:
+                profile = "Balanced"
+            st.metric("🎯 Active Profile", profile)
+        st.divider()
+        # Enhanced Market Analysis & Strategy Display
+        col1, col2 = st.columns(2)
+        with col1:
+            st.subheader("📊 Market Analysis")
+            # ...existing code for market_explanations and display...
+        with col2:
+            st.subheader("🎛️ Your Current Settings")
+            # ...existing code for strategy/risk display...
+        st.divider()
+        st.subheader("💼 Portfolio Holdings")
+        st.info("No holdings to display.")
+        st.markdown("---")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("🔄 Refresh Portfolio"):
+                st.rerun()
+        with col2:
+            if st.button("⚙️ Adjust Strategy"):
+                st.info("💡 Go to Settings tab to change your strategy and risk level")
+        with col3:
+            if st.button("📊 View Opportunities"):
+                st.info("💡 Go to Market Indicators tab to see current trading opportunities")
         return
+
     
     # Calculate totals
     total_usd = sum(coin['usd_value'] for coin in portfolio.values())
