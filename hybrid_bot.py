@@ -144,7 +144,60 @@ class RobustBackgroundBot:
         """Scan for trading opportunities with robust error handling and user-selected strategy"""
         portfolio = self.get_portfolio_balances()
         opportunities = []
-
+        # DEBUG: Opportunity scan diagnostics
+        import logging
+        logging.basicConfig(filename='logs/console_output.log', level=logging.INFO, format='%(asctime)s %(message)s')
+        status = load_bot_status()
+        strategy = status.get('latest_strategy', 'Breakout')
+        risk = status.get('latest_risk_level', 'Balanced')
+        portfolio = status.get('portfolio', {})
+        logging.info(f"[SCAN] Starting opportunity scan | Strategy: {strategy} | Risk: {risk} | Portfolio assets: {len(portfolio)}")
+        opportunities = []
+        assets_scanned = 0
+        assets_skipped = 0
+        for asset, data in portfolio.items():
+            assets_scanned += 1
+            price_change = data.get('price_change_pct', 0)
+            volume_ratio = data.get('volume_ratio', 1)
+            confidence = data.get('confidence', 0.5)
+            # Thresholds (adjust as needed)
+            # LESS STRICT THRESHOLDS
+            if strategy == 'Breakout':
+                min_change = 1.5 * (1.0 if risk == 'Balanced' else 0.7 if risk == 'Conservative' else 1.3)
+                min_volume = 1.0
+                min_conf = 0.45
+            elif strategy == 'Scalping':
+                min_change = 0.5 * (1.0 if risk == 'Balanced' else 0.7 if risk == 'Conservative' else 1.3)
+                min_volume = 0.7
+                min_conf = 0.40
+            elif strategy == 'Swing':
+                min_change = 2.5 * (1.0 if risk == 'Balanced' else 0.7 if risk == 'Conservative' else 1.3)
+                min_volume = 0.7
+                min_conf = 0.35
+            else:
+                min_change = 1.5
+                min_volume = 0.7
+                min_conf = 0.40
+            # Detailed debug output for each asset
+            logging.info(f"[SCAN-DETAIL] Asset: {asset} | price_change_pct: {price_change} | volume_ratio: {volume_ratio} | confidence: {confidence} | min_change: {min_change} | min_volume: {min_volume} | min_conf: {min_conf}")
+            # Opportunity filter
+            if abs(price_change) >= min_change and volume_ratio >= min_volume and confidence >= min_conf:
+                opportunities.append({
+                    'asset': asset,
+                    'signal': 'BUY' if price_change > 0 else 'SELL',
+                    'confidence': confidence,
+                    'change_pct': price_change,
+                    'volume_ratio': volume_ratio,
+                    'strategy_used': strategy,
+                    'risk_level_used': risk
+                })
+                logging.info(f"[SCAN] Opportunity found: {asset} | Change: {price_change:.2f}% | Volume: {volume_ratio:.2f}x | Confidence: {confidence:.2f}")
+            else:
+                assets_skipped += 1
+                logging.info(f"[SCAN] Skipped {asset} | Change: {price_change:.2f}% | Volume: {volume_ratio:.2f}x | Confidence: {confidence:.2f} | Thresholds: Change>={min_change}, Volume>={min_volume}, Conf>={min_conf}")
+        logging.info(f"[SCAN] Scan complete | Opportunities found: {len(opportunities)} | Assets scanned: {assets_scanned} | Assets skipped: {assets_skipped}")
+        # Save status
+        self.save_status(portfolio, opportunities)
         # Always read latest strategy and risk level from logs/bot_status.json
         selected_strategy = 'Breakout'
         risk_level = 'Balanced'
@@ -612,21 +665,21 @@ def render_portfolio_overview_tab(portfolio, gbp_rate, market_condition, conditi
         strategy_descriptions = {
             "Breakout": {
                 "emoji": "🚀",
-                "description": "Captures 5%+ price movements with volume confirmation",
-                "best_for": "Trending markets, clear directional moves",
-                "risk": "Medium to High"
+                "description": "Captures 1.5%+ price movements with moderate volume confirmation (less strict)",
+                "best_for": "Trending or choppy markets, more frequent signals",
+                "risk": "Low to Medium"
             },
             "Scalping": {
                 "emoji": "⚡",
-                "description": "Quick 2-3% moves with high volume requirements",
-                "best_for": "High volatility, ranging markets",
-                "risk": "High (but shorter exposure)"
+                "description": "Quick 0.5%+ moves with lower volume requirements (less strict)",
+                "best_for": "High volatility, ranging or flat markets",
+                "risk": "Low (shorter exposure, more trades)"
             },
             "Swing": {
                 "emoji": "🌊",
-                "description": "Larger 8%+ moves with patient positioning",
-                "best_for": "Strong trending markets, lower volatility",
-                "risk": "Medium (longer holds)"
+                "description": "Captures 2.5%+ moves with patient positioning (less strict)",
+                "best_for": "Strong trends, but more signals in quieter markets too",
+                "risk": "Low to Medium (longer holds, more opportunities)"
             }
         }
         
@@ -643,18 +696,18 @@ def render_portfolio_overview_tab(portfolio, gbp_rate, market_condition, conditi
         risk_descriptions = {
             "Conservative": {
                 "emoji": "🛡️",
-                "multiplier": "0.8x",
-                "description": "Lower thresholds, tighter stops, capital preservation focus"
+                "multiplier": "0.7x",
+                "description": "Lowest thresholds, most signals, tightest stops, capital preservation focus (less strict)"
             },
             "Balanced": {
                 "emoji": "⚖️",
                 "multiplier": "1.0x",
-                "description": "Standard thresholds, balanced risk-reward approach"
+                "description": "Moderate thresholds, balanced risk-reward, frequent signals (less strict)"
             },
             "Aggressive": {
                 "emoji": "🔥",
-                "multiplier": "1.2x",
-                "description": "Higher thresholds, wider stops, maximum profit potential"
+                "multiplier": "1.3x",
+                "description": "Highest thresholds, widest stops, maximum profit potential, but still more signals (less strict)"
             }
         }
         
