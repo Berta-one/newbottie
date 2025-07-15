@@ -137,51 +137,82 @@ class RobustBackgroundBot:
             return {}
     
     def scan_for_opportunities(self):
-        """Scan for trading opportunities with robust error handling"""
+        """Scan for trading opportunities with robust error handling and user-selected strategy"""
         portfolio = self.get_portfolio_balances()
         opportunities = []
-        
+
+        # Always read latest strategy and risk level from logs/bot_status.json, never fallback to session state
+        selected_strategy = 'Breakout'
+        risk_level = 'Balanced'
+        try:
+            if os.path.exists('logs/bot_status.json'):
+                with open('logs/bot_status.json', 'r') as f:
+                    status = json.load(f)
+                if status.get('latest_strategy'):
+                    selected_strategy = status['latest_strategy']
+                if status.get('latest_risk_level'):
+                    risk_level = status['latest_risk_level']
+        except Exception:
+            pass
+
+        # Define thresholds for each strategy and risk level
+        base_thresholds = {
+            'Breakout': {'change': 5.0, 'volume': 1.5},
+            'Scalping': {'change': 2.0, 'volume': 1.2},
+            'Swing': {'change': 8.0, 'volume': 1.0},
+        }
+        # Risk level modifiers
+        risk_modifiers = {
+            'Conservative': 0.8,
+            'Balanced': 1.0,
+            'Aggressive': 1.2,
+        }
+        thresholds = base_thresholds.get(selected_strategy, base_thresholds['Breakout']).copy()
+        modifier = risk_modifiers.get(risk_level, 1.0)
+        thresholds['change'] *= modifier
+        thresholds['volume'] *= modifier
+
         for asset, data in portfolio.items():
             if asset == 'USDT':
                 continue
-                
+
             try:
                 symbol = f"{asset}USDT"
-                
+
                 # Get recent price data
                 klines = self.client.get_klines(
                     symbol=symbol,
                     interval='1m',
                     limit=120
                 )
-                
+
                 if len(klines) >= 120:
                     # Calculate price change over 2 hours
                     current_price = float(klines[-1][4])  # Close price
                     price_2h_ago = float(klines[-120][4])  # Close price 120 minutes ago
                     change_pct = ((current_price - price_2h_ago) / price_2h_ago) * 100
-                    
+
                     # Calculate volume
                     volumes = [float(k[5]) for k in klines[-20:]]  # Last 20 periods
                     avg_volume = sum(volumes) / len(volumes)
                     current_volume = float(klines[-1][5])
                     volume_ratio = current_volume / avg_volume if avg_volume > 0 else 1
-                    
-                    # Enhanced signal logic
+
+                    # Strategy-based signal logic
                     signal = "HOLD"
                     confidence = 0.5
-                    
-                    # Check for significant price movement with volume confirmation
-                    if abs(change_pct) >= 5.0 and volume_ratio >= 1.5:
+
+                    # Use thresholds based on selected strategy and risk level
+                    if abs(change_pct) >= thresholds['change'] and volume_ratio >= thresholds['volume']:
                         # Additional filters for quality signals
-                        if self.is_good_trading_time() and volume_ratio >= 2.0:
+                        if self.is_good_trading_time() and volume_ratio >= (thresholds['volume'] + 0.5 * modifier):
                             if change_pct > 0:
                                 signal = "BUY_LONG"
-                                confidence = min(0.9, 0.6 + (change_pct / 30))
+                                confidence = min(0.9, 0.6 + (change_pct / (30 / modifier)))
                             else:
-                                signal = "BUY_SHORT" 
-                                confidence = min(0.9, 0.6 + (abs(change_pct) / 30))
-                    
+                                signal = "BUY_SHORT"
+                                confidence = min(0.9, 0.6 + (abs(change_pct) / (30 / modifier)))
+
                     # Only add high-confidence opportunities
                     if signal != "HOLD" and confidence >= 0.65:
                         opportunities.append({
@@ -193,12 +224,14 @@ class RobustBackgroundBot:
                             'volume_ratio': volume_ratio,
                             'balance': data['balance'],
                             'usd_value': data['usd_value'],
-                            'timestamp': datetime.now().isoformat()
+                            'timestamp': datetime.now().isoformat(),
+                            'strategy_used': selected_strategy,
+                            'risk_level_used': risk_level
                         })
-            
+
             except Exception as e:
                 self.log_to_console(f"⚠️ Error analyzing {asset}: {e}")
-        
+
         return portfolio, opportunities
     
     def is_good_trading_time(self):
@@ -208,7 +241,20 @@ class RobustBackgroundBot:
         return current_hour not in [0, 1, 2, 3, 4, 5, 22, 23]
     
     def save_status(self, portfolio, opportunities):
-        """Save bot status to multiple files for monitoring"""
+        """Save bot status to multiple files for monitoring, preserving latest strategy and risk level"""
+        # Read previous bot_status.json to preserve latest_strategy and latest_risk_level
+        status_path = 'logs/bot_status.json'
+        prev_strategy = None
+        prev_risk = None
+        try:
+            if os.path.exists(status_path):
+                with open(status_path, 'r') as f:
+                    prev_status = json.load(f)
+                prev_strategy = prev_status.get('latest_strategy')
+                prev_risk = prev_status.get('latest_risk_level')
+        except Exception:
+            pass
+
         status = {
             'timestamp': datetime.now().isoformat(),
             'running': self.running,
@@ -218,18 +264,20 @@ class RobustBackgroundBot:
             'uptime_seconds': int((datetime.now() - self.start_time).total_seconds()),
             'heartbeat_count': self.heartbeat_count,
             'last_heartbeat': self.last_heartbeat.isoformat(),
-            'mode': 'Testnet' if USE_TESTNET else 'Live Trading'
+            'mode': 'Testnet' if USE_TESTNET else 'Live Trading',
+            'latest_strategy': prev_strategy if prev_strategy else 'Breakout',
+            'latest_risk_level': prev_risk if prev_risk else 'Balanced'
         }
-        
+
         try:
             # Main status file for dashboard
-            with open('logs/bot_status.json', 'w') as f:
+            with open(status_path, 'w') as f:
                 json.dump(status, f, indent=2)
-            
+
             # Append to scan history
             with open('logs/robust_bot_scans.log', 'a') as f:
                 f.write(f"{json.dumps(status)}\n")
-                
+
         except Exception as e:
             self.log_to_console(f"❌ Error saving status: {e}")
     
@@ -650,17 +698,74 @@ def render_settings_tab():
         # Trading mode settings
         st.subheader("🎛️ Trading Configuration")
         trading_mode = st.radio("Trading Mode", ["Automated", "Manual"], key="settings_trading_mode")
-        risk_level = st.selectbox("Risk Level", ["Conservative", "Balanced", "Aggressive"], key="settings_risk_level")
+        def update_bot_status_shared():
+            try:
+                status_path = 'logs/bot_status.json'
+                if os.path.exists(status_path):
+                    with open(status_path, 'r') as f:
+                        status = json.load(f)
+                else:
+                    status = {}
+                # Always get latest from session_state
+                status['latest_strategy'] = st.session_state.get('selected_strategy', 'Breakout')
+                status['latest_risk_level'] = st.session_state.get('settings_risk_level', 'Balanced')
+                with open(status_path, 'w') as f:
+                    json.dump(status, f, indent=2)
+            except Exception:
+                pass
+
         strategy_options = ["Breakout", "Scalping", "Swing"]
+        # Always sync session state with bot_status.json before rendering dropdowns
+        status_path = 'logs/bot_status.json'
+        file_strategy = None
+        file_risk = None
+        try:
+            if os.path.exists(status_path):
+                with open(status_path, 'r') as f:
+                    status = json.load(f)
+                file_strategy = status.get('latest_strategy')
+                file_risk = status.get('latest_risk_level')
+        except Exception:
+            pass
+
+        # Set session state from file if not already set or if different
+        if file_strategy and (st.session_state.get('selected_strategy') != file_strategy):
+            st.session_state['selected_strategy'] = file_strategy
+        if file_risk and (st.session_state.get('settings_risk_level') != file_risk):
+            st.session_state['settings_risk_level'] = file_risk
         if 'selected_strategy' not in st.session_state:
             st.session_state['selected_strategy'] = strategy_options[0]
-        selected_strategy = st.selectbox("Strategy", strategy_options, key="selected_strategy")
+        if 'settings_risk_level' not in st.session_state:
+            st.session_state['settings_risk_level'] = 'Balanced'
+
+        # Use a form to guarantee callback fires for both
+        with st.form(key="strategy_risk_form"):
+            risk_level = st.selectbox(
+                "Risk Level", ["Conservative", "Balanced", "Aggressive"], key="settings_risk_level"
+            )
+            selected_strategy = st.selectbox(
+                "Strategy", strategy_options, key="selected_strategy"
+            )
+            submitted = st.form_submit_button("Apply Strategy & Risk")
+            if submitted:
+                update_bot_status_shared()
+                # Show confirmation of what was written
+                try:
+                    if os.path.exists(status_path):
+                        with open(status_path, 'r') as f:
+                            status = json.load(f)
+                        st.success(f"Strategy set to: {status.get('latest_strategy', 'N/A')}, Risk level set to: {status.get('latest_risk_level', 'N/A')}")
+                    else:
+                        st.warning("bot_status.json not found after update.")
+                except Exception as e:
+                    st.error(f"Error reading bot_status.json: {e}")
         log_retention = st.slider("Log Retention (days)", 1, 30, 7, key="settings_log_retention")
         notification = st.multiselect("Notification Channels", ["Email", "Telegram"], key="settings_notification")
 
         st.write(f"Current mode: {trading_mode}, Risk: {risk_level}, Strategy: {selected_strategy}, Log retention: {log_retention} days")
         st.write(f"Notifications: {', '.join(notification) if notification else 'None'}")
         st.info("Settings are for display only. To make changes, edit your config or .env file.")
+        # ...existing code...
 
 def render_strategy_tab():
     """Render strategy tab"""
