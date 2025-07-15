@@ -514,3 +514,574 @@
 🔄 Running bot at 2025-07-13 21:46:43
 
 🔄 Running bot at 2025-07-13 21:46:53
+[2025-07-15 08:10:04] 🚀 Robust Trading Bot Started
+[2025-07-15 08:10:04] 📊 Scan Interval: 30 seconds
+[2025-07-15 08:10:04] 🔗 Mode: Testnet
+[2025-07-15 08:10:04] 💓 Keep-alive: Enabled
+[2025-07-15 08:10:04] ============================================================
+[2025-07-15 08:10:04] 🔍 Starting scan #1
+[2025-07-15 08:10:04] 💓 Heartbeat #1 - Bot alive and scanning
+[2025-07-15 08:10:05] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:10:05] ✅ Scan #1 complete - 0 assets, 0 opportunities
+[2025-07-15 08:10:35] 🔍 Starting scan #2
+[2025-07-15 08:10:35] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:10:35] ✅ Scan #2 complete - 0 assets, 0 opportunities
+[2025-07-15 08:11:04] 💓 Heartbeat #2 - Bot alive and scanning
+[2025-07-15 08:11:05] 🔍 Starting scan #3
+[2025-07-15 08:11:05] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:11:05] ✅ Scan #3 complete - 0 assets, 0 opportunities
+[2025-07-15 08:11:35] 🔍 Starting scan #4
+[2025-07-15 08:11:36] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:11:36] ✅ Scan #4 complete - 0 assets, 0 opportunities
+[2025-07-15 08:11:40] 🚀 Robust Trading Bot Started
+[2025-07-15 08:11:40] 📊 Scan Interval: 30 seconds
+[2025-07-15 08:11:40] 🔗 Mode: Testnet
+[2025-07-15 08:11:40] 💓 Keep-alive: Enabled
+[2025-07-15 08:11:40] ============================================================
+[2025-07-15 08:11:40] 💓 Heartbeat #1 - Bot alive and scanning
+[2025-07-15 08:11:40] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:11:40] ✅ Scan #1 complete - 0 assets, 0 opportunities
+[2025-07-15 08:12:04] 💓 Heartbeat #3 - Bot alive and scanning
+[2025-07-15 08:12:06] 🔍 Starting scan #5
+[2025-07-15 08:12:06] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:12:06] ✅ Scan #5 complete - 0 assets, 0 opportunities
+[2025-07-15 08:12:10] 🔍 Starting scan #2
+[2025-07-15 08:12:10] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:12:10] ✅ Scan #2 complete - 0 assets, 0 opportunities
+[2025-07-15 08:12:36] 🔍 Starting scan #6
+[2025-07-15 08:12:37] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:12:37] ✅ Scan #6 complete - 0 assets, 0 opportunities
+[2025-07-15 08:12:40] 💓 Heartbeat #2 - Bot alive and scanning
+[2025-07-15 08:12:40] 🔍 Starting scan #3
+[2025-07-15 08:12:40] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:12:40] ✅ Scan #3 complete - 0 assets, 0 opportunities
+[2025-07-15 08:12:45] 🚀 Robust Trading Bot Started
+[2025-07-15 08:12:45] 📊 Scan Interval: 30 seconds
+[2025-07-15 08:12:45] 🔗 Mode: Testnet
+[2025-07-15 08:12:45] 💓 Keep-alive: Enabled
+[2025-07-15 08:12:45] ============================================================
+[2025-07-15 08:12:45] 💓 Heartbeat #1 - Bot alive and scanning
+[2025-07-15 08:12:45] 🔍 Starting scan #1
+[2025-07-15 08:12:45] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:12:45] ✅ Scan #1 complete - 0 assets, 0 opportunities
+[2025-07-15 08:13:04] 💓 Heartbeat #4 - Bot alive and scanning
+[2025-07-15 08:13:07] 🔍 Starting scan #7
+[2025-07-15 08:13:07] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:13:07] ✅ Scan #7 complete - 0 assets, 0 opportunities
+[2025-07-15 08:13:10] 🔍 Starting scan #4
+[2025-07-15 08:13:11] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:13:11] ✅ Scan #4 complete - 0 assets, 0 opportunities
+[2025-07-15 08:13:15] 🔍 Starting scan #2
+[2025-07-15 08:13:16] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:13:16] ✅ Scan #2 complete - 0 assets, 0 opportunities
+[2025-07-15 08:13:37] 🔍 Starting scan #8
+[2025-07-15 08:13:37] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:13:37] ✅ Scan #8 complete - 0 assets, 0 opportunities
+[2025-07-15 08:13:40] 💓 Heartbeat #3 - Bot alive and scanning
+[2025-07-15 08:13:41] 🔍 Starting scan #5
+[2025-07-15 08:13:41] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:13:41] ✅ Scan #5 complete - 0 assets, 0 opportunities
+[2025-07-15 08:13:45] 💓 Heartbeat #2 - Bot alive and scanning
+[2025-07-15 08:13:46] 🔍 Starting scan #3
+[2025-07-15 08:13:46] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:13:46] ✅ Scan #3 complete - 0 assets, 0 opportunities
+[2025-07-15 08:14:05] 💓 Heartbeat #5 - Bot alive and scanning
+[2025-07-15 08:14:07] 🔍 Starting scan #9
+[2025-07-15 08:14:08] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:14:08] ✅ Scan #9 complete - 0 assets, 0 opportunities
+[2025-07-15 08:14:11] 🔍 Starting scan #6
+[2025-07-15 08:14:12] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:14:12] ✅ Scan #6 complete - 0 assets, 0 opportunities
+[2025-07-15 08:14:16] 🔍 Starting scan #4
+[2025-07-15 08:14:16] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:14:16] ✅ Scan #4 complete - 0 assets, 0 opportunities
+[2025-07-15 08:14:38] 🔍 Starting scan #10
+[2025-07-15 08:14:38] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:14:38] ✅ Scan #10 complete - 0 assets, 0 opportunities
+[2025-07-15 08:14:40] 💓 Heartbeat #4 - Bot alive and scanning
+[2025-07-15 08:14:42] 🔍 Starting scan #7
+[2025-07-15 08:14:42] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:14:42] ✅ Scan #7 complete - 0 assets, 0 opportunities
+[2025-07-15 08:15:00] 🚀 Robust Trading Bot Started
+[2025-07-15 08:15:00] 📊 Scan Interval: 30 seconds
+[2025-07-15 08:15:00] 🔗 Mode: Testnet
+[2025-07-15 08:15:00] 💓 Keep-alive: Enabled
+[2025-07-15 08:15:00] ============================================================
+[2025-07-15 08:15:00] 💓 Heartbeat #1 - Bot alive and scanning
+[2025-07-15 08:15:00] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:15:00] ✅ Scan #1 complete - 0 assets, 0 opportunities
+[2025-07-15 08:15:05] 💓 Heartbeat #6 - Bot alive and scanning
+[2025-07-15 08:15:06] 🛑 Stop signal received
+[2025-07-15 08:15:06] 🚀 Robust Trading Bot Started
+[2025-07-15 08:15:06] 📊 Scan Interval: 30 seconds
+[2025-07-15 08:15:06] 🔗 Mode: Testnet
+[2025-07-15 08:15:06] 💓 Keep-alive: Enabled
+[2025-07-15 08:15:06] ============================================================
+[2025-07-15 08:15:06] 💓 Heartbeat #2 - Bot alive and scanning
+[2025-07-15 08:15:06] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:15:06] ✅ Scan #2 complete - 0 assets, 0 opportunities
+[2025-07-15 08:15:08] 🔍 Starting scan #11
+[2025-07-15 08:15:08] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:15:08] ✅ Scan #11 complete - 0 assets, 0 opportunities
+[2025-07-15 08:15:10] 🛑 Stop signal received
+[2025-07-15 08:15:10] 🚀 Robust Trading Bot Started
+[2025-07-15 08:15:10] 📊 Scan Interval: 30 seconds
+[2025-07-15 08:15:10] 🔗 Mode: Testnet
+[2025-07-15 08:15:10] 💓 Keep-alive: Enabled
+[2025-07-15 08:15:10] ============================================================
+[2025-07-15 08:15:10] 🔍 Starting scan #3
+ alive and scanning
+[2025-07-15 08:15:10] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:15:10] ✅ Scan #3 complete - 0 assets, 0 opportunities
+[2025-07-15 08:15:12] 🔍 Starting scan #8
+[2025-07-15 08:15:12] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:15:12] ✅ Scan #8 complete - 0 assets, 0 opportunities
+[2025-07-15 08:15:30] 🔍 Starting scan #4
+[2025-07-15 08:15:30] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:15:30] ✅ Scan #4 complete - 0 assets, 0 opportunities
+[2025-07-15 08:15:35] 🛑 Stop signal received
+[2025-07-15 08:15:35] 🚀 Robust Trading Bot Started
+[2025-07-15 08:15:35] 📊 Scan Interval: 30 seconds
+[2025-07-15 08:15:35] 🔗 Mode: Testnet
+[2025-07-15 08:15:35] 💓 Keep-alive: Enabled
+[2025-07-15 08:15:35] ============================================================
+[2025-07-15 08:15:35] 💓 Heartbeat #4 - Bot alive and scanning
+[2025-07-15 08:15:35] 🔍 Starting scan #5
+[2025-07-15 08:15:35] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:15:35] ✅ Scan #5 complete - 0 assets, 0 opportunities
+[2025-07-15 08:15:36] 🔍 Starting scan #6
+[2025-07-15 08:15:37] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:15:37] ✅ Scan #6 complete - 0 assets, 0 opportunities
+[2025-07-15 08:15:38] 🔍 Starting scan #12
+[2025-07-15 08:15:39] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:15:39] ✅ Scan #12 complete - 0 assets, 0 opportunities
+[2025-07-15 08:15:40] 💓 Heartbeat #5 - Bot alive and scanning
+[2025-07-15 08:15:40] 🔍 Starting scan #7
+[2025-07-15 08:15:40] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:15:40] ✅ Scan #7 complete - 0 assets, 0 opportunities
+[2025-07-15 08:15:42] 🔍 Starting scan #9
+[2025-07-15 08:15:42] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:15:42] ✅ Scan #9 complete - 0 assets, 0 opportunities
+[2025-07-15 08:15:53] 🚀 Robust Trading Bot Started
+[2025-07-15 08:15:53] 📊 Scan Interval: 30 seconds
+[2025-07-15 08:15:53] 🔗 Mode: Testnet
+[2025-07-15 08:15:53] 💓 Keep-alive: Enabled
+[2025-07-15 08:15:53] ============================================================
+[2025-07-15 08:15:53] 💓 Heartbeat #1 - Bot alive and scanning
+[2025-07-15 08:15:53] 🔍 Starting scan #1
+[2025-07-15 08:15:53] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:15:53] ✅ Scan #1 complete - 0 assets, 0 opportunities
+[2025-07-15 08:16:00] 💓 Heartbeat #5 - Bot alive and scanning
+[2025-07-15 08:16:00] 🔍 Starting scan #8
+[2025-07-15 08:16:01] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:16:01] ✅ Scan #8 complete - 0 assets, 0 opportunities
+[2025-07-15 08:16:05] 💓 Heartbeat #7 - Bot alive and scanning
+[2025-07-15 08:16:05] 🔍 Starting scan #9
+[2025-07-15 08:16:05] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:16:05] ✅ Scan #9 complete - 0 assets, 0 opportunities
+[2025-07-15 08:16:06] 💓 Heartbeat #6 - Bot alive and scanning
+[2025-07-15 08:16:07] 🔍 Starting scan #10
+[2025-07-15 08:16:07] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:16:07] ✅ Scan #10 complete - 0 assets, 0 opportunities
+[2025-07-15 08:16:09] 🔍 Starting scan #13
+[2025-07-15 08:16:09] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:16:09] ✅ Scan #13 complete - 0 assets, 0 opportunities
+[2025-07-15 08:16:10] 💓 Heartbeat #7 - Bot alive and scanning
+[2025-07-15 08:16:10] 🔍 Starting scan #11
+[2025-07-15 08:16:11] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:16:11] ✅ Scan #11 complete - 0 assets, 0 opportunities
+[2025-07-15 08:16:12] 🔍 Starting scan #10
+[2025-07-15 08:16:13] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:16:13] ✅ Scan #10 complete - 0 assets, 0 opportunities
+[2025-07-15 08:16:23] 🔍 Starting scan #2
+[2025-07-15 08:16:23] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:16:23] ✅ Scan #2 complete - 0 assets, 0 opportunities
+[2025-07-15 08:16:31] 🔍 Starting scan #12
+[2025-07-15 08:16:31] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:16:31] ✅ Scan #12 complete - 0 assets, 0 opportunities
+[2025-07-15 08:16:35] 💓 Heartbeat #8 - Bot alive and scanning
+[2025-07-15 08:16:35] 🔍 Starting scan #13
+[2025-07-15 08:16:35] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:16:35] ✅ Scan #13 complete - 0 assets, 0 opportunities
+[2025-07-15 08:16:37] 🔍 Starting scan #14
+[2025-07-15 08:16:37] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:16:37] ✅ Scan #14 complete - 0 assets, 0 opportunities
+[2025-07-15 08:16:39] 🔍 Starting scan #14
+[2025-07-15 08:16:39] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:16:39] ✅ Scan #14 complete - 0 assets, 0 opportunities
+[2025-07-15 08:16:40] 💓 Heartbeat #6 - Bot alive and scanning
+[2025-07-15 08:16:41] 🔍 Starting scan #15
+[2025-07-15 08:16:41] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:16:41] ✅ Scan #15 complete - 0 assets, 0 opportunities
+[2025-07-15 08:16:43] 🔍 Starting scan #11
+[2025-07-15 08:16:43] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:16:43] ✅ Scan #11 complete - 0 assets, 0 opportunities
+[2025-07-15 08:16:53] 💓 Heartbeat #2 - Bot alive and scanning
+[2025-07-15 08:16:53] 🔍 Starting scan #3
+[2025-07-15 08:16:54] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:16:54] ✅ Scan #3 complete - 0 assets, 0 opportunities
+[2025-07-15 08:17:00] 💓 Heartbeat #9 - Bot alive and scanning
+[2025-07-15 08:17:01] 🔍 Starting scan #16
+[2025-07-15 08:17:01] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:17:01] ✅ Scan #16 complete - 0 assets, 0 opportunities
+[2025-07-15 08:17:05] 💓 Heartbeat #8 - Bot alive and scanning
+[2025-07-15 08:17:05] 🔍 Starting scan #17
+[2025-07-15 08:17:06] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:17:06] ✅ Scan #17 complete - 0 assets, 0 opportunities
+[2025-07-15 08:17:06] 💓 Heartbeat #10 - Bot alive and scanning
+[2025-07-15 08:17:07] 🔍 Starting scan #18
+[2025-07-15 08:17:07] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:17:07] ✅ Scan #18 complete - 0 assets, 0 opportunities
+[2025-07-15 08:17:09] 🔍 Starting scan #15
+[2025-07-15 08:17:09] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:17:09] ✅ Scan #15 complete - 0 assets, 0 opportunities
+[2025-07-15 08:17:10] 💓 Heartbeat #11 - Bot alive and scanning
+[2025-07-15 08:17:11] 🔍 Starting scan #19
+[2025-07-15 08:17:11] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:17:11] ✅ Scan #19 complete - 0 assets, 0 opportunities
+[2025-07-15 08:17:13] 🔍 Starting scan #12
+[2025-07-15 08:17:13] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:17:13] ✅ Scan #12 complete - 0 assets, 0 opportunities
+[2025-07-15 08:17:24] 🔍 Starting scan #4
+[2025-07-15 08:17:24] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:17:24] ✅ Scan #4 complete - 0 assets, 0 opportunities
+[2025-07-15 08:17:31] 🔍 Starting scan #20
+[2025-07-15 08:17:31] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:17:31] ✅ Scan #20 complete - 0 assets, 0 opportunities
+[2025-07-15 08:17:35] 💓 Heartbeat #12 - Bot alive and scanning
+[2025-07-15 08:17:36] 🔍 Starting scan #21
+[2025-07-15 08:17:36] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:17:36] ✅ Scan #21 complete - 0 assets, 0 opportunities
+[2025-07-15 08:17:37] 🔍 Starting scan #22
+[2025-07-15 08:17:38] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:17:38] ✅ Scan #22 complete - 0 assets, 0 opportunities
+[2025-07-15 08:17:39] 🔍 Starting scan #16
+[2025-07-15 08:17:40] 💓 Heartbeat #7 - Bot alive and scanning
+[2025-07-15 08:17:40] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:17:40] ✅ Scan #16 complete - 0 assets, 0 opportunities
+[2025-07-15 08:17:41] 🔍 Starting scan #23
+[2025-07-15 08:17:41] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:17:41] ✅ Scan #23 complete - 0 assets, 0 opportunities
+[2025-07-15 08:17:43] 🔍 Starting scan #13
+[2025-07-15 08:17:44] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:17:44] ✅ Scan #13 complete - 0 assets, 0 opportunities
+[2025-07-15 08:17:53] 💓 Heartbeat #3 - Bot alive and scanning
+[2025-07-15 08:17:54] 🔍 Starting scan #5
+[2025-07-15 08:17:54] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:17:54] ✅ Scan #5 complete - 0 assets, 0 opportunities
+[2025-07-15 08:18:00] 💓 Heartbeat #13 - Bot alive and scanning
+[2025-07-15 08:18:01] 🔍 Starting scan #24
+[2025-07-15 08:18:02] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:18:02] ✅ Scan #24 complete - 0 assets, 0 opportunities
+[2025-07-15 08:18:05] 💓 Heartbeat #9 - Bot alive and scanning
+[2025-07-15 08:18:06] 🔍 Starting scan #25
+[2025-07-15 08:18:06] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:18:06] ✅ Scan #25 complete - 0 assets, 0 opportunities
+[2025-07-15 08:18:06] 💓 Heartbeat #14 - Bot alive and scanning
+[2025-07-15 08:18:08] 🔍 Starting scan #26
+[2025-07-15 08:18:08] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:18:08] ✅ Scan #26 complete - 0 assets, 0 opportunities
+[2025-07-15 08:18:10] 🔍 Starting scan #17
+[2025-07-15 08:18:10] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:18:10] ✅ Scan #17 complete - 0 assets, 0 opportunities
+[2025-07-15 08:18:10] 💓 Heartbeat #15 - Bot alive and scanning
+[2025-07-15 08:18:11] 🔍 Starting scan #27
+[2025-07-15 08:18:12] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:18:12] ✅ Scan #27 complete - 0 assets, 0 opportunities
+[2025-07-15 08:18:14] 🔍 Starting scan #14
+[2025-07-15 08:18:14] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:18:14] ✅ Scan #14 complete - 0 assets, 0 opportunities
+[2025-07-15 08:18:24] 🔍 Starting scan #6
+[2025-07-15 08:18:24] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:18:24] ✅ Scan #6 complete - 0 assets, 0 opportunities
+[2025-07-15 08:18:32] 🔍 Starting scan #28
+[2025-07-15 08:18:32] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:18:32] ✅ Scan #28 complete - 0 assets, 0 opportunities
+[2025-07-15 08:18:35] 💓 Heartbeat #16 - Bot alive and scanning
+[2025-07-15 08:18:36] 🔍 Starting scan #29
+[2025-07-15 08:18:37] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:18:37] ✅ Scan #29 complete - 0 assets, 0 opportunities
+[2025-07-15 08:18:38] 🔍 Starting scan #30
+[2025-07-15 08:18:39] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:18:39] ✅ Scan #30 complete - 0 assets, 0 opportunities
+[2025-07-15 08:18:40] 💓 Heartbeat #8 - Bot alive and scanning
+[2025-07-15 08:18:40] 🔍 Starting scan #18
+[2025-07-15 08:18:40] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:18:40] ✅ Scan #18 complete - 0 assets, 0 opportunities
+[2025-07-15 08:18:42] 🔍 Starting scan #31
+[2025-07-15 08:18:42] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:18:42] ✅ Scan #31 complete - 0 assets, 0 opportunities
+[2025-07-15 08:18:44] 🔍 Starting scan #15
+[2025-07-15 08:18:44] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:18:44] ✅ Scan #15 complete - 0 assets, 0 opportunities
+[2025-07-15 08:18:53] 💓 Heartbeat #4 - Bot alive and scanning
+[2025-07-15 08:18:54] 🔍 Starting scan #7
+[2025-07-15 08:18:55] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:18:55] ✅ Scan #7 complete - 0 assets, 0 opportunities
+[2025-07-15 08:19:00] 💓 Heartbeat #17 - Bot alive and scanning
+[2025-07-15 08:19:02] 🔍 Starting scan #32
+[2025-07-15 08:19:03] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:19:03] ✅ Scan #32 complete - 0 assets, 0 opportunities
+[2025-07-15 08:19:05] 💓 Heartbeat #10 - Bot alive and scanning
+[2025-07-15 08:19:06] 💓 Heartbeat #18 - Bot alive and scanning
+[2025-07-15 08:19:07] 🔍 Starting scan #33
+[2025-07-15 08:19:07] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:19:07] ✅ Scan #33 complete - 0 assets, 0 opportunities
+[2025-07-15 08:19:09] 🔍 Starting scan #34
+[2025-07-15 08:19:09] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:19:09] ✅ Scan #34 complete - 0 assets, 0 opportunities
+[2025-07-15 08:19:10] 💓 Heartbeat #19 - Bot alive and scanning
+[2025-07-15 08:19:10] 🔍 Starting scan #19
+[2025-07-15 08:19:11] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:19:11] ✅ Scan #19 complete - 0 assets, 0 opportunities
+[2025-07-15 08:19:12] 🔍 Starting scan #35
+[2025-07-15 08:19:12] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:19:12] ✅ Scan #35 complete - 0 assets, 0 opportunities
+[2025-07-15 08:19:14] 🔍 Starting scan #16
+[2025-07-15 08:19:14] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:19:14] ✅ Scan #16 complete - 0 assets, 0 opportunities
+[2025-07-15 08:19:25] 🔍 Starting scan #8
+[2025-07-15 08:19:25] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:19:25] ✅ Scan #8 complete - 0 assets, 0 opportunities
+[2025-07-15 08:19:33] 🔍 Starting scan #36
+[2025-07-15 08:19:33] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:19:33] ✅ Scan #36 complete - 0 assets, 0 opportunities
+[2025-07-15 08:19:35] 💓 Heartbeat #20 - Bot alive and scanning
+[2025-07-15 08:19:37] 🔍 Starting scan #37
+[2025-07-15 08:19:37] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:19:37] ✅ Scan #37 complete - 0 assets, 0 opportunities
+[2025-07-15 08:19:39] 🔍 Starting scan #38
+[2025-07-15 08:19:39] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:19:39] ✅ Scan #38 complete - 0 assets, 0 opportunities
+[2025-07-15 08:19:40] 💓 Heartbeat #9 - Bot alive and scanning
+[2025-07-15 08:19:41] 🔍 Starting scan #20
+[2025-07-15 08:19:41] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:19:41] ✅ Scan #20 complete - 0 assets, 0 opportunities
+[2025-07-15 08:19:42] 🔍 Starting scan #39
+[2025-07-15 08:19:42] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:19:42] ✅ Scan #39 complete - 0 assets, 0 opportunities
+[2025-07-15 08:19:44] 🔍 Starting scan #17
+[2025-07-15 08:19:45] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:19:45] ✅ Scan #17 complete - 0 assets, 0 opportunities
+[2025-07-15 08:20:05] 💓 Heartbeat #11 - Bot alive and scanning
+[2025-07-15 08:20:11] 🔍 Starting scan #21
+[2025-07-15 08:20:11] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:20:11] ✅ Scan #21 complete - 0 assets, 0 opportunities
+[2025-07-15 08:20:15] 🔍 Starting scan #18
+[2025-07-15 08:20:15] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:20:15] ✅ Scan #18 complete - 0 assets, 0 opportunities
+[2025-07-15 08:20:40] 💓 Heartbeat #10 - Bot alive and scanning
+[2025-07-15 08:20:41] 🔍 Starting scan #22
+[2025-07-15 08:20:41] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:20:41] ✅ Scan #22 complete - 0 assets, 0 opportunities
+[2025-07-15 08:20:45] 🔍 Starting scan #19
+[2025-07-15 08:20:45] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:20:45] ✅ Scan #19 complete - 0 assets, 0 opportunities
+[2025-07-15 08:21:05] 💓 Heartbeat #12 - Bot alive and scanning
+[2025-07-15 08:21:11] 🔍 Starting scan #23
+[2025-07-15 08:21:12] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:21:12] ✅ Scan #23 complete - 0 assets, 0 opportunities
+[2025-07-15 08:21:15] 🔍 Starting scan #20
+[2025-07-15 08:21:15] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:21:15] ✅ Scan #20 complete - 0 assets, 0 opportunities
+[2025-07-15 08:21:17] 🚀 Robust Trading Bot Started
+[2025-07-15 08:21:17] 📊 Scan Interval: 30 seconds
+[2025-07-15 08:21:17] 🔗 Mode: Testnet
+[2025-07-15 08:21:17] 💓 Keep-alive: Enabled
+[2025-07-15 08:21:17] ============================================================
+[2025-07-15 08:21:17] 💓 Heartbeat #1 - Bot alive and scanning
+[2025-07-15 08:21:17] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:21:17] ✅ Scan #1 complete - 0 assets, 0 opportunities
+[2025-07-15 08:21:40] 💓 Heartbeat #11 - Bot alive and scanning
+[2025-07-15 08:21:42] 🔍 Starting scan #24
+[2025-07-15 08:21:42] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:21:42] ✅ Scan #24 complete - 0 assets, 0 opportunities
+[2025-07-15 08:21:45] 🔍 Starting scan #21
+[2025-07-15 08:21:46] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:21:46] ✅ Scan #21 complete - 0 assets, 0 opportunities
+[2025-07-15 08:21:47] 🔍 Starting scan #2
+[2025-07-15 08:21:47] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:21:47] ✅ Scan #2 complete - 0 assets, 0 opportunities
+[2025-07-15 08:22:05] 💓 Heartbeat #13 - Bot alive and scanning
+[2025-07-15 08:22:12] 🔍 Starting scan #25
+[2025-07-15 08:22:13] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:22:13] ✅ Scan #25 complete - 0 assets, 0 opportunities
+[2025-07-15 08:22:16] 🔍 Starting scan #22
+[2025-07-15 08:22:16] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:22:16] ✅ Scan #22 complete - 0 assets, 0 opportunities
+[2025-07-15 08:22:17] 💓 Heartbeat #2 - Bot alive and scanning
+[2025-07-15 08:22:17] 🔍 Starting scan #3
+[2025-07-15 08:22:17] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:22:17] ✅ Scan #3 complete - 0 assets, 0 opportunities
+[2025-07-15 08:22:40] 💓 Heartbeat #12 - Bot alive and scanning
+[2025-07-15 08:22:43] 🔍 Starting scan #26
+[2025-07-15 08:22:43] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:22:43] ✅ Scan #26 complete - 0 assets, 0 opportunities
+[2025-07-15 08:22:46] 🔍 Starting scan #23
+[2025-07-15 08:22:46] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:22:46] ✅ Scan #23 complete - 0 assets, 0 opportunities
+[2025-07-15 08:22:47] 🔍 Starting scan #4
+[2025-07-15 08:22:48] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:22:48] ✅ Scan #4 complete - 0 assets, 0 opportunities
+[2025-07-15 08:23:05] 💓 Heartbeat #14 - Bot alive and scanning
+[2025-07-15 08:23:13] 🔍 Starting scan #27
+[2025-07-15 08:23:13] ❌ Error getting portfolio: APIError(code=-2014): API-key format invalid.
+[2025-07-15 08:23:13] ✅ Scan #27 complete - 0 assets, 0 opportunities
+[2025-07-15 08:23:55] 🚀 Robust Trading Bot Started
+[2025-07-15 08:23:55] 📊 Scan Interval: 30 seconds
+[2025-07-15 08:23:55] 🔗 Mode: Testnet
+[2025-07-15 08:23:55] 💓 Keep-alive: Enabled
+[2025-07-15 08:23:55] ============================================================
+[2025-07-15 08:23:55] 💓 Heartbeat #1 - Bot alive and scanning
+[2025-07-15 08:23:56] ❌ Error getting portfolio: APIError(code=-2015): Invalid API-key, IP, or permissions for action.
+[2025-07-15 08:23:56] ✅ Scan #1 complete - 0 assets, 0 opportunities
+[2025-07-15 08:24:26] 🔍 Starting scan #2
+[2025-07-15 08:24:26] ❌ Error getting portfolio: APIError(code=-2015): Invalid API-key, IP, or permissions for action.
+[2025-07-15 08:24:26] ✅ Scan #2 complete - 0 assets, 0 opportunities
+[2025-07-15 08:24:55] 💓 Heartbeat #2 - Bot alive and scanning
+[2025-07-15 08:24:56] 🔍 Starting scan #3
+[2025-07-15 08:24:56] ❌ Error getting portfolio: APIError(code=-2015): Invalid API-key, IP, or permissions for action.
+[2025-07-15 08:24:56] ✅ Scan #3 complete - 0 assets, 0 opportunities
+[2025-07-15 08:25:41] 🚀 Robust Trading Bot Started
+[2025-07-15 08:25:41] 📊 Scan Interval: 30 seconds
+[2025-07-15 08:25:41] 🔗 Mode: Testnet
+[2025-07-15 08:25:41] 💓 Keep-alive: Enabled
+[2025-07-15 08:25:41] ============================================================
+[2025-07-15 08:25:41] 🔍 Starting scan #1
+ alive and scanning
+[2025-07-15 08:25:41] ❌ Error getting portfolio: APIError(code=-2015): Invalid API-key, IP, or permissions for action.
+[2025-07-15 08:25:41] ✅ Scan #1 complete - 0 assets, 0 opportunities
+[2025-07-15 08:26:11] 🔍 Starting scan #2
+[2025-07-15 08:26:11] ❌ Error getting portfolio: APIError(code=-2015): Invalid API-key, IP, or permissions for action.
+[2025-07-15 08:26:11] ✅ Scan #2 complete - 0 assets, 0 opportunities
+[2025-07-15 08:26:41] 💓 Heartbeat #2 - Bot alive and scanning
+[2025-07-15 08:26:41] 🔍 Starting scan #3
+[2025-07-15 08:26:42] ❌ Error getting portfolio: APIError(code=-2015): Invalid API-key, IP, or permissions for action.
+[2025-07-15 08:26:42] ✅ Scan #3 complete - 0 assets, 0 opportunities
+[2025-07-15 08:27:12] 🔍 Starting scan #4
+[2025-07-15 08:27:12] ❌ Error getting portfolio: APIError(code=-2015): Invalid API-key, IP, or permissions for action.
+[2025-07-15 08:27:12] ✅ Scan #4 complete - 0 assets, 0 opportunities
+[2025-07-15 08:27:41] 💓 Heartbeat #3 - Bot alive and scanning
+[2025-07-15 08:27:42] 🔍 Starting scan #5
+[2025-07-15 08:27:42] ❌ Error getting portfolio: APIError(code=-2015): Invalid API-key, IP, or permissions for action.
+[2025-07-15 08:27:42] ✅ Scan #5 complete - 0 assets, 0 opportunities
+[2025-07-15 08:28:12] 🔍 Starting scan #6
+[2025-07-15 08:28:12] ❌ Error getting portfolio: APIError(code=-2015): Invalid API-key, IP, or permissions for action.
+[2025-07-15 08:28:12] ✅ Scan #6 complete - 0 assets, 0 opportunities
+[2025-07-15 08:28:41] 💓 Heartbeat #4 - Bot alive and scanning
+[2025-07-15 08:28:42] 🔍 Starting scan #7
+[2025-07-15 08:28:43] ❌ Error getting portfolio: APIError(code=-2015): Invalid API-key, IP, or permissions for action.
+[2025-07-15 08:28:43] ✅ Scan #7 complete - 0 assets, 0 opportunities
+[2025-07-15 08:29:13] 🔍 Starting scan #8
+[2025-07-15 08:29:13] ❌ Error getting portfolio: APIError(code=-2015): Invalid API-key, IP, or permissions for action.
+[2025-07-15 08:29:13] ✅ Scan #8 complete - 0 assets, 0 opportunities
+[2025-07-15 08:29:41] 💓 Heartbeat #5 - Bot alive and scanning
+[2025-07-15 08:29:43] 🔍 Starting scan #9
+[2025-07-15 08:29:43] ❌ Error getting portfolio: APIError(code=-2015): Invalid API-key, IP, or permissions for action.
+[2025-07-15 08:29:43] ✅ Scan #9 complete - 0 assets, 0 opportunities
+[2025-07-15 08:30:13] 🔍 Starting scan #10
+[2025-07-15 08:30:13] ❌ Error getting portfolio: APIError(code=-2015): Invalid API-key, IP, or permissions for action.
+[2025-07-15 08:30:13] ✅ Scan #10 complete - 0 assets, 0 opportunities
+[2025-07-15 08:30:41] 💓 Heartbeat #6 - Bot alive and scanning
+[2025-07-15 08:30:43] 🔍 Starting scan #11
+[2025-07-15 08:30:44] ❌ Error getting portfolio: APIError(code=-2015): Invalid API-key, IP, or permissions for action.
+[2025-07-15 08:30:44] ✅ Scan #11 complete - 0 assets, 0 opportunities
+[2025-07-15 08:31:26] 🚀 Robust Trading Bot Started
+[2025-07-15 08:31:26] 📊 Scan Interval: 30 seconds
+[2025-07-15 08:31:26] 🔗 Mode: Live Trading
+[2025-07-15 08:31:26] 💓 Keep-alive: Enabled
+[2025-07-15 08:31:26] ============================================================
+[2025-07-15 08:31:26] 🔍 Starting scan #1
+[2025-07-15 08:31:26] 💓 Heartbeat #1 - Bot alive and scanning
+[2025-07-15 08:31:28] ✅ Scan #1 complete - 2 assets, 0 opportunities
+[2025-07-15 08:31:58] 🔍 Starting scan #2
+[2025-07-15 08:32:00] ✅ Scan #2 complete - 2 assets, 0 opportunities
+[2025-07-15 08:32:26] 💓 Heartbeat #2 - Bot alive and scanning
+[2025-07-15 08:32:30] 🔍 Starting scan #3
+[2025-07-15 08:32:32] ✅ Scan #3 complete - 2 assets, 0 opportunities
+[2025-07-15 08:33:02] 🔍 Starting scan #4
+[2025-07-15 08:33:04] ✅ Scan #4 complete - 2 assets, 0 opportunities
+[2025-07-15 08:33:26] 💓 Heartbeat #3 - Bot alive and scanning
+[2025-07-15 08:33:34] 🔍 Starting scan #5
+[2025-07-15 08:33:36] ✅ Scan #5 complete - 2 assets, 0 opportunities
+[2025-07-15 08:34:06] 🔍 Starting scan #6
+[2025-07-15 08:34:08] ✅ Scan #6 complete - 2 assets, 0 opportunities
+[2025-07-15 08:34:26] 💓 Heartbeat #4 - Bot alive and scanning
+[2025-07-15 08:34:38] 🔍 Starting scan #7
+[2025-07-15 08:34:40] ✅ Scan #7 complete - 2 assets, 0 opportunities
+[2025-07-15 08:35:10] 🔍 Starting scan #8
+[2025-07-15 08:35:12] ✅ Scan #8 complete - 2 assets, 0 opportunities
+[2025-07-15 08:35:26] 💓 Heartbeat #5 - Bot alive and scanning
+[2025-07-15 08:35:42] 🔍 Starting scan #9
+[2025-07-15 08:35:45] ✅ Scan #9 complete - 2 assets, 0 opportunities
+[2025-07-15 08:36:15] 🔍 Starting scan #10
+[2025-07-15 08:36:17] 🚀 Robust Trading Bot Started
+[2025-07-15 08:36:17] 📊 Scan Interval: 30 seconds
+[2025-07-15 08:36:17] 🔗 Mode: Live Trading
+[2025-07-15 08:36:17] 💓 Keep-alive: Enabled
+[2025-07-15 08:36:17] ============================================================
+[2025-07-15 08:36:17] 💓 Heartbeat #1 - Bot alive and scanning
+[2025-07-15 08:36:17] 🔍 Starting scan #1
+[2025-07-15 08:36:17] ✅ Scan #10 complete - 2 assets, 0 opportunities
+[2025-07-15 08:36:19] ✅ Scan #1 complete - 2 assets, 0 opportunities
+[2025-07-15 08:36:26] 💓 Heartbeat #6 - Bot alive and scanning
+[2025-07-15 08:36:47] 🔍 Starting scan #11
+[2025-07-15 08:36:49] 🔍 Starting scan #2
+[2025-07-15 08:36:59] ✅ Scan #11 complete - 2 assets, 0 opportunities
+[2025-07-15 08:37:03] ✅ Scan #2 complete - 2 assets, 0 opportunities
+[2025-07-15 08:37:17] 💓 Heartbeat #2 - Bot alive and scanning
+[2025-07-15 08:37:26] 💓 Heartbeat #7 - Bot alive and scanning
+[2025-07-15 08:37:29] 🔍 Starting scan #12
+[2025-07-15 08:37:31] ✅ Scan #12 complete - 2 assets, 0 opportunities
+[2025-07-15 08:37:33] 🔍 Starting scan #3
+[2025-07-15 08:37:35] ✅ Scan #3 complete - 2 assets, 0 opportunities
+[2025-07-15 08:38:01] 🔍 Starting scan #13
+[2025-07-15 08:38:03] ✅ Scan #13 complete - 2 assets, 0 opportunities
+[2025-07-15 08:38:05] 🔍 Starting scan #4
+[2025-07-15 08:38:07] ✅ Scan #4 complete - 2 assets, 0 opportunities
+[2025-07-15 08:38:17] 💓 Heartbeat #3 - Bot alive and scanning
+[2025-07-15 08:38:26] 💓 Heartbeat #8 - Bot alive and scanning
+[2025-07-15 08:38:33] 🔍 Starting scan #14
+[2025-07-15 08:38:35] ✅ Scan #14 complete - 2 assets, 0 opportunities
+[2025-07-15 08:38:37] 🔍 Starting scan #5
+[2025-07-15 08:38:39] ✅ Scan #5 complete - 2 assets, 0 opportunities
+[2025-07-15 08:39:05] 🔍 Starting scan #15
+[2025-07-15 08:39:07] ✅ Scan #15 complete - 2 assets, 0 opportunities
+[2025-07-15 08:39:09] 🔍 Starting scan #6
+[2025-07-15 08:39:11] ✅ Scan #6 complete - 2 assets, 0 opportunities
+[2025-07-15 08:39:17] 💓 Heartbeat #4 - Bot alive and scanning
+[2025-07-15 08:39:26] 💓 Heartbeat #9 - Bot alive and scanning
+[2025-07-15 08:39:37] 🔍 Starting scan #16
+[2025-07-15 08:39:39] ✅ Scan #16 complete - 2 assets, 0 opportunities
+[2025-07-15 08:39:41] 🔍 Starting scan #7
+[2025-07-15 08:39:43] ✅ Scan #7 complete - 2 assets, 0 opportunities
+[2025-07-15 08:40:09] 🔍 Starting scan #17
+[2025-07-15 08:40:11] ✅ Scan #17 complete - 2 assets, 0 opportunities
+[2025-07-15 08:40:13] 🔍 Starting scan #8
+[2025-07-15 08:40:14] 🚀 Robust Trading Bot Started
+[2025-07-15 08:40:14] 📊 Scan Interval: 30 seconds
+[2025-07-15 08:40:14] 🔗 Mode: Live Trading
+[2025-07-15 08:40:14] 💓 Keep-alive: Enabled
+[2025-07-15 08:40:14] ============================================================
+[2025-07-15 08:40:14] 💓 Heartbeat #1 - Bot alive and scanning
+[2025-07-15 08:40:15] ✅ Scan #8 complete - 2 assets, 0 opportunities
+[2025-07-15 08:40:16] ✅ Scan #1 complete - 2 assets, 0 opportunities
+[2025-07-15 08:40:17] 💓 Heartbeat #5 - Bot alive and scanning
+[2025-07-15 08:40:26] 💓 Heartbeat #10 - Bot alive and scanning
+[2025-07-15 08:40:48] 🚀 Robust Trading Bot Started
+[2025-07-15 08:40:48] 📊 Scan Interval: 30 seconds
+[2025-07-15 08:40:49] 🔗 Mode: Live Trading
+[2025-07-15 08:40:49] 💓 Keep-alive: Enabled
+[2025-07-15 08:40:49] ============================================================
+[2025-07-15 08:40:49] 💓 Heartbeat #1 - Bot alive and scanning
+[2025-07-15 08:40:51] ✅ Scan #1 complete - 2 assets, 0 opportunities
+[2025-07-15 08:41:21] 🔍 Starting scan #2
+[2025-07-15 08:41:23] ✅ Scan #2 complete - 2 assets, 0 opportunities
+[2025-07-15 08:41:49] 💓 Heartbeat #2 - Bot alive and scanning
+[2025-07-15 08:41:53] 🔍 Starting scan #3
+[2025-07-15 08:41:55] ✅ Scan #3 complete - 2 assets, 0 opportunities
+[2025-07-15 08:42:25] 🔍 Starting scan #4
+[2025-07-15 08:42:27] ✅ Scan #4 complete - 2 assets, 0 opportunities
+[2025-07-15 08:42:49] 💓 Heartbeat #3 - Bot alive and scanning
+[2025-07-15 08:42:57] 🔍 Starting scan #5
+[2025-07-15 08:42:59] ✅ Scan #5 complete - 2 assets, 0 opportunities

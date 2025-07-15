@@ -651,10 +651,14 @@ def render_settings_tab():
         st.subheader("🎛️ Trading Configuration")
         trading_mode = st.radio("Trading Mode", ["Automated", "Manual"], key="settings_trading_mode")
         risk_level = st.selectbox("Risk Level", ["Conservative", "Balanced", "Aggressive"], key="settings_risk_level")
+        strategy_options = ["Breakout", "Scalping", "Swing"]
+        if 'selected_strategy' not in st.session_state:
+            st.session_state['selected_strategy'] = strategy_options[0]
+        selected_strategy = st.selectbox("Strategy", strategy_options, key="selected_strategy")
         log_retention = st.slider("Log Retention (days)", 1, 30, 7, key="settings_log_retention")
         notification = st.multiselect("Notification Channels", ["Email", "Telegram"], key="settings_notification")
-        
-        st.write(f"Current mode: {trading_mode}, Risk: {risk_level}, Log retention: {log_retention} days")
+
+        st.write(f"Current mode: {trading_mode}, Risk: {risk_level}, Strategy: {selected_strategy}, Log retention: {log_retention} days")
         st.write(f"Notifications: {', '.join(notification) if notification else 'None'}")
         st.info("Settings are for display only. To make changes, edit your config or .env file.")
 
@@ -664,26 +668,27 @@ def render_strategy_tab():
     st.caption("Strategy selection & ML status")
     
     st.write("**Strategy Status:**")
-    st.info("Enhanced breakout strategy active with volume and time filters")
-    
+    st.info("Enhanced breakout, scalping, and swing strategies active with volume and time filters")
+
     st.markdown("---")
     st.subheader("📊 Current Strategy Configuration")
-    
+
     col1, col2 = st.columns(2)
     with col1:
         st.write("**Breakout Threshold:** 5% price movement")
+        st.write("**Scalping Threshold:** 2-3% quick moves, high volume")
         st.write("**Volume Confirmation:** 1.5x average required")
         st.write("**Time Filtering:** Avoid low-volume hours")
-    
+
     with col2:
         st.write("**Confidence Threshold:** 65% minimum")
         st.write("**Risk Management:** Dynamic position sizing")
         st.write("**Stop Loss:** 8-15% based on confidence")
-    
+
     st.markdown("---")
     st.subheader("🎯 Signal Preview")
-    st.info("Strategy continuously analyzes your portfolio for trading opportunities.")
-    
+    st.info("Strategy continuously analyzes your portfolio for breakout, scalping, and swing trading opportunities.")
+
     # Show recent opportunities
     status = load_bot_status()
     opportunities = status.get('opportunities', [])
@@ -737,6 +742,9 @@ def render_health_tab():
         st.metric("Total Scans", status.get('scan_count', 0))
         uptime = status.get('uptime_seconds', 0)
         st.metric("Bot Uptime", f"{uptime // 3600:.0f}h {(uptime % 3600) // 60:.0f}m")
+        # Show last scan time if available
+        if 'timestamp' in status:
+            st.metric("Last Scan", status['timestamp'])
     
     # Log file check
     st.subheader("📁 Log File Status")
