@@ -4,15 +4,11 @@ import threading
 import time
 import os
 import json
-import signal
-import sys
 import subprocess
-from datetime import datetime, timedelta
+from datetime import datetime
 from dotenv import load_dotenv
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 
 # Load environment variables
 load_dotenv()
@@ -30,13 +26,6 @@ try:
     BINANCE_AVAILABLE = True
 except ImportError:
     BINANCE_AVAILABLE = False
-
-# Check for bot controller
-try:
-    from bot_controller import BotController
-    BOT_CONTROLLER_AVAILABLE = True
-except ImportError:
-    BOT_CONTROLLER_AVAILABLE = False
 
 # Initialize session state
 if 'dashboard_password' not in st.session_state:
@@ -415,7 +404,7 @@ def simulate_market_analysis(portfolio):
     return condition, score, volatility
 
 def render_portfolio_overview_tab(portfolio, gbp_rate, market_condition, condition_score, avg_volatility):
-    """Render portfolio overview tab - matching robust structure"""
+    """Render portfolio overview tab"""
     st.header("💼 Portfolio Overview")
     st.caption("Live portfolio analysis with dynamic risk management")
     
@@ -431,7 +420,7 @@ def render_portfolio_overview_tab(portfolio, gbp_rate, market_condition, conditi
     total_usd = sum(coin['usd_value'] for coin in portfolio.values())
     total_gbp = total_usd * gbp_rate
     
-    # Key metrics - matching robust layout
+    # Key metrics
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
@@ -478,7 +467,7 @@ def render_portfolio_overview_tab(portfolio, gbp_rate, market_condition, conditi
     st.dataframe(df, use_container_width=True, hide_index=True)
 
 def render_market_indicators_tab():
-    """Render market indicators tab - matching robust structure"""
+    """Render market indicators tab"""
     st.header("📊 Market Indicators & Signals")
     st.caption("Live summary of all tracked coins, signals, and movements.")
     
@@ -512,7 +501,7 @@ def render_market_indicators_tab():
         st.info("🔍 No trading opportunities found at this time.")
 
 def render_performance_tab():
-    """Render performance tab - enhanced version"""
+    """Render performance tab"""
     st.header("📊 Performance")
     st.caption("Trading performance metrics and live wallet")
     
@@ -551,7 +540,7 @@ def render_performance_tab():
     else:
         st.info("No trade data available yet.")
     
-    # Live Wallet - matching robust structure
+    # Live Wallet
     st.subheader("💰 Live Wallet (Binance)")
     try:
         if BINANCE_AVAILABLE and API_KEY and API_SECRET:
@@ -580,7 +569,7 @@ def render_performance_tab():
     st.info("If you see no wallet, check your API keys and Binance account.")
 
 def render_logs_tab():
-    """Render logs tab - matching robust structure"""
+    """Render logs tab"""
     st.header("📡 Logs")
     st.caption("Live logs from your bot will appear here")
     
@@ -621,7 +610,7 @@ def render_logs_tab():
     st.info("Live logs from your bot will appear here. If empty, check your log file path and bot status.")
 
 def render_settings_tab():
-    """Render settings tab - matching robust structure"""
+    """Render settings tab"""
     st.header("⚙️ Settings")
     st.caption("Bot controls and configuration")
     
@@ -658,7 +647,7 @@ def render_settings_tab():
                 st.warning("Password cannot be empty.")
     
     with col2:
-        # Trading mode settings - matching robust structure
+        # Trading mode settings
         st.subheader("🎛️ Trading Configuration")
         trading_mode = st.radio("Trading Mode", ["Automated", "Manual"], key="settings_trading_mode")
         risk_level = st.selectbox("Risk Level", ["Conservative", "Balanced", "Aggressive"], key="settings_risk_level")
@@ -670,48 +659,43 @@ def render_settings_tab():
         st.info("Settings are for display only. To make changes, edit your config or .env file.")
 
 def render_strategy_tab():
-    """Render strategy tab - matching robust structure"""
+    """Render strategy tab"""
     st.header("🧠 Strategy")
     st.caption("Strategy selection & ML status")
     
-    try:
-        # Try to import ML strategy
-        st.write("**Strategy Status:**")
-        st.info("Enhanced breakout strategy active with volume and time filters")
-        
-        st.markdown("---")
-        st.subheader("📊 Current Strategy Configuration")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.write("**Breakout Threshold:** 5% price movement")
-            st.write("**Volume Confirmation:** 1.5x average required")
-            st.write("**Time Filtering:** Avoid low-volume hours")
-        
-        with col2:
-            st.write("**Confidence Threshold:** 65% minimum")
-            st.write("**Risk Management:** Dynamic position sizing")
-            st.write("**Stop Loss:** 8-15% based on confidence")
-        
-        st.markdown("---")
-        st.subheader("🎯 Signal Preview")
-        st.info("Strategy continuously analyzes your portfolio for trading opportunities.")
-        
-        # Show recent opportunities
-        status = load_bot_status()
-        opportunities = status.get('opportunities', [])
-        if opportunities:
-            st.success(f"Current opportunities found: {len(opportunities)}")
-            for opp in opportunities[:3]:  # Show top 3
-                st.write(f"• {opp['asset']}: {opp['signal']} (Confidence: {opp['confidence']:.1%})")
-        else:
-            st.write("No current opportunities detected.")
-            
-    except Exception as e:
-        st.error(f"Strategy module error: {e}")
+    st.write("**Strategy Status:**")
+    st.info("Enhanced breakout strategy active with volume and time filters")
+    
+    st.markdown("---")
+    st.subheader("📊 Current Strategy Configuration")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.write("**Breakout Threshold:** 5% price movement")
+        st.write("**Volume Confirmation:** 1.5x average required")
+        st.write("**Time Filtering:** Avoid low-volume hours")
+    
+    with col2:
+        st.write("**Confidence Threshold:** 65% minimum")
+        st.write("**Risk Management:** Dynamic position sizing")
+        st.write("**Stop Loss:** 8-15% based on confidence")
+    
+    st.markdown("---")
+    st.subheader("🎯 Signal Preview")
+    st.info("Strategy continuously analyzes your portfolio for trading opportunities.")
+    
+    # Show recent opportunities
+    status = load_bot_status()
+    opportunities = status.get('opportunities', [])
+    if opportunities:
+        st.success(f"Current opportunities found: {len(opportunities)}")
+        for opp in opportunities[:3]:  # Show top 3
+            st.write(f"• {opp['asset']}: {opp['signal']} (Confidence: {opp['confidence']:.1%})")
+    else:
+        st.write("No current opportunities detected.")
 
 def render_health_tab():
-    """Render health tab - matching robust structure"""
+    """Render health tab"""
     st.header("💓 Health")
     st.caption("Bot health & connection status")
     
@@ -774,100 +758,19 @@ def render_health_tab():
         st.error("❌ Log file not found")
     
     st.info("If health info is missing, check your bot and log file paths.")
-    else:
-        st.warning("🔴 Background bot is stopped")
-    
-    # Display logs
-    lines = load_logs("logs/console_output.log")
-    colored_logs = []
-    for line in lines:
-        colored_logs.append(color_line(line))
-    
-    log_output = "\n".join(colored_logs[-50:])  # Show last 50 lines
-    st.text_area("Recent Logs", log_output, height=400)
-
-def render_settings_tab():
-    """Render settings and controls tab"""
-    st.subheader("⚙️ Bot Controls & Settings")
-    
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown("### 🤖 Background Bot Control")
-        
-        if st.session_state['background_bot_running']:
-            st.success("✅ Background bot is RUNNING 24/7")
-            st.info("Bot scans every 30 seconds automatically")
-            
-            if st.button("🛑 Stop Background Bot", type="secondary"):
-                if stop_background_bot():
-                    st.success("Background bot stopped")
-                    st.rerun()
-        else:
-            st.warning("⏹️ Background bot is STOPPED")
-            
-            if st.button("▶️ Start Background Bot", type="primary"):
-                if start_background_bot():
-                    st.success("🚀 Background bot started!")
-                    st.rerun()
-        
-        # Password change
-        st.markdown("---")
-        st.subheader("🔐 Change Dashboard Password")
-        new_password = st.text_input("New Password", type="password")
-        if st.button("Set New Password"):
-            if new_password:
-                st.session_state['dashboard_password'] = new_password
-                st.success("Password updated.")
-            else:
-                st.warning("Password cannot be empty.")
-    
-    with col2:
-        st.subheader("📊 System Status")
-        
-        # API status
-        if BINANCE_AVAILABLE and API_KEY and API_SECRET:
-            st.success("✅ Binance API Configured")
-        else:
-            st.error("❌ Binance API Not Configured")
-        
-        st.info(f"📡 Mode: {'Testnet' if USE_TESTNET else 'Live Trading'}")
-        
-        # Bot statistics
-        st.markdown("---")
-        st.subheader("📈 Bot Statistics")
-        
-        status = load_bot_status()
-        col_a, col_b = st.columns(2)
-        with col_a:
-            st.metric("Scans Completed", status.get('scan_count', 0))
-        with col_b:
-            uptime = status.get('uptime_seconds', 0)
-            st.metric("Uptime", f"{uptime // 3600:.0f}h {(uptime % 3600) // 60:.0f}m")
-        
-        # Remote access
-        st.markdown("---")
-        st.subheader("🔗 Remote Access")
-        ts_ip = get_tailscale_ip()
-        if ts_ip != "Unavailable":
-            remote_url = f"http://{ts_ip}:8501"
-            st.text_input("🔗 Access URL", value=remote_url, label_visibility="collapsed")
-            st.info("Use this URL to access dashboard remotely via Tailscale")
-        else:
-            st.info("Tailscale not available")
 
 def dashboard():
     """Main dashboard function"""
-    # Get Tailscale IP and setup sidebar controls like robust
+    # Get Tailscale IP and setup sidebar controls
     ts_ip = get_tailscale_ip()
     remote_url = f"http://{ts_ip}:8501" if ts_ip != "Unavailable" else "Unavailable"
     
-    # Sidebar setup - matching robust structure
+    # Sidebar setup
     st.sidebar.markdown(f"**Tailscale IP:** `{ts_ip}`")
     st.sidebar.text_input("🔗 Access URL", value=remote_url, key="url", label_visibility="collapsed")
     st.sidebar.download_button("📥 Download Logs", data="\n".join(load_logs("logs/console_output.log")), file_name="console_output.log")
 
-    # Bot status in sidebar - matching robust structure
+    # Bot status in sidebar
     st.sidebar.subheader("🤖 Bot Status")
     if st.session_state['background_bot_running']:
         st.sidebar.success("🟢 Bot is running")
@@ -889,7 +792,7 @@ def dashboard():
     if not st.session_state['background_bot_running'] and BINANCE_AVAILABLE and API_KEY and API_SECRET:
         start_background_bot()
 
-    # Sidebar navigation - matching robust structure exactly
+    # Sidebar navigation
     selected_tab = st.sidebar.radio(
         "Select Dashboard Tab",
         ["Portfolio Overview", "Market Indicators", "Performance", "Logs", "Settings", "Strategy", "Health"]
@@ -905,7 +808,7 @@ def dashboard():
     else:
         market_condition, condition_score, avg_volatility = "UNCERTAIN", 0.5, 2.0
     
-    # Render selected tab - matching robust structure
+    # Render selected tab
     if selected_tab == "Portfolio Overview":
         render_portfolio_overview_tab(portfolio, gbp_rate, market_condition, condition_score, avg_volatility)
     elif selected_tab == "Market Indicators":
@@ -942,7 +845,7 @@ def main():
         if not st.session_state['password_authenticated']:
             st.stop()
     
-    # Main dashboard - matching robust title structure
+    # Main dashboard
     st.title("🤖 Crypto Trading Bot Dashboard")
     st.caption("Professional trading with 24/7 background scanning")
     
