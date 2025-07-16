@@ -1,3 +1,20 @@
+# --- Dynamic Client Creation ---
+def get_dynamic_client():
+    """
+    Returns a Binance client instance based on the current sidebar mode (Demo/Live).
+    Reads API keys from environment variables for testnet or live as appropriate.
+    """
+    use_testnet = get_use_testnet()
+    if use_testnet:
+        api_key = os.getenv("BINANCE_TESTNET_API_KEY")
+        api_secret = os.getenv("BINANCE_TESTNET_API_SECRET")
+        base_url = "https://testnet.binance.vision/api"
+    else:
+        api_key = os.getenv("BINANCE_API_KEY")
+        api_secret = os.getenv("BINANCE_API_SECRET")
+        base_url = "https://api.binance.com/api"
+    from binance.client import Client
+    return Client(api_key, api_secret, base_url=base_url)
 # Trigger redeploy: harmless comment for Railway
 #!/usr/bin/env python3
 """
@@ -67,7 +84,6 @@ def get_use_testnet():
     # Use testnet if in Demo mode, otherwise use live
     return st.session_state.get('bot_mode', 'Demo') == 'Demo'
 
-USE_TESTNET = get_use_testnet()
 API_KEY = os.getenv('BINANCE_API_KEY')
 API_SECRET = os.getenv('BINANCE_API_SECRET')
 SCAN_INTERVAL = int(os.getenv('SCAN_INTERVAL', '300').split('#')[0].strip())
@@ -269,18 +285,14 @@ def get_real_portfolio():
         return {}, 0.79
 
     try:
-        use_testnet = get_use_testnet()
-        client = Client(API_KEY, API_SECRET)
-        if use_testnet:
-            client.API_URL = "https://testnet.binance.vision/api"
-        
+        client = get_dynamic_client()
         # Get account info
         account = client.get_account()
         all_tickers = client.get_all_tickers()
-        
+
         # Create price lookup
         price_dict = {ticker['symbol']: float(ticker['price']) for ticker in all_tickers}
-        
+
         portfolio = {}
         for balance in account['balances']:
             asset = balance['asset']
@@ -494,6 +506,13 @@ def render_manual_trading_tab():
                         st.warning("You must confirm before placing a LIVE trade.")
                         st.stop()
                 try:
+                    client = get_dynamic_client()
+                    # Live trade confirmation
+                    if not get_use_testnet():
+                        confirm = st.checkbox("⚠️ I understand this will execute a LIVE trade with real funds.", key="live_trade_confirm")
+                        if not confirm:
+                            st.warning("You must confirm before placing a LIVE trade.")
+                            st.stop()
                     # Execute the trade based on order type
                     if order_type == "MARKET":
                         order = client.order_market(
@@ -767,7 +786,7 @@ def render_performance_tab():
     try:
         if BINANCE_AVAILABLE and API_KEY and API_SECRET:
             client = Client(API_KEY, API_SECRET)
-            if USE_TESTNET:
+            if get_use_testnet():
                 client.API_URL = "https://testnet.binance.vision/api"
             # Get all symbols with trades
             account = client.get_account()
@@ -1076,39 +1095,37 @@ def render_strategy_tab():
     
     rec = recommendations.get(market_condition, {
         'recommended': ['Balanced'],
-        'avoid': [],
-        'reason': 'Mixed market conditions'
-    })
-    
-    st.info(f"**Market Condition:** {market_condition}")
-    st.success(f"**Recommended Strategies:** {', '.join(rec['recommended'])}")
-    if rec['avoid']:
-        st.warning(f"**Avoid:** {', '.join(rec['avoid'])}")
-    st.markdown(f"**Reasoning:** {rec['reason']}")
-
-def render_market_indicators_tab():
-    """Enhanced market indicators tab"""
-    st.header("📊 Market Indicators")
-    st.caption("Real-time market analysis and trading opportunities")
-    
-    # Manual scan button
-    if st.button("🔍 Scan Market Now", type="primary"):
-        perform_scan()
-    
-    # Market overview
-    st.subheader("🌍 Market Overview")
-    
-    # Get market data
-    portfolio, gbp_rate = get_real_portfolio()
-    market_condition, condition_score, avg_volatility = simulate_market_analysis(portfolio)
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric("Market Condition", market_condition)
-    
-    with col2:
-        st.metric("Confidence Score", f"{condition_score:.1%}")
+    try:
+        if BINANCE_AVAILABLE and API_KEY and API_SECRET:
+            client = get_dynamic_client()
+            # Get all symbols with trades
+            account = client.get_account()
+            all_balances = account['balances']
+            # Only show assets with nonzero balance
+            for bal in all_balances:
+                asset = bal['asset']
+                free = float(bal['free'])
+                locked = float(bal['locked'])
+                total = free + locked
+                if total > 0 and asset not in ['USDT', 'BUSD', 'USDC']:
+                    # Try to find a USDT pair for this asset
+                    symbol = f"{asset}USDT"
+                    try:
+                        ticker = client.get_symbol_ticker(symbol=symbol)
+                        current_price = float(ticker['price'])
+                        entry_price = current_price  # No entry price info, so just show current
+                        pnl_pct = 0.0
+                        positions_data.append({
+                            'Symbol': symbol,
+                            'Direction': 'LONG',
+                            'Entry Price': f"${entry_price:.8f}",
+                            'Current Price': f"${current_price:.8f}",
+                            'P&L %': f"{pnl_pct:+.2f}%",
+                        })
+                    except Exception:
+                        continue
+    except Exception as e:
+        st.warning(f"Could not fetch live positions: {e}")
     
     with col3:
         st.metric("Avg Volatility", f"{avg_volatility:.1f}%")
@@ -1274,7 +1291,7 @@ def render_health_tab():
         st.subheader("🔗 API Connection")
         if BINANCE_AVAILABLE and API_KEY and API_SECRET:
             st.success("✅ Binance API Connected")
-            mode = "🧪 Testnet" if USE_TESTNET else "🔴 Live Trading"
+            mode = "🧪 Testnet" if get_use_testnet() else "🔴 Live Trading"
             st.info(f"📡 Mode: {mode}")
         else:
             st.error("❌ Binance API Not Connected")
@@ -1283,10 +1300,7 @@ def render_health_tab():
         if st.button("🔄 Test API Connection"):
             if BINANCE_AVAILABLE and API_KEY and API_SECRET:
                 try:
-                    client = Client(API_KEY, API_SECRET)
-                    if USE_TESTNET:
-                        client.API_URL = "https://testnet.binance.vision/api"
-                    
+                    client = get_dynamic_client()
                     account = client.get_account()
                     st.success("✅ API Connection Test Passed!")
                     st.info(f"Account Status: {account.get('accountType', 'Unknown')}")
@@ -1403,7 +1417,7 @@ def render_health_tab():
         'Python Version': sys.version,
         'Streamlit Version': st.__version__,
         'Current Directory': os.getcwd(),
-        'Environment': 'Testnet' if USE_TESTNET else 'Live Trading',
+        'Environment': 'Testnet' if get_use_testnet() else 'Live Trading',
         'API Keys Configured': bool(API_KEY and API_SECRET),
         'Binance Library': 'Available' if BINANCE_AVAILABLE else 'Missing'
     }
