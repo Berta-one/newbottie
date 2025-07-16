@@ -356,13 +356,37 @@ def render_manual_trading_tab():
         trading_pair = f"{base_asset}{quote_asset}"
         trade_direction = st.radio("Trade Direction", ["Buy", "Sell"])
 
-        # Get current price
+        # Get current price and symbol info for precision
         try:
             ticker = client.get_symbol_ticker(symbol=trading_pair)
             current_price = float(ticker['price'])
             st.success(f"💰 Current {trading_pair} Price: {current_price:.8f}")
 
             order_type = st.selectbox("Order Type", ["MARKET", "LIMIT", "STOP_LOSS", "STOP_LOSS_LIMIT"])
+
+            # Get step size for quantity precision
+            step_size = 0.000001
+            try:
+                symbol_info = next(s for s in exchange_info['symbols'] if s['symbol'] == trading_pair)
+                for f in symbol_info['filters']:
+                    if f['filterType'] == 'LOT_SIZE':
+                        step_size = float(f['stepSize'])
+                        min_qty = float(f['minQty'])
+                        break
+            except Exception:
+                min_qty = 0.0
+
+
+            import math
+            def get_step_decimals(step):
+                step_str = f'{step:.20f}'.rstrip('0')
+                if '.' in step_str:
+                    return len(step_str.split('.')[1])
+                return 0
+
+            def round_step(qty, step):
+                decimals = get_step_decimals(step)
+                return float(f'{math.floor(qty / step) * step:.{decimals}f}')
 
             # Quantity input (no balance check, as user may not hold asset yet)
             if trade_direction == "Buy":
@@ -389,6 +413,15 @@ def render_manual_trading_tab():
                     format="%.8f"
                 )
 
+            # Round quantity to allowed precision
+
+            quantity = round_step(quantity, step_size)
+            if quantity < min_qty:
+                st.warning(f"Quantity must be at least {min_qty}")
+
+            # Format quantity for Binance API
+            quantity_str = f'{quantity:.{get_step_decimals(step_size)}f}'
+
             limit_price = current_price
             stop_price = current_price
 
@@ -408,8 +441,9 @@ def render_manual_trading_tab():
                     format="%.8f"
                 )
 
-            button_text = f"🛒 {trade_direction} {quantity:.8f} {base_asset}"
-            can_execute = quantity > 0 and current_price > 0
+
+            button_text = f"🛒 {trade_direction} {quantity_str} {base_asset}"
+            can_execute = quantity >= min_qty and current_price > 0
 
             if st.button(button_text, type="primary", disabled=not can_execute):
                 if can_execute:
@@ -419,24 +453,24 @@ def render_manual_trading_tab():
                             if trade_direction == "Buy":
                                 order = client.order_market_buy(
                                     symbol=trading_pair,
-                                    quantity=quantity
+                                    quantity=quantity_str
                                 )
                             else:
                                 order = client.order_market_sell(
                                     symbol=trading_pair,
-                                    quantity=quantity
+                                    quantity=quantity_str
                                 )
                         elif order_type == "LIMIT":
                             if trade_direction == "Buy":
                                 order = client.order_limit_buy(
                                     symbol=trading_pair,
-                                    quantity=quantity,
+                                    quantity=quantity_str,
                                     price=str(limit_price)
                                 )
                             else:
                                 order = client.order_limit_sell(
                                     symbol=trading_pair,
-                                    quantity=quantity,
+                                    quantity=quantity_str,
                                     price=str(limit_price)
                                 )
                         # Add STOP_LOSS and STOP_LOSS_LIMIT as needed
@@ -449,7 +483,7 @@ def render_manual_trading_tab():
                             'type': 'manual_trade',
                             'symbol': trading_pair,
                             'side': trade_direction.upper(),
-                            'quantity': quantity,
+                            'quantity': quantity_str,
                             'price': limit_price if order_type == "LIMIT" else current_price,
                             'order_type': order_type,
                             'order_id': order.get('orderId'),
