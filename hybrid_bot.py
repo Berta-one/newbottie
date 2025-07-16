@@ -1,3 +1,4 @@
+# Trigger redeploy: harmless comment for Railway
 #!/usr/bin/env python3
 """
 Complete Enhanced Crypto Trading Bot Dashboard
@@ -61,7 +62,39 @@ try:
 except ImportError:
     BINANCE_AVAILABLE = False
 
-# Initialize session state
+import csv
+# --- Ensure required log files exist on startup ---
+def ensure_log_files():
+    os.makedirs('logs', exist_ok=True)
+    # trades.csv
+    trades_path = 'logs/trades.csv'
+    if not os.path.exists(trades_path):
+        with open(trades_path, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['timestamp','symbol','direction','entry_price','exit_price','quantity','change_pct','status','strategy'])
+    # manual_trades.log
+    manual_trades_path = 'logs/manual_trades.log'
+    if not os.path.exists(manual_trades_path):
+        with open(manual_trades_path, 'w') as f:
+            f.write('')
+    # portfolio_scans.log
+    scans_path = 'logs/portfolio_scans.log'
+    if not os.path.exists(scans_path):
+        with open(scans_path, 'w') as f:
+            f.write('')
+    # console_output.log
+    console_path = 'logs/console_output.log'
+    if not os.path.exists(console_path):
+        with open(console_path, 'w') as f:
+            f.write('')
+    # bot_status.json
+    status_path = 'logs/bot_status.json'
+    if not os.path.exists(status_path):
+        with open(status_path, 'w') as f:
+            import json
+            json.dump({'timestamp':'','running':False,'scan_count':0,'opportunities':[],'portfolio':{}}, f)
+
+ensure_log_files()
 if 'background_bot_running' not in st.session_state:
     st.session_state['background_bot_running'] = False
 if 'bot_process' not in st.session_state:
@@ -410,7 +443,7 @@ def render_manual_trading_tab():
                         st.success(f"✅ {order_type} order placed successfully!")
                         st.json(order)
 
-                        # Log the trade
+                        # Log the trade (manual_trades.log)
                         trade_data = {
                             'timestamp': datetime.now().isoformat(),
                             'type': 'manual_trade',
@@ -422,10 +455,23 @@ def render_manual_trading_tab():
                             'order_id': order.get('orderId'),
                             'status': order.get('status')
                         }
-
                         os.makedirs('logs', exist_ok=True)
                         with open('logs/manual_trades.log', 'a') as f:
                             f.write(f"{json.dumps(trade_data)}\n")
+                        # Also log to trades.csv for performance tab
+                        with open('logs/trades.csv', 'a', newline='') as f:
+                            writer = csv.writer(f)
+                            writer.writerow([
+                                trade_data['timestamp'],
+                                trade_data['symbol'],
+                                trade_data['side'],
+                                trade_data['price'],  # entry_price
+                                '',                   # exit_price (empty for open)
+                                trade_data['quantity'],
+                                '',                   # change_pct (empty for open)
+                                'ENTRY',              # status
+                                'Manual'              # strategy
+                            ])
                     except Exception as e:
                         st.error(f"❌ Order failed: {e}")
         except Exception as e:
@@ -565,133 +611,85 @@ def render_performance_tab():
     st.header("📈 Trading Performance")
     st.caption("Historical performance metrics and current position analysis")
     
-    # Load current positions
-    current_positions = get_current_positions()
-    
-    # Current positions section
-    st.subheader("🔄 Current Positions")
-    
-    if current_positions:
-        positions_data = []
-        
-        for symbol, position in current_positions.items():
-            if position.get('status') != 'CLOSED':
-                # Calculate mark-to-market P&L
-                try:
-                    if BINANCE_AVAILABLE and API_KEY and API_SECRET:
-                        client = Client(API_KEY, API_SECRET)
-                        if USE_TESTNET:
-                            client.API_URL = "https://testnet.binance.vision/api"
-                        
-                        current_ticker = client.get_symbol_ticker(symbol=symbol)
-                        current_price = float(current_ticker['price'])
-                        
-                        entry_price = position['entry_price']
-                        pnl_pct = ((current_price - entry_price) / entry_price) * 100
-                        
-                        if position['direction'] == 'SHORT':
-                            pnl_pct = -pnl_pct
-                        
+    # --- NEW: Pull trade history from Binance ---
+    st.subheader("🔄 Current Positions (Live from Binance)")
+    positions_data = []
+    trades_data = []
+    try:
+        if BINANCE_AVAILABLE and API_KEY and API_SECRET:
+            client = Client(API_KEY, API_SECRET)
+            if USE_TESTNET:
+                client.API_URL = "https://testnet.binance.vision/api"
+            # Get all symbols with trades
+            account = client.get_account()
+            all_balances = account['balances']
+            # Only show assets with nonzero balance
+            for bal in all_balances:
+                asset = bal['asset']
+                free = float(bal['free'])
+                locked = float(bal['locked'])
+                total = free + locked
+                if total > 0 and asset not in ['USDT', 'BUSD', 'USDC']:
+                    # Try to find a USDT pair for this asset
+                    symbol = f"{asset}USDT"
+                    try:
+                        ticker = client.get_symbol_ticker(symbol=symbol)
+                        current_price = float(ticker['price'])
+                        entry_price = current_price  # No entry price info, so just show current
+                        pnl_pct = 0.0
                         positions_data.append({
                             'Symbol': symbol,
-                            'Direction': position['direction'],
+                            'Direction': 'LONG',
                             'Entry Price': f"${entry_price:.8f}",
                             'Current Price': f"${current_price:.8f}",
                             'P&L %': f"{pnl_pct:+.2f}%",
-                            'Strategy': position['strategy'],
-                            'Risk Level': position['risk_level'],
-                            'Entry Time': position['entry_time']
+                            'Strategy': 'Unknown',
+                            'Risk Level': 'Unknown',
+                            'Entry Time': 'N/A'
                         })
-                
-                except Exception as e:
-                    st.error(f"Error calculating P&L for {symbol}: {e}")
-        
-        if positions_data:
-            positions_df = pd.DataFrame(positions_data)
-            st.dataframe(positions_df, use_container_width=True)
-            
-            # P&L summary
-            total_pnl = sum([float(pos['P&L %'].replace('%', '').replace('+', '')) for pos in positions_data])
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                st.metric("Open Positions", len(positions_data))
-            
-            with col2:
-                st.metric("Total Unrealized P&L", f"{total_pnl:+.2f}%")
-            
-            with col3:
-                avg_pnl = total_pnl / len(positions_data) if positions_data else 0
-                st.metric("Average P&L", f"{avg_pnl:+.2f}%")
-        else:
-            st.info("No open positions")
+                    except Exception:
+                        continue
+            # Get trade history for all symbols with trades
+            exchange_info = client.get_exchange_info()
+            trading_symbols = [s['symbol'] for s in exchange_info['symbols'] if s['status'] == 'TRADING']
+            for symbol in trading_symbols:
+                try:
+                    trades = client.get_my_trades(symbol=symbol)
+                    for t in trades:
+                        trades_data.append({
+                            'timestamp': datetime.fromtimestamp(t['time']/1000),
+                            'symbol': symbol,
+                            'side': 'BUY' if t['isBuyer'] else 'SELL',
+                            'price': float(t['price']),
+                            'qty': float(t['qty']),
+                            'commission': float(t['commission']),
+                            'commissionAsset': t['commissionAsset'],
+                            'orderId': t['orderId'],
+                            'tradeId': t['id']
+                        })
+                except Exception:
+                    continue
+    except Exception as e:
+        st.error(f"Error fetching live trades from Binance: {e}")
+
+    # Show open positions
+    if positions_data:
+        positions_df = pd.DataFrame(positions_data)
+        st.dataframe(positions_df, use_container_width=True)
     else:
-        st.info("No current positions found")
-    
-    # Individual trade P&L
-    st.subheader("💰 Individual Trade P&L")
-    
-    trade_file = "logs/trades.csv"
-    if os.path.exists(trade_file):
-        df = pd.read_csv(trade_file)
-        
-        if not df.empty:
-            # Filter for completed trades
-            completed_trades = df[df['status'] == 'EXIT'].copy()
-            
-            if not completed_trades.empty:
-                # Calculate individual P&L
-                completed_trades['P&L'] = completed_trades['change_pct']
-                
-                # Display recent trades
-                st.dataframe(completed_trades[['timestamp', 'symbol', 'direction', 'entry_price', 'exit_price', 'change_pct', 'strategy']].tail(10))
-                
-                # Performance metrics
-                total_trades = len(completed_trades)
-                winning_trades = len(completed_trades[completed_trades['change_pct'] > 0])
-                win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
-                total_pnl = completed_trades['change_pct'].sum()
-                
-                col1, col2, col3, col4 = st.columns(4)
-                
-                with col1:
-                    st.metric("Total Trades", total_trades)
-                
-                with col2:
-                    st.metric("Win Rate", f"{win_rate:.1f}%")
-                
-                with col3:
-                    st.metric("Total P&L", f"{total_pnl:+.2f}%")
-                
-                with col4:
-                    avg_trade = completed_trades['change_pct'].mean()
-                    st.metric("Avg Trade", f"{avg_trade:+.2f}%")
-                
-                # Performance chart
-                if 'timestamp' in completed_trades.columns:
-                    completed_trades['timestamp'] = pd.to_datetime(completed_trades['timestamp'])
-                    completed_trades['cumulative_pnl'] = completed_trades['change_pct'].cumsum()
-                    
-                    fig = px.line(completed_trades, x='timestamp', y='cumulative_pnl', 
-                                 title="Cumulative P&L Over Time")
-                    st.plotly_chart(fig, use_container_width=True)
-                
-                # Strategy performance breakdown
-                st.subheader("📊 Performance by Strategy")
-                
-                strategy_performance = completed_trades.groupby('strategy').agg({
-                    'change_pct': ['count', 'mean', 'sum']
-                }).round(2)
-                
-                strategy_performance.columns = ['Trades', 'Avg P&L %', 'Total P&L %']
-                st.dataframe(strategy_performance)
-            
-            else:
-                st.info("No completed trades found")
-        else:
-            st.info("No trade history available yet")
+        st.info("No open positions found on Binance.")
+
+    # Show trade history
+    st.subheader("� Individual Trade History (Live from Binance)")
+    if trades_data:
+        trades_df = pd.DataFrame(trades_data)
+        trades_df = trades_df.sort_values('timestamp', ascending=False)
+        st.dataframe(trades_df[['timestamp','symbol','side','price','qty','commission','commissionAsset']].head(20), use_container_width=True)
+        # Simple stats
+        st.metric("Total Trades", len(trades_df))
+        st.metric("Unique Symbols", trades_df['symbol'].nunique())
     else:
-        st.info("No trade history file found")
+        st.info("No trade history found on Binance.")
 
 def render_settings_tab():
     """Enhanced settings tab with methodology and risk level selection"""
