@@ -62,7 +62,11 @@ from binance.client import Client
 from binance.exceptions import BinanceAPIException
 
 # Configuration
-USE_TESTNET = os.getenv('USE_TESTNET', 'True').lower() == 'true'
+def get_use_testnet():
+    # Use testnet if in Demo mode, otherwise use live
+    return st.session_state.get('bot_mode', 'Demo') == 'Demo'
+
+USE_TESTNET = get_use_testnet()
 API_KEY = os.getenv('BINANCE_API_KEY')
 API_SECRET = os.getenv('BINANCE_API_SECRET')
 SCAN_INTERVAL = int(os.getenv('SCAN_INTERVAL', '300').split('#')[0].strip())
@@ -216,8 +220,9 @@ def get_real_portfolio():
         return {}, 0.79
 
     try:
+        use_testnet = get_use_testnet()
         client = Client(API_KEY, API_SECRET)
-        if USE_TESTNET:
+        if use_testnet:
             client.API_URL = "https://testnet.binance.vision/api"
         
         # Get account info
