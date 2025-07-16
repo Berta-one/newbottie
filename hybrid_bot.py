@@ -43,8 +43,15 @@ import signal
 import requests
 import random
 # Add dotenv support
-if 'bot_mode' not in st.session_state:
-    st.session_state['bot_mode'] = 'Demo'
+
+def render_mode_switch():
+    """Render the Demo/Live mode switch at the very top of the sidebar."""
+    st.sidebar.title("Bot Mode")
+    mode = st.sidebar.radio("Select Mode", ["Demo", "Live"], index=0 if st.session_state.get('bot_mode', 'Demo')=="Demo" else 1)
+    st.session_state['bot_mode'] = mode
+    st.sidebar.markdown(f"**Current Mode:** {mode}")
+
+render_mode_switch()
 
 try:
     from dotenv import load_dotenv
@@ -315,13 +322,8 @@ def render_manual_trading_tab():
     quote_asset = st.session_state.get('manual_quote_asset', 'USDT')
     exchange_info = st.session_state.get('exchange_info', None)
     client = st.session_state.get('client', None)
-    mode = st.session_state.get('bot_mode', 'Demo')
 
-    # Sidebar mode switch
-    st.sidebar.title("Bot Mode")
-    mode = st.sidebar.radio("Select Mode", ["Demo", "Live"], index=0 if mode=="Demo" else 1)
-    st.session_state['bot_mode'] = mode
-    st.sidebar.markdown(f"**Current Mode:** {mode}")
+    mode = st.session_state.get('bot_mode', 'Demo')
 
     # WebSocket price streaming for selected trading pair (Live mode only)
     import importlib.util
@@ -544,7 +546,7 @@ def render_manual_trading_tab():
                     except Exception as e:
                         st.error(f"❌ Order failed: {e}")
 
-    
+    col1, col2 = st.columns(2)
     with col2:
         st.subheader("📊 Portfolio Overview (Live)")
         try:
