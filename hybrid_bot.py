@@ -1,46 +1,14 @@
 # --- Dynamic Client Creation ---
 def get_dynamic_client():
     """
-    Returns a Binance client instance based on the current sidebar mode (Demo/Live).
-    Reads API keys from environment variables for testnet or live as appropriate.
+    Returns a Binance client instance using live API keys only.
     """
-    use_testnet = get_use_testnet()
-    if use_testnet:
-        api_key = os.getenv("BINANCE_TESTNET_API_KEY")
-        api_secret = os.getenv("BINANCE_TESTNET_API_SECRET")
-        base_url = "https://testnet.binance.vision/api"
-    else:
-        api_key = os.getenv("BINANCE_API_KEY")
-        api_secret = os.getenv("BINANCE_API_SECRET")
-        base_url = "https://api.binance.com/api"
+    api_key = os.getenv("BINANCE_API_KEY")
+    api_secret = os.getenv("BINANCE_API_SECRET")
     from binance.client import Client
-    return Client(api_key, api_secret, base_url=base_url)
+    return Client(api_key, api_secret)
 # Trigger redeploy: harmless comment for Railway
 #!/usr/bin/env python3
-"""
-Complete Enhanced Crypto Trading Bot Dashboard
-===========================================
-
-This dashboard includes:
-1. Real portfolio positions with P&L tracking
-2. Cross-crypto trading capabilities
-3. Strategy selection (Scalping, Breakout, Swing, Conservative)
-4. Risk level configuration
-5. Current positions with mark-to-market P&L
-6. Complete trading methodologies
-7. All required log files and health checks
-
-Fixed Issues:
-- Portfolio Overview shows real positions
-- Trading supports cross-crypto pairs
-- Performance shows current positions and individual P&L
-- Settings includes methodology and risk selection
-- Strategy shows complete method information
-- Health checks all required log files
-
-Usage:
-    streamlit run hybrid_bot.py
-"""
 
 import streamlit as st
 import pandas as pd
@@ -61,15 +29,6 @@ import requests
 import random
 # Add dotenv support
 
-def render_mode_switch():
-    """Render the Demo/Live mode switch at the very top of the sidebar."""
-    st.sidebar.title("Bot Mode")
-    mode = st.sidebar.radio("Select Mode", ["Demo", "Live"], index=0 if st.session_state.get('bot_mode', 'Demo')=="Demo" else 1, key="sidebar_mode_switch")
-    st.session_state['bot_mode'] = mode
-    st.sidebar.markdown(f"**Current Mode:** {mode}")
-
-
-# Only render the mode switch once, inside main/dashboard, not at module level
 
 try:
     from dotenv import load_dotenv
@@ -81,8 +40,8 @@ from binance.exceptions import BinanceAPIException
 
 # Configuration
 def get_use_testnet():
-    # Use testnet if in Demo mode, otherwise use live
-    return st.session_state.get('bot_mode', 'Demo') == 'Demo'
+    # Always use live
+    return False
 
 API_KEY = os.getenv('BINANCE_API_KEY')
 API_SECRET = os.getenv('BINANCE_API_SECRET')
@@ -1364,7 +1323,6 @@ def stop_background_bot():
 def dashboard():
     """Main dashboard function"""
     # Render the mode switch ONCE at the top of the sidebar
-    render_mode_switch()
     # Get Tailscale IP and setup sidebar controls
     ts_ip = get_tailscale_ip()
     remote_url = f"http://{ts_ip}:8501" if ts_ip != "Unavailable" else "Unavailable"
