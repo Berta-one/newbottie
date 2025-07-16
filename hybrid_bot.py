@@ -785,9 +785,7 @@ def render_performance_tab():
     trades_data = []
     try:
         if BINANCE_AVAILABLE and API_KEY and API_SECRET:
-            client = Client(API_KEY, API_SECRET)
-            if get_use_testnet():
-                client.API_URL = "https://testnet.binance.vision/api"
+            client = get_dynamic_client()
             # Get all symbols with trades
             account = client.get_account()
             all_balances = account['balances']
@@ -821,38 +819,15 @@ def render_performance_tab():
             exchange_info = client.get_exchange_info()
             trading_symbols = [s['symbol'] for s in exchange_info['symbols'] if s['status'] == 'TRADING']
             from datetime import timedelta
-            import time as _time
             now = datetime.utcnow()
             since = now - timedelta(days=30)
-            since_ms = int(_time.mktime(since.timetuple()) * 1000)
+            since_ms = int(time.mktime(since.timetuple()) * 1000)
             for symbol in trading_symbols:
                 # Disabled live trade history polling to avoid Binance API rate limits
                 st.warning("Live trade history polling is temporarily disabled to prevent Binance API rate limit errors. Please use the Binance website for full trade history.")
                 break  # Only show warning once
     except Exception as e:
         st.error(f"Error fetching live trades from Binance: {e}")
-
-    # Show open positions
-    if positions_data:
-        positions_df = pd.DataFrame(positions_data)
-        st.dataframe(positions_df, use_container_width=True)
-    else:
-        st.info("No open positions found on Binance.")
-
-    # Show trade history
-    st.subheader("� Individual Trade History (Live from Binance)")
-    if trades_data:
-        trades_df = pd.DataFrame(trades_data)
-        trades_df = trades_df.sort_values('timestamp', ascending=False)
-        st.dataframe(trades_df[['timestamp','symbol','side','price','qty','commission','commissionAsset']].head(20), use_container_width=True)
-        # Simple stats
-        st.metric("Total Trades", len(trades_df))
-        st.metric("Unique Symbols", trades_df['symbol'].nunique())
-    else:
-        st.info("No trade history found on Binance.")
-
-def render_settings_tab():
-    """Enhanced settings tab with methodology and risk level selection"""
     st.header("⚙️ Bot Control & Settings")
     st.caption("Configure trading strategy, risk level, and bot parameters")
     
@@ -867,185 +842,51 @@ def render_settings_tab():
             options=list(TRADING_STRATEGIES.keys()),
             index=list(TRADING_STRATEGIES.keys()).index(st.session_state['selected_strategy'])
         )
-        
-        # Display strategy info
-        strategy_info = TRADING_STRATEGIES[selected_strategy]
-        st.info(f"**{selected_strategy}:** {strategy_info['description']}")
-        
-        # Risk level selection
-        selected_risk = st.selectbox(
-            "Select Risk Level",
-            options=list(RISK_LEVELS.keys()),
-            index=list(RISK_LEVELS.keys()).index(st.session_state['selected_risk_level'])
-        )
-        
-        # Display risk info
-        risk_info = RISK_LEVELS[selected_risk]
-        st.info(f"**{selected_risk}:** {risk_info['description']}")
-        
-        # Update button
-        if st.button("💾 Update Strategy & Risk", type="primary"):
-            st.session_state['selected_strategy'] = selected_strategy
-            st.session_state['selected_risk_level'] = selected_risk
-            
-            # Save to bot status file
-            status = load_bot_status()
-            status['latest_strategy'] = selected_strategy
-            status['latest_risk_level'] = selected_risk
-            
-            os.makedirs('logs', exist_ok=True)
-            with open('logs/bot_status.json', 'w') as f:
-                json.dump(status, f, indent=2)
-            
-            st.success(f"✅ Updated to {selected_strategy} strategy with {selected_risk} risk level")
-            st.rerun()
-    
-    with col2:
-        st.subheader("🤖 Bot Control")
-        
-        if st.session_state['bot_running']:
-            st.success("✅ Auto-scan is ENABLED")
-            st.info("Page automatically scans every 30 seconds")
-            
-            if st.button("⏸️ Disable Auto-Scan", type="secondary"):
-                st.session_state['bot_running'] = False
-                st.success("Auto-scan disabled")
-                st.rerun()
-        else:
-            st.warning("⏸️ Auto-scan is DISABLED")
-            st.info("Use manual 'Scan Now' button in Market Indicators")
-            
-            if st.button("▶️ Enable Auto-Scan", type="primary"):
-                st.session_state['bot_running'] = True
-                st.success("✅ Auto-scan enabled!")
-                st.rerun()
-        
-        st.markdown("---")
-        st.subheader("⚙️ Advanced Configuration")
-        
-        # Max trade percentage
-        max_trade_percent = st.slider(
-            "Max Trade Size (% of Portfolio)", 
-            1.0, 20.0, 
-            st.session_state['max_trade_percent'], 
-            0.5
-        )
-        st.session_state['max_trade_percent'] = max_trade_percent
-        st.info(f"Current max trade per deal: {max_trade_percent:.1f}% of portfolio value.")
-        
-        # Scan interval
-        scan_interval = st.slider(
-            "Scan Interval (seconds)",
-            60, 900,
-            300,
-            30
-        )
-        
-        # Confidence threshold
-        confidence_threshold = st.slider(
-            "Minimum Confidence Threshold",
-            0.5, 0.9,
-            0.65,
-            0.05
-        )
-        
-        # Password change
-        st.markdown("---")
-        st.subheader("🔐 Change Dashboard Password")
-        new_password = st.text_input("New Password", type="password")
-        if st.button("Set New Password"):
-            if new_password:
-                st.session_state['dashboard_password'] = new_password
-                st.success("Password updated for this session.")
-            else:
-                st.warning("Password cannot be empty.")
-
-def render_strategy_tab():
-    """Enhanced strategy tab with complete methodology information"""
-    st.header("🎯 Trading Strategy")
-    st.caption("Detailed strategy information and methodology explanations")
-    
-    # Current strategy display
-    current_strategy = st.session_state['selected_strategy']
-    current_risk = st.session_state['selected_risk_level']
-    
-    st.success(f"✅ Active Strategy: {current_strategy}")
-    st.success(f"✅ Risk Level: {current_risk}")
-    
-    # Strategy selector for detailed view
-    st.subheader("📋 Strategy Details")
-    
-    selected_strategy_view = st.selectbox(
-        "Select Strategy to View Details",
-        options=list(TRADING_STRATEGIES.keys()),
-        index=list(TRADING_STRATEGIES.keys()).index(current_strategy)
-    )
-    
-    strategy_info = TRADING_STRATEGIES[selected_strategy_view]
-    
-    # Detailed strategy information
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown(f"### {selected_strategy_view} Strategy")
-        st.markdown(f"**Description:** {strategy_info['description']}")
-        st.markdown(f"**Price Threshold:** {strategy_info['threshold']}%")
-        st.markdown(f"**Volume Requirement:** {strategy_info['volume_req']}x average")
-        st.markdown(f"**Hold Time:** {strategy_info['hold_time']}")
-        st.markdown(f"**Take Profit:** {strategy_info['take_profit']}")
-        st.markdown(f"**Stop Loss:** {strategy_info['stop_loss']}")
-        st.markdown(f"**Min Confidence:** {strategy_info['confidence_min']:.0%}")
-    
-    with col2:
-        st.markdown("### Strategy Rules & Logic")
-        
-        if selected_strategy_view == 'Scalping':
-            st.markdown("""
-            **Scalping Strategy Rules:**
-            - Monitor 1-minute candles for quick moves
-            - Enter on 2-3% price movements
-            - High volume confirmation required (1.5x+)
-            - Quick exits: 3-5% profit or 2-3% loss
-            - Maximum hold time: 30 minutes
-            - Best for: High volatility, sideways markets
-            - Risk: High frequency, requires constant monitoring
-            """)
-        
-        elif selected_strategy_view == 'Breakout':
-            st.markdown("""
-            **Breakout Strategy Rules:**
-            - Monitor 2-hour price movements
-            - Enter on 5%+ breakouts with volume
-            - Confirm trend direction with RSI
-            - Avoid low-volume hours (0-6 UTC, 22-23 UTC)
-            - Take profit: 8-15% based on confidence
-            - Stop loss: 8-12% based on confidence
-            - Best for: Trending markets, clear direction
-            """)
-        
-        elif selected_strategy_view == 'Swing':
-            st.markdown("""
-            **Swing Strategy Rules:**
-            - Monitor 4-hour+ price movements
-            - Enter on 8%+ moves with trend confirmation
-            - Lower volume requirement (1.2x)
-            - Longer hold times: 4-24 hours
-            - Take profit: 15-25% targets
-            - Stop loss: 10-15% protection
-            - Best for: Strong trending markets
-            """)
-        
-        elif selected_strategy_view == 'Conservative':
-            st.markdown("""
-            **Conservative Strategy Rules:**
-            - Monitor smaller 3% movements
-            - Higher volume confirmation (1.8x)
-            - Strict risk management
-            - Quick exits: 5-8% profit, 3-5% loss
-            - Shorter hold times: 1-2 hours
-            - Higher confidence threshold (75%)
-            - Best for: Uncertain markets, capital preservation
-            """)
+    try:
+        if BINANCE_AVAILABLE and API_KEY and API_SECRET:
+            client = get_dynamic_client()
+            # Get all symbols with trades
+            account = client.get_account()
+            all_balances = account['balances']
+            # Only show assets with nonzero balance
+            for bal in all_balances:
+                asset = bal['asset']
+                free = float(bal['free'])
+                locked = float(bal['locked'])
+                total = free + locked
+                if total > 0 and asset not in ['USDT', 'BUSD', 'USDC']:
+                    # Try to find a USDT pair for this asset
+                    symbol = f"{asset}USDT"
+                    try:
+                        ticker = client.get_symbol_ticker(symbol=symbol)
+                        current_price = float(ticker['price'])
+                        entry_price = current_price  # No entry price info, so just show current
+                        pnl_pct = 0.0
+                        positions_data.append({
+                            'Symbol': symbol,
+                            'Direction': 'LONG',
+                            'Entry Price': f"${entry_price:.8f}",
+                            'Current Price': f"${current_price:.8f}",
+                            'P&L %': f"{pnl_pct:+.2f}%",
+                            'Strategy': 'Unknown',
+                            'Risk Level': 'Unknown',
+                            'Entry Time': 'N/A'
+                        })
+                    except Exception:
+                        continue
+            # Get trade history for all symbols with trades
+            exchange_info = client.get_exchange_info()
+            trading_symbols = [s['symbol'] for s in exchange_info['symbols'] if s['status'] == 'TRADING']
+            from datetime import timedelta
+            now = datetime.utcnow()
+            since = now - timedelta(days=30)
+            since_ms = int(time.mktime(since.timetuple()) * 1000)
+            for symbol in trading_symbols:
+                # Disabled live trade history polling to avoid Binance API rate limits
+                st.warning("Live trade history polling is temporarily disabled to prevent Binance API rate limit errors. Please use the Binance website for full trade history.")
+                break  # Only show warning once
+    except Exception as e:
+        st.error(f"Error fetching live trades from Binance: {e}")
     
     # Strategy performance comparison
     st.subheader("📊 Strategy Performance Comparison")
@@ -1069,6 +910,9 @@ def render_strategy_tab():
     # Get current market condition
     portfolio, _ = get_real_portfolio()
     market_condition, condition_score, avg_volatility = simulate_market_analysis(portfolio)
+
+    # Top metrics
+    col1, col2, col3, col4 = st.columns(4)
     
     recommendations = {
         'BULL_TRENDING': {
@@ -1577,7 +1421,7 @@ def dashboard():
     if selected_tab == "Portfolio Overview":
         render_portfolio_overview_tab()
     elif selected_tab == "Market Indicators":
-        render_market_indicators_tab()
+        st.warning("Market Indicators tab is not implemented.")
     elif selected_tab == "Bot Trading":
         trading_dashboard(settings_compact=True)
     elif selected_tab == "Trading":
@@ -1587,9 +1431,9 @@ def dashboard():
     elif selected_tab == "Logs":
         render_logs_tab()
     elif selected_tab == "Settings":
-        render_settings_tab()
+        st.warning("Settings tab is not implemented.")
     elif selected_tab == "Strategy":
-        render_strategy_tab()
+        st.warning("Strategy tab is not implemented.")
     elif selected_tab == "Health":
         render_health_tab()
     # Add MIT License and copyright at the bottom of the sidebar
