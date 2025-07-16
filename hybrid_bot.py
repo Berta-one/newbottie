@@ -1465,7 +1465,7 @@ def main():
         st.caption("Default password: admin123")
         
         input_password = st.text_input("Password", type="password")
-        
+
         if st.button("🔓 Login"):
             if input_password == st.session_state['dashboard_password']:
                 st.session_state['password_authenticated'] = True
@@ -1474,7 +1474,7 @@ def main():
             else:
                 st.error("❌ Incorrect password.")
                 st.stop()
-        
+
         if not st.session_state['password_authenticated']:
             st.stop()
     
