@@ -17,7 +17,7 @@ import time
 import streamlit as st
 from datetime import datetime
 
-def trading_dashboard():
+def trading_dashboard(settings_compact=False):
     # --- Bot Demo Tab Content Only ---
     import random
     import plotly.graph_objs as go
@@ -33,11 +33,6 @@ def trading_dashboard():
     selected_risk = st.session_state.get('selected_risk_level', 'Balanced')
 
     # --- Main Logo and Title ---
-    st.image(
-        "https://static.wixstatic.com/media/80aa29_3bdfcbab4dd34671915e3b66b0b596e4~mv2.jpeg/v1/fill/w_146,h_104,al_c,q_80,usm_0.66_1.00_0.01,enc_avif,quality_auto/LRC_1719585575250.jpeg",
-        width=146,
-        caption="Rondanini Publishing Ltd."
-    )
     st.title("🤖 Crypto Trading Bot Demo (Integrated)")
 
     # --- Status indicators ---
@@ -63,7 +58,30 @@ def trading_dashboard():
     risk_info = RISK_LEVELS[selected_risk]
 
 
-    # --- Single Simulation Block (no UI stacking) ---
+    # --- Settings section (compact if settings_compact=True) ---
+    import inspect
+    frame = inspect.currentframe()
+    args, _, _, values = inspect.getargvalues(frame)
+    settings_compact = values.get('settings_compact', False)
+    if settings_compact:
+        with st.expander("⚙️ Demo Settings", expanded=False):
+            col1, col2 = st.columns(2)
+            with col1:
+                strategy = st.selectbox("Strategy", ["Scalping", "Breakout", "Swing", "Conservative"], key="demo_strategy")
+            with col2:
+                risk = st.selectbox("Risk Level", ["Conservative", "Balanced", "Aggressive"], key="demo_risk")
+            st.button("Update Settings", key="update_demo_settings")
+    else:
+        st.header("Bot Settings")
+        st.write("Select trading strategy and risk level for the demo bot.")
+        col1, col2 = st.columns(2)
+        with col1:
+            strategy = st.selectbox("Strategy", ["Scalping", "Breakout", "Swing", "Conservative"], key="demo_strategy")
+        with col2:
+            risk = st.selectbox("Risk Level", ["Conservative", "Balanced", "Aggressive"], key="demo_risk")
+        st.button("Update Settings", key="update_demo_settings")
+
+    # --- Main Demo Content (as before) ---
     st.subheader("📈 Trading Simulation (Multi-Pair)")
     if st.session_state.get('bot_override', False):
         st.warning("🚨 Bot is currently BLOCKED by override. No trades or signals will be generated.")

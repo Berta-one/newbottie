@@ -32,6 +32,9 @@ import plotly.express as px
 from datetime import datetime, timedelta
 import json
 import os
+def is_bot_blocked():
+    """Check if the override flag file exists to block the bot."""
+    return os.path.exists('logs/bot_override.flag')
 import time
 import threading
 import subprocess
@@ -40,6 +43,9 @@ import signal
 import requests
 import random
 # Add dotenv support
+if 'bot_mode' not in st.session_state:
+    st.session_state['bot_mode'] = 'Demo'
+
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -52,7 +58,7 @@ from binance.exceptions import BinanceAPIException
 USE_TESTNET = os.getenv('USE_TESTNET', 'True').lower() == 'true'
 API_KEY = os.getenv('BINANCE_API_KEY')
 API_SECRET = os.getenv('BINANCE_API_SECRET')
-SCAN_INTERVAL = int(os.getenv('SCAN_INTERVAL', '300'))
+SCAN_INTERVAL = int(os.getenv('SCAN_INTERVAL', '300').split('#')[0].strip())
 MIN_BALANCE_USD = float(os.getenv('MIN_BALANCE_USD', '10.0'))
 
 # Check if binance is available
@@ -302,132 +308,173 @@ def get_current_positions():
 
 def render_manual_trading_tab():
     """Enhanced manual trading tab with cross-crypto support"""
-    st.header("📈 Manual Trading")
-    st.caption("Execute trades manually with cross-crypto support and advanced order types")
-    
-    # Check if API is available
-    if not BINANCE_AVAILABLE or not API_KEY or not API_SECRET:
-        st.error("❌ Binance API not configured. Please check your environment variables.")
-        return
-    
+    # Fetch required variables from session state
+    trading_pair = st.session_state.get('manual_trading_pair', 'BTCUSDT')
+    trade_direction = st.session_state.get('manual_trade_direction', 'Buy')
+    base_asset = st.session_state.get('manual_base_asset', 'BTC')
+    quote_asset = st.session_state.get('manual_quote_asset', 'USDT')
+    exchange_info = st.session_state.get('exchange_info', None)
+    client = st.session_state.get('client', None)
+    mode = st.session_state.get('bot_mode', 'Demo')
+
+    # Sidebar mode switch
+    st.sidebar.title("Bot Mode")
+    mode = st.sidebar.radio("Select Mode", ["Demo", "Live"], index=0 if mode=="Demo" else 1)
+    st.session_state['bot_mode'] = mode
+    st.sidebar.markdown(f"**Current Mode:** {mode}")
+
+    # WebSocket price streaming for selected trading pair (Live mode only)
+    import importlib.util
+    import time
+    if mode == "Live":
+        ws_util_path = '/workspaces/Bottie/binance_ws_price.py'
+        spec = importlib.util.spec_from_file_location('binance_ws_price', ws_util_path)
+        ws_mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(ws_mod)
+        if 'ws_price' not in st.session_state or st.session_state.get('ws_pair') != trading_pair:
+            # Stop previous ws if exists
+            if 'ws_price' in st.session_state and st.session_state['ws_price']:
+                try:
+                    st.session_state['ws_price'].stop()
+                except Exception:
+                    pass
+            # Start new ws for selected pair
+            st.session_state['latest_price'] = None
+            def on_price_update(symbol, price):
+                st.session_state['latest_price'] = price
+            ws = ws_mod.BinancePriceWebSocket([trading_pair], on_price_update)
+            ws.start()
+            st.session_state['ws_price'] = ws
+            st.session_state['ws_pair'] = trading_pair
+            # Wait for first price
+            for _ in range(20):
+                if st.session_state['latest_price']:
+                    break
+                time.sleep(0.1)
+        current_price = st.session_state.get('latest_price', 0.0)
+        st.success(f"\U0001F4B0 Live {trading_pair} Price: {current_price:.8f}")
+    else:
+        # Demo mode: Simulate price
+        import random
+        current_price = st.session_state.get('latest_price', random.uniform(20000, 70000))
+        st.info(f"\U0001F4B0 Demo {trading_pair} Price: {current_price:.8f}")
+
+    order_type = st.selectbox("Order Type", ["MARKET", "LIMIT", "STOP_LOSS", "STOP_LOSS_LIMIT"])
+
+    # Get step size for quantity precision
+    step_size = 0.000001
     try:
-        client = Client(API_KEY, API_SECRET)
-        if USE_TESTNET:
-            client.API_URL = "https://testnet.binance.vision/api"
-        
-        # Test connection
-        account = client.get_account()
-        balances = account['balances']
-        
-    except Exception as e:
-        st.error(f"❌ Error connecting to Binance: {e}")
-        return
-    
-    col1, col2 = st.columns(2)
+        symbol_info = next(s for s in exchange_info['symbols'] if s['symbol'] == trading_pair)
+        for f in symbol_info['filters']:
+            if f['filterType'] == 'LOT_SIZE':
+                step_size = float(f['stepSize'])
+                min_qty = float(f['minQty'])
+                break
+    except Exception:
+        min_qty = 0.0
 
-    with col1:
-        st.subheader("🛒 Place Order")
+        def round_step(qty, step):
+            import math
+            return math.floor(qty / step) * step
 
-        # Pull all available symbols from Binance
-        try:
-            exchange_info = client.get_exchange_info()
-            all_symbols = [s['symbol'] for s in exchange_info['symbols'] if s['status'] == 'TRADING']
-            # Build asset set for base and quote
-            base_assets = sorted(set([s['baseAsset'] for s in exchange_info['symbols'] if s['status'] == 'TRADING']))
-            quote_assets = sorted(set([s['quoteAsset'] for s in exchange_info['symbols'] if s['status'] == 'TRADING']))
-        except Exception as e:
-            st.error(f"Error fetching symbols from Binance: {e}")
-            return
-
-        # Searchable base asset selector
-        base_asset = st.selectbox(
-            "Base Asset (type to search)",
-            options=base_assets,
-            index=base_assets.index('BTC') if 'BTC' in base_assets else 0,
-            key="manual_base_asset"
-        )
-        quote_asset = st.selectbox(
-            "Quote Asset",
-            options=quote_assets,
-            index=quote_assets.index('USDT') if 'USDT' in quote_assets else 0,
-            key="manual_quote_asset"
-        )
-
-        trading_pair = f"{base_asset}{quote_asset}"
-        trade_direction = st.radio("Trade Direction", ["Buy", "Sell"])
-
-        # Get current price and symbol info for precision
-        try:
-            ticker = client.get_symbol_ticker(symbol=trading_pair)
-            current_price = float(ticker['price'])
-            st.success(f"💰 Current {trading_pair} Price: {current_price:.8f}")
-
-            order_type = st.selectbox("Order Type", ["MARKET", "LIMIT", "STOP_LOSS", "STOP_LOSS_LIMIT"])
-
-            # Get step size for quantity precision
-            step_size = 0.000001
-            try:
-                symbol_info = next(s for s in exchange_info['symbols'] if s['symbol'] == trading_pair)
-                for f in symbol_info['filters']:
-                    if f['filterType'] == 'LOT_SIZE':
-                        step_size = float(f['stepSize'])
-                        min_qty = float(f['minQty'])
-                        break
-            except Exception:
-                min_qty = 0.0
-
-            def round_step(qty, step):
-                import math
-                return math.floor(qty / step) * step
-
-            # Quantity input (no balance check, as user may not hold asset yet)
-            if trade_direction == "Buy":
-                if order_type == "MARKET":
-                    quote_amount = st.number_input(
-                        f"{quote_asset} Amount to spend",
-                        min_value=0.0,
-                        value=50.0,
-                        step=1.0
-                    )
-                    quantity = quote_amount / current_price if current_price > 0 else 0
-                else:
-                    quantity = st.number_input(
-                        f"{base_asset} Quantity",
-                        min_value=0.0,
-                        value=0.001,
-                        format="%.8f"
-                    )
+        # Quantity input (no balance check, as user may not hold asset yet)
+        if trade_direction == "Buy":
+            if order_type == "MARKET":
+                quote_amount = st.number_input(
+                    f"{quote_asset} Amount to spend",
+                    min_value=0.0,
+                    value=50.0,
+                    step=1.0
+                )
+                quantity = quote_amount / current_price if current_price > 0 else 0
             else:
                 quantity = st.number_input(
-                    f"{base_asset} Quantity to sell",
+                    f"{base_asset} Quantity",
                     min_value=0.0,
                     value=0.001,
                     format="%.8f"
                 )
+        else:
+            quantity = st.number_input(
+                f"{base_asset} Quantity to sell",
+                min_value=0.0,
+                value=0.001,
+                format="%.8f"
+            )
 
-            # Round quantity to allowed precision
-            quantity = round_step(quantity, step_size)
-            if quantity < min_qty:
-                st.warning(f"Quantity must be at least {min_qty}")
+        # Round quantity to allowed precision
+        quantity = round_step(quantity, step_size)
+        if quantity < min_qty:
+            st.warning(f"Quantity must be at least {min_qty}")
 
-            limit_price = current_price
-            stop_price = current_price
+        limit_price = current_price
+        stop_price = current_price
 
-            if order_type in ["LIMIT", "STOP_LOSS_LIMIT"]:
-                limit_price = st.number_input(
-                    "Limit Price",
-                    min_value=0.0,
-                    value=float(current_price),
-                    format="%.8f"
-                )
+        if order_type in ["LIMIT", "STOP_LOSS_LIMIT"]:
+            limit_price = st.number_input(
+                "Limit Price",
+                min_value=0.0,
+                value=float(current_price),
+                format="%.8f"
+            )
 
-            if order_type in ["STOP_LOSS", "STOP_LOSS_LIMIT"]:
-                stop_price = st.number_input(
-                    "Stop Price",
-                    min_value=0.0,
-                    value=float(current_price * 0.95),
-                    format="%.8f"
-                )
+        if order_type in ["STOP_LOSS", "STOP_LOSS_LIMIT"]:
+            stop_price = st.number_input(
+                "Stop Price",
+                min_value=0.0,
+                value=float(current_price * 0.95),
+                format="%.8f"
+            )
+
+        button_text = f"\U0001F6D2 {trade_direction} {quantity:.8f} {base_asset}"
+        can_execute = quantity >= min_qty and current_price > 0
+
+        if st.button(button_text, type="primary", disabled=not can_execute):
+            if can_execute:
+                try:
+                    # Execute the trade based on order type
+                    if order_type == "MARKET":
+                        order = client.order_market(
+                            symbol=trading_pair,
+                            side="BUY" if trade_direction == "Buy" else "SELL",
+                            quantity=quantity
+                        )
+                    elif order_type == "LIMIT":
+                        order = client.order_limit(
+                            symbol=trading_pair,
+                            side="BUY" if trade_direction == "Buy" else "SELL",
+                            quantity=quantity,
+                            price=limit_price
+                        )
+                    # Add STOP_LOSS and STOP_LOSS_LIMIT as needed
+                    st.success(f"\u2705 {order_type} order placed successfully!")
+                    st.json(order)
+
+                    # Log the trade (manual_trades.log)
+                    trade_data = {
+                        'timestamp': datetime.now().isoformat(),
+                        'type': 'manual_trade',
+                        'symbol': trading_pair,
+                        'side': trade_direction.upper(),
+                        'quantity': quantity,
+                        'price': limit_price if order_type == "LIMIT" else current_price,
+                        'order_type': order_type,
+                        'order_id': order.get('orderId'),
+                        'status': order.get('status')
+                    }
+                    os.makedirs('logs', exist_ok=True)
+                    with open('logs/manual_trades.log', 'a') as f:
+                        f.write(json.dumps(trade_data) + '\n')
+                    # Also log to trades.csv for performance tab
+                    with open('logs/trades.csv', 'a', newline='') as f:
+                        writer = csv.writer(f)
+                        writer.writerow([
+                            trade_data['timestamp'], trade_data['symbol'], trade_data['side'],
+                            trade_data['price'], '', trade_data['quantity'], '', 'ENTRY', trade_data['order_type']
+                        ])
+
+                except Exception as e:
+                    st.error(f"\u274c Order failed: {e}")
 
             button_text = f"🛒 {trade_direction} {quantity:.8f} {base_asset}"
             can_execute = quantity >= min_qty and current_price > 0
@@ -493,10 +540,10 @@ def render_manual_trading_tab():
                                 'ENTRY',              # status
                                 'Manual'              # strategy
                             ])
+
                     except Exception as e:
                         st.error(f"❌ Order failed: {e}")
-        except Exception as e:
-            st.error(f"Error getting price for {trading_pair}: {e}")
+
     
     with col2:
         st.subheader("📊 Portfolio Overview (Live)")
@@ -692,23 +739,15 @@ def render_performance_tab():
             # Get trade history for all symbols with trades
             exchange_info = client.get_exchange_info()
             trading_symbols = [s['symbol'] for s in exchange_info['symbols'] if s['status'] == 'TRADING']
+            from datetime import timedelta
+            import time as _time
+            now = datetime.utcnow()
+            since = now - timedelta(days=30)
+            since_ms = int(_time.mktime(since.timetuple()) * 1000)
             for symbol in trading_symbols:
-                try:
-                    trades = client.get_my_trades(symbol=symbol)
-                    for t in trades:
-                        trades_data.append({
-                            'timestamp': datetime.fromtimestamp(t['time']/1000),
-                            'symbol': symbol,
-                            'side': 'BUY' if t['isBuyer'] else 'SELL',
-                            'price': float(t['price']),
-                            'qty': float(t['qty']),
-                            'commission': float(t['commission']),
-                            'commissionAsset': t['commissionAsset'],
-                            'orderId': t['orderId'],
-                            'tradeId': t['id']
-                        })
-                except Exception:
-                    continue
+                # Disabled live trade history polling to avoid Binance API rate limits
+                st.warning("Live trade history polling is temporarily disabled to prevent Binance API rate limit errors. Please use the Binance website for full trade history.")
+                break  # Only show warning once
     except Exception as e:
         st.error(f"Error fetching live trades from Binance: {e}")
 
@@ -1069,11 +1108,11 @@ def render_logs_tab():
     # --- Refresh button and auto-refresh ---
     refresh = st.button("🔄 Refresh Logs")
     # Optional: auto-refresh every 10 seconds
-    st_autorefresh = st.experimental_get_query_params().get('autorefresh', ['off'])[0]
+    st_autorefresh = st.query_params.get('autorefresh', 'off')
     if st_autorefresh == 'on':
         import time as _time
         _time.sleep(0.5)
-        st.experimental_rerun()
+        st.rerun()
     # Log file tabs
     log_tab1, log_tab2, log_tab3 = st.tabs(["📟 Console", "🔍 Scans", "💼 Trades"])
 
@@ -1464,17 +1503,33 @@ def dashboard():
     if st.sidebar.button("🔄 Refresh Dashboard"):
         st.rerun()
 
-    # Sidebar navigation - ALL 8 TABS
+    # Sidebar navigation - Unified tabs, Bot Demo before Manual Trading
+    from trading_bot import trading_dashboard
+    tab_options = [
+        "Portfolio Overview", "Market Indicators", "Bot Demo", "Trading", "Performance", "Logs", "Settings", "Strategy", "Health"
+    ]
+    # Add company logo at the very top of the sidebar
+    st.sidebar.markdown("<div style='text-align:center; margin-bottom:0.5em;'>" 
+        "<img src='https://static.wixstatic.com/media/80aa29_3bdfcbab4dd34671915e3b66b0b596e4~mv2.jpeg/v1/fill/w_146,h_104,al_c,q_80,usm_0.66_1.00_0.01,enc_avif,quality_auto/LRC_1719585575250.jpeg' width='146'/><br>"
+        "<strong>Rondanini Publishing Ltd.</strong>"
+        "</div>", unsafe_allow_html=True)
+    # Add site clickers (website and docs)
+    st.sidebar.markdown("<div style='text-align:center; margin-bottom:1em;'>"
+        "<a href='https://www.rondanini.net' target='_blank'>🌐 Website</a> | "
+        "<a href='https://docs.rondanini.net' target='_blank'>📄 Docs</a>"
+        "</div>", unsafe_allow_html=True)
     selected_tab = st.sidebar.radio(
         "Select Dashboard Tab",
-        ["Portfolio Overview", "Market Indicators", "Trading", "Performance", "Logs", "Settings", "Strategy", "Health"]
+        tab_options
     )
-    
+
     # Render selected tab
     if selected_tab == "Portfolio Overview":
         render_portfolio_overview_tab()
     elif selected_tab == "Market Indicators":
         render_market_indicators_tab()
+    elif selected_tab == "Bot Demo":
+        trading_dashboard(settings_compact=True)
     elif selected_tab == "Trading":
         render_manual_trading_tab()
     elif selected_tab == "Performance":
@@ -1487,6 +1542,13 @@ def dashboard():
         render_strategy_tab()
     elif selected_tab == "Health":
         render_health_tab()
+    # Add MIT License and copyright at the bottom of the sidebar
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("<div style='font-size:12px; text-align:center;'>\
+        <strong>MIT License</strong><br>\
+        &copy; 2025 Rondanini Publishing Ltd.<br>\
+        <a href='https://opensource.org/licenses/MIT' target='_blank'>View License</a>\
+        </div>", unsafe_allow_html=True)
 
 def main():
     """Main application entry point"""
