@@ -172,8 +172,6 @@ def verify_environment_variables():
     print("🔧 ENVIRONMENT VARIABLE VERIFICATION:")
     print("="*50)
     env_vars = {
-        'PAPER_TRADING': os.getenv('PAPER_TRADING', 'NOT SET'),
-        'TEST_MODE': os.getenv('TEST_MODE', 'NOT SET'),
         'MIN_CONFIDENCE': os.getenv('MIN_CONFIDENCE', 'NOT SET'),
         'MIN_VOLUME_RATIO': os.getenv('MIN_VOLUME_RATIO', 'NOT SET'),
         'MIN_PRICE_CHANGE': os.getenv('MIN_PRICE_CHANGE', 'NOT SET'),
@@ -181,14 +179,7 @@ def verify_environment_variables():
     }
     for key, value in env_vars.items():
         print(f"   {key}: {value}")
-    paper_trading = os.getenv('PAPER_TRADING', 'True').lower() == 'true'
-    test_mode = os.getenv('TEST_MODE', 'True').lower() == 'true'
-    if not paper_trading and not test_mode:
-        print("\n🟢 LIVE TRADING ENABLED!")
-    else:
-        print("\n🔴 STILL IN TEST/PAPER MODE")
-        print(f"   PAPER_TRADING: {paper_trading}")
-        print(f"   TEST_MODE: {test_mode}")
+    print("\n🟢 LIVE TRADING ENABLED!")
     print("\n📊 STRATEGY THRESHOLDS:")
     for strategy_name, strategy_info in TRADING_STRATEGIES.items():
         print(f"   {strategy_name}:")
@@ -348,43 +339,35 @@ def render_manual_trading_tab():
     exchange_info = st.session_state.get('exchange_info', None)
     client = st.session_state.get('client', None)
 
-    mode = st.session_state.get('bot_mode', 'Demo')
-
-    # WebSocket price streaming for selected trading pair (Live mode only)
+    # Always use live WebSocket price streaming for selected trading pair
     import importlib.util
     import time
-    if mode == "Live":
-        ws_util_path = '/workspaces/Bottie/binance_ws_price.py'
-        spec = importlib.util.spec_from_file_location('binance_ws_price', ws_util_path)
-        ws_mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(ws_mod)
-        if 'ws_price' not in st.session_state or st.session_state.get('ws_pair') != trading_pair:
-            # Stop previous ws if exists
-            if 'ws_price' in st.session_state and st.session_state['ws_price']:
-                try:
-                    st.session_state['ws_price'].stop()
-                except Exception:
-                    pass
-            # Start new ws for selected pair
-            st.session_state['latest_price'] = None
-            def on_price_update(symbol, price):
-                st.session_state['latest_price'] = price
-            ws = ws_mod.BinancePriceWebSocket([trading_pair], on_price_update)
-            ws.start()
-            st.session_state['ws_price'] = ws
-            st.session_state['ws_pair'] = trading_pair
-            # Wait for first price
-            for _ in range(20):
-                if st.session_state['latest_price']:
-                    break
-                time.sleep(0.1)
-        current_price = st.session_state.get('latest_price', 0.0)
-        st.success(f"\U0001F4B0 Live {trading_pair} Price: {current_price:.8f}")
-    else:
-        # Demo mode: Simulate price
-        import random
-        current_price = st.session_state.get('latest_price', random.uniform(20000, 70000))
-        st.info(f"\U0001F4B0 Demo {trading_pair} Price: {current_price:.8f}")
+    ws_util_path = '/workspaces/Bottie/binance_ws_price.py'
+    spec = importlib.util.spec_from_file_location('binance_ws_price', ws_util_path)
+    ws_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(ws_mod)
+    if 'ws_price' not in st.session_state or st.session_state.get('ws_pair') != trading_pair:
+        # Stop previous ws if exists
+        if 'ws_price' in st.session_state and st.session_state['ws_price']:
+            try:
+                st.session_state['ws_price'].stop()
+            except Exception:
+                pass
+        # Start new ws for selected pair
+        st.session_state['latest_price'] = None
+        def on_price_update(symbol, price):
+            st.session_state['latest_price'] = price
+        ws = ws_mod.BinancePriceWebSocket([trading_pair], on_price_update)
+        ws.start()
+        st.session_state['ws_price'] = ws
+        st.session_state['ws_pair'] = trading_pair
+        # Wait for first price
+        for _ in range(20):
+            if st.session_state['latest_price']:
+                break
+            time.sleep(0.1)
+    current_price = st.session_state.get('latest_price', 0.0)
+    st.success(f"\U0001F4B0 Live {trading_pair} Price: {current_price:.8f}")
 
     order_type = st.selectbox("Order Type", ["MARKET", "LIMIT", "STOP_LOSS", "STOP_LOSS_LIMIT"])
 
@@ -458,20 +441,13 @@ def render_manual_trading_tab():
 
         if st.button(button_text, type="primary", disabled=not can_execute):
             if can_execute:
-                is_live = st.session_state.get('bot_mode', 'Demo') == 'Live'
-                if is_live:
-                    confirm = st.checkbox("⚠️ I understand this will execute a LIVE trade with real funds.", key="live_trade_confirm")
-                    if not confirm:
-                        st.warning("You must confirm before placing a LIVE trade.")
-                        st.stop()
+                # Always require live trade confirmation
+                confirm = st.checkbox("⚠️ I understand this will execute a LIVE trade with real funds.", key="live_trade_confirm")
+                if not confirm:
+                    st.warning("You must confirm before placing a LIVE trade.")
+                    st.stop()
                 try:
                     client = get_dynamic_client()
-                    # Live trade confirmation
-                    if not get_use_testnet():
-                        confirm = st.checkbox("⚠️ I understand this will execute a LIVE trade with real funds.", key="live_trade_confirm")
-                        if not confirm:
-                            st.warning("You must confirm before placing a LIVE trade.")
-                            st.stop()
                     # Execute the trade based on order type
                     if order_type == "MARKET":
                         order = client.order_market(
@@ -1066,8 +1042,7 @@ def render_health_tab():
         st.subheader("🔗 API Connection")
         if BINANCE_AVAILABLE and API_KEY and API_SECRET:
             st.success("✅ Binance API Connected")
-            mode = "🧪 Testnet" if get_use_testnet() else "🔴 Live Trading"
-            st.info(f"📡 Mode: {mode}")
+            st.info("📡 Mode: � Live Trading")
         else:
             st.error("❌ Binance API Not Connected")
         
@@ -1192,7 +1167,7 @@ def render_health_tab():
         'Python Version': sys.version,
         'Streamlit Version': st.__version__,
         'Current Directory': os.getcwd(),
-        'Environment': 'Testnet' if get_use_testnet() else 'Live Trading',
+        'Environment': 'Live Trading',
         'API Keys Configured': bool(API_KEY and API_SECRET),
         'Binance Library': 'Available' if BINANCE_AVAILABLE else 'Missing'
     }
@@ -1420,12 +1395,8 @@ def main():
     st.sidebar.text(f"Volume Ratio: {os.getenv('MIN_VOLUME_RATIO', '1.5')}x")
     st.sidebar.text(f"Confidence: {os.getenv('MIN_CONFIDENCE', '0.65')}")
 
-    # Check if environment variables are being used
-    paper_trading = os.getenv('PAPER_TRADING', 'True').lower() == 'true'
-    if not paper_trading:
-        st.sidebar.success("🟢 Live Trading Mode")
-    else:
-        st.sidebar.warning("🧪 Test/Paper Mode")
+    # Always show live trading mode
+    st.sidebar.success("🟢 Live Trading Mode")
 
     # Password authentication (persist for session, use .env password)
     if 'dashboard_password' not in st.session_state:
