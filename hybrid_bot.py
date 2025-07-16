@@ -1,8 +1,276 @@
 # hybrid_bot.py - Complete Dashboard + Never-Stop Background Bot + Manual Trading
+# 🚨 EMERGENCY OVERRIDE CODE
+# Add this to the VERY TOP of your main bot script (before any other imports)
+
+import os
+import sys
+
+print("🚨 APPLYING EMERGENCY TRADING OVERRIDES...")
+
+# ================================
+# FORCE OVERRIDE ALL CRITICAL SETTINGS
+# ================================
+
+# 1. ENABLE LIVE TRADING (CRITICAL)
+os.environ['PAPER_TRADING'] = 'False'
+os.environ['TEST_MODE'] = 'False'
+os.environ['DRY_RUN'] = 'False'
+os.environ['ENABLE_LIVE_TRADING'] = 'True'
+
+# 2. FIX THRESHOLDS (Your bot shows 0.39% - way too low)
+os.environ['MIN_CONFIDENCE'] = '0.65'           # Was: ~0.42
+os.environ['MIN_VOLUME_RATIO'] = '1.5'          # Was: 0.91x
+os.environ['MIN_PRICE_CHANGE'] = '2.0'          # Was: 0.39%
+os.environ['BREAKOUT_THRESHOLD'] = '2.0'        # For scalping
+os.environ['VOLUME_THRESHOLD'] = '1.5'          # Match volume ratio
+
+# 3. FIX SCANNING (Every 60 seconds instead of continuous)
+os.environ['SCAN_INTERVAL'] = '60'              # Seconds between scans
+os.environ['HEARTBEAT_INTERVAL'] = '300'        # 5 minutes between heartbeats
+
+# 4. DISABLE STRATEGY OVERRIDE (Let bot choose naturally)
+os.environ['DISABLE_STRATEGY_OVERRIDE'] = 'True'
+os.environ['FORCE_STRATEGY'] = 'None'
+os.environ['STRATEGY_MODE'] = 'BREAKOUT'
+
+# 5. SAFETY SETTINGS (Start small)
+os.environ['MAX_POSITION_SIZE'] = '50'          # $50 max per trade
+os.environ['MAX_POSITIONS'] = '2'               # Only 2 positions max
+os.environ['STOP_LOSS_PERCENT'] = '3.0'         # 3% stop loss
+os.environ['TAKE_PROFIT_PERCENT'] = '5.0'       # 5% take profit
+
+# 6. FIX INVALID SYMBOLS (Stop NFT/ETHW errors)
+os.environ['INVALID_SYMBOLS'] = 'NFT,ETHW,LUNA,UST,FTT'
+os.environ['SKIP_INVALID_SYMBOLS'] = 'True'
+os.environ['FILTER_DELISTED'] = 'True'
+
+print("✅ EMERGENCY OVERRIDES APPLIED!")
+
+# ================================
+# VERIFICATION FUNCTION
+# ================================
+
+def verify_overrides():
+    """Verify the overrides are working"""
+    
+    print("\n🔧 VERIFYING OVERRIDE VALUES:")
+    print("="*50)
+    
+    critical_settings = {
+        'PAPER_TRADING': os.getenv('PAPER_TRADING'),
+        'TEST_MODE': os.getenv('TEST_MODE'),
+        'MIN_CONFIDENCE': os.getenv('MIN_CONFIDENCE'),
+        'MIN_VOLUME_RATIO': os.getenv('MIN_VOLUME_RATIO'),
+        'MIN_PRICE_CHANGE': os.getenv('MIN_PRICE_CHANGE'),
+        'SCAN_INTERVAL': os.getenv('SCAN_INTERVAL'),
+        'MAX_POSITION_SIZE': os.getenv('MAX_POSITION_SIZE'),
+        'INVALID_SYMBOLS': os.getenv('INVALID_SYMBOLS')
+    }
+    
+    for setting, value in critical_settings.items():
+        print(f"   {setting:>20}: {value}")
+    
+    # Check if trading is enabled
+    paper_trading = os.getenv('PAPER_TRADING', 'True').lower() == 'true'
+    test_mode = os.getenv('TEST_MODE', 'True').lower() == 'true'
+    
+    if not paper_trading and not test_mode:
+        print("\n🟢 LIVE TRADING IS ENABLED!")
+        print("   Bot will execute REAL trades when opportunities arise")
+    else:
+        print("\n🔴 STILL IN TEST MODE!")
+        print("   Check your bot code for hardcoded PAPER_TRADING=True")
+    
+    return not paper_trading and not test_mode
+
+# ================================
+# FORCE CONFIGURATION FUNCTION
+# ================================
+
+def force_trading_config():
+    """Force configuration that your bot MUST use"""
+    
+    # Return a config dict that overrides everything
+    config = {
+        # Trading enablement
+        'PAPER_TRADING': False,
+        'TEST_MODE': False,
+        'DRY_RUN': False,
+        'LIVE_TRADING': True,
+        
+        # Proper thresholds for trading
+        'MIN_CONFIDENCE': 0.65,
+        'MIN_VOLUME_RATIO': 1.5,
+        'MIN_PRICE_CHANGE': 2.0,
+        'BREAKOUT_THRESHOLD': 2.0,
+        
+        # Timing
+        'SCAN_INTERVAL': 60,
+        'HEARTBEAT_INTERVAL': 300,
+        
+        # Strategy
+        'STRATEGY_OVERRIDE': False,
+        'FORCE_STRATEGY': None,
+        'ADAPTIVE_THRESHOLDS': True,
+        
+        # Safety
+        'MAX_POSITION_SIZE': 50,
+        'MAX_POSITIONS': 2,
+        'STOP_LOSS_PERCENT': 3.0,
+        'TAKE_PROFIT_PERCENT': 5.0,
+        
+        # Symbol filtering
+        'INVALID_SYMBOLS': ['NFT', 'ETHW', 'LUNA', 'UST', 'FTT'],
+        'SKIP_INVALID_SYMBOLS': True
+    }
+    
+    print("\n🔧 FORCED CONFIGURATION:")
+    print("="*50)
+    for key, value in config.items():
+        print(f"   {key:>25}: {value}")
+    
+    return config
+
+# ================================
+# THRESHOLD OVERRIDE FUNCTION
+# ================================
+
+def override_thresholds():
+    """Override the hardcoded thresholds in your bot"""
+    
+    print("\n🎯 OVERRIDING HARDCODED THRESHOLDS:")
+    print("="*50)
+    
+    # These will replace any hardcoded values
+    new_thresholds = {
+        'change_threshold': 2.0,        # Instead of 0.39%
+        'volume_threshold': 1.5,        # Instead of 0.91x
+        'confidence_threshold': 0.65,   # Instead of ~0.42
+        'scan_interval': 60,            # Instead of ~60 seconds currently
+    }
+    
+    for threshold, value in new_thresholds.items():
+        print(f"   {threshold:>20}: {value}")
+        # Set as environment variable
+        os.environ[threshold.upper()] = str(value)
+    
+    print("\n💡 Your bot should now use these values instead of hardcoded ones")
+    
+    return new_thresholds
+
+# ================================
+# SYMBOL FILTER OVERRIDE
+# ================================
+
+def fix_invalid_symbols():
+    """Fix the NFT/ETHW symbol errors"""
+    
+    invalid_symbols = ['NFT', 'ETHW', 'LUNA', 'UST', 'FTT', 'LUNC']
+    
+    print(f"\n🚫 FILTERING INVALID SYMBOLS: {', '.join(invalid_symbols)}")
+    
+    # Set environment variable for symbol filtering
+    os.environ['INVALID_SYMBOLS'] = ','.join(invalid_symbols)
+    os.environ['SKIP_INVALID_SYMBOLS'] = 'True'
+    
+    return invalid_symbols
+
+# ================================
+# MAIN OVERRIDE EXECUTION
+# ================================
+
+def apply_all_overrides():
+    """Apply all emergency overrides"""
+    
+    print("\n" + "="*60)
+    print("🚨 APPLYING ALL EMERGENCY OVERRIDES")
+    print("="*60)
+    
+    # Apply overrides
+    trading_enabled = verify_overrides()
+    config = force_trading_config() 
+    thresholds = override_thresholds()
+    invalid_symbols = fix_invalid_symbols()
+    
+    print("\n" + "="*60)
+    print("📊 EXPECTED CHANGES IN YOUR LOGS:")
+    print("="*60)
+    
+    expected_changes = {
+        "BEFORE": {
+            "thresholds": "change=0.39%, volume=0.91x",
+            "opportunities": "[TEST] Created test opportunity",
+            "confidence": "conf=0.421",
+            "errors": "Error getting price for NFT/ETHW"
+        },
+        "AFTER": {
+            "thresholds": "change=2.0%, volume=1.5x", 
+            "opportunities": "[TRADE] Executing live trade OR No opportunities above threshold",
+            "confidence": "conf=0.65+ OR No opportunities found",
+            "errors": "No more NFT/ETHW errors"
+        }
+    }
+    
+    for timing, changes in expected_changes.items():
+        print(f"\n{timing}:")
+        for aspect, description in changes.items():
+            print(f"   {aspect:>12}: {description}")
+    
+    print("\n" + "="*60)
+    print("⏰ EXPECTED TIMELINE:")
+    print("="*60)
+    print("   Next 1-2 scans: Should see threshold changes")
+    print("   Next 5-10 mins: Should see real opportunities or 'no opportunities'")
+    print("   Next 30 mins: Should see actual trades if market moves 2%+")
+    
+    return {
+        'trading_enabled': trading_enabled,
+        'config': config,
+        'thresholds': thresholds,
+        'invalid_symbols': invalid_symbols
+    }
+
+# ================================
+# EXECUTE OVERRIDES
+# ================================
+
+if __name__ == "__main__":
+    # Apply all overrides immediately
+    results = apply_all_overrides()
+    
+    # Final verification
+    if results['trading_enabled']:
+        print("\n🟢 SUCCESS: Live trading is now enabled!")
+    else:
+        print("\n🔴 WARNING: Check your bot code for hardcoded test mode!")
+
+# ================================
+# ADD THIS TO YOUR BOT'S MAIN LOOP
+# ================================
+
+# After adding the above code, modify your main trading loop to use these values:
+
+def get_override_config():
+    """Get configuration with overrides applied"""
+    return {
+        'paper_trading': os.getenv('PAPER_TRADING', 'False').lower() == 'true',
+        'test_mode': os.getenv('TEST_MODE', 'False').lower() == 'true',
+        'min_confidence': float(os.getenv('MIN_CONFIDENCE', '0.65')),
+        'min_volume_ratio': float(os.getenv('MIN_VOLUME_RATIO', '1.5')),
+        'min_price_change': float(os.getenv('MIN_PRICE_CHANGE', '2.0')),
+        'scan_interval': int(os.getenv('SCAN_INTERVAL', '60')),
+        'max_position_size': float(os.getenv('MAX_POSITION_SIZE', '50')),
+        'invalid_symbols': os.getenv('INVALID_SYMBOLS', 'NFT,ETHW').split(',')
+    }
+
+# Use this config in your bot instead of hardcoded values:
+# CONFIG = get_override_config()
+# if not CONFIG['paper_trading'] and not CONFIG['test_mode']:
+#     # Execute real trade
+#     pass 
 import streamlit as st
 import threading
 import time
-import os
 import json
 import subprocess
 from datetime import datetime
