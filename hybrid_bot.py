@@ -47,7 +47,7 @@ import random
 def render_mode_switch():
     """Render the Demo/Live mode switch at the very top of the sidebar."""
     st.sidebar.title("Bot Mode")
-    mode = st.sidebar.radio("Select Mode", ["Demo", "Live"], index=0 if st.session_state.get('bot_mode', 'Demo')=="Demo" else 1)
+    mode = st.sidebar.radio("Select Mode", ["Demo", "Live"], index=0 if st.session_state.get('bot_mode', 'Demo')=="Demo" else 1, key="sidebar_mode_switch")
     st.session_state['bot_mode'] = mode
     st.sidebar.markdown(f"**Current Mode:** {mode}")
 
