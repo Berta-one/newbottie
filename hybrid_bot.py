@@ -50,34 +50,6 @@ print("✅ EMERGENCY OVERRIDES APPLIED!")
 # VERIFICATION FUNCTION
 # ================================
 
-        # Order type
-        order_type = st.selectbox("Order Type", ["MARKET", "LIMIT"])
-        limit_price = None
-        price_offset_percent = 0.1
-        # Limit order price input and strategies
-        if order_type == "LIMIT":
-            st.markdown("**🎯 Limit Order Settings**")
-            price_strategy = st.selectbox(
-                "Price Strategy",
-                ["Custom Price", "Market - 0.1%", "Market + 0.1%", "Market - 0.5%", "Market + 0.5%"]
-            )
-            if price_strategy == "Custom Price":
-                limit_price = st.number_input(
-                    f"Limit Price (USD)",
-                    min_value=0.0,
-                    value=current_price,
-                    format="%.6f"
-                )
-            else:
-                if "- 0.1%" in price_strategy:
-                    limit_price = current_price * 0.999
-                elif "+ 0.1%" in price_strategy:
-                    limit_price = current_price * 1.001
-                elif "- 0.5%" in price_strategy:
-                    limit_price = current_price * 0.995
-                elif "+ 0.5%" in price_strategy:
-                    limit_price = current_price * 1.005
-                st.info(f"🎯 Calculated Limit Price: **${limit_price:.6f}**")
         
         # Execute button
         if trade_direction == "Buy":
