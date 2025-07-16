@@ -478,8 +478,27 @@ def render_manual_trading_tab():
             st.error(f"Error getting price for {trading_pair}: {e}")
     
     with col2:
-        st.subheader("📊 Portfolio Overview")
-        st.info("Portfolio balances are not shown in this version. Use the Portfolio Overview tab for full details.")
+        st.subheader("📊 Portfolio Overview (Live)")
+        try:
+            portfolio, _ = get_real_portfolio()
+            if portfolio:
+                df = pd.DataFrame([
+                    {
+                        'Asset': k,
+                        'Balance': v['balance'],
+                        'Free': v['free'],
+                        'Locked': v['locked'],
+                        'USD Value': v.get('usd_value', 0.0),
+                        '24h Change (%)': v.get('change_24h', 0.0),
+                        'Volume 24h': v.get('volume_24h', 0.0)
+                    }
+                    for k, v in portfolio.items()
+                ])
+                st.dataframe(df)
+            else:
+                st.info("No assets found in portfolio.")
+        except Exception as e:
+            st.error(f"Error loading live portfolio: {e}")
 
         # Recent manual trades
         st.subheader("📝 Recent Manual Trades")
