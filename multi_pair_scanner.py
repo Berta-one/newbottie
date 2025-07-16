@@ -8,6 +8,114 @@ from datetime import datetime
 import os
 
 class CryptoPairScanner:
+    def get_all_trading_pairs(self, base_assets=['USDT', 'BTC', 'ETH', 'BNB'], min_volume_24h=1000000):
+        """
+        Enhanced: Get ALL trading pairs, not just USDT pairs
+        Supports cross trading like ADABTC, ETHBTC, etc.
+        """
+        try:
+            print(f"🌍 Fetching ALL trading pairs with bases: {base_assets}")
+            ticker_24h = self.client.get_ticker()
+            all_pairs = []
+            excluded_keywords = ['UP', 'DOWN', 'BEAR', 'BULL']
+            for ticker in ticker_24h:
+                symbol = ticker['symbol']
+                volume = float(ticker['quoteVolume'])
+                price_change_24h = float(ticker['priceChangePercent'])
+                # Check if symbol ends with any of our base assets
+                quote_asset = None
+                for base in base_assets:
+                    if symbol.endswith(base):
+                        quote_asset = base
+                        break
+                # Filter criteria
+                if (quote_asset and 
+                    volume >= min_volume_24h and
+                    not any(keyword in symbol for keyword in excluded_keywords)):
+                    # Extract base asset (the crypto being traded)
+                    base_asset = symbol.replace(quote_asset, '')
+                    all_pairs.append({
+                        'symbol': symbol,
+                        'base_asset': base_asset,
+                        'quote_asset': quote_asset,
+                        'volume_24h': volume,
+                        'price_change_24h': price_change_24h,
+                        'category': f'{quote_asset}-Pairs',
+                        'base_qty': self._estimate_base_quantity(symbol, float(ticker['lastPrice'])),
+                        'risk_multiplier': self._get_risk_multiplier(quote_asset)
+                    })
+            # Sort by 24h volume (highest first)
+            all_pairs.sort(key=lambda x: x['volume_24h'], reverse=True)
+            print(f"🎯 Found {len(all_pairs)} qualifying trading pairs across {len(base_assets)} quote assets")
+            # Show breakdown by quote asset
+            for base in base_assets:
+                count = len([p for p in all_pairs if p['quote_asset'] == base])
+                print(f"   {base}: {count} pairs")
+            return all_pairs
+        except Exception as e:
+            print(f"❌ Error fetching trading pairs: {e}")
+            return []
+
+    def _get_risk_multiplier(self, quote_asset):
+        """Get risk multiplier based on quote asset volatility"""
+        risk_multipliers = {
+            'USDT': 1.0,    # Most stable
+            'USDC': 1.0,    # Stable
+            'BTC': 0.8,     # Volatile base
+            'ETH': 0.7,     # More volatile  
+            'BNB': 0.6,     # Exchange token
+        }
+        return risk_multipliers.get(quote_asset, 0.5)
+
+    def get_cross_crypto_pairs(self):
+        """
+        Get popular cross-crypto pairs (non-stablecoin)
+        Examples: ETHBTC, ADABTC, LINKETH, etc.
+        """
+        cross_pairs = [
+            # ETH-based pairs
+            {'symbol': 'ADAETH', 'category': 'ETH-Cross', 'base_qty': 50, 'risk_multiplier': 0.7},
+            {'symbol': 'LINKETH', 'category': 'ETH-Cross', 'base_qty': 5, 'risk_multiplier': 0.7},
+            {'symbol': 'DOTETH', 'category': 'ETH-Cross', 'base_qty': 10, 'risk_multiplier': 0.7},
+            {'symbol': 'UNIETH', 'category': 'ETH-Cross', 'base_qty': 8, 'risk_multiplier': 0.7},
+            # BTC-based pairs  
+            {'symbol': 'ETHBTC', 'category': 'BTC-Cross', 'base_qty': 0.05, 'risk_multiplier': 0.8},
+            {'symbol': 'ADABTC', 'category': 'BTC-Cross', 'base_qty': 500, 'risk_multiplier': 0.8},
+            {'symbol': 'LINKBTC', 'category': 'BTC-Cross', 'base_qty': 5, 'risk_multiplier': 0.8},
+            {'symbol': 'LTCBTC', 'category': 'BTC-Cross', 'base_qty': 1, 'risk_multiplier': 0.8},
+            {'symbol': 'DOTBTC', 'category': 'BTC-Cross', 'base_qty': 10, 'risk_multiplier': 0.8},
+            {'symbol': 'BNBBTC', 'category': 'BTC-Cross', 'base_qty': 0.5, 'risk_multiplier': 0.8},
+            # BNB-based pairs
+            {'symbol': 'ETHBNB', 'category': 'BNB-Cross', 'base_qty': 0.1, 'risk_multiplier': 0.6},
+            {'symbol': 'ADABNB', 'category': 'BNB-Cross', 'base_qty': 50, 'risk_multiplier': 0.6},
+            {'symbol': 'LINKBNB', 'category': 'BNB-Cross', 'base_qty': 2, 'risk_multiplier': 0.6},
+        ]
+        print(f"🔄 Selected {len(cross_pairs)} cross-crypto pairs")
+        return cross_pairs
+
+    @staticmethod
+    def get_quote_asset_balance(client, symbol):
+        """
+        Get balance for the quote asset of a trading pair
+        Example: For ADABTC, returns BTC balance
+        """
+        try:
+            quote_assets = ['USDT', 'USDC', 'BTC', 'ETH', 'BNB']
+            quote_asset = None
+            for asset in quote_assets:
+                if symbol.endswith(asset):
+                    quote_asset = asset
+                    break
+            if not quote_asset:
+                return 0.0
+            account = client.get_account()
+            for balance in account['balances']:
+                if balance['asset'] == quote_asset:
+                    return float(balance['free'])
+            return 0.0
+        except Exception as e:
+            print(f"❌ Error getting quote asset balance: {e}")
+            return 0.0
     def __init__(self, client):
         self.client = client
         self.active_positions = {}

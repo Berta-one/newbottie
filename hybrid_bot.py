@@ -50,63 +50,110 @@ print("✅ EMERGENCY OVERRIDES APPLIED!")
 # VERIFICATION FUNCTION
 # ================================
 
-def verify_overrides():
-    """Verify the overrides are working"""
-    
-    print("\n🔧 VERIFYING OVERRIDE VALUES:")
-    print("="*50)
-    
-    critical_settings = {
-        'PAPER_TRADING': os.getenv('PAPER_TRADING'),
-        'TEST_MODE': os.getenv('TEST_MODE'),
-        'MIN_CONFIDENCE': os.getenv('MIN_CONFIDENCE'),
-        'MIN_VOLUME_RATIO': os.getenv('MIN_VOLUME_RATIO'),
-        'MIN_PRICE_CHANGE': os.getenv('MIN_PRICE_CHANGE'),
-        'SCAN_INTERVAL': os.getenv('SCAN_INTERVAL'),
-        'MAX_POSITION_SIZE': os.getenv('MAX_POSITION_SIZE'),
-        'INVALID_SYMBOLS': os.getenv('INVALID_SYMBOLS')
-    }
-    
-    for setting, value in critical_settings.items():
-        print(f"   {setting:>20}: {value}")
-    
-    # Check if trading is enabled
-    paper_trading = os.getenv('PAPER_TRADING', 'True').lower() == 'true'
-    test_mode = os.getenv('TEST_MODE', 'True').lower() == 'true'
-    
-    if not paper_trading and not test_mode:
-        print("\n🟢 LIVE TRADING IS ENABLED!")
-        print("   Bot will execute REAL trades when opportunities arise")
-    else:
-        print("\n🔴 STILL IN TEST MODE!")
-        print("   Check your bot code for hardcoded PAPER_TRADING=True")
-    
-    return not paper_trading and not test_mode
-
-# ================================
-# FORCE CONFIGURATION FUNCTION
-# ================================
-
-def force_trading_config():
-    """Force configuration that your bot MUST use"""
-    
-    # Return a config dict that overrides everything
-    config = {
-        # Trading enablement
-        'PAPER_TRADING': False,
-        'TEST_MODE': False,
-        'DRY_RUN': False,
-        'LIVE_TRADING': True,
+        # Order type
+        order_type = st.selectbox("Order Type", ["MARKET", "LIMIT"])
+        limit_price = None
+        price_offset_percent = 0.1
+        # Limit order price input and strategies
+        if order_type == "LIMIT":
+            st.markdown("**🎯 Limit Order Settings**")
+            price_strategy = st.selectbox(
+                "Price Strategy",
+                ["Custom Price", "Market - 0.1%", "Market + 0.1%", "Market - 0.5%", "Market + 0.5%"]
+            )
+            if price_strategy == "Custom Price":
+                limit_price = st.number_input(
+                    f"Limit Price (USD)",
+                    min_value=0.0,
+                    value=current_price,
+                    format="%.6f"
+                )
+            else:
+                if "- 0.1%" in price_strategy:
+                    limit_price = current_price * 0.999
+                elif "+ 0.1%" in price_strategy:
+                    limit_price = current_price * 1.001
+                elif "- 0.5%" in price_strategy:
+                    limit_price = current_price * 0.995
+                elif "+ 0.5%" in price_strategy:
+                    limit_price = current_price * 1.005
+                st.info(f"🎯 Calculated Limit Price: **${limit_price:.6f}**")
         
-        # Proper thresholds for trading
-        'MIN_CONFIDENCE': 0.65,
-        'MIN_VOLUME_RATIO': 1.5,
-        'MIN_PRICE_CHANGE': 2.0,
-        'BREAKOUT_THRESHOLD': 2.0,
+        # Execute button
+        if trade_direction == "Buy":
+            button_text = f"\U0001F6D2 Buy {quantity:.6f} {selected_crypto}"
+            symbol = f"{selected_crypto}USDT"
+            side = "BUY"
+        else:
+            button_text = f"\U0001F525 Sell {quantity:.6f} {selected_asset}"
+            symbol = f"{selected_asset}USDT"
+            side = "SELL"
         
-        # Timing
-        'SCAN_INTERVAL': 60,
-        'HEARTBEAT_INTERVAL': 300,
+        # Validation
+        can_execute = quantity > 0 and current_price > 0
+        
+        if st.button(button_text, type="primary", disabled=not can_execute):
+            if can_execute:
+                try:
+                    # Get symbol precision info for limit orders
+                    exchange_info = client.get_exchange_info()
+                    symbol_info = None
+                    for s in exchange_info['symbols']:
+                        if s['symbol'] == symbol:
+                            symbol_info = s
+                            break
+                    # Format price and quantity
+                    if symbol_info:
+                        price_filter = next((f for f in symbol_info['filters'] if f['filterType'] == 'PRICE_FILTER'), None)
+                        lot_size_filter = next((f for f in symbol_info['filters'] if f['filterType'] == 'LOT_SIZE'), None)
+                        if price_filter and order_type == "LIMIT":
+                            tick_size = float(price_filter['tickSize'])
+                            decimals = len(str(tick_size).split('.')[-1].rstrip('0'))
+                            limit_price = round(float(limit_price), decimals) if limit_price else round(current_price, decimals)
+                        if lot_size_filter:
+                            step_size = float(lot_size_filter['stepSize'])
+                            qty_decimals = len(str(step_size).split('.')[-1].rstrip('0'))
+                            quantity = round(float(quantity), qty_decimals)
+                    # Execute the trade
+                    if order_type == "MARKET":
+                        order = client.create_order(
+                            symbol=symbol,
+                            side=side,
+                            type="MARKET",
+                            quantity=str(quantity)
+                        )
+                    else:
+                        order = client.create_order(
+                            symbol=symbol,
+                            side=side,
+                            type="LIMIT",
+                            timeInForce="GTC",
+                            quantity=str(quantity),
+                            price=str(limit_price)
+                        )
+                    st.success(f"✅ {order_type} order placed successfully!")
+                    st.json(order)
+                    # Log the trade
+                    trade_data = {
+                        'timestamp': datetime.now().isoformat(),
+                        'type': 'manual_trade',
+                        'symbol': symbol,
+                        'side': side,
+                        'quantity': quantity,
+                        'price': limit_price if order_type == "LIMIT" else current_price,
+                        'order_id': order.get('orderId'),
+                        'status': order.get('status')
+                    }
+                    with open('logs/manual_trades.log', 'a') as f:
+                        f.write(f"{json.dumps(trade_data)}\n")
+                except Exception as e:
+                    st.error(f"❌ Order failed: {e}")
+                    if "insufficient balance" in str(e).lower():
+                        st.warning("💡 Try reducing the quantity or check your balance")
+                    elif "invalid price" in str(e).lower():
+                        st.warning("💡 Adjust the limit price within market bounds")
+                    elif "lot size" in str(e).lower():
+                        st.warning("💡 Adjust quantity to meet minimum/maximum limits")
         
         # Strategy
         'STRATEGY_OVERRIDE': False,
