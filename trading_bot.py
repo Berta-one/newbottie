@@ -328,7 +328,7 @@ def trading_dashboard(settings_compact=False):
     - 💰 Risk: {risk}% per trade
     - ⏱️ Scan Interval: {scan_interval} minutes
     - 🛡️ Mode: {mode}
-    - 📊 Exchange: {'Binance Testnet' if mode == 'Demo' else 'Binance Live'}
+    - 📊 Exchange: {'Binance Live' if mode == 'Live' else 'Binance Testnet'}
     """)
 
     # --- Help & Documentation ---
