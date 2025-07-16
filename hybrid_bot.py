@@ -1065,19 +1065,24 @@ def render_logs_tab():
     """Enhanced logs tab"""
     st.header("📋 System Logs")
     st.caption("Real-time bot activity and system monitoring")
-    
+
+    # --- Refresh button and auto-refresh ---
+    refresh = st.button("🔄 Refresh Logs")
+    # Optional: auto-refresh every 10 seconds
+    st_autorefresh = st.experimental_get_query_params().get('autorefresh', ['off'])[0]
+    if st_autorefresh == 'on':
+        import time as _time
+        _time.sleep(0.5)
+        st.experimental_rerun()
     # Log file tabs
     log_tab1, log_tab2, log_tab3 = st.tabs(["📟 Console", "🔍 Scans", "💼 Trades"])
-    
+
     with log_tab1:
         st.subheader("📟 Console Output")
-        
         log_file = "logs/console_output.log"
         if os.path.exists(log_file):
             with open(log_file, 'r', encoding='utf-8') as f:
                 logs = f.readlines()[-100:]
-            
-            # Color code logs
             for line in logs:
                 if "error" in line.lower():
                     st.markdown(f":red[{line.strip()}]")
@@ -1091,32 +1096,28 @@ def render_logs_tab():
                     st.text(line.strip())
         else:
             st.info("No console log file found.")
-    
+
     with log_tab2:
         st.subheader("🔍 Scan Logs")
-        
         scan_log_file = "logs/portfolio_scans.log"
         if os.path.exists(scan_log_file):
             with open(scan_log_file, 'r', encoding='utf-8') as f:
                 scan_logs = f.readlines()[-50:]
-            
             for line in scan_logs:
                 st.text(line.strip())
         else:
             st.info("No scan log file found.")
-    
+
     with log_tab3:
         st.subheader("💼 Trade Logs")
-        
         if os.path.exists('logs/trades.csv'):
             df = pd.read_csv('logs/trades.csv')
             st.dataframe(df.tail(20), use_container_width=True)
         else:
             st.info("No trade log file found.")
-    
+
     # Download logs
     st.subheader("📥 Download Logs")
-    
     col1, col2, col3 = st.columns(3)
     
     with col1:
