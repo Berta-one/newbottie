@@ -1009,32 +1009,76 @@ def render_market_indicators_tab():
     
     # Market overview
     st.subheader("🌍 Market Overview")
-    
-    # Get market data
-    portfolio, gbp_rate = get_real_portfolio()
-    market_condition, condition_score, avg_volatility = simulate_market_analysis(portfolio)
-    
+
+    # --- Live WebSocket price stream widget ---
+    import websocket
+    import threading
+    import json
+    ws_symbol = st.text_input("Live Price Symbol (e.g. btcusdt)", value="btcusdt", key="ws_market_symbol")
+    ws_price_placeholder = st.empty()
+    ws_status_placeholder = st.empty()
+
+    def ws_on_message(ws, message):
+        data = json.loads(message)
+        price = data.get('p') or data.get('c') or data.get('price')
+        if price:
+            ws_price_placeholder.info(f"Live {ws_symbol.upper()} Price: {price}")
+
+    def ws_on_error(ws, error):
+        ws_status_placeholder.error(f"WebSocket error: {error}")
+
+    def ws_on_close(ws, close_status_code, close_msg):
+        ws_status_placeholder.warning("WebSocket closed")
+
+    def ws_on_open(ws):
+        ws_status_placeholder.success("WebSocket connection opened")
+
+    def start_ws():
+        url = f"wss://stream.binance.com:9443/ws/{ws_symbol.lower()}@trade"
+        ws = websocket.WebSocketApp(
+            url,
+            on_open=ws_on_open,
+            on_message=ws_on_message,
+            on_error=ws_on_error,
+            on_close=ws_on_close
+        )
+        ws.run_forever()
+
+    if st.button("Start Live Price Stream", key="ws_market_start"):
+        t = threading.Thread(target=start_ws)
+        t.daemon = True
+        t.start()
+        ws_status_placeholder.success("Started WebSocket stream. To stop, reload the page.")
+
+    # --- End WebSocket widget ---
+
+    # Get market data (keep REST API usage minimal)
+    try:
+        portfolio, gbp_rate = get_real_portfolio()
+        market_condition, condition_score, avg_volatility = simulate_market_analysis(portfolio)
+    except Exception as e:
+        st.error(f"Error fetching market data: {e}")
+        return
+
     col1, col2, col3, col4 = st.columns(4)
-    
+
     with col1:
         st.metric("Market Condition", market_condition)
-    
+
     with col2:
         st.metric("Confidence Score", f"{condition_score:.1%}")
-    
+
     with col3:
         st.metric("Avg Volatility", f"{avg_volatility:.1f}%")
-    
+
     with col4:
         st.metric("Trading Pairs", len(portfolio))
-    
+
     # Display last scan results
     if 'last_opportunities' in st.session_state and st.session_state['last_opportunities']:
         st.subheader("🎯 Current Trading Opportunities")
-        
         opportunities_df = pd.DataFrame(st.session_state['last_opportunities'])
         st.dataframe(opportunities_df, use_container_width=True)
-        
         # Chart of opportunities
         if len(opportunities_df) > 0 and 'confidence' in opportunities_df.columns:
             fig = px.bar(opportunities_df, x='symbol', y='confidence', 
@@ -1043,10 +1087,10 @@ def render_market_indicators_tab():
             st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("🔍 No opportunities found in last scan. Try scanning again or wait for market movements.")
-    
+
     # Market trend analysis
     st.subheader("📈 Market Trend Analysis")
-    
+
     if portfolio:
         # Create trend chart
         trend_data = []
@@ -1058,16 +1102,13 @@ def render_market_indicators_tab():
                 'Volume': data['volume_24h'],
                 'Confidence': data['confidence']
             })
-        
         trend_df = pd.DataFrame(trend_data)
-        
         # Price change chart
         fig = px.bar(trend_df, x='Asset', y='Change', 
                     title="24h Price Changes",
                     color='Change',
                     color_continuous_scale='RdYlGn')
         st.plotly_chart(fig, use_container_width=True)
-        
         # Volume analysis
         fig2 = px.scatter(trend_df, x='Volume', y='Change', 
                          size='Confidence', hover_name='Asset',
