@@ -51,7 +51,8 @@ def render_mode_switch():
     st.session_state['bot_mode'] = mode
     st.sidebar.markdown(f"**Current Mode:** {mode}")
 
-render_mode_switch()
+
+# Only render the mode switch once, inside main/dashboard, not at module level
 
 try:
     from dotenv import load_dotenv
@@ -1478,6 +1479,8 @@ def stop_background_bot():
 
 def dashboard():
     """Main dashboard function"""
+    # Render the mode switch ONCE at the top of the sidebar
+    render_mode_switch()
     # Get Tailscale IP and setup sidebar controls
     ts_ip = get_tailscale_ip()
     remote_url = f"http://{ts_ip}:8501" if ts_ip != "Unavailable" else "Unavailable"
