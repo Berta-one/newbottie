@@ -1095,37 +1095,9 @@ def render_strategy_tab():
     
     rec = recommendations.get(market_condition, {
         'recommended': ['Balanced'],
-    try:
-        if BINANCE_AVAILABLE and API_KEY and API_SECRET:
-            client = get_dynamic_client()
-            # Get all symbols with trades
-            account = client.get_account()
-            all_balances = account['balances']
-            # Only show assets with nonzero balance
-            for bal in all_balances:
-                asset = bal['asset']
-                free = float(bal['free'])
-                locked = float(bal['locked'])
-                total = free + locked
-                if total > 0 and asset not in ['USDT', 'BUSD', 'USDC']:
-                    # Try to find a USDT pair for this asset
-                    symbol = f"{asset}USDT"
-                    try:
-                        ticker = client.get_symbol_ticker(symbol=symbol)
-                        current_price = float(ticker['price'])
-                        entry_price = current_price  # No entry price info, so just show current
-                        pnl_pct = 0.0
-                        positions_data.append({
-                            'Symbol': symbol,
-                            'Direction': 'LONG',
-                            'Entry Price': f"${entry_price:.8f}",
-                            'Current Price': f"${current_price:.8f}",
-                            'P&L %': f"{pnl_pct:+.2f}%",
-                        })
-                    except Exception:
-                        continue
-    except Exception as e:
-        st.warning(f"Could not fetch live positions: {e}")
+        'avoid': [],
+        'reason': 'No specific market condition detected.'
+    })
     
     with col3:
         st.metric("Avg Volatility", f"{avg_volatility:.1f}%")
