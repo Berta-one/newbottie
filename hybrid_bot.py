@@ -38,6 +38,12 @@ import sys
 import signal
 import requests
 import random
+# Add dotenv support
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 from binance.client import Client
 from binance.exceptions import BinanceAPIException
 
@@ -181,28 +187,44 @@ def get_real_portfolio():
             free_balance = float(balance['free'])
             locked_balance = float(balance['locked'])
             total_balance = free_balance + locked_balance
-            
+
             if total_balance > 0:
-                # Try different quote currencies
-                for quote in ['USDT', 'BUSD', 'USDC']:
-                    symbol = f"{asset}{quote}"
-                    if symbol in price_dict:
-                        price_usd = price_dict[symbol]
-                        usd_value = total_balance * price_usd
-                        
-                        if usd_value >= MIN_BALANCE_USD:
-                            portfolio[asset] = {
-                                'balance': total_balance,
-                                'free': free_balance,
-                                'locked': locked_balance,
-                                'price_usd': price_usd,
-                                'usd_value': usd_value,
-                                'symbol': symbol,
-                                'change_24h': random.uniform(-5, 5),  # Simulate change
-                                'volume_24h': random.uniform(1000000, 100000000),
-                                'confidence': random.uniform(0.5, 0.9)
-                            }
-                        break
+                # Special handling for stablecoins
+                if asset in ['USDT', 'BUSD', 'USDC']:
+                    price_usd = 1.0
+                    usd_value = total_balance * price_usd
+                    if usd_value >= MIN_BALANCE_USD:
+                        portfolio[asset] = {
+                            'balance': total_balance,
+                            'free': free_balance,
+                            'locked': locked_balance,
+                            'price_usd': price_usd,
+                            'usd_value': usd_value,
+                            'symbol': asset,
+                            'change_24h': 0.0,  # Stablecoins have no change
+                            'volume_24h': 0.0,
+                            'confidence': 1.0
+                        }
+                else:
+                    # Try different quote currencies
+                    for quote in ['USDT', 'BUSD', 'USDC']:
+                        symbol = f"{asset}{quote}"
+                        if symbol in price_dict:
+                            price_usd = price_dict[symbol]
+                            usd_value = total_balance * price_usd
+                            if usd_value >= MIN_BALANCE_USD:
+                                portfolio[asset] = {
+                                    'balance': total_balance,
+                                    'free': free_balance,
+                                    'locked': locked_balance,
+                                    'price_usd': price_usd,
+                                    'usd_value': usd_value,
+                                    'symbol': symbol,
+                                    'change_24h': random.uniform(-5, 5),  # Simulate change
+                                    'volume_24h': random.uniform(1000000, 100000000),
+                                    'confidence': random.uniform(0.5, 0.9)
+                                }
+                            break
         
         # Get GBP rate
         gbp_rate = get_gbp_exchange_rate()
@@ -269,62 +291,56 @@ def render_manual_trading_tab():
         return
     
     col1, col2 = st.columns(2)
-    
+
     with col1:
         st.subheader("🛒 Place Order")
-        
-        # Get portfolio for trading options
-        portfolio_balances = {}
-        for balance in balances:
-            if float(balance['free']) > 0:
-                portfolio_balances[balance['asset']] = {
-                    'free': float(balance['free']),
-                    'locked': float(balance['locked'])
-                }
-        
-        # Enhanced trading interface
-        st.markdown("**Trading Pair Selection**")
-        
-        # Base and quote currency selection
-        col_base, col_quote = st.columns(2)
-        
-        with col_base:
-            available_assets = list(portfolio_balances.keys())
-            base_asset = st.selectbox("Base Asset", available_assets)
-        
-        with col_quote:
-            quote_options = ['USDT', 'BTC', 'ETH', 'BNB', 'BUSD']
-            quote_asset = st.selectbox("Quote Asset", quote_options)
-        
-        # Create trading pair
+
+        # Pull all available symbols from Binance
+        try:
+            exchange_info = client.get_exchange_info()
+            all_symbols = [s['symbol'] for s in exchange_info['symbols'] if s['status'] == 'TRADING']
+            # Build asset set for base and quote
+            base_assets = sorted(set([s['baseAsset'] for s in exchange_info['symbols'] if s['status'] == 'TRADING']))
+            quote_assets = sorted(set([s['quoteAsset'] for s in exchange_info['symbols'] if s['status'] == 'TRADING']))
+        except Exception as e:
+            st.error(f"Error fetching symbols from Binance: {e}")
+            return
+
+        # Searchable base asset selector
+        base_asset = st.selectbox(
+            "Base Asset (type to search)",
+            options=base_assets,
+            index=base_assets.index('BTC') if 'BTC' in base_assets else 0,
+            key="manual_base_asset"
+        )
+        quote_asset = st.selectbox(
+            "Quote Asset",
+            options=quote_assets,
+            index=quote_assets.index('USDT') if 'USDT' in quote_assets else 0,
+            key="manual_quote_asset"
+        )
+
         trading_pair = f"{base_asset}{quote_asset}"
-        
-        # Trade direction
         trade_direction = st.radio("Trade Direction", ["Buy", "Sell"])
-        
+
         # Get current price
         try:
             ticker = client.get_symbol_ticker(symbol=trading_pair)
             current_price = float(ticker['price'])
             st.success(f"💰 Current {trading_pair} Price: {current_price:.8f}")
-            
-            # Order type selection
+
             order_type = st.selectbox("Order Type", ["MARKET", "LIMIT", "STOP_LOSS", "STOP_LOSS_LIMIT"])
-            
-            # Quantity input
+
+            # Quantity input (no balance check, as user may not hold asset yet)
             if trade_direction == "Buy":
-                quote_balance = portfolio_balances.get(quote_asset, {}).get('free', 0)
-                st.info(f"💰 Available {quote_asset}: {quote_balance:.8f}")
-                
                 if order_type == "MARKET":
                     quote_amount = st.number_input(
                         f"{quote_asset} Amount to spend",
                         min_value=0.0,
-                        max_value=float(quote_balance),
-                        value=min(50.0, float(quote_balance) * 0.1),
+                        value=50.0,
                         step=1.0
                     )
-                    quantity = quote_amount / current_price
+                    quantity = quote_amount / current_price if current_price > 0 else 0
                 else:
                     quantity = st.number_input(
                         f"{base_asset} Quantity",
@@ -333,21 +349,16 @@ def render_manual_trading_tab():
                         format="%.8f"
                     )
             else:
-                base_balance = portfolio_balances.get(base_asset, {}).get('free', 0)
-                st.info(f"💰 Available {base_asset}: {base_balance:.8f}")
-                
                 quantity = st.number_input(
                     f"{base_asset} Quantity to sell",
                     min_value=0.0,
-                    max_value=float(base_balance),
-                    value=min(float(base_balance), float(base_balance) * 0.1),
+                    value=0.001,
                     format="%.8f"
                 )
-            
-            # Price inputs for limit orders
+
             limit_price = current_price
             stop_price = current_price
-            
+
             if order_type in ["LIMIT", "STOP_LOSS_LIMIT"]:
                 limit_price = st.number_input(
                     "Limit Price",
@@ -355,7 +366,7 @@ def render_manual_trading_tab():
                     value=float(current_price),
                     format="%.8f"
                 )
-            
+
             if order_type in ["STOP_LOSS", "STOP_LOSS_LIMIT"]:
                 stop_price = st.number_input(
                     "Stop Price",
@@ -363,11 +374,10 @@ def render_manual_trading_tab():
                     value=float(current_price * 0.95),
                     format="%.8f"
                 )
-            
-            # Execute button
+
             button_text = f"🛒 {trade_direction} {quantity:.8f} {base_asset}"
             can_execute = quantity > 0 and current_price > 0
-            
+
             if st.button(button_text, type="primary", disabled=not can_execute):
                 if can_execute:
                     try:
@@ -396,10 +406,10 @@ def render_manual_trading_tab():
                                     quantity=quantity,
                                     price=str(limit_price)
                                 )
-                        
+                        # Add STOP_LOSS and STOP_LOSS_LIMIT as needed
                         st.success(f"✅ {order_type} order placed successfully!")
                         st.json(order)
-                        
+
                         # Log the trade
                         trade_data = {
                             'timestamp': datetime.now().isoformat(),
@@ -412,37 +422,25 @@ def render_manual_trading_tab():
                             'order_id': order.get('orderId'),
                             'status': order.get('status')
                         }
-                        
-                        # Ensure logs directory exists
+
                         os.makedirs('logs', exist_ok=True)
-                        
                         with open('logs/manual_trades.log', 'a') as f:
                             f.write(f"{json.dumps(trade_data)}\n")
-                            
                     except Exception as e:
                         st.error(f"❌ Order failed: {e}")
-                        
         except Exception as e:
             st.error(f"Error getting price for {trading_pair}: {e}")
     
     with col2:
         st.subheader("📊 Portfolio Overview")
-        
-        # Display current balances
-        if portfolio_balances:
-            portfolio_df = pd.DataFrame([
-                {'Asset': asset, 'Free': data['free'], 'Locked': data['locked']}
-                for asset, data in portfolio_balances.items()
-            ])
-            st.dataframe(portfolio_df)
-        
+        st.info("Portfolio balances are not shown in this version. Use the Portfolio Overview tab for full details.")
+
         # Recent manual trades
         st.subheader("📝 Recent Manual Trades")
         try:
             if os.path.exists('logs/manual_trades.log'):
                 with open('logs/manual_trades.log', 'r') as f:
                     trades = [json.loads(line) for line in f.readlines()[-5:]]
-                
                 if trades:
                     trades_df = pd.DataFrame(trades)
                     st.dataframe(trades_df[['timestamp', 'symbol', 'side', 'quantity', 'price']])
