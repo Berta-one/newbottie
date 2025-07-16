@@ -135,44 +135,92 @@ if 'selected_risk_level' not in st.session_state:
     st.session_state['selected_risk_level'] = 'Balanced'
 
 # Trading strategies and risk levels
+
+# --- ENVIRONMENT VARIABLE-DRIVEN STRATEGY THRESHOLDS ---
+def get_env_threshold(strategy_name, default_threshold):
+    env_threshold = float(os.getenv('MIN_PRICE_CHANGE', str(default_threshold)))
+    print(f"[ENV] Using threshold for {strategy_name}: {env_threshold}% (from MIN_PRICE_CHANGE)")
+    return env_threshold
+
+def get_env_volume(strategy_name, default_volume):
+    env_volume = float(os.getenv('MIN_VOLUME_RATIO', str(default_volume)))
+    print(f"[ENV] Using volume for {strategy_name}: {env_volume}x (from MIN_VOLUME_RATIO)")
+    return env_volume
+
+def get_env_confidence(strategy_name, default_confidence):
+    env_confidence = float(os.getenv('MIN_CONFIDENCE', str(default_confidence)))
+    print(f"[ENV] Using confidence for {strategy_name}: {env_confidence} (from MIN_CONFIDENCE)")
+    return env_confidence
+
 TRADING_STRATEGIES = {
     'Scalping': {
         'description': 'Quick trades on 2-3% moves with high volume',
-        'threshold': 2.0,
-        'volume_req': 1.5,
+        'threshold': get_env_threshold('Scalping', 2.0),
+        'volume_req': get_env_volume('Scalping', 1.5),
         'hold_time': '30 minutes',
         'take_profit': '3-5%',
         'stop_loss': '2-3%',
-        'confidence_min': 0.65
+        'confidence_min': get_env_confidence('Scalping', 0.65)
     },
     'Breakout': {
         'description': 'Trade 5% price breakouts with volume confirmation',
-        'threshold': 5.0,
-        'volume_req': 2.0,
+        'threshold': get_env_threshold('Breakout', 5.0),
+        'volume_req': get_env_volume('Breakout', 2.0),
         'hold_time': '2-4 hours',
         'take_profit': '8-15%',
         'stop_loss': '8-12%',
-        'confidence_min': 0.70
+        'confidence_min': get_env_confidence('Breakout', 0.70)
     },
     'Swing': {
         'description': 'Capture 10-20% moves over longer periods',
-        'threshold': 8.0,
-        'volume_req': 1.2,
+        'threshold': get_env_threshold('Swing', 8.0),
+        'volume_req': get_env_volume('Swing', 1.2),
         'hold_time': '4-24 hours',
         'take_profit': '15-25%',
         'stop_loss': '10-15%',
-        'confidence_min': 0.60
+        'confidence_min': get_env_confidence('Swing', 0.60)
     },
     'Conservative': {
         'description': 'Safe trading with reduced risk and smaller positions',
-        'threshold': 3.0,
-        'volume_req': 1.8,
+        'threshold': get_env_threshold('Conservative', 3.0),
+        'volume_req': get_env_volume('Conservative', 1.8),
         'hold_time': '1-2 hours',
         'take_profit': '5-8%',
         'stop_loss': '3-5%',
-        'confidence_min': 0.75
+        'confidence_min': get_env_confidence('Conservative', 0.75)
     }
 }
+
+# --- ENVIRONMENT VERIFICATION FUNCTION ---
+def verify_environment_variables():
+    """Verify environment variables are being used"""
+    print("🔧 ENVIRONMENT VARIABLE VERIFICATION:")
+    print("="*50)
+    env_vars = {
+        'PAPER_TRADING': os.getenv('PAPER_TRADING', 'NOT SET'),
+        'TEST_MODE': os.getenv('TEST_MODE', 'NOT SET'),
+        'MIN_CONFIDENCE': os.getenv('MIN_CONFIDENCE', 'NOT SET'),
+        'MIN_VOLUME_RATIO': os.getenv('MIN_VOLUME_RATIO', 'NOT SET'),
+        'MIN_PRICE_CHANGE': os.getenv('MIN_PRICE_CHANGE', 'NOT SET'),
+        'INVALID_SYMBOLS': os.getenv('INVALID_SYMBOLS', 'NOT SET')
+    }
+    for key, value in env_vars.items():
+        print(f"   {key}: {value}")
+    paper_trading = os.getenv('PAPER_TRADING', 'True').lower() == 'true'
+    test_mode = os.getenv('TEST_MODE', 'True').lower() == 'true'
+    if not paper_trading and not test_mode:
+        print("\n🟢 LIVE TRADING ENABLED!")
+    else:
+        print("\n🔴 STILL IN TEST/PAPER MODE")
+        print(f"   PAPER_TRADING: {paper_trading}")
+        print(f"   TEST_MODE: {test_mode}")
+    print("\n📊 STRATEGY THRESHOLDS:")
+    for strategy_name, strategy_info in TRADING_STRATEGIES.items():
+        print(f"   {strategy_name}:")
+        print(f"     Threshold: {strategy_info['threshold']}%")
+        print(f"     Volume: {strategy_info['volume_req']}x")
+        print(f"     Confidence: {strategy_info['confidence_min']}")
+    print("="*50)
 
 RISK_LEVELS = {
     'Conservative': {
@@ -1573,7 +1621,24 @@ def main():
         page_icon="🤖",
         layout="wide"
     )
-    
+
+    # ✅ ADD THIS: Verify environment variables on startup
+    if st.sidebar.button("🔧 Show Environment Variables"):
+        verify_environment_variables()
+
+    # Show current thresholds in sidebar
+    st.sidebar.markdown("### 🎯 Current Thresholds")
+    st.sidebar.text(f"Price Change: {os.getenv('MIN_PRICE_CHANGE', '2.0')}%")
+    st.sidebar.text(f"Volume Ratio: {os.getenv('MIN_VOLUME_RATIO', '1.5')}x")
+    st.sidebar.text(f"Confidence: {os.getenv('MIN_CONFIDENCE', '0.65')}")
+
+    # Check if environment variables are being used
+    paper_trading = os.getenv('PAPER_TRADING', 'True').lower() == 'true'
+    if not paper_trading:
+        st.sidebar.success("🟢 Live Trading Mode")
+    else:
+        st.sidebar.warning("🧪 Test/Paper Mode")
+
     # Password authentication (persist for session, use .env password)
     if 'dashboard_password' not in st.session_state:
         st.session_state['dashboard_password'] = os.getenv('DASHBOARD_PASSWORD', 'bottie')
