@@ -28,7 +28,8 @@ def trading_dashboard(settings_compact=False):
     # Use main app's session state for settings
     risk = st.session_state.get('risk', 1.5)
     scan_interval = st.session_state.get('scan_interval', 5)
-    mode = st.session_state.get('mode', 'Paper Trading')
+    # Use unified mode from hybrid_bot sidebar
+    mode = st.session_state.get('bot_mode', 'Demo')
     selected_strategy = st.session_state.get('selected_strategy', 'Breakout')
     selected_risk = st.session_state.get('selected_risk_level', 'Balanced')
 
@@ -44,7 +45,7 @@ def trading_dashboard(settings_compact=False):
     with col3:
         st.metric("Uptime", f"{datetime.now().strftime('%H:%M:%S')}", "Live Clock")
     with col4:
-        st.metric("Mode", mode, "Safe Testing" if mode=="Paper Trading" else "Live")
+        st.metric("Mode", mode, "Demo" if mode=="Demo" else "Live")
 
     # --- Bot Health Panel ---
     st.markdown("### 🩺 Bot Health & System Status")
@@ -327,7 +328,7 @@ def trading_dashboard(settings_compact=False):
     - 💰 Risk: {risk}% per trade
     - ⏱️ Scan Interval: {scan_interval} minutes
     - 🛡️ Mode: {mode}
-    - 📊 Exchange: Binance Testnet
+    - 📊 Exchange: {'Binance Testnet' if mode == 'Demo' else 'Binance Live'}
     """)
 
     # --- Help & Documentation ---
