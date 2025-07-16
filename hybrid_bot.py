@@ -439,6 +439,12 @@ def render_manual_trading_tab():
 
         if st.button(button_text, type="primary", disabled=not can_execute):
             if can_execute:
+                is_live = st.session_state.get('bot_mode', 'Demo') == 'Live'
+                if is_live:
+                    confirm = st.checkbox("⚠️ I understand this will execute a LIVE trade with real funds.", key="live_trade_confirm")
+                    if not confirm:
+                        st.warning("You must confirm before placing a LIVE trade.")
+                        st.stop()
                 try:
                     # Execute the trade based on order type
                     if order_type == "MARKET":
@@ -1516,7 +1522,7 @@ def dashboard():
     # Sidebar navigation - Unified tabs, Bot Demo before Manual Trading
     from trading_bot import trading_dashboard
     tab_options = [
-        "Portfolio Overview", "Market Indicators", "Bot Demo", "Trading", "Performance", "Logs", "Settings", "Strategy", "Health"
+        "Portfolio Overview", "Market Indicators", "Bot Trading", "Trading", "Performance", "Logs", "Settings", "Strategy", "Health"
     ]
     # Add company logo at the very top of the sidebar
     st.sidebar.markdown("<div style='text-align:center; margin-bottom:0.5em;'>" 
@@ -1538,7 +1544,7 @@ def dashboard():
         render_portfolio_overview_tab()
     elif selected_tab == "Market Indicators":
         render_market_indicators_tab()
-    elif selected_tab == "Bot Demo":
+    elif selected_tab == "Bot Trading":
         trading_dashboard(settings_compact=True)
     elif selected_tab == "Trading":
         render_manual_trading_tab()
