@@ -75,18 +75,18 @@ def ensure_log_files():
     # manual_trades.log
     manual_trades_path = 'logs/manual_trades.log'
     if not os.path.exists(manual_trades_path):
-        with open(manual_trades_path, 'w') as f:
-            f.write('')
+        with open(manual_trades_path, 'a') as f:
+            pass
     # portfolio_scans.log
     scans_path = 'logs/portfolio_scans.log'
     if not os.path.exists(scans_path):
-        with open(scans_path, 'w') as f:
-            f.write('')
+        with open(scans_path, 'a') as f:
+            pass
     # console_output.log
     console_path = 'logs/console_output.log'
     if not os.path.exists(console_path):
-        with open(console_path, 'w') as f:
-            f.write('')
+        with open(console_path, 'a') as f:
+            pass
     # bot_status.json
     status_path = 'logs/bot_status.json'
     if not os.path.exists(status_path):
@@ -192,10 +192,10 @@ def load_logs(log_file):
     try:
         if os.path.exists(log_file):
             with open(log_file, 'r', encoding='utf-8') as f:
-                return f.readlines()
-    except:
-        pass
-    return []
+                return f.read()
+    except Exception as e:
+        return f"Error loading log: {e}"
+    return ''
 
 def get_real_portfolio():
     """Get real portfolio data from Binance"""
@@ -376,17 +376,9 @@ def render_manual_trading_tab():
             except Exception:
                 min_qty = 0.0
 
-
-            import math
-            def get_step_decimals(step):
-                step_str = f'{step:.20f}'.rstrip('0')
-                if '.' in step_str:
-                    return len(step_str.split('.')[1])
-                return 0
-
             def round_step(qty, step):
-                decimals = get_step_decimals(step)
-                return float(f'{math.floor(qty / step) * step:.{decimals}f}')
+                import math
+                return math.floor(qty / step) * step
 
             # Quantity input (no balance check, as user may not hold asset yet)
             if trade_direction == "Buy":
@@ -414,13 +406,9 @@ def render_manual_trading_tab():
                 )
 
             # Round quantity to allowed precision
-
             quantity = round_step(quantity, step_size)
             if quantity < min_qty:
                 st.warning(f"Quantity must be at least {min_qty}")
-
-            # Format quantity for Binance API
-            quantity_str = f'{quantity:.{get_step_decimals(step_size)}f}'
 
             limit_price = current_price
             stop_price = current_price
@@ -441,8 +429,7 @@ def render_manual_trading_tab():
                     format="%.8f"
                 )
 
-
-            button_text = f"🛒 {trade_direction} {quantity_str} {base_asset}"
+            button_text = f"🛒 {trade_direction} {quantity:.8f} {base_asset}"
             can_execute = quantity >= min_qty and current_price > 0
 
             if st.button(button_text, type="primary", disabled=not can_execute):
@@ -453,24 +440,24 @@ def render_manual_trading_tab():
                             if trade_direction == "Buy":
                                 order = client.order_market_buy(
                                     symbol=trading_pair,
-                                    quantity=quantity_str
+                                    quantity=quantity
                                 )
                             else:
                                 order = client.order_market_sell(
                                     symbol=trading_pair,
-                                    quantity=quantity_str
+                                    quantity=quantity
                                 )
                         elif order_type == "LIMIT":
                             if trade_direction == "Buy":
                                 order = client.order_limit_buy(
                                     symbol=trading_pair,
-                                    quantity=quantity_str,
+                                    quantity=quantity,
                                     price=str(limit_price)
                                 )
                             else:
                                 order = client.order_limit_sell(
                                     symbol=trading_pair,
-                                    quantity=quantity_str,
+                                    quantity=quantity,
                                     price=str(limit_price)
                                 )
                         # Add STOP_LOSS and STOP_LOSS_LIMIT as needed
@@ -483,7 +470,7 @@ def render_manual_trading_tab():
                             'type': 'manual_trade',
                             'symbol': trading_pair,
                             'side': trade_direction.upper(),
-                            'quantity': quantity_str,
+                            'quantity': quantity,
                             'price': limit_price if order_type == "LIMIT" else current_price,
                             'order_type': order_type,
                             'order_id': order.get('orderId'),
@@ -1009,76 +996,32 @@ def render_market_indicators_tab():
     
     # Market overview
     st.subheader("🌍 Market Overview")
-
-    # --- Live WebSocket price stream widget ---
-    import websocket
-    import threading
-    import json
-    ws_symbol = st.text_input("Live Price Symbol (e.g. btcusdt)", value="btcusdt", key="ws_market_symbol")
-    ws_price_placeholder = st.empty()
-    ws_status_placeholder = st.empty()
-
-    def ws_on_message(ws, message):
-        data = json.loads(message)
-        price = data.get('p') or data.get('c') or data.get('price')
-        if price:
-            ws_price_placeholder.info(f"Live {ws_symbol.upper()} Price: {price}")
-
-    def ws_on_error(ws, error):
-        ws_status_placeholder.error(f"WebSocket error: {error}")
-
-    def ws_on_close(ws, close_status_code, close_msg):
-        ws_status_placeholder.warning("WebSocket closed")
-
-    def ws_on_open(ws):
-        ws_status_placeholder.success("WebSocket connection opened")
-
-    def start_ws():
-        url = f"wss://stream.binance.com:9443/ws/{ws_symbol.lower()}@trade"
-        ws = websocket.WebSocketApp(
-            url,
-            on_open=ws_on_open,
-            on_message=ws_on_message,
-            on_error=ws_on_error,
-            on_close=ws_on_close
-        )
-        ws.run_forever()
-
-    if st.button("Start Live Price Stream", key="ws_market_start"):
-        t = threading.Thread(target=start_ws)
-        t.daemon = True
-        t.start()
-        ws_status_placeholder.success("Started WebSocket stream. To stop, reload the page.")
-
-    # --- End WebSocket widget ---
-
-    # Get market data (keep REST API usage minimal)
-    try:
-        portfolio, gbp_rate = get_real_portfolio()
-        market_condition, condition_score, avg_volatility = simulate_market_analysis(portfolio)
-    except Exception as e:
-        st.error(f"Error fetching market data: {e}")
-        return
-
+    
+    # Get market data
+    portfolio, gbp_rate = get_real_portfolio()
+    market_condition, condition_score, avg_volatility = simulate_market_analysis(portfolio)
+    
     col1, col2, col3, col4 = st.columns(4)
-
+    
     with col1:
         st.metric("Market Condition", market_condition)
-
+    
     with col2:
         st.metric("Confidence Score", f"{condition_score:.1%}")
-
+    
     with col3:
         st.metric("Avg Volatility", f"{avg_volatility:.1f}%")
-
+    
     with col4:
         st.metric("Trading Pairs", len(portfolio))
-
+    
     # Display last scan results
     if 'last_opportunities' in st.session_state and st.session_state['last_opportunities']:
         st.subheader("🎯 Current Trading Opportunities")
+        
         opportunities_df = pd.DataFrame(st.session_state['last_opportunities'])
         st.dataframe(opportunities_df, use_container_width=True)
+        
         # Chart of opportunities
         if len(opportunities_df) > 0 and 'confidence' in opportunities_df.columns:
             fig = px.bar(opportunities_df, x='symbol', y='confidence', 
@@ -1087,10 +1030,10 @@ def render_market_indicators_tab():
             st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("🔍 No opportunities found in last scan. Try scanning again or wait for market movements.")
-
+    
     # Market trend analysis
     st.subheader("📈 Market Trend Analysis")
-
+    
     if portfolio:
         # Create trend chart
         trend_data = []
@@ -1102,13 +1045,16 @@ def render_market_indicators_tab():
                 'Volume': data['volume_24h'],
                 'Confidence': data['confidence']
             })
+        
         trend_df = pd.DataFrame(trend_data)
+        
         # Price change chart
         fig = px.bar(trend_df, x='Asset', y='Change', 
                     title="24h Price Changes",
                     color='Change',
                     color_continuous_scale='RdYlGn')
         st.plotly_chart(fig, use_container_width=True)
+        
         # Volume analysis
         fig2 = px.scatter(trend_df, x='Volume', y='Change', 
                          size='Confidence', hover_name='Asset',
@@ -1549,13 +1495,15 @@ def main():
         layout="wide"
     )
     
-    # Password authentication
+    # Password authentication (persist for session, use .env password)
+    if 'dashboard_password' not in st.session_state:
+        st.session_state['dashboard_password'] = os.getenv('DASHBOARD_PASSWORD', 'bottie')
+    if 'password_authenticated' not in st.session_state:
+        st.session_state['password_authenticated'] = False
     if not st.session_state['password_authenticated']:
         st.title("🔒 Enter Dashboard Password")
-        st.caption("Default password: admin123")
-        
+        st.caption("Default password: bottie")
         input_password = st.text_input("Password", type="password")
-
         if st.button("🔓 Login"):
             if input_password == st.session_state['dashboard_password']:
                 st.session_state['password_authenticated'] = True
@@ -1563,16 +1511,17 @@ def main():
                 st.rerun()
             else:
                 st.error("❌ Incorrect password.")
+                st.session_state['password_authenticated'] = False
                 st.stop()
-
         if not st.session_state['password_authenticated']:
             st.stop()
-    
+    # Start background bot automatically if not running
+    if 'background_bot_running' not in st.session_state or not st.session_state['background_bot_running']:
+        start_background_bot()
     # Main dashboard
     st.title("🤖 Crypto Trading Bot Dashboard")
     st.caption("Professional cryptocurrency trading with advanced market analysis and risk management")
     st.markdown("---")
-    
     dashboard()
 
 if __name__ == "__main__":
