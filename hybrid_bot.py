@@ -1,4 +1,13 @@
 # hybrid_bot.py - Complete Dashboard + Never-Stop Background Bot + Manual Trading
+import os
+
+# FORCE OVERRIDE (add to top of your script)
+os.environ['PAPER_TRADING'] = 'False'
+os.environ['TEST_MODE'] = 'False'
+os.environ['MIN_CONFIDENCE'] = '0.65'
+os.environ['SCAN_INTERVAL'] = '60'
+
+print("🚨 FORCED OVERRIDES APPLIED")
 import streamlit as st
 import threading
 import time
