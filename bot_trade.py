@@ -165,7 +165,18 @@ def start_auto_trader():
         # Get selected risk level from session state, fallback to 'Balanced'
         selected_risk = st.session_state.get('selected_risk_level', 'Balanced')
         risk_info = RISK_LEVELS.get(selected_risk, RISK_LEVELS['Balanced'])
-        risk_per_trade = risk_info.get('risk_per_trade', 0.015)
+        # Use user-adjustable max_trade_percent if set, else risk_per_trade from risk level
+        max_trade_percent = st.session_state.get('max_trade_percent', None)
+        if max_trade_percent is not None:
+            risk_per_trade = float(max_trade_percent) / 100.0
+        else:
+            risk_per_trade = risk_info.get('risk_per_trade', 0.015)
+        # Always use selected strategy from session state
+        selected_strategy = st.session_state.get('selected_strategy', 'Breakout')
+        # Log for debug
+        import logging
+        logging.basicConfig(filename='logs/auto_trader_debug.log', level=logging.INFO, format='%(asctime)s %(message)s')
+        logging.info(f"Auto-trader using risk_per_trade={risk_per_trade}, strategy={selected_strategy}, risk_level={selected_risk}")
         import logging
         logging.basicConfig(filename='logs/auto_trader_debug.log', level=logging.INFO, format='%(asctime)s %(message)s')
         while st.session_state.get('auto_trader_running', True):
@@ -229,6 +240,7 @@ def start_auto_trader():
                     volatility=volatility,
                     risk_percentage=risk_per_trade
                 )
+                logging.info(f"Trade sizing: balance={balance}, base_quantity={base_quantity}, confidence={confidence}, volatility={volatility}, risk_percentage={risk_per_trade}, qty={qty}")
                 logging.info(f"Placing trade: {symbol}, qty={qty}, price={price}, volatility={volatility}, confidence={confidence}")
                 result = execute_entry(client, symbol, qty, signal_type)
                 logging.info(f"Trade result: {result}")

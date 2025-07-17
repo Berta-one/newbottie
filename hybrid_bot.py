@@ -127,7 +127,7 @@ if 'scan_count' not in st.session_state:
 if 'last_scan_time' not in st.session_state:
     st.session_state['last_scan_time'] = None
 if 'max_trade_percent' not in st.session_state:
-    st.session_state['max_trade_percent'] = 10.0
+    st.session_state['max_trade_percent'] = 10.0  # User can adjust this in the UI; now used for trade sizing if set
 if 'selected_strategy' not in st.session_state:
     st.session_state['selected_strategy'] = 'Breakout'
 if 'selected_risk_level' not in st.session_state:
