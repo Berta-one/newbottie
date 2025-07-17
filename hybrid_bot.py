@@ -1060,21 +1060,27 @@ def render_market_indicators_tab():
                 'Volume': data['volume_24h'],
                 'Confidence': data['confidence']
             })
-        
         trend_df = pd.DataFrame(trend_data)
-        
+        # Drop rows with NaN for plotting
+        trend_df_bar = trend_df.dropna(subset=['Change'])
+        trend_df_scatter = trend_df.dropna(subset=['Volume', 'Change', 'Confidence'])
         # Price change chart
-        fig = px.bar(trend_df, x='Asset', y='Change', 
-                    title="24h Price Changes",
-                    color='Change',
-                    color_continuous_scale='RdYlGn')
-        st.plotly_chart(fig, use_container_width=True)
-        
+        if not trend_df_bar.empty:
+            fig = px.bar(trend_df_bar, x='Asset', y='Change', 
+                        title="24h Price Changes",
+                        color='Change',
+                        color_continuous_scale='RdYlGn')
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No valid data for price change chart.")
         # Volume analysis
-        fig2 = px.scatter(trend_df, x='Volume', y='Change', 
-                         size='Confidence', hover_name='Asset',
-                         title="Volume vs Price Change Analysis")
-        st.plotly_chart(fig2, use_container_width=True)
+        if not trend_df_scatter.empty:
+            fig2 = px.scatter(trend_df_scatter, x='Volume', y='Change', 
+                             size='Confidence', hover_name='Asset',
+                             title="Volume vs Price Change Analysis")
+            st.plotly_chart(fig2, use_container_width=True)
+        else:
+            st.info("No valid data for volume vs price change analysis.")
 
 def render_logs_tab():
     """Enhanced logs tab"""
