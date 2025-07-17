@@ -332,11 +332,10 @@ def render_manual_trading_tab():
         except Exception:
             exchange_info = None
     # Get all symbols for dropdown
-    all_symbols = []
-    if exchange_info:
-        all_symbols = [s['symbol'] for s in exchange_info['symbols'] if s['status'] == 'TRADING']
-    else:
-        all_symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT']
+    if not exchange_info or 'symbols' not in exchange_info or not exchange_info['symbols']:
+        st.error("Exchange info is missing or invalid. Cannot place trades. Please check your Binance connection and reload the page.")
+        return
+    all_symbols = [s['symbol'] for s in exchange_info['symbols'] if s['status'] == 'TRADING']
     trading_pair = st.selectbox('Trading Pair', all_symbols, index=all_symbols.index(st.session_state.get('manual_trading_pair', 'BTCUSDT')) if st.session_state.get('manual_trading_pair', 'BTCUSDT') in all_symbols else 0, key='manual_trading_pair')
     trade_direction = st.selectbox('Trade Direction', ['Buy', 'Sell'], index=0 if st.session_state.get('manual_trade_direction', 'Buy') == 'Buy' else 1, key='manual_trade_direction')
     # Parse base and quote asset from selected pair
