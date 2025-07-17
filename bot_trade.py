@@ -6,14 +6,35 @@ from binance.client import Client
 import os
 
 # --- Helper: Get current signal, confidence, and price (live) ---
+
+# --- Import all available strategies ---
 from strategy import check_breakout_enhanced, get_strategy_confidence
+try:
+    from enhanced_ml_strategy import check_ml_signal, get_ml_confidence
+except ImportError:
+    check_ml_signal = None
+    get_ml_confidence = None
+
 def get_current_signal(symbol='BTCUSDT', interval='5m', lookback=120):
     client = get_binance_client()
+    strategy = st.session_state.get('selected_strategy', 'Breakout')
     try:
         klines = client.get_klines(symbol=symbol, interval=interval, limit=lookback)
-        signal = check_breakout_enhanced(klines)
-        confidence = get_strategy_confidence(klines)
         price = float(klines[-1][4])
+        # Select strategy logic
+        if strategy == 'ML Enhanced' and check_ml_signal and get_ml_confidence:
+            signal = check_ml_signal(klines)
+            confidence = get_ml_confidence(klines)
+            strategy_label = 'ML Enhanced'
+        elif strategy == 'Breakout':
+            signal = check_breakout_enhanced(klines)
+            confidence = get_strategy_confidence(klines)
+            strategy_label = 'Breakout'
+        else:
+            # Default fallback
+            signal = check_breakout_enhanced(klines)
+            confidence = get_strategy_confidence(klines)
+            strategy_label = 'Breakout'
         # Map signal to BUY/SELL/HOLD for dashboard
         if signal == 'BUY_LONG':
             signal_out = 'BUY'
@@ -21,10 +42,10 @@ def get_current_signal(symbol='BTCUSDT', interval='5m', lookback=120):
             signal_out = 'SELL'
         else:
             signal_out = 'HOLD'
-        return signal_out, confidence, price
+        return signal_out, confidence, price, strategy_label
     except Exception as e:
         st.error(f"Error loading market signal: {e}")
-        return 'HOLD', 0.0, 0.0
+        return 'HOLD', 0.0, 0.0, strategy
 
 # --- Helper: Get Binance client ---
 def get_binance_client():
@@ -98,7 +119,7 @@ def bot_trade_dashboard():
 
     # --- Market Signal ---
     st.subheader("📈 Market Signal")
-    signal, confidence, price = get_current_signal()
+    signal, confidence, price, strategy_label = get_current_signal()
     col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("BTC/USDT", f"${price:,.2f}")
@@ -106,7 +127,7 @@ def bot_trade_dashboard():
         signal_color = "🟢" if signal == "BUY" else "🔴" if signal == "SELL" else "🟡"
         st.metric(f"{signal_color} Signal", signal, f"Conf: {confidence:.1%}")
     with col3:
-        st.metric("Strategy", "Live ML/Breakout", "Auto")
+        st.metric("Strategy", strategy_label, "Auto")
 
     # --- Open Positions ---
     st.subheader("📊 Open Positions")
@@ -129,7 +150,7 @@ def bot_trade_dashboard():
     # --- Configuration ---
     with st.expander("⚙️ Bot Configuration"):
         st.json({
-            "Strategy": "Live ML/Breakout",
+            "Strategy": st.session_state.get('selected_strategy', 'Breakout'),
             "Risk": st.session_state.get('risk', 0.015),
             "Max Positions": st.session_state.get('max_positions', 3),
             "Scan Interval": st.session_state.get('scan_interval', 60),
