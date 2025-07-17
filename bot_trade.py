@@ -237,20 +237,44 @@ def bot_trade_dashboard():
 
     # --- Multi-Asset Market Signals ---
     st.subheader("📈 Market Signals (Watchlist)")
-    # Flashing/highlight for new opportunities
-    signals = get_all_signals([])
-    if signals:
-        df = pd.DataFrame(signals)
-        def highlight_signal(row):
-            color = ''
-            if row.get('Signal', '').startswith('BUY'):
-                color = 'background-color: #d4f7d4; font-weight: bold;'
-            elif row.get('Signal', '').startswith('SELL'):
-                color = 'background-color: #ffd6d6; font-weight: bold;'
-            return [color]*len(row)
-        st.dataframe(df.style.apply(highlight_signal, axis=1), use_container_width=True)
+    try:
+        exchange_info = client.get_exchange_info()
+        tickers = client.get_ticker()
+        top_symbols = sorted(
+            [t for t in tickers if t.get('quoteVolume')],
+            key=lambda x: float(x['quoteVolume']),
+            reverse=True
+        )[:40]
+        all_usdt_pairs = [t['symbol'] for t in top_symbols if t['symbol'][-4:] == 'USDT']
+    except Exception:
+        all_usdt_pairs = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT']
+    default_watchlist = all_usdt_pairs[:20]
+    st.session_state.setdefault('watchlist', default_watchlist)
+    st.markdown('**Select pairs to scan (max 20):**')
+    st.multiselect('Watchlist', all_usdt_pairs, default=st.session_state['watchlist'], key='watchlist', max_selections=20)
+    if st.button('🔄 Scan Now', key='scan_now_btn'):
+        st.session_state['last_bot_trade_scan'] = datetime.now()
+    with st.spinner('Scanning selected pairs for signals...'):
+        signals = get_all_signals([])
+    df = pd.DataFrame(signals)
+    if not df.empty and 'Signal' in df.columns:
+        df = df[df['Signal'] != 'ERROR']
+        if not df.empty:
+            def color_signal(val):
+                if val == 'BUY':
+                    return 'background-color: #2ecc40; color: white; font-weight: bold; animation: flash-green 1s infinite alternate;'
+                elif val == 'SELL':
+                    return 'background-color: #ff4136; color: white; font-weight: bold; animation: flash-red 1s infinite alternate;'
+                elif val == 'HOLD':
+                    return 'background-color: #0074d9; color: white; font-weight: bold; animation: flash-blue 1s infinite alternate;'
+                return ''
+            styled = df[['Pair','Price','Signal','Confidence','Strategy']].style.applymap(color_signal, subset=['Signal'])
+            st.write('<style>@keyframes flash-green {0%{background:#2ecc40;}100%{background:#27ae60;}}@keyframes flash-red {0%{background:#ff4136;}100%{background:#c0392b;}}@keyframes flash-blue {0%{background:#0074d9;}100%{background:#2980b9;}}</style>', unsafe_allow_html=True)
+            st.dataframe(styled, use_container_width=True)
+        else:
+            st.warning('No valid trading signals found. Try scanning again or check your API connection.')
     else:
-        st.info("No signals found.")
+        st.error('No signals returned. There may be an issue with the Binance API, your connection, or the scanning logic.')
     # --- Open positions ---
     st.subheader("🔓 Open Positions")
     open_positions = get_open_positions()
@@ -303,6 +327,43 @@ def bot_trade_dashboard():
             st.warning('No valid trading signals found. Try scanning again or check your API connection.')
     else:
         st.error('No signals returned. There may be an issue with the Binance API, your connection, or the scanning logic.')
+
+
+    # --- Historical Opportunities from Logs ---
+    st.subheader("🕒 Historical Opportunities (Scans Log)")
+    log_path = 'logs/portfolio_scans.log'
+    if os.path.exists(log_path):
+        log_rows = []
+        with open(log_path, 'r') as f:
+            scan_time = None
+            for line in f:
+                line = line.strip()
+                if line.startswith('[') and 'Scan' in line:
+                    scan_time = line.split(']')[0][1:]
+                elif '|' in line and 'Signal:' in line:
+                    # Example: ETHUSDT | Δ%: +3.65 | Vol: 1.26x | Conf: 0.62 | Signal: HOLD
+                    parts = line.split('|')
+                    if len(parts) == 5:
+                        pair = parts[0].strip()
+                        change = parts[1].split(':')[-1].strip()
+                        vol = parts[2].split(':')[-1].strip()
+                        conf = parts[3].split(':')[-1].strip()
+                        signal = parts[4].split(':')[-1].strip()
+                        log_rows.append({
+                            'Time': scan_time,
+                            'Pair': pair,
+                            'Change %': change,
+                            'Volume': vol,
+                            'Confidence': conf,
+                            'Signal': signal
+                        })
+        if log_rows:
+            log_df = pd.DataFrame(log_rows)
+            st.dataframe(log_df, use_container_width=True)
+        else:
+            st.info("No opportunities found in scan logs.")
+    else:
+        st.info("No scan log file found.")
 
     # --- Trade History ---
     st.subheader("📋 Trade History (BTC/USDT)")
