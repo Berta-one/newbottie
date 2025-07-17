@@ -236,45 +236,26 @@ def bot_trade_dashboard():
     st.info(f"Last action: {st.session_state.get('last_action', 'None')}")
 
     # --- Multi-Asset Market Signals ---
-    st.subheader("📈 Market Signals (Watchlist)")
-    try:
-        exchange_info = client.get_exchange_info()
-        tickers = client.get_ticker()
-        top_symbols = sorted(
-            [t for t in tickers if t.get('quoteVolume')],
-            key=lambda x: float(x['quoteVolume']),
-            reverse=True
-        )[:40]
-        all_usdt_pairs = [t['symbol'] for t in top_symbols if t['symbol'][-4:] == 'USDT']
-    except Exception:
-        all_usdt_pairs = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT']
-    default_watchlist = all_usdt_pairs[:20]
-    st.session_state.setdefault('watchlist', default_watchlist)
-    st.markdown('**Select pairs to scan (max 20):**')
-    st.multiselect('Watchlist', all_usdt_pairs, default=st.session_state['watchlist'], key='watchlist', max_selections=20)
-    if st.button('🔄 Scan Now', key='scan_now_btn'):
-        st.session_state['last_bot_trade_scan'] = datetime.now()
-    with st.spinner('Scanning selected pairs for signals...'):
-        signals = get_all_signals([])
-    df = pd.DataFrame(signals)
-    if not df.empty and 'Signal' in df.columns:
-        df = df[df['Signal'] != 'ERROR']
-        if not df.empty:
-            def color_signal(val):
-                if val == 'BUY':
-                    return 'background-color: #2ecc40; color: white; font-weight: bold; animation: flash-green 1s infinite alternate;'
-                elif val == 'SELL':
-                    return 'background-color: #ff4136; color: white; font-weight: bold; animation: flash-red 1s infinite alternate;'
-                elif val == 'HOLD':
-                    return 'background-color: #0074d9; color: white; font-weight: bold; animation: flash-blue 1s infinite alternate;'
-                return ''
-            styled = df[['Pair','Price','Signal','Confidence','Strategy']].style.applymap(color_signal, subset=['Signal'])
-            st.write('<style>@keyframes flash-green {0%{background:#2ecc40;}100%{background:#27ae60;}}@keyframes flash-red {0%{background:#ff4136;}100%{background:#c0392b;}}@keyframes flash-blue {0%{background:#0074d9;}100%{background:#2980b9;}}</style>', unsafe_allow_html=True)
-            st.dataframe(styled, use_container_width=True)
-        else:
-            st.warning('No valid trading signals found. Try scanning again or check your API connection.')
+    st.subheader("� Recent Opportunities (from Scan Log)")
+    import os, json
+    log_path = 'logs/portfolio_scans.log'
+    opportunities = []
+    if os.path.exists(log_path):
+        with open(log_path, 'r') as f:
+            for line in f.readlines()[-100:]:
+                try:
+                    entry = json.loads(line)
+                    if isinstance(entry, dict):
+                        opportunities.append(entry)
+                except Exception:
+                    continue
+    if opportunities:
+        df = pd.DataFrame(opportunities)
+        # Only show relevant columns if present
+        cols = [c for c in ['timestamp','symbol','price','signal','confidence','strategy','change','volume'] if c in df.columns]
+        st.dataframe(df[cols] if cols else df, use_container_width=True)
     else:
-        st.error('No signals returned. There may be an issue with the Binance API, your connection, or the scanning logic.')
+        st.info('No recent opportunities found in scan log.')
     # --- Open positions ---
     st.subheader("🔓 Open Positions")
     open_positions = get_open_positions()
