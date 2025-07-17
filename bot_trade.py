@@ -21,14 +21,13 @@ def get_all_signals(assets, interval='5m', lookback=120):
     client = get_binance_client()
     strategy = st.session_state.get('selected_strategy', 'Breakout')
     results = []
-    # Exclude NFT and ETHW from assets
-    assets = [a for a in assets if a.upper() not in ['NFT', 'ETHW']]
-    # Generate all possible asset pairs (A/B) where A != B
-    pairs = []
-    for base in assets:
-        for quote in assets:
-            if base != quote:
-                pairs.append((base, quote))
+    # Get all trading pairs from Binance
+    try:
+        exchange_info = client.get_exchange_info()
+        symbols = [s['symbol'] for s in exchange_info['symbols'] if s['status'] == 'TRADING']
+    except Exception as e:
+        st.error(f"Error fetching Binance symbols: {e}")
+        return []
     # Try to use websocket for price updates if available
     ws_prices = {}
     try:
@@ -40,16 +39,14 @@ def get_all_signals(assets, interval='5m', lookback=120):
         def handle_msg(msg):
             s = msg['s']
             ws_prices[s] = float(msg['c'])
-        for base, quote in pairs:
-            symbol = f"{base}{quote}"
+        for symbol in symbols:
             twm.start_symbol_ticker_socket(callback=handle_msg, symbol=symbol)
         import time
         time.sleep(2)
         twm.stop()
     except Exception:
         ws_prices = {}
-    for base, quote in pairs:
-        symbol = f"{base}{quote}"
+    for symbol in symbols:
         try:
             klines = client.get_klines(symbol=symbol, interval=interval, limit=lookback)
             price = ws_prices.get(symbol, float(klines[-1][4]))
@@ -73,8 +70,6 @@ def get_all_signals(assets, interval='5m', lookback=120):
             else:
                 signal_out = 'HOLD'
             results.append({
-                'Base': base,
-                'Quote': quote,
                 'Pair': symbol,
                 'Price': price,
                 'Signal': signal_out,
@@ -85,8 +80,6 @@ def get_all_signals(assets, interval='5m', lookback=120):
             # Only append error if not invalid symbol
             if 'Invalid symbol' not in str(e):
                 results.append({
-                    'Base': base,
-                    'Quote': quote,
                     'Pair': symbol,
                     'Price': None,
                     'Signal': 'ERROR',
@@ -182,18 +175,26 @@ def bot_trade_dashboard():
     with scan_col2:
         st.write(f"Last scan: {st.session_state['last_scan_time']}")
     # Removed scanned pairs display as requested
-    if assets:
-        signals = get_all_signals(assets)
-        df = pd.DataFrame(signals)
-        # Show only valid signals (exclude errors)
-        if not df.empty:
-            df = df[df['Signal'] != 'ERROR']
-            # Show base, quote, pair, price, signal, confidence, strategy
-            st.dataframe(df[['Base','Quote','Pair','Price','Signal','Confidence','Strategy']], use_container_width=True)
-        else:
-            st.info("No valid signals found.")
+    # Always scan all Binance pairs, not just portfolio assets
+    signals = get_all_signals([])
+    df = pd.DataFrame(signals)
+    # Show only valid signals (exclude errors)
+    if not df.empty:
+        df = df[df['Signal'] != 'ERROR']
+        # Color map for signals
+        def color_signal(val):
+            if val == 'BUY':
+                return 'background-color: #2ecc40; color: white; font-weight: bold; animation: flash-green 1s infinite alternate;'
+            elif val == 'SELL':
+                return 'background-color: #ff4136; color: white; font-weight: bold; animation: flash-red 1s infinite alternate;'
+            elif val == 'HOLD':
+                return 'background-color: #0074d9; color: white; font-weight: bold; animation: flash-blue 1s infinite alternate;'
+            return ''
+        styled = df[['Pair','Price','Signal','Confidence','Strategy']].style.applymap(color_signal, subset=['Signal'])
+        st.write('<style>@keyframes flash-green {0%{background:#2ecc40;}100%{background:#27ae60;}}@keyframes flash-red {0%{background:#ff4136;}100%{background:#c0392b;}}@keyframes flash-blue {0%{background:#0074d9;}100%{background:#2980b9;}}</style>', unsafe_allow_html=True)
+        st.dataframe(styled, use_container_width=True)
     else:
-        st.info("No open positions.")
+        st.info("No valid signals found.")
 
     # --- Trade History ---
     st.subheader("📋 Trade History (BTC/USDT)")
