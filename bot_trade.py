@@ -53,12 +53,29 @@ def get_open_positions():
         st.error(f"Error loading open positions: {e}")
         return []
 
-# --- Helper: Get trade history (from logs) ---
-def get_trade_history():
+# --- Helper: Get trade history (from Binance API) ---
+def get_trade_history(symbol='BTCUSDT', limit=50):
+    client = get_binance_client()
     try:
-        df = pd.read_csv('logs/trades.csv')
-        return df.to_dict('records')
-    except Exception:
+        trades = client.get_my_trades(symbol=symbol, limit=limit)
+        # Format for dashboard
+        trade_list = []
+        for t in trades:
+            trade_list.append({
+                'Time': datetime.fromtimestamp(t['time']/1000).strftime('%Y-%m-%d %H:%M:%S'),
+                'Symbol': t['symbol'],
+                'Side': 'BUY' if t['isBuyer'] else 'SELL',
+                'Price': float(t['price']),
+                'Qty': float(t['qty']),
+                'QuoteQty': float(t['quoteQty']),
+                'Commission': float(t['commission']),
+                'CommissionAsset': t['commissionAsset'],
+                'OrderId': t['orderId'],
+                'TradeId': t['id']
+            })
+        return trade_list
+    except Exception as e:
+        st.error(f"Error loading trade history: {e}")
         return []
 
 # --- Bot Trade Dashboard (Live Data) ---
