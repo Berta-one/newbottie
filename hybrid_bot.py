@@ -896,6 +896,46 @@ def render_strategy_tab():
     st.caption("Detailed strategy information and methodology explanations")
     
     # Current strategy display
+    # --- Auto-update strategy and risk level based on live market condition ---
+    portfolio, _ = get_real_portfolio()
+    market_condition, condition_score, avg_volatility = simulate_market_analysis(portfolio)
+    recommendations = {
+        'BULL_TRENDING': {
+            'recommended': ['Swing', 'Breakout'],
+            'risk': 'Aggressive',
+            'avoid': ['Conservative'],
+            'reason': 'Strong uptrend favors momentum strategies'
+        },
+        'BEAR_TRENDING': {
+            'recommended': ['Conservative', 'Scalping'],
+            'risk': 'Conservative',
+            'avoid': ['Swing'],
+            'reason': 'Downtrend requires defensive positioning'
+        },
+        'HIGH_VOLATILITY': {
+            'recommended': ['Scalping', 'Breakout'],
+            'risk': 'Balanced',
+            'avoid': ['Swing'],
+            'reason': 'High volatility creates quick profit opportunities'
+        },
+        'CONSOLIDATING': {
+            'recommended': ['Scalping', 'Conservative'],
+            'risk': 'Conservative',
+            'avoid': ['Swing'],
+            'reason': 'Sideways markets favor range trading'
+        }
+    }
+    rec = recommendations.get(market_condition, {
+        'recommended': ['Balanced'],
+        'risk': 'Balanced',
+        'avoid': [],
+        'reason': 'Mixed market conditions'
+    })
+    # Set recommended strategy and risk level in session state
+    recommended_strategy = rec['recommended'][0]
+    recommended_risk = rec['risk']
+    st.session_state['selected_strategy'] = recommended_strategy
+    st.session_state['selected_risk_level'] = recommended_risk
     current_strategy = st.session_state['selected_strategy']
     current_risk = st.session_state['selected_risk_level']
     
