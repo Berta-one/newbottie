@@ -189,11 +189,7 @@ def start_auto_trader():
                                 price = None  # Price not in log, will fetch below
                                 # Only act on BUY_LONG or BUY_SHORT
                                 if signal in ('BUY_LONG', 'BUY_SHORT'):
-                                    # Only act if at least one asset in pair is in open positions
-                                    base = symbol[:-4] if symbol.endswith('USDT') else symbol[:3]
-                                    quote = 'USDT' if symbol.endswith('USDT') else symbol[3:]
-                                    if base in open_assets or quote in open_assets:
-                                        actionable.append({'symbol': symbol, 'signal': signal, 'confidence': confidence})
+                                    actionable.append({'symbol': symbol, 'signal': signal, 'confidence': confidence})
             except Exception as e:
                 logging.info(f"Error reading portfolio_scans.log: {e}")
             logging.info(f"Found {len(actionable)} actionable opportunities from scan log.")
