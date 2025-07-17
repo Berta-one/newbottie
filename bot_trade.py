@@ -192,10 +192,28 @@ def start_auto_trader():
                 if symbol in open_symbols:
                     logging.info(f"Skipping {symbol}: already in open positions.")
                     continue
-                # Position sizing using risk factor
+                # --- Dynamic Position Sizing using confidence and volatility ---
+                from trader import calculate_dynamic_position_size
                 balance = get_account_balance(client, 'USDT')
-                qty = (balance * risk_per_trade) / price if price else 0.001
-                logging.info(f"Placing trade: {symbol}, qty={qty}, price={price}")
+                base_quantity = 0.001  # Default base trade size, can be made configurable
+                # Estimate volatility as stddev of last 20 closes / mean close (fallback to 0.02 if error)
+                volatility = 0.02
+                try:
+                    klines = client.get_klines(symbol=symbol, interval='5m', limit=20)
+                    closes = [float(k[4]) for k in klines]
+                    if len(closes) > 1:
+                        import numpy as np
+                        volatility = float(np.std(closes) / np.mean(closes))
+                except Exception as e:
+                    logging.info(f"Volatility calculation failed for {symbol}: {e}")
+                qty = calculate_dynamic_position_size(
+                    account_balance=balance,
+                    base_quantity=base_quantity,
+                    confidence=confidence,
+                    volatility=volatility,
+                    risk_percentage=risk_per_trade
+                )
+                logging.info(f"Placing trade: {symbol}, qty={qty}, price={price}, volatility={volatility}, confidence={confidence}")
                 result = execute_entry(client, symbol, qty, signal_type)
                 logging.info(f"Trade result: {result}")
                 log_trade_execution('ENTRY', symbol, qty, price, result)
