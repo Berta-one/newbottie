@@ -1,9 +1,12 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from trader import get_account_balance
+from trader import get_account_balance, execute_entry, execute_exit, monitor_position_enhanced, log_trade_execution
 from binance.client import Client
 import os
+import threading
+import time
+import json
 
 # --- Helper: Get current signal, confidence, and price (live) ---
 
@@ -152,6 +155,57 @@ def get_trade_history(symbol='BTCUSDT', limit=50):
 # --- Bot Trade Dashboard (Live Data) ---
 
 
+def start_auto_trader():
+    """Background trading loop: scans, opens, and closes trades automatically."""
+    if 'auto_trader_running' in st.session_state and st.session_state['auto_trader_running']:
+        return  # Already running
+    st.session_state['auto_trader_running'] = True
+    def trading_loop():
+        client = get_binance_client()
+        while st.session_state.get('auto_trader_running', True):
+            # 1. Get signals for watchlist
+            signals = get_all_signals([])
+            # 2. Load open positions (from Binance)
+            open_positions = get_open_positions()
+            open_symbols = [p['Asset'] + 'USDT' for p in open_positions]
+            # 3. For each signal, open trade if not already open
+            for sig in signals:
+                symbol = sig['Symbol'] if 'Symbol' in sig else sig.get('symbol')
+                signal_type = sig.get('Signal') or sig.get('signal')
+                price = sig.get('Price') or sig.get('price')
+                confidence = sig.get('Confidence') or sig.get('confidence', 0.7)
+                if symbol and signal_type and signal_type.startswith('BUY') and symbol not in open_symbols:
+                    # Position sizing (simple, can be improved)
+                    balance = get_account_balance(client, 'USDT')
+                    qty = (balance * 0.1) / price if price else 0.001
+                    result = execute_entry(client, symbol, qty, signal_type)
+                    log_trade_execution('ENTRY', symbol, qty, price, result)
+                    st.session_state['last_action'] = f"Opened {symbol} at {price} ({signal_type})"
+                # 4. For open positions, check exit
+            for pos in open_positions:
+                symbol = pos['Asset'] + 'USDT'
+                qty = pos['Total']
+                # Find entry price from trade log (simplified)
+                entry_price = None
+                try:
+                    with open('logs/trade_executions.json', 'r') as f:
+                        for line in f:
+                            entry = json.loads(line)
+                            if entry['trade_type'] == 'ENTRY' and entry['symbol'] == symbol:
+                                entry_price = entry['price']
+                except Exception:
+                    pass
+                if entry_price:
+                    should_exit, reason = monitor_position_enhanced(client, symbol, entry_price)
+                    if should_exit:
+                        result = execute_exit(client, symbol, qty, None, entry_price, reason)
+                        log_trade_execution('EXIT', symbol, qty, entry_price, result)
+                        st.session_state['last_action'] = f"Closed {symbol} ({reason})"
+            # 5. Sleep for scan interval
+            time.sleep(st.session_state.get('scan_interval', 60))
+    t = threading.Thread(target=trading_loop, daemon=True)
+    t.start()
+
 def bot_trade_dashboard():
     st.title("🤖 Bot Trade (Live)")
     st.caption("Live multi-crypto trading dashboard with real Binance data and signals")
@@ -159,7 +213,8 @@ def bot_trade_dashboard():
     # --- Status indicators ---
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("Status", "🟢 Online", "24/7 Active")
+        status = "🟢 Running" if st.session_state.get('auto_trader_running') else "🔴 Stopped"
+        st.metric("Bot Status", status)
     with col2:
         st.metric("Platform", "Binance", "Live")
     with col3:
@@ -168,26 +223,50 @@ def bot_trade_dashboard():
         st.metric("USDT Balance", f"${balance:,.2f}")
     with col4:
         st.metric("Time", datetime.now().strftime("%H:%M:%S"), "Live")
+    # --- Bot control ---
+    if not st.session_state.get('auto_trader_running'):
+        if st.button("▶️ Start Auto-Trader", type="primary"):
+            start_auto_trader()
+            st.success("Auto-trader started!")
+    else:
+        if st.button("⏹️ Stop Auto-Trader", type="secondary"):
+            st.session_state['auto_trader_running'] = False
+            st.warning("Auto-trader stopped.")
+    # --- Last action ---
+    st.info(f"Last action: {st.session_state.get('last_action', 'None')}")
 
     # --- Multi-Asset Market Signals ---
-    st.subheader("📈 Market Signals (All Portfolio Assets)")
-    positions = get_open_positions()
-    # Exclude NFT and ETHW from assets
-    assets = [p['Asset'] for p in positions if p['Asset'].upper() not in ['NFT', 'ETHW']] if positions else []
-    if 'last_scan_time' not in st.session_state:
-        st.session_state['last_scan_time'] = None
-    scan_col1, scan_col2 = st.columns([1,3])
-    with scan_col1:
-        if st.button("🔄 Scan Now", type="primary"):
-            st.session_state['last_scan_time'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with scan_col2:
-        st.write(f"Last scan: {st.session_state['last_scan_time']}")
-    # Removed scanned pairs display as requested
-    st.header('Bot Trade (Live)')
-    st.caption('Live multi-crypto trading dashboard with real Binance data and signals')
-    # Watchlist selection UI
-    client = get_binance_client()
+    st.subheader("📈 Market Signals (Watchlist)")
+    # Flashing/highlight for new opportunities
+    signals = get_all_signals([])
+    if signals:
+        df = pd.DataFrame(signals)
+        def highlight_signal(row):
+            color = ''
+            if row.get('Signal', '').startswith('BUY'):
+                color = 'background-color: #d4f7d4; font-weight: bold;'
+            elif row.get('Signal', '').startswith('SELL'):
+                color = 'background-color: #ffd6d6; font-weight: bold;'
+            return [color]*len(row)
+        st.dataframe(df.style.apply(highlight_signal, axis=1), use_container_width=True)
+    else:
+        st.info("No signals found.")
+    # --- Open positions ---
+    st.subheader("🔓 Open Positions")
+    open_positions = get_open_positions()
+    if open_positions:
+        st.dataframe(pd.DataFrame(open_positions), use_container_width=True)
+    else:
+        st.info("No open positions.")
+    # --- Recent actions ---
+    st.subheader("⚡ Recent Actions")
     try:
+        with open('logs/trade_executions.json', 'r') as f:
+            lines = f.readlines()[-10:]
+            actions = [json.loads(line) for line in lines]
+        st.dataframe(pd.DataFrame(actions), use_container_width=True)
+    except Exception:
+        st.info("No recent actions logged.")
         tickers = client.get_ticker()
         top_symbols = sorted(
             [t for t in tickers if t.get('quoteVolume')],
