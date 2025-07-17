@@ -56,9 +56,8 @@ def get_all_signals(assets, interval='5m', lookback=120):
         twm.stop()
     except Exception:
         ws_prices = {}
-    # User watchlist (from session or default)
-    watchlist = st.session_state.get('watchlist', symbols)
-    for symbol in watchlist:
+    # Scan all symbols (no watchlist)
+    for symbol in symbols:
         try:
             klines = client.get_klines(symbol=symbol, interval=interval, limit=lookback)
             price = ws_prices.get(symbol, float(klines[-1][4]))
@@ -281,13 +280,8 @@ def bot_trade_dashboard():
         all_usdt_pairs = [t['symbol'] for t in top_symbols if t['symbol'][-4:] == 'USDT']
     except Exception:
         all_usdt_pairs = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT']
-    default_watchlist = all_usdt_pairs[:20]
-    st.session_state.setdefault('watchlist', default_watchlist)
-    st.markdown('**Select pairs to scan (max 20):**')
-    st.multiselect('Watchlist', all_usdt_pairs, default=st.session_state['watchlist'], key='watchlist', max_selections=20)
-    if st.button('🔄 Scan Now', key='scan_now_btn'):
-        st.session_state['last_bot_trade_scan'] = datetime.now()
-    with st.spinner('Scanning selected pairs for signals...'):
+    # Scan all pairs, no watchlist UI
+    with st.spinner('Scanning all pairs for signals...'):
         signals = get_all_signals([])
     df = pd.DataFrame(signals)
     if not df.empty and 'Signal' in df.columns:
