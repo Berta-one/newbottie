@@ -175,26 +175,35 @@ def bot_trade_dashboard():
     with scan_col2:
         st.write(f"Last scan: {st.session_state['last_scan_time']}")
     # Removed scanned pairs display as requested
+    st.header('Bot Trade (Live)')
+    st.caption('Live multi-crypto trading dashboard with real Binance data and signals')
+    # Add scan button
+    if st.button('🔄 Scan Now', key='scan_now_btn'):
+        st.session_state['last_bot_trade_scan'] = datetime.now()
     # Always scan all Binance pairs, not just portfolio assets
-    signals = get_all_signals([])
+    with st.spinner('Scanning all Binance pairs for signals...'):
+        signals = get_all_signals([])
     df = pd.DataFrame(signals)
     # Show only valid signals (exclude errors)
-    if not df.empty:
+    if not df.empty and 'Signal' in df.columns:
         df = df[df['Signal'] != 'ERROR']
-        # Color map for signals
-        def color_signal(val):
-            if val == 'BUY':
-                return 'background-color: #2ecc40; color: white; font-weight: bold; animation: flash-green 1s infinite alternate;'
-            elif val == 'SELL':
-                return 'background-color: #ff4136; color: white; font-weight: bold; animation: flash-red 1s infinite alternate;'
-            elif val == 'HOLD':
-                return 'background-color: #0074d9; color: white; font-weight: bold; animation: flash-blue 1s infinite alternate;'
-            return ''
-        styled = df[['Pair','Price','Signal','Confidence','Strategy']].style.applymap(color_signal, subset=['Signal'])
-        st.write('<style>@keyframes flash-green {0%{background:#2ecc40;}100%{background:#27ae60;}}@keyframes flash-red {0%{background:#ff4136;}100%{background:#c0392b;}}@keyframes flash-blue {0%{background:#0074d9;}100%{background:#2980b9;}}</style>', unsafe_allow_html=True)
-        st.dataframe(styled, use_container_width=True)
+        if not df.empty:
+            # Color map for signals
+            def color_signal(val):
+                if val == 'BUY':
+                    return 'background-color: #2ecc40; color: white; font-weight: bold; animation: flash-green 1s infinite alternate;'
+                elif val == 'SELL':
+                    return 'background-color: #ff4136; color: white; font-weight: bold; animation: flash-red 1s infinite alternate;'
+                elif val == 'HOLD':
+                    return 'background-color: #0074d9; color: white; font-weight: bold; animation: flash-blue 1s infinite alternate;'
+                return ''
+            styled = df[['Pair','Price','Signal','Confidence','Strategy']].style.applymap(color_signal, subset=['Signal'])
+            st.write('<style>@keyframes flash-green {0%{background:#2ecc40;}100%{background:#27ae60;}}@keyframes flash-red {0%{background:#ff4136;}100%{background:#c0392b;}}@keyframes flash-blue {0%{background:#0074d9;}100%{background:#2980b9;}}</style>', unsafe_allow_html=True)
+            st.dataframe(styled, use_container_width=True)
+        else:
+            st.warning('No valid trading signals found. Try scanning again or check your API connection.')
     else:
-        st.info("No valid signals found.")
+        st.error('No signals returned. There may be an issue with the Binance API, your connection, or the scanning logic.')
 
     # --- Trade History ---
     st.subheader("📋 Trade History (BTC/USDT)")

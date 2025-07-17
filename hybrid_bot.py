@@ -1552,19 +1552,23 @@ def main():
         st.session_state['dashboard_password'] = os.getenv('DASHBOARD_PASSWORD', 'bottie')
     if 'password_authenticated' not in st.session_state:
         st.session_state['password_authenticated'] = False
+    # Only ask for password if not authenticated
     if not st.session_state['password_authenticated']:
         st.title("🔒 Enter Dashboard Password")
         st.caption("Default password: bottie")
-        input_password = st.text_input("Password", type="password")
-        if st.button("🔓 Login"):
+        input_password = st.text_input("Password", type="password", key="dashboard_password_input")
+        login_btn = st.button("🔓 Login", key="dashboard_login_btn")
+        if login_btn:
             if input_password == st.session_state['dashboard_password']:
                 st.session_state['password_authenticated'] = True
                 st.success("✅ Access granted!")
+                st.experimental_set_query_params(auth="1")
                 st.rerun()
             else:
                 st.error("❌ Incorrect password.")
                 st.session_state['password_authenticated'] = False
                 st.stop()
+        # Prevent further execution if not authenticated
         if not st.session_state['password_authenticated']:
             st.stop()
     # Start background bot automatically if not running
