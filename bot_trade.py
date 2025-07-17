@@ -60,7 +60,6 @@ def get_trade_history():
         return df.to_dict('records')
     except Exception:
         return []
-from strategy import get_current_signal
 
 # --- Bot Trade Dashboard (Live Data) ---
 def bot_trade_dashboard():
