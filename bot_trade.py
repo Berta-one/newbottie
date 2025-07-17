@@ -194,7 +194,12 @@ def start_auto_trader():
                             # Example: ETHUSDT | Δ%: +3.65 | Vol: 1.26x | Conf: 0.62 | Signal: BUY_LONG
                             parts = line.split('|')
                             if len(parts) == 5:
-                                symbol = parts[0].strip()
+                                # Remove timestamp if present, extract only the symbol
+                                raw = parts[0].strip()
+                                if ']' in raw:
+                                    symbol = raw.split(']')[-1].strip()
+                                else:
+                                    symbol = raw
                                 signal = parts[4].split(':')[-1].strip()
                                 confidence = float(parts[3].split(':')[-1].strip())
                                 price = None  # Price not in log, will fetch below
