@@ -15,37 +15,74 @@ except ImportError:
     check_ml_signal = None
     get_ml_confidence = None
 
-def get_current_signal(symbol='BTCUSDT', interval='5m', lookback=120):
+
+# --- Multi-asset signal fetcher (with optional websocket price updates) ---
+def get_all_signals(assets, interval='5m', lookback=120):
     client = get_binance_client()
     strategy = st.session_state.get('selected_strategy', 'Breakout')
+    results = []
+    # Try to use websocket for price updates if available
+    ws_prices = {}
     try:
-        klines = client.get_klines(symbol=symbol, interval=interval, limit=lookback)
-        price = float(klines[-1][4])
-        # Select strategy logic
-        if strategy == 'ML Enhanced' and check_ml_signal and get_ml_confidence:
-            signal = check_ml_signal(klines)
-            confidence = get_ml_confidence(klines)
-            strategy_label = 'ML Enhanced'
-        elif strategy == 'Breakout':
-            signal = check_breakout_enhanced(klines)
-            confidence = get_strategy_confidence(klines)
-            strategy_label = 'Breakout'
-        else:
-            # Default fallback
-            signal = check_breakout_enhanced(klines)
-            confidence = get_strategy_confidence(klines)
-            strategy_label = 'Breakout'
-        # Map signal to BUY/SELL/HOLD for dashboard
-        if signal == 'BUY_LONG':
-            signal_out = 'BUY'
-        elif signal == 'BUY_SHORT':
-            signal_out = 'SELL'
-        else:
-            signal_out = 'HOLD'
-        return signal_out, confidence, price, strategy_label
-    except Exception as e:
-        st.error(f"Error loading market signal: {e}")
-        return 'HOLD', 0.0, 0.0, strategy
+        from binance import ThreadedWebsocketManager
+        api_key = os.getenv('BINANCE_API_KEY')
+        api_secret = os.getenv('BINANCE_API_SECRET')
+        twm = ThreadedWebsocketManager(api_key=api_key, api_secret=api_secret)
+        twm.start()
+        def handle_msg(msg):
+            s = msg['s']
+            ws_prices[s] = float(msg['c'])
+        for asset in assets:
+            symbol = f"{asset}USDT"
+            twm.start_symbol_ticker_socket(callback=handle_msg, symbol=symbol)
+        import time
+        time.sleep(2)  # Let websocket collect some prices
+        twm.stop()
+    except Exception:
+        ws_prices = {}
+    for asset in assets:
+        symbol = f"{asset}USDT"
+        try:
+            klines = client.get_klines(symbol=symbol, interval=interval, limit=lookback)
+            price = ws_prices.get(symbol, float(klines[-1][4]))
+            # Select strategy logic
+            if strategy == 'ML Enhanced' and check_ml_signal and get_ml_confidence:
+                signal = check_ml_signal(klines)
+                confidence = get_ml_confidence(klines)
+                strategy_label = 'ML Enhanced'
+            elif strategy == 'Breakout':
+                signal = check_breakout_enhanced(klines)
+                confidence = get_strategy_confidence(klines)
+                strategy_label = 'Breakout'
+            else:
+                signal = check_breakout_enhanced(klines)
+                confidence = get_strategy_confidence(klines)
+                strategy_label = 'Breakout'
+            if signal == 'BUY_LONG':
+                signal_out = 'BUY'
+            elif signal == 'BUY_SHORT':
+                signal_out = 'SELL'
+            else:
+                signal_out = 'HOLD'
+            results.append({
+                'Asset': asset,
+                'Pair': symbol,
+                'Price': price,
+                'Signal': signal_out,
+                'Confidence': confidence,
+                'Strategy': strategy_label
+            })
+        except Exception as e:
+            results.append({
+                'Asset': asset,
+                'Pair': symbol,
+                'Price': None,
+                'Signal': 'ERROR',
+                'Confidence': 0.0,
+                'Strategy': strategy,
+                'Error': str(e)
+            })
+    return results
 
 # --- Helper: Get Binance client ---
 def get_binance_client():
@@ -100,9 +137,10 @@ def get_trade_history(symbol='BTCUSDT', limit=50):
         return []
 
 # --- Bot Trade Dashboard (Live Data) ---
+
 def bot_trade_dashboard():
     st.title("🤖 Bot Trade (Live)")
-    st.caption("Live trading dashboard with real Binance data and signals")
+    st.caption("Live multi-crypto trading dashboard with real Binance data and signals")
 
     # --- Status indicators ---
     col1, col2, col3, col4 = st.columns(4)
@@ -117,29 +155,19 @@ def bot_trade_dashboard():
     with col4:
         st.metric("Time", datetime.now().strftime("%H:%M:%S"), "Live")
 
-    # --- Market Signal ---
-    st.subheader("📈 Market Signal")
-    signal, confidence, price, strategy_label = get_current_signal()
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("BTC/USDT", f"${price:,.2f}")
-    with col2:
-        signal_color = "🟢" if signal == "BUY" else "🔴" if signal == "SELL" else "🟡"
-        st.metric(f"{signal_color} Signal", signal, f"Conf: {confidence:.1%}")
-    with col3:
-        st.metric("Strategy", strategy_label, "Auto")
-
-    # --- Open Positions ---
-    st.subheader("📊 Open Positions")
+    # --- Multi-Asset Market Signals ---
+    st.subheader("📈 Market Signals (All Portfolio Assets)")
     positions = get_open_positions()
-    if positions:
-        df = pd.DataFrame(positions)
-        st.dataframe(df)
+    assets = [p['Asset'] for p in positions] if positions else []
+    if assets:
+        signals = get_all_signals(assets)
+        df = pd.DataFrame(signals)
+        st.dataframe(df, use_container_width=True)
     else:
         st.info("No open positions.")
 
     # --- Trade History ---
-    st.subheader("📋 Trade History")
+    st.subheader("📋 Trade History (BTC/USDT)")
     trades = get_trade_history()
     if trades:
         df = pd.DataFrame(trades)
