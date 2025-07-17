@@ -21,14 +21,21 @@ def get_all_signals(assets, interval='5m', lookback=120):
     client = get_binance_client()
     strategy = st.session_state.get('selected_strategy', 'Breakout')
     results = []
-    # Get all trading pairs from Binance
+    # Get all trading pairs and tickers from Binance
     try:
         exchange_info = client.get_exchange_info()
-        symbols = [s['symbol'] for s in exchange_info['symbols'] if s['status'] == 'TRADING']
+        tickers = client.get_ticker()
+        # Top 20 by volume
+        top_symbols = sorted(
+            [t for t in tickers if t.get('quoteVolume')],
+            key=lambda x: float(x['quoteVolume']),
+            reverse=True
+        )[:20]
+        symbols = [t['symbol'] for t in top_symbols if t['symbol'][-4:] == 'USDT']
     except Exception as e:
         st.error(f"Error fetching Binance symbols: {e}")
         return []
-    # Try to use websocket for price updates if available
+    # WebSocket for live prices (optional, fallback to REST price)
     ws_prices = {}
     try:
         from binance import ThreadedWebsocketManager
@@ -46,7 +53,9 @@ def get_all_signals(assets, interval='5m', lookback=120):
         twm.stop()
     except Exception:
         ws_prices = {}
-    for symbol in symbols:
+    # User watchlist (from session or default)
+    watchlist = st.session_state.get('watchlist', symbols)
+    for symbol in watchlist:
         try:
             klines = client.get_klines(symbol=symbol, interval=interval, limit=lookback)
             price = ws_prices.get(symbol, float(klines[-1][4]))
@@ -77,7 +86,6 @@ def get_all_signals(assets, interval='5m', lookback=120):
                 'Strategy': strategy_label
             })
         except Exception as e:
-            # Only append error if not invalid symbol
             if 'Invalid symbol' not in str(e):
                 results.append({
                     'Pair': symbol,
@@ -177,18 +185,31 @@ def bot_trade_dashboard():
     # Removed scanned pairs display as requested
     st.header('Bot Trade (Live)')
     st.caption('Live multi-crypto trading dashboard with real Binance data and signals')
-    # Add scan button
+    # Watchlist selection UI
+    client = get_binance_client()
+    try:
+        tickers = client.get_ticker()
+        top_symbols = sorted(
+            [t for t in tickers if t.get('quoteVolume')],
+            key=lambda x: float(x['quoteVolume']),
+            reverse=True
+        )[:40]
+        all_usdt_pairs = [t['symbol'] for t in top_symbols if t['symbol'][-4:] == 'USDT']
+    except Exception:
+        all_usdt_pairs = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT']
+    default_watchlist = all_usdt_pairs[:20]
+    st.session_state.setdefault('watchlist', default_watchlist)
+    st.markdown('**Select pairs to scan (max 20):**')
+    selected_pairs = st.multiselect('Watchlist', all_usdt_pairs, default=st.session_state['watchlist'], key='watchlist', max_selections=20)
+    st.session_state['watchlist'] = selected_pairs
     if st.button('🔄 Scan Now', key='scan_now_btn'):
         st.session_state['last_bot_trade_scan'] = datetime.now()
-    # Always scan all Binance pairs, not just portfolio assets
-    with st.spinner('Scanning all Binance pairs for signals...'):
+    with st.spinner('Scanning selected pairs for signals...'):
         signals = get_all_signals([])
     df = pd.DataFrame(signals)
-    # Show only valid signals (exclude errors)
     if not df.empty and 'Signal' in df.columns:
         df = df[df['Signal'] != 'ERROR']
         if not df.empty:
-            # Color map for signals
             def color_signal(val):
                 if val == 'BUY':
                     return 'background-color: #2ecc40; color: white; font-weight: bold; animation: flash-green 1s infinite alternate;'
