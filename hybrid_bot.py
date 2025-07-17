@@ -316,12 +316,34 @@ def get_current_positions():
 def render_manual_trading_tab():
     """Enhanced manual trading tab with cross-crypto support"""
     # Fetch required variables from session state
-    trading_pair = st.session_state.get('manual_trading_pair', 'BTCUSDT')
-    trade_direction = st.session_state.get('manual_trade_direction', 'Buy')
-    base_asset = st.session_state.get('manual_base_asset', 'BTC')
-    quote_asset = st.session_state.get('manual_quote_asset', 'USDT')
-    exchange_info = st.session_state.get('exchange_info', None)
+    # Load exchange info if not in session state
     client = st.session_state.get('client', None)
+    if client is None:
+        try:
+            client = Client(API_KEY, API_SECRET)
+            st.session_state['client'] = client
+        except Exception:
+            client = None
+    exchange_info = st.session_state.get('exchange_info', None)
+    if exchange_info is None and client is not None:
+        try:
+            exchange_info = client.get_exchange_info()
+            st.session_state['exchange_info'] = exchange_info
+        except Exception:
+            exchange_info = None
+    # Get all symbols for dropdown
+    all_symbols = []
+    if exchange_info:
+        all_symbols = [s['symbol'] for s in exchange_info['symbols'] if s['status'] == 'TRADING']
+    else:
+        all_symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT']
+    trading_pair = st.selectbox('Trading Pair', all_symbols, index=all_symbols.index(st.session_state.get('manual_trading_pair', 'BTCUSDT')) if st.session_state.get('manual_trading_pair', 'BTCUSDT') in all_symbols else 0, key='manual_trading_pair')
+    trade_direction = st.selectbox('Trade Direction', ['Buy', 'Sell'], index=0 if st.session_state.get('manual_trade_direction', 'Buy') == 'Buy' else 1, key='manual_trade_direction')
+    # Parse base and quote asset from selected pair
+    base_asset = trading_pair[:-3] if trading_pair.endswith('BTC') or trading_pair.endswith('ETH') else trading_pair[:-4]
+    quote_asset = trading_pair[-3:] if trading_pair.endswith('BTC') or trading_pair.endswith('ETH') else trading_pair[-4:]
+    st.session_state['manual_base_asset'] = base_asset
+    st.session_state['manual_quote_asset'] = quote_asset
 
     mode = 'Live'
 
@@ -378,6 +400,7 @@ def render_manual_trading_tab():
                 st.success(f"\U0001F4B0 Live {trading_pair} Price: {current_price:.8f}")
             else:
                 st.warning(f"\U0001F4B0 Live {trading_pair} Price: unavailable")
+                current_price = None
         except Exception as e:
             st.warning(f"WebSocket price streaming failed: {e}. Falling back to REST API.")
             ws_mod = None
@@ -388,11 +411,16 @@ def render_manual_trading_tab():
         st.info("WebSocket price streaming unavailable. Using REST API for price updates.")
         try:
             if client is not None:
-                ticker = client.get_symbol_ticker(symbol=trading_pair)
-                current_price = float(ticker['price'])
-                st.success(f"\U0001F4B0 {trading_pair} Price (REST): {current_price:.8f}")
+                try:
+                    ticker = client.get_symbol_ticker(symbol=trading_pair)
+                    current_price = float(ticker['price'])
+                    st.success(f"\U0001F4B0 {trading_pair} Price (REST): {current_price:.8f}")
+                except Exception as e:
+                    st.warning(f"Failed to fetch price for {trading_pair}: {e}")
+                    current_price = None
             else:
                 st.warning("Binance client unavailable. Cannot fetch price.")
+                current_price = None
         except Exception as e:
             st.warning(f"Failed to fetch price for {trading_pair}: {e}")
 
@@ -401,173 +429,123 @@ def render_manual_trading_tab():
 
     # Get step size for quantity precision
     step_size = 0.000001
-    try:
-        symbol_info = next(s for s in exchange_info['symbols'] if s['symbol'] == trading_pair)
-        for f in symbol_info['filters']:
-            if f['filterType'] == 'LOT_SIZE':
-                step_size = float(f['stepSize'])
-                min_qty = float(f['minQty'])
-                break
-    except Exception:
-        min_qty = 0.0
+    min_qty = 0.0
+    if exchange_info:
+        try:
+            symbol_info = next(s for s in exchange_info['symbols'] if s['symbol'] == trading_pair)
+            for f in symbol_info['filters']:
+                if f['filterType'] == 'LOT_SIZE':
+                    step_size = float(f['stepSize'])
+                    min_qty = float(f['minQty'])
+                    break
+        except Exception:
+            min_qty = 0.0
 
-        def round_step(qty, step):
-            import math
-            return math.floor(qty / step) * step
+    import math
+    def round_step(qty, step):
+        if step == 0:
+            return qty
+        return math.floor(qty / step) * step
 
-        # Quantity input (no balance check, as user may not hold asset yet)
-        if trade_direction == "Buy":
-            if order_type == "MARKET":
-                quote_amount = st.number_input(
-                    f"{quote_asset} Amount to spend",
-                    min_value=0.0,
-                    value=50.0,
-                    step=1.0
-                )
-                quantity = quote_amount / current_price if current_price > 0 else 0
+    # Quantity input (no balance check, as user may not hold asset yet)
+    if trade_direction == "Buy":
+        if order_type == "MARKET":
+            quote_amount = st.number_input(
+                f"{quote_asset} Amount to spend",
+                min_value=0.0,
+                value=50.0,
+                step=1.0
+            )
+            if current_price is not None and current_price > 0:
+                quantity = quote_amount / current_price
             else:
-                quantity = st.number_input(
-                    f"{base_asset} Quantity",
-                    min_value=0.0,
-                    value=0.001,
-                    format="%.8f"
-                )
+                quantity = 0.0
         else:
             quantity = st.number_input(
-                f"{base_asset} Quantity to sell",
+                f"{base_asset} Quantity",
                 min_value=0.0,
                 value=0.001,
                 format="%.8f"
             )
+    else:
+        quantity = st.number_input(
+            f"{base_asset} Quantity to sell",
+            min_value=0.0,
+            value=0.001,
+            format="%.8f"
+        )
 
-        # Round quantity to allowed precision
-        quantity = round_step(quantity, step_size)
-        if quantity < min_qty:
-            st.warning(f"Quantity must be at least {min_qty}")
+    # Round quantity to allowed precision
+    quantity = round_step(quantity, step_size)
+    if quantity < min_qty:
+        st.warning(f"Quantity must be at least {min_qty}")
 
-        limit_price = current_price
-        stop_price = current_price
+    limit_price = current_price if current_price is not None else 0.0
+    stop_price = current_price if current_price is not None else 0.0
 
-        if order_type in ["LIMIT", "STOP_LOSS_LIMIT"]:
-            limit_price = st.number_input(
-                "Limit Price",
-                min_value=0.0,
-                value=float(current_price),
-                format="%.8f"
-            )
+    if order_type in ["LIMIT", "STOP_LOSS_LIMIT"]:
+        limit_price = st.number_input(
+            "Limit Price",
+            min_value=0.0,
+            value=float(limit_price),
+            format="%.8f"
+        )
 
-        if order_type in ["STOP_LOSS", "STOP_LOSS_LIMIT"]:
-            stop_price = st.number_input(
-                "Stop Price",
-                min_value=0.0,
-                value=float(current_price * 0.95),
-                format="%.8f"
-            )
+    if order_type in ["STOP_LOSS", "STOP_LOSS_LIMIT"]:
+        stop_price = st.number_input(
+            "Stop Price",
+            min_value=0.0,
+            value=float(stop_price * 0.95),
+            format="%.8f"
+        )
 
-        button_text = f"\U0001F6D2 {trade_direction} {quantity:.8f} {base_asset}"
-        can_execute = quantity >= min_qty and current_price > 0
+    button_text = f"\U0001F6D2 {trade_direction} {quantity:.8f} {base_asset}"
+    can_execute = quantity >= min_qty and current_price is not None and current_price > 0
 
-
-        if st.button(button_text, type="primary", disabled=not can_execute):
-            if can_execute:
+    if st.button(button_text, type="primary", disabled=not can_execute):
+        if can_execute:
+            try:
+                import trader
+                result = trader.execute_entry(client, trading_pair, quantity, signal_type="BUY_LONG" if trade_direction=="Buy" else "BUY_SHORT")
+                if result['status'] == 'SUCCESS':
+                    st.success(f"✅ LIVE {order_type} order placed successfully!")
+                    st.json(result)
+                else:
+                    st.error(f"❌ LIVE order failed: {result.get('error')}")
+                trade_data = {
+                    'timestamp': datetime.now().isoformat(),
+                    'type': 'manual_trade',
+                    'symbol': trading_pair,
+                    'side': trade_direction.upper(),
+                    'quantity': quantity,
+                    'price': limit_price if order_type == "LIMIT" else current_price,
+                    'order_type': order_type,
+                    'order_id': result.get('order_id'),
+                    'status': result.get('status')
+                }
+                os.makedirs('logs', exist_ok=True)
+                # Enhanced error logging for manual_trades.log
                 try:
-                    import trader
-                    result = trader.execute_entry(client, trading_pair, quantity, signal_type="BUY_LONG" if trade_direction=="Buy" else "BUY_SHORT")
-                    if result['status'] == 'SUCCESS':
-                        st.success(f"✅ LIVE {order_type} order placed successfully!")
-                        st.json(result)
-                    else:
-                        st.error(f"❌ LIVE order failed: {result.get('error')}")
-                    trade_data = {
-                        'timestamp': datetime.now().isoformat(),
-                        'type': 'manual_trade',
-                        'symbol': trading_pair,
-                        'side': trade_direction.upper(),
-                        'quantity': quantity,
-                        'price': limit_price if order_type == "LIMIT" else current_price,
-                        'order_type': order_type,
-                        'order_id': result.get('order_id'),
-                        'status': result.get('status')
-                    }
-                    os.makedirs('logs', exist_ok=True)
                     with open('logs/manual_trades.log', 'a') as f:
                         f.write(json.dumps(trade_data) + '\n')
+                except Exception as logerr:
+                    st.error(f"❌ Failed to write to manual_trades.log: {logerr}")
+                    import traceback
+                    st.text(traceback.format_exc())
+                # Enhanced error logging for trades.csv
+                try:
                     with open('logs/trades.csv', 'a', newline='') as f:
                         writer = csv.writer(f)
                         writer.writerow([
                             trade_data['timestamp'], trade_data['symbol'], trade_data['side'],
                             trade_data['price'], '', trade_data['quantity'], '', 'ENTRY', trade_data['order_type']
                         ])
-                except Exception as e:
-                    st.error(f"❌ Order failed: {e}")
-
-            button_text = f"🛒 {trade_direction} {quantity:.8f} {base_asset}"
-            can_execute = quantity >= min_qty and current_price > 0
-
-            if st.button(button_text, type="primary", disabled=not can_execute):
-                if can_execute:
-                    try:
-                        # Execute the trade based on order type
-                        if order_type == "MARKET":
-                            if trade_direction == "Buy":
-                                order = client.order_market_buy(
-                                    symbol=trading_pair,
-                                    quantity=quantity
-                                )
-                            else:
-                                order = client.order_market_sell(
-                                    symbol=trading_pair,
-                                    quantity=quantity
-                                )
-                        elif order_type == "LIMIT":
-                            if trade_direction == "Buy":
-                                order = client.order_limit_buy(
-                                    symbol=trading_pair,
-                                    quantity=quantity,
-                                    price=str(limit_price)
-                                )
-                            else:
-                                order = client.order_limit_sell(
-                                    symbol=trading_pair,
-                                    quantity=quantity,
-                                    price=str(limit_price)
-                                )
-                        # Add STOP_LOSS and STOP_LOSS_LIMIT as needed
-                        st.success(f"✅ {order_type} order placed successfully!")
-                        st.json(order)
-
-                        # Log the trade (manual_trades.log)
-                        trade_data = {
-                            'timestamp': datetime.now().isoformat(),
-                            'type': 'manual_trade',
-                            'symbol': trading_pair,
-                            'side': trade_direction.upper(),
-                            'quantity': quantity,
-                            'price': limit_price if order_type == "LIMIT" else current_price,
-                            'order_type': order_type,
-                            'order_id': order.get('orderId'),
-                            'status': order.get('status')
-                        }
-                        os.makedirs('logs', exist_ok=True)
-                        with open('logs/manual_trades.log', 'a') as f:
-                            f.write(f"{json.dumps(trade_data)}\n")
-                        # Also log to trades.csv for performance tab
-                        with open('logs/trades.csv', 'a', newline='') as f:
-                            writer = csv.writer(f)
-                            writer.writerow([
-                                trade_data['timestamp'],
-                                trade_data['symbol'],
-                                trade_data['side'],
-                                trade_data['price'],  # entry_price
-                                '',                   # exit_price (empty for open)
-                                trade_data['quantity'],
-                                '',                   # change_pct (empty for open)
-                                'ENTRY',              # status
-                                'Manual'              # strategy
-                            ])
-
-                    except Exception as e:
-                        st.error(f"❌ Order failed: {e}")
+                except Exception as logerr:
+                    st.error(f"❌ Failed to write to trades.csv: {logerr}")
+                    import traceback
+                    st.text(traceback.format_exc())
+            except Exception as e:
+                st.error(f"❌ Order failed: {e}")
 
     col1, col2 = st.columns(2)
     with col2:
