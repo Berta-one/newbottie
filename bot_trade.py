@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 from trader import get_account_balance
-from strategy import get_current_signal
 from binance.client import Client
 import os
 
