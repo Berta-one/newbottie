@@ -328,36 +328,73 @@ def render_manual_trading_tab():
     # WebSocket price streaming for selected trading pair (Live mode only)
     import importlib.util
     import time
-    # Always use Live mode
-    ws_util_path = '/workspaces/Bottie/binance_ws_price.py'
-    spec = importlib.util.spec_from_file_location('binance_ws_price', ws_util_path)
-    ws_mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(ws_mod)
-    if 'ws_price' not in st.session_state or st.session_state.get('ws_pair') != trading_pair:
-        # Stop previous ws if exists
-        if 'ws_price' in st.session_state and st.session_state['ws_price']:
-            try:
-                st.session_state['ws_price'].stop()
-            except Exception:
-                pass
-        # Start new ws for selected pair
-        st.session_state['latest_price'] = None
-        def on_price_update(symbol, price):
-            st.session_state['latest_price'] = price
-        ws = ws_mod.BinancePriceWebSocket([trading_pair], on_price_update)
-        ws.start()
-        st.session_state['ws_price'] = ws
-        st.session_state['ws_pair'] = trading_pair
-        # Wait for first price
-        for _ in range(20):
-            if st.session_state['latest_price']:
-                break
-            time.sleep(0.1)
-    current_price = st.session_state.get('latest_price', None)
-    if current_price is not None and current_price != 0:
-        st.success(f"\U0001F4B0 Live {trading_pair} Price: {current_price:.8f}")
-    else:
-        st.warning(f"\U0001F4B0 Live {trading_pair} Price: unavailable")
+    import os
+    ws_mod = None
+    ws_import_error = None
+    import_success = False
+    try:
+        ws_util_path = os.path.join(os.path.dirname(__file__), 'binance_ws_price.py')
+        if os.path.exists(ws_util_path):
+            spec = importlib.util.spec_from_file_location('binance_ws_price', ws_util_path)
+            ws_mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(ws_mod)
+            import_success = True
+        else:
+            ws_util_path = '/workspaces/Bottie/binance_ws_price.py'
+            if os.path.exists(ws_util_path):
+                spec = importlib.util.spec_from_file_location('binance_ws_price', ws_util_path)
+                ws_mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(ws_mod)
+                import_success = True
+    except Exception as e:
+        ws_import_error = e
+        ws_mod = None
+        import_success = False
+
+    current_price = None
+    if import_success and ws_mod is not None:
+        try:
+            if 'ws_price' not in st.session_state or st.session_state.get('ws_pair') != trading_pair:
+                # Stop previous ws if exists
+                if 'ws_price' in st.session_state and st.session_state['ws_price']:
+                    try:
+                        st.session_state['ws_price'].stop()
+                    except Exception:
+                        pass
+                # Start new ws for selected pair
+                st.session_state['latest_price'] = None
+                def on_price_update(symbol, price):
+                    st.session_state['latest_price'] = price
+                ws = ws_mod.BinancePriceWebSocket([trading_pair], on_price_update)
+                ws.start()
+                st.session_state['ws_price'] = ws
+                st.session_state['ws_pair'] = trading_pair
+                for _ in range(20):
+                    if st.session_state['latest_price']:
+                        break
+                    time.sleep(0.1)
+            current_price = st.session_state.get('latest_price', None)
+            if current_price is not None and current_price != 0:
+                st.success(f"\U0001F4B0 Live {trading_pair} Price: {current_price:.8f}")
+            else:
+                st.warning(f"\U0001F4B0 Live {trading_pair} Price: unavailable")
+        except Exception as e:
+            st.warning(f"WebSocket price streaming failed: {e}. Falling back to REST API.")
+            ws_mod = None
+            import_success = False
+
+    if not import_success or ws_mod is None:
+        # Fallback: REST polling for price
+        st.info("WebSocket price streaming unavailable. Using REST API for price updates.")
+        try:
+            if client is not None:
+                ticker = client.get_symbol_ticker(symbol=trading_pair)
+                current_price = float(ticker['price'])
+                st.success(f"\U0001F4B0 {trading_pair} Price (REST): {current_price:.8f}")
+            else:
+                st.warning("Binance client unavailable. Cannot fetch price.")
+        except Exception as e:
+            st.warning(f"Failed to fetch price for {trading_pair}: {e}")
 
 
     order_type = st.selectbox("Order Type", ["MARKET", "LIMIT", "STOP_LOSS", "STOP_LOSS_LIMIT"])
