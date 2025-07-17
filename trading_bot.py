@@ -28,13 +28,13 @@ def trading_dashboard(settings_compact=False):
     # Use main app's session state for settings
     risk = st.session_state.get('risk', 1.5)
     scan_interval = st.session_state.get('scan_interval', 5)
-    # Always live mode
-    mode = 'Live'
+    # Use unified mode from hybrid_bot sidebar
+    mode = st.session_state.get('bot_mode', 'Demo')
     selected_strategy = st.session_state.get('selected_strategy', 'Breakout')
     selected_risk = st.session_state.get('selected_risk_level', 'Balanced')
 
     # --- Main Logo and Title ---
-    st.title("🤖 Crypto Trading Bot Dashboard (Live)")
+    st.title("🤖 Crypto Trading Bot Demo (Integrated)")
 
     # --- Status indicators ---
     col1, col2, col3, col4 = st.columns(4)
@@ -45,7 +45,7 @@ def trading_dashboard(settings_compact=False):
     with col3:
         st.metric("Uptime", f"{datetime.now().strftime('%H:%M:%S')}", "Live Clock")
     with col4:
-        st.metric("Mode", "Live", "Live")
+        st.metric("Mode", mode, "Demo" if mode=="Demo" else "Live")
 
     # --- Bot Health Panel ---
     st.markdown("### 🩺 Bot Health & System Status")
@@ -64,14 +64,23 @@ def trading_dashboard(settings_compact=False):
     frame = inspect.currentframe()
     args, _, _, values = inspect.getargvalues(frame)
     settings_compact = values.get('settings_compact', False)
-    st.header("Bot Settings")
-    st.write("Select trading strategy and risk level for the live bot.")
-    col1, col2 = st.columns(2)
-    with col1:
-        strategy = st.selectbox("Strategy", ["Scalping", "Breakout", "Swing", "Conservative"], key="live_strategy")
-    with col2:
-        risk = st.selectbox("Risk Level", ["Conservative", "Balanced", "Aggressive"], key="live_risk")
-    st.button("Update Settings", key="update_live_settings")
+    if settings_compact:
+        with st.expander("⚙️ Demo Settings", expanded=False):
+            col1, col2 = st.columns(2)
+            with col1:
+                strategy = st.selectbox("Strategy", ["Scalping", "Breakout", "Swing", "Conservative"], key="demo_strategy")
+            with col2:
+                risk = st.selectbox("Risk Level", ["Conservative", "Balanced", "Aggressive"], key="demo_risk")
+            st.button("Update Settings", key="update_demo_settings")
+    else:
+        st.header("Bot Settings")
+        st.write("Select trading strategy and risk level for the demo bot.")
+        col1, col2 = st.columns(2)
+        with col1:
+            strategy = st.selectbox("Strategy", ["Scalping", "Breakout", "Swing", "Conservative"], key="demo_strategy")
+        with col2:
+            risk = st.selectbox("Risk Level", ["Conservative", "Balanced", "Aggressive"], key="demo_risk")
+        st.button("Update Settings", key="update_demo_settings")
 
     # --- Main Demo Content (as before) ---
     st.subheader("📈 Trading Simulation (Multi-Pair)")
@@ -178,19 +187,20 @@ def trading_dashboard(settings_compact=False):
         - 🎯 Strategy: {selected_strategy} ({strategy_info['description']})
         - 💰 Risk: {risk}% per trade (Risk Level: {selected_risk})
         - ⏱️ Scan Interval: {scan_interval} minutes
-        - 🛡️ Mode: Live
-        - 📊 Exchange: Binance Live
+        - 🛡️ Mode: {mode}
+        - 📊 Exchange: Binance Testnet
         """)
 
         # --- Help & Documentation ---
         with st.expander("❓ Help & Documentation"):
             st.markdown("""
             **How to use this dashboard:**
-            - The bot trades on multiple crypto pairs using live funds.
+            - The bot simulates trades on multiple crypto pairs.
             - Adjust risk and scan interval in the sidebar.
             - Download logs and trades for analysis.
             - View live price chart, signals, and summary stats.
-            - News and leaderboard are for informational purposes.
+            - News and leaderboard are for demo purposes.
+            - For real trading, switch to 'Live Trading' mode (demo only).
             """)
 
 
@@ -317,8 +327,8 @@ def trading_dashboard(settings_compact=False):
     - 🎯 Strategy: 5% Breakout + ML Enhancement
     - 💰 Risk: {risk}% per trade
     - ⏱️ Scan Interval: {scan_interval} minutes
-    - 🛡️ Mode: Live
-    - 📊 Exchange: Binance Live
+    - 🛡️ Mode: {mode}
+    - 📊 Exchange: {'Binance Live' if mode == 'Live' else 'Binance Testnet'}
     """)
 
     # --- Help & Documentation ---
