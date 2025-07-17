@@ -200,8 +200,7 @@ def bot_trade_dashboard():
     default_watchlist = all_usdt_pairs[:20]
     st.session_state.setdefault('watchlist', default_watchlist)
     st.markdown('**Select pairs to scan (max 20):**')
-    selected_pairs = st.multiselect('Watchlist', all_usdt_pairs, default=st.session_state['watchlist'], key='watchlist', max_selections=20)
-    st.session_state['watchlist'] = selected_pairs
+    st.multiselect('Watchlist', all_usdt_pairs, default=st.session_state['watchlist'], key='watchlist', max_selections=20)
     if st.button('🔄 Scan Now', key='scan_now_btn'):
         st.session_state['last_bot_trade_scan'] = datetime.now()
     with st.spinner('Scanning selected pairs for signals...'):
