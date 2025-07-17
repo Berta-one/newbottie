@@ -485,9 +485,37 @@ def render_manual_trading_tab():
             format="%.8f"
         )
 
-    # Always use the greater of min_qty or user input, and round to step size
-    quantity = max(raw_qty, min_qty)
-    quantity = round_step(quantity, step_size)
+
+    # --- Enforce minimum notional value: greater of 10% of portfolio or 50 USDT equivalent ---
+    min_notional_usdt = 50.0
+    # Calculate 10% of portfolio value in USDT
+    portfolio, _ = get_real_portfolio()
+    total_usdt = sum([v.get('usd_value', 0.0) for v in portfolio.values()])
+    ten_percent_usdt = total_usdt * 0.10 if total_usdt > 0 else 0.0
+    min_required_notional = max(min_notional_usdt, ten_percent_usdt)
+
+    # Try to get the current price in USDT for the trading pair
+    notional = 0.0
+    if current_price is not None and current_price > 0:
+        notional = current_price * raw_qty
+    # If quote asset is a stablecoin, notional is just the quote amount
+    stablecoins = ['USDT', 'BUSD', 'USDC']
+    if quote_asset in stablecoins:
+        if trade_direction == "Buy" and order_type == "MARKET":
+            notional = quote_amount
+        else:
+            notional = current_price * raw_qty
+
+    # Adjust quantity to meet min notional if needed
+    if notional < min_required_notional and current_price is not None and current_price > 0:
+        min_qty_by_notional = min_required_notional / current_price
+        quantity = max(raw_qty, min_qty, min_qty_by_notional)
+        quantity = round_step(quantity, step_size)
+        if quantity * current_price < min_required_notional:
+            st.warning(f"Order must be at least {min_required_notional:.2f} {quote_asset} equivalent (greater of 10% portfolio or 50 USDT). Adjusting quantity.")
+    else:
+        quantity = max(raw_qty, min_qty)
+        quantity = round_step(quantity, step_size)
     if quantity < min_qty:
         st.warning(f"Quantity must be at least {min_qty}")
 
