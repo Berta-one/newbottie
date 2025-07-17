@@ -169,29 +169,49 @@ def start_auto_trader():
         import logging
         logging.basicConfig(filename='logs/auto_trader_debug.log', level=logging.INFO, format='%(asctime)s %(message)s')
         while st.session_state.get('auto_trader_running', True):
-            # 1. Get signals for all pairs
-            signals = get_all_signals([])
-            logging.info(f"Fetched {len(signals)} signals.")
-            # 2. Load open positions (from Binance)
+            # 1. Load open positions (from Binance)
             open_positions = get_open_positions()
+            open_assets = set([p['Asset'] for p in open_positions])
             open_symbols = [p['Asset'] + 'USDT' for p in open_positions]
             logging.info(f"Open positions: {open_symbols}")
-            # 3. For each signal, open trade if not already open
-            for sig in signals:
-                symbol = sig['Symbol'] if 'Symbol' in sig else sig.get('symbol')
-                signal_type = sig.get('Signal') or sig.get('signal')
-                price = sig.get('Price') or sig.get('price')
-                confidence = sig.get('Confidence') or sig.get('confidence', 0.7)
-                logging.info(f"Signal: symbol={symbol}, signal_type={signal_type}, price={price}, confidence={confidence}")
-                if not symbol:
-                    logging.info("Skipping: No symbol present.")
-                    continue
-                if not signal_type or not signal_type.startswith('BUY'):
-                    logging.info(f"Skipping {symbol}: signal_type is not BUY (got {signal_type})")
-                    continue
+            # 2. Read actionable opportunities from logs/portfolio_scans.log
+            actionable = []
+            try:
+                with open('logs/portfolio_scans.log', 'r') as f:
+                    for line in f.readlines()[-200:]:
+                        if '|' in line and 'Signal:' in line:
+                            # Example: ETHUSDT | Δ%: +3.65 | Vol: 1.26x | Conf: 0.62 | Signal: BUY_LONG
+                            parts = line.split('|')
+                            if len(parts) == 5:
+                                symbol = parts[0].strip()
+                                signal = parts[4].split(':')[-1].strip()
+                                confidence = float(parts[3].split(':')[-1].strip())
+                                price = None  # Price not in log, will fetch below
+                                # Only act on BUY_LONG or BUY_SHORT
+                                if signal in ('BUY_LONG', 'BUY_SHORT'):
+                                    # Only act if at least one asset in pair is in open positions
+                                    base = symbol[:-4] if symbol.endswith('USDT') else symbol[:3]
+                                    quote = 'USDT' if symbol.endswith('USDT') else symbol[3:]
+                                    if base in open_assets or quote in open_assets:
+                                        actionable.append({'symbol': symbol, 'signal': signal, 'confidence': confidence})
+            except Exception as e:
+                logging.info(f"Error reading portfolio_scans.log: {e}")
+            logging.info(f"Found {len(actionable)} actionable opportunities from scan log.")
+            # 3. For each actionable opportunity, open trade if not already open
+            for opp in actionable:
+                symbol = opp['symbol']
+                signal_type = 'BUY' if opp['signal'] == 'BUY_LONG' else 'SELL'
+                confidence = opp['confidence']
                 if symbol in open_symbols:
                     logging.info(f"Skipping {symbol}: already in open positions.")
                     continue
+                # Fetch price
+                try:
+                    klines = client.get_klines(symbol=symbol, interval='5m', limit=1)
+                    price = float(klines[-1][4])
+                except Exception as e:
+                    logging.info(f"Failed to fetch price for {symbol}: {e}")
+                    price = None
                 # --- Dynamic Position Sizing using confidence and volatility ---
                 from trader import calculate_dynamic_position_size
                 balance = get_account_balance(client, 'USDT')
