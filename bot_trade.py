@@ -160,27 +160,56 @@ def start_auto_trader():
         return  # Already running
     st.session_state['auto_trader_running'] = True
     def trading_loop():
+        from hybrid_bot import RISK_LEVELS
         client = get_binance_client()
+        # Get selected risk level from session state, fallback to 'Balanced'
+        selected_risk = st.session_state.get('selected_risk_level', 'Balanced')
+        risk_info = RISK_LEVELS.get(selected_risk, RISK_LEVELS['Balanced'])
+        risk_per_trade = risk_info.get('risk_per_trade', 0.015)
+        import logging
+        logging.basicConfig(filename='logs/auto_trader_debug.log', level=logging.INFO, format='%(asctime)s %(message)s')
         while st.session_state.get('auto_trader_running', True):
-            # 1. Get signals for watchlist
+            # 1. Get signals for all pairs
             signals = get_all_signals([])
+            logging.info(f"Fetched {len(signals)} signals.")
             # 2. Load open positions (from Binance)
             open_positions = get_open_positions()
             open_symbols = [p['Asset'] + 'USDT' for p in open_positions]
+            logging.info(f"Open positions: {open_symbols}")
             # 3. For each signal, open trade if not already open
             for sig in signals:
                 symbol = sig['Symbol'] if 'Symbol' in sig else sig.get('symbol')
                 signal_type = sig.get('Signal') or sig.get('signal')
                 price = sig.get('Price') or sig.get('price')
                 confidence = sig.get('Confidence') or sig.get('confidence', 0.7)
-                if symbol and signal_type and signal_type.startswith('BUY') and symbol not in open_symbols:
-                    # Position sizing (simple, can be improved)
-                    balance = get_account_balance(client, 'USDT')
-                    qty = (balance * 0.1) / price if price else 0.001
-                    result = execute_entry(client, symbol, qty, signal_type)
-                    log_trade_execution('ENTRY', symbol, qty, price, result)
-                    st.session_state['last_action'] = f"Opened {symbol} at {price} ({signal_type})"
-                # 4. For open positions, check exit
+                logging.info(f"Signal: symbol={symbol}, signal_type={signal_type}, price={price}, confidence={confidence}")
+                if not symbol:
+                    logging.info("Skipping: No symbol present.")
+                    continue
+                if not signal_type or not signal_type.startswith('BUY'):
+                    logging.info(f"Skipping {symbol}: signal_type is not BUY (got {signal_type})")
+                    continue
+                if symbol in open_symbols:
+                    logging.info(f"Skipping {symbol}: already in open positions.")
+                    continue
+                # Position sizing using risk factor
+                balance = get_account_balance(client, 'USDT')
+                qty = (balance * risk_per_trade) / price if price else 0.001
+                logging.info(f"Placing trade: {symbol}, qty={qty}, price={price}")
+                result = execute_entry(client, symbol, qty, signal_type)
+                logging.info(f"Trade result: {result}")
+                log_trade_execution('ENTRY', symbol, qty, price, result)
+                # --- Write trade to logs/trades.csv ---
+                try:
+                    pnl = ''
+                    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    with open('logs/trades.csv', 'a') as f:
+                        f.write(f"{now},{symbol},{signal_type},{price},{pnl}\n")
+                except Exception as e:
+                    with open('logs/trade_errors.log', 'a') as ferr:
+                        ferr.write(f"{datetime.now().isoformat()} Error writing trade: {e}\n")
+                st.session_state['last_action'] = f"Opened {symbol} at {price} ({signal_type})"
+            # 4. For open positions, check exit
             for pos in open_positions:
                 symbol = pos['Asset'] + 'USDT'
                 qty = pos['Total']
@@ -199,6 +228,15 @@ def start_auto_trader():
                     if should_exit:
                         result = execute_exit(client, symbol, qty, None, entry_price, reason)
                         log_trade_execution('EXIT', symbol, qty, entry_price, result)
+                        # --- Write exit trade to logs/trades.csv ---
+                        try:
+                            pnl = ''
+                            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            with open('logs/trades.csv', 'a') as f:
+                                f.write(f"{now},{symbol},EXIT,{entry_price},{pnl}\n")
+                        except Exception as e:
+                            with open('logs/trade_errors.log', 'a') as ferr:
+                                ferr.write(f"{datetime.now().isoformat()} Error writing exit trade: {e}\n")
                         st.session_state['last_action'] = f"Closed {symbol} ({reason})"
             # 5. Sleep for scan interval
             time.sleep(st.session_state.get('scan_interval', 60))
