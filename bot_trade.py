@@ -196,7 +196,7 @@ def start_auto_trader():
             # 3. For each actionable opportunity, open trade if not already open
             for opp in actionable:
                 symbol = opp['symbol']
-                signal_type = 'BUY' if opp['signal'] == 'BUY_LONG' else 'SELL'
+                signal_type = opp['signal']
                 confidence = opp['confidence']
                 if symbol in open_symbols:
                     logging.info(f"Skipping {symbol}: already in open positions.")
