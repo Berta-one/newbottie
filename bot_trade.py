@@ -331,8 +331,8 @@ def start_auto_trader():
                             with open('logs/trade_errors.log', 'a') as ferr:
                                 ferr.write(f"{datetime.now().isoformat()} Error writing exit trade: {e}\n")
                         st.session_state['last_action'] = f"Closed {symbol} ({reason})"
-            # 5. Sleep for scan interval
-            time.sleep(st.session_state.get('scan_interval', 60))
+            # 5. Sleep for a very short interval to react to signals quickly
+            time.sleep(2)  # Reduced from scan_interval to 2 seconds for near-instant reaction
     t = threading.Thread(target=trading_loop, daemon=True)
     t.start()
 
