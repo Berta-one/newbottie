@@ -41,6 +41,9 @@ def get_all_signals(assets, interval='5m', lookback=120):
     except Exception:
         ws_prices = {}
     for asset in assets:
+        # Exclude NFT and ETHW from scanning and display
+        if asset.upper() in ['NFT', 'ETHW']:
+            continue
         symbol = f"{asset}USDT"
         try:
             klines = client.get_klines(symbol=symbol, interval=interval, limit=lookback)
@@ -73,15 +76,17 @@ def get_all_signals(assets, interval='5m', lookback=120):
                 'Strategy': strategy_label
             })
         except Exception as e:
-            results.append({
-                'Asset': asset,
-                'Pair': symbol,
-                'Price': None,
-                'Signal': 'ERROR',
-                'Confidence': 0.0,
-                'Strategy': strategy,
-                'Error': str(e)
-            })
+            # Only append error if not invalid symbol (e.g., skip NFT/ETHW)
+            if 'Invalid symbol' not in str(e):
+                results.append({
+                    'Asset': asset,
+                    'Pair': symbol,
+                    'Price': None,
+                    'Signal': 'ERROR',
+                    'Confidence': 0.0,
+                    'Strategy': strategy,
+                    'Error': str(e)
+                })
     return results
 
 # --- Helper: Get Binance client ---
@@ -138,6 +143,7 @@ def get_trade_history(symbol='BTCUSDT', limit=50):
 
 # --- Bot Trade Dashboard (Live Data) ---
 
+
 def bot_trade_dashboard():
     st.title("🤖 Bot Trade (Live)")
     st.caption("Live multi-crypto trading dashboard with real Binance data and signals")
@@ -158,11 +164,26 @@ def bot_trade_dashboard():
     # --- Multi-Asset Market Signals ---
     st.subheader("📈 Market Signals (All Portfolio Assets)")
     positions = get_open_positions()
-    assets = [p['Asset'] for p in positions] if positions else []
+    # Exclude NFT and ETHW from assets
+    assets = [p['Asset'] for p in positions if p['Asset'].upper() not in ['NFT', 'ETHW']] if positions else []
+    if 'last_scan_time' not in st.session_state:
+        st.session_state['last_scan_time'] = None
+    scan_col1, scan_col2 = st.columns([1,3])
+    with scan_col1:
+        if st.button("🔄 Scan Now", type="primary"):
+            st.session_state['last_scan_time'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with scan_col2:
+        st.write(f"Last scan: {st.session_state['last_scan_time']}")
+    st.write(f"Scanned pairs: {', '.join([f'{a}USDT' for a in assets]) if assets else 'None'}")
     if assets:
         signals = get_all_signals(assets)
         df = pd.DataFrame(signals)
-        st.dataframe(df, use_container_width=True)
+        # Show only valid signals (exclude errors and NFT/ETHW)
+        if not df.empty:
+            df = df[df['Signal'] != 'ERROR']
+            st.dataframe(df[['Asset','Pair','Price','Signal','Confidence','Strategy']], use_container_width=True)
+        else:
+            st.info("No valid signals found.")
     else:
         st.info("No open positions.")
 
