@@ -658,15 +658,23 @@ def render_portfolio_overview_tab():
     # Portfolio breakdown
     st.subheader("📊 Portfolio Breakdown")
     
+    def safe_fmt(val, fmt, fallback="-"):
+        try:
+            if val is None:
+                return fallback
+            return fmt.format(val)
+        except Exception:
+            return fallback
+
     portfolio_df = pd.DataFrame([
         {
             'Asset': asset,
-            'Balance': f"{data['balance']:.8f}",
-            'USD Value': f"${data['usd_value']:.2f}",
-            'GBP Value': f"£{data['usd_value'] * gbp_rate:.2f}",
-            'Price': f"${data['price_usd']:.8f}",
-            '24h Change': f"{data['change_24h']:.2f}%",
-            'Weight': f"{(data['usd_value']/total_usd)*100:.1f}%"
+            'Balance': safe_fmt(data.get('balance'), "{:.8f}"),
+            'USD Value': safe_fmt(data.get('usd_value'), "$ {:.2f}"),
+            'GBP Value': safe_fmt((data.get('usd_value', 0) or 0) * gbp_rate, "£{:.2f}"),
+            'Price': safe_fmt(data.get('price_usd'), "$ {:.8f}"),
+            '24h Change': safe_fmt(data.get('change_24h'), "{:.2f}%"),
+            'Weight': safe_fmt((data.get('usd_value', 0) or 0) / total_usd * 100 if total_usd else None, "{:.1f}%")
         }
         for asset, data in portfolio.items()
     ])

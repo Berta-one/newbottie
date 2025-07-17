@@ -21,6 +21,14 @@ def get_all_signals(assets, interval='5m', lookback=120):
     client = get_binance_client()
     strategy = st.session_state.get('selected_strategy', 'Breakout')
     results = []
+    # Exclude NFT and ETHW from assets
+    assets = [a for a in assets if a.upper() not in ['NFT', 'ETHW']]
+    # Generate all possible asset pairs (A/B) where A != B
+    pairs = []
+    for base in assets:
+        for quote in assets:
+            if base != quote:
+                pairs.append((base, quote))
     # Try to use websocket for price updates if available
     ws_prices = {}
     try:
@@ -32,19 +40,16 @@ def get_all_signals(assets, interval='5m', lookback=120):
         def handle_msg(msg):
             s = msg['s']
             ws_prices[s] = float(msg['c'])
-        for asset in assets:
-            symbol = f"{asset}USDT"
+        for base, quote in pairs:
+            symbol = f"{base}{quote}"
             twm.start_symbol_ticker_socket(callback=handle_msg, symbol=symbol)
         import time
-        time.sleep(2)  # Let websocket collect some prices
+        time.sleep(2)
         twm.stop()
     except Exception:
         ws_prices = {}
-    for asset in assets:
-        # Exclude NFT and ETHW from scanning and display
-        if asset.upper() in ['NFT', 'ETHW']:
-            continue
-        symbol = f"{asset}USDT"
+    for base, quote in pairs:
+        symbol = f"{base}{quote}"
         try:
             klines = client.get_klines(symbol=symbol, interval=interval, limit=lookback)
             price = ws_prices.get(symbol, float(klines[-1][4]))
@@ -68,7 +73,8 @@ def get_all_signals(assets, interval='5m', lookback=120):
             else:
                 signal_out = 'HOLD'
             results.append({
-                'Asset': asset,
+                'Base': base,
+                'Quote': quote,
                 'Pair': symbol,
                 'Price': price,
                 'Signal': signal_out,
@@ -76,10 +82,11 @@ def get_all_signals(assets, interval='5m', lookback=120):
                 'Strategy': strategy_label
             })
         except Exception as e:
-            # Only append error if not invalid symbol (e.g., skip NFT/ETHW)
+            # Only append error if not invalid symbol
             if 'Invalid symbol' not in str(e):
                 results.append({
-                    'Asset': asset,
+                    'Base': base,
+                    'Quote': quote,
                     'Pair': symbol,
                     'Price': None,
                     'Signal': 'ERROR',
@@ -174,14 +181,15 @@ def bot_trade_dashboard():
             st.session_state['last_scan_time'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     with scan_col2:
         st.write(f"Last scan: {st.session_state['last_scan_time']}")
-    st.write(f"Scanned pairs: {', '.join([f'{a}USDT' for a in assets]) if assets else 'None'}")
+    # Removed scanned pairs display as requested
     if assets:
         signals = get_all_signals(assets)
         df = pd.DataFrame(signals)
-        # Show only valid signals (exclude errors and NFT/ETHW)
+        # Show only valid signals (exclude errors)
         if not df.empty:
             df = df[df['Signal'] != 'ERROR']
-            st.dataframe(df[['Asset','Pair','Price','Signal','Confidence','Strategy']], use_container_width=True)
+            # Show base, quote, pair, price, signal, confidence, strategy
+            st.dataframe(df[['Base','Quote','Pair','Price','Signal','Confidence','Strategy']], use_container_width=True)
         else:
             st.info("No valid signals found.")
     else:
