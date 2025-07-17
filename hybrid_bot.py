@@ -127,7 +127,7 @@ if 'scan_count' not in st.session_state:
 if 'last_scan_time' not in st.session_state:
     st.session_state['last_scan_time'] = None
 if 'max_trade_percent' not in st.session_state:
-    st.session_state['max_trade_percent'] = 10.0  # User can adjust this in the UI; now used for trade sizing if set
+    st.session_state['max_trade_percent'] = 10.0
 if 'selected_strategy' not in st.session_state:
     st.session_state['selected_strategy'] = 'Breakout'
 if 'selected_risk_level' not in st.session_state:
@@ -427,27 +427,38 @@ def render_manual_trading_tab():
 
     order_type = st.selectbox("Order Type", ["MARKET", "LIMIT", "STOP_LOSS", "STOP_LOSS_LIMIT"])
 
-    # Get step size for quantity precision
-    step_size = 0.000001
-    min_qty = 0.0
-    if exchange_info:
+    # --- Symbol minQty/stepSize utility ---
+    def get_symbol_lot_info(symbol, exchange_info):
+        """Return (min_qty, step_size) for a symbol from exchange_info, or (0, 0.000001) if not found."""
         try:
-            symbol_info = next(s for s in exchange_info['symbols'] if s['symbol'] == trading_pair)
+            symbol_info = next(s for s in exchange_info['symbols'] if s['symbol'] == symbol)
             for f in symbol_info['filters']:
                 if f['filterType'] == 'LOT_SIZE':
-                    step_size = float(f['stepSize'])
-                    min_qty = float(f['minQty'])
-                    break
+                    return float(f['minQty']), float(f['stepSize'])
         except Exception:
-            min_qty = 0.0
+            pass
+        return 0.0, 0.000001
 
+    # Cache all min_qty for all symbols for quick lookup
+    symbol_min_qty = {}
+    symbol_step_size = {}
+    if exchange_info:
+        for s in exchange_info['symbols']:
+            if s['status'] == 'TRADING':
+                minq, steps = get_symbol_lot_info(s['symbol'], exchange_info)
+                symbol_min_qty[s['symbol']] = minq
+                symbol_step_size[s['symbol']] = steps
+    # Get for current trading pair
+    min_qty, step_size = get_symbol_lot_info(trading_pair, exchange_info) if exchange_info else (0.0, 0.000001)
     import math
     def round_step(qty, step):
         if step == 0:
             return qty
         return math.floor(qty / step) * step
 
-    # Quantity input (no balance check, as user may not hold asset yet)
+
+    # --- Calculate minimum allowed quantity for this symbol ---
+    # User can set a percentage of portfolio or a manual amount, but must not go below min_qty
     if trade_direction == "Buy":
         if order_type == "MARKET":
             quote_amount = st.number_input(
@@ -457,25 +468,26 @@ def render_manual_trading_tab():
                 step=1.0
             )
             if current_price is not None and current_price > 0:
-                quantity = quote_amount / current_price
+                raw_qty = quote_amount / current_price
             else:
-                quantity = 0.0
+                raw_qty = 0.0
         else:
-            quantity = st.number_input(
+            raw_qty = st.number_input(
                 f"{base_asset} Quantity",
                 min_value=0.0,
                 value=0.001,
                 format="%.8f"
             )
     else:
-        quantity = st.number_input(
+        raw_qty = st.number_input(
             f"{base_asset} Quantity to sell",
             min_value=0.0,
             value=0.001,
             format="%.8f"
         )
 
-    # Round quantity to allowed precision
+    # Always use the greater of min_qty or user input, and round to step size
+    quantity = max(raw_qty, min_qty)
     quantity = round_step(quantity, step_size)
     if quantity < min_qty:
         st.warning(f"Quantity must be at least {min_qty}")
@@ -896,46 +908,6 @@ def render_strategy_tab():
     st.caption("Detailed strategy information and methodology explanations")
     
     # Current strategy display
-    # --- Auto-update strategy and risk level based on live market condition ---
-    portfolio, _ = get_real_portfolio()
-    market_condition, condition_score, avg_volatility = simulate_market_analysis(portfolio)
-    recommendations = {
-        'BULL_TRENDING': {
-            'recommended': ['Swing', 'Breakout'],
-            'risk': 'Aggressive',
-            'avoid': ['Conservative'],
-            'reason': 'Strong uptrend favors momentum strategies'
-        },
-        'BEAR_TRENDING': {
-            'recommended': ['Conservative', 'Scalping'],
-            'risk': 'Conservative',
-            'avoid': ['Swing'],
-            'reason': 'Downtrend requires defensive positioning'
-        },
-        'HIGH_VOLATILITY': {
-            'recommended': ['Scalping', 'Breakout'],
-            'risk': 'Balanced',
-            'avoid': ['Swing'],
-            'reason': 'High volatility creates quick profit opportunities'
-        },
-        'CONSOLIDATING': {
-            'recommended': ['Scalping', 'Conservative'],
-            'risk': 'Conservative',
-            'avoid': ['Swing'],
-            'reason': 'Sideways markets favor range trading'
-        }
-    }
-    rec = recommendations.get(market_condition, {
-        'recommended': ['Balanced'],
-        'risk': 'Balanced',
-        'avoid': [],
-        'reason': 'Mixed market conditions'
-    })
-    # Set recommended strategy and risk level in session state
-    recommended_strategy = rec['recommended'][0]
-    recommended_risk = rec['risk']
-    st.session_state['selected_strategy'] = recommended_strategy
-    st.session_state['selected_risk_level'] = recommended_risk
     current_strategy = st.session_state['selected_strategy']
     current_risk = st.session_state['selected_risk_level']
     
