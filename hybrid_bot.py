@@ -1169,7 +1169,9 @@ def render_health_tab():
                     account = client.get_account()
                     st.success("✅ API Connection Test Passed!")
                     st.info(f"Account Status: {account.get('accountType', 'Unknown')}")
-                except Exception as e:
+                except Exception
+    pass
+  except Exception as e:
                     st.error(f"❌ API Connection Test Failed: {e}")
             else:
                 st.error("❌ API credentials not configured")
