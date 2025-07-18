@@ -616,7 +616,9 @@ def render_quantum_analysis_tab():
     else:
         st.warning(f"📊 Classical analysis recommended: {recommendation}")
     
-    st.info("🔬 Quantum analysis complete. This is a demonstration of quantum mechanics applied to trading.")def render_portfolio_overview_tab():
+    st.info("🔬 Quantum analysis complete. This is a demonstration of quantum mechanics applied to trading.")
+
+def render_portfolio_overview_tab():
     """Enhanced portfolio overview with real positions and methodology"""
     st.header("💼 Portfolio Overview")
     st.caption("Live portfolio analysis with trading methodology and risk assessment")
