@@ -6,7 +6,6 @@ Complete Enhanced Crypto Trading Bot Dashboard
 Company: Rondanini Publishing Ltd.  
 Website: https://www.rondanini.net
 
-MIT License
 Copyright (c) 2025 Rondanini Publishing Ltd.
 
 This dashboard includes:
