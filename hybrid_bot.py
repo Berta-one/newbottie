@@ -463,9 +463,160 @@ def render_quantum_analysis_tab():
     with col4:
         st.metric("Hold Time", f"{quantum_result['quantum_holding_time']:.0f}m")
     
-    st.info("🔬 Quantum analysis complete. This is a demonstration of quantum mechanics applied to trading.")
-
-def render_portfolio_overview_tab():
+    # ===== ADD THIS SECTION: TRADING EXECUTION =====
+    st.subheader("🚀 Quantum Trading Execution")
+    
+    # Symbol selection
+    trading_symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'SOLUSDT', 'DOGEUSDT']
+    selected_symbol = st.selectbox("Select Trading Symbol", trading_symbols, key="quantum_symbol")
+    
+    # Display what will be traded
+    st.info(f"🎯 **Target**: {selected_symbol} | **Signal**: {quantum_result['quantum_signal']} | **Confidence**: {quantum_result['quantum_confidence']:.1%}")
+    
+    # Trading execution buttons
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        trade_enabled = quantum_result['quantum_signal'] != 'HOLD' and quantum_result['quantum_confidence'] > 0.5
+        
+        if st.button("🔬 Execute Quantum Trade", type="primary", disabled=not trade_enabled):
+            if not BINANCE_AVAILABLE:
+                st.error("❌ Binance client not available")
+            elif quantum_result['quantum_confidence'] < 0.5:
+                st.warning("⚠️ Quantum confidence too low for safe trading")
+            else:
+                with st.spinner("🌀 Executing quantum trade..."):
+                    # Check if quantum trader is available
+                    if 'quantum_trader' in st.session_state and st.session_state['quantum_trader']:
+                        trade_result = st.session_state['quantum_trader'].execute_quantum_signal(
+                            quantum_result, 
+                            selected_symbol
+                        )
+                        
+                        if trade_result['status'] == 'SUCCESS':
+                            st.success(f"✅ Quantum trade executed successfully!")
+                            st.success(f"📍 Position ID: {trade_result.get('position_id', 'N/A')}")
+                            st.success(f"💰 Entry Price: ${trade_result.get('entry_price', 0):.8f}")
+                            st.success(f"📊 Quantity: {trade_result.get('quantity', 0):.8f}")
+                            st.json(trade_result)
+                        elif trade_result['status'] == 'HOLD':
+                            st.info(f"⏸️ {trade_result.get('reason', 'Signal is HOLD')}")
+                        elif trade_result['status'] == 'SKIPPED':
+                            st.warning(f"⚠️ Trade skipped: {trade_result.get('reason', 'Unknown')}")
+                        elif trade_result['status'] == 'BLOCKED':
+                            st.error(f"🚫 Trade blocked: {trade_result.get('reason', 'Unknown')}")
+                        else:
+                            st.error(f"❌ Trade failed: {trade_result.get('message', 'Unknown error')}")
+                            st.json(trade_result)
+                    else:
+                        # Fallback: Simple demo trade execution
+                        st.success(f"✅ Demo quantum trade executed for {selected_symbol}!")
+                        st.info(f"📊 Signal: {quantum_result['quantum_signal']}")
+                        st.info(f"🎯 Confidence: {quantum_result['quantum_confidence']:.1%}")
+                        st.info(f"💰 Position Size: ${quantum_result['quantum_position_size']:,.0f}")
+                        
+                        # Log the demo trade
+                        demo_trade = {
+                            'timestamp': datetime.now().isoformat(),
+                            'symbol': selected_symbol,
+                            'signal': quantum_result['quantum_signal'],
+                            'confidence': quantum_result['quantum_confidence'],
+                            'position_size': quantum_result['quantum_position_size'],
+                            'mode': 'DEMO_QUANTUM'
+                        }
+                        
+                        try:
+                            with open('logs/quantum_demo_trades.log', 'a') as f:
+                                f.write(json.dumps(demo_trade) + '\n')
+                        except Exception as e:
+                            st.error(f"Error logging trade: {e}")
+        
+        if not trade_enabled:
+            if quantum_result['quantum_signal'] == 'HOLD':
+                st.info("⏸️ Quantum signal is HOLD - no trade recommended")
+            else:
+                st.warning("⚠️ Quantum confidence too low for trading")
+    
+    with col2:
+        if st.button("📊 Monitor Quantum Positions", type="secondary"):
+            if 'quantum_trader' in st.session_state and st.session_state['quantum_trader']:
+                with st.spinner("🔍 Monitoring quantum positions..."):
+                    monitor_result = st.session_state['quantum_trader'].monitor_quantum_positions()
+                    
+                    if monitor_result['status'] == 'NO_POSITIONS':
+                        st.info("📭 No active quantum positions")
+                    elif monitor_result['status'] == 'SUCCESS':
+                        st.success(f"✅ Monitoring {monitor_result['monitored']} positions")
+                        if monitor_result['closed'] > 0:
+                            st.success(f"🔄 Closed {monitor_result['closed']} positions")
+                        
+                        # Show position details
+                        for result in monitor_result['results']:
+                            if result['action'] == 'MONITORING':
+                                st.info(f"📊 {result['symbol']} {result['direction']}: {result['current_pnl_pct']:.2f}% P&L")
+                            elif result['action'] == 'CLOSED':
+                                profit_color = "🟢" if result['pnl_pct'] > 0 else "🔴"
+                                st.success(f"{profit_color} Closed: {result['pnl_pct']:.2f}% - {result['reason']}")
+                    else:
+                        st.error(f"❌ Monitoring failed: {monitor_result.get('message', 'Unknown error')}")
+            else:
+                st.info("📊 No quantum trader available - demo mode only")
+    
+    with col3:
+        manual_override = st.checkbox("🔓 Manual Override", help="Allow trading with lower confidence")
+        
+        if manual_override and st.button("⚠️ Force Execute", type="secondary"):
+            st.warning("⚠️ Manual override enabled - trading with reduced safety checks")
+            
+            with st.spinner("🌀 Executing with manual override..."):
+                if 'quantum_trader' in st.session_state and st.session_state['quantum_trader']:
+                    trade_result = st.session_state['quantum_trader'].execute_quantum_signal(
+                        quantum_result, 
+                        selected_symbol,
+                        manual_override=True
+                    )
+                    
+                    if trade_result['status'] == 'SUCCESS':
+                        st.success(f"✅ Manual override trade executed!")
+                        st.json(trade_result)
+                    else:
+                        st.error(f"❌ Manual override failed: {trade_result.get('message', 'Unknown error')}")
+                else:
+                    st.success(f"✅ Demo override trade executed for {selected_symbol}!")
+    
+    # ===== EXISTING QUANTUM ANALYSIS SECTIONS =====
+    st.subheader("⚖️ Quantum vs Classical Analysis")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**🔬 Quantum Analysis**")
+        st.success(f"Signal: {quantum_result['quantum_signal']}")
+        st.info(f"Confidence: {quantum_result['quantum_confidence']:.1%}")
+        st.info(f"Stop Loss: {quantum_result.get('quantum_stop_loss', 8.0):.1f}%")
+        st.info(f"Take Profit: {quantum_result.get('quantum_take_profit', 12.0):.1f}%")
+        st.info(f"Position Size: ${quantum_result['quantum_position_size']:,.0f}")
+    
+    with col2:
+        st.markdown("**📊 Classical Analysis**")
+        st.info(f"Market Condition: {market_condition}")
+        st.info(f"Confidence: {condition_score:.1%}")
+        st.info(f"Strategy: {current_strategy}")
+        st.info(f"Risk Level: {current_risk}")
+        st.info(f"Volatility: {avg_volatility:.1f}%")
+    
+    # Show quantum advantage
+    recommendation = quantum_result['classical_comparison']['recommendation']
+    quantum_advantage = quantum_result['quantum_confidence'] - condition_score
+    
+    if quantum_advantage > 0.15:
+        st.success(f"✨ Strong Quantum Advantage! {recommendation}")
+        st.success(f"Quantum provides {quantum_advantage:.1%} higher confidence")
+    elif quantum_advantage > 0.05:
+        st.info(f"🔬 Moderate Quantum Advantage: {recommendation}")
+    else:
+        st.warning(f"📊 Classical analysis recommended: {recommendation}")
+    
+    st.info("🔬 Quantum analysis complete. This is a demonstration of quantum mechanics applied to trading.")def render_portfolio_overview_tab():
     """Enhanced portfolio overview with real positions and methodology"""
     st.header("💼 Portfolio Overview")
     st.caption("Live portfolio analysis with trading methodology and risk assessment")
