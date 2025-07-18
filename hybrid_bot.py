@@ -1891,7 +1891,7 @@ def dashboard():
         render_portfolio_overview_tab()
     elif selected_tab == "Market Indicators":
         render_market_indicators_tab()
-        elif selected_tab == "Quantum Analysis":
+    elif selected_tab == "Quantum Analysis":
         render_quantum_analysis_tab()
     elif selected_tab == "Bot Trade":
         from bot_trade import bot_trade_dashboard
