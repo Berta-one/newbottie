@@ -127,7 +127,7 @@ if 'scan_count' not in st.session_state:
 if 'last_scan_time' not in st.session_state:
     st.session_state['last_scan_time'] = None
 if 'max_trade_percent' not in st.session_state:
-    st.session_state['max_trade_percent'] = 10.0
+    st.session_state['max_trade_percent'] = 10.0  # User can adjust this in the UI; now used for trade sizing if set
 if 'selected_strategy' not in st.session_state:
     st.session_state['selected_strategy'] = 'Breakout'
 if 'selected_risk_level' not in st.session_state:
@@ -332,10 +332,11 @@ def render_manual_trading_tab():
         except Exception:
             exchange_info = None
     # Get all symbols for dropdown
-    if not exchange_info or 'symbols' not in exchange_info or not exchange_info['symbols']:
-        st.error("Exchange info is missing or invalid. Cannot place trades. Please check your Binance connection and reload the page.")
-        return
-    all_symbols = [s['symbol'] for s in exchange_info['symbols'] if s['status'] == 'TRADING']
+    all_symbols = []
+    if exchange_info:
+        all_symbols = [s['symbol'] for s in exchange_info['symbols'] if s['status'] == 'TRADING']
+    else:
+        all_symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT']
     trading_pair = st.selectbox('Trading Pair', all_symbols, index=all_symbols.index(st.session_state.get('manual_trading_pair', 'BTCUSDT')) if st.session_state.get('manual_trading_pair', 'BTCUSDT') in all_symbols else 0, key='manual_trading_pair')
     trade_direction = st.selectbox('Trade Direction', ['Buy', 'Sell'], index=0 if st.session_state.get('manual_trade_direction', 'Buy') == 'Buy' else 1, key='manual_trade_direction')
     # Parse base and quote asset from selected pair
@@ -426,38 +427,27 @@ def render_manual_trading_tab():
 
     order_type = st.selectbox("Order Type", ["MARKET", "LIMIT", "STOP_LOSS", "STOP_LOSS_LIMIT"])
 
-    # --- Symbol minQty/stepSize utility ---
-    def get_symbol_lot_info(symbol, exchange_info):
-        """Return (min_qty, step_size) for a symbol from exchange_info, or (0, 0.000001) if not found."""
+    # Get step size for quantity precision
+    step_size = 0.000001
+    min_qty = 0.0
+    if exchange_info:
         try:
-            symbol_info = next(s for s in exchange_info['symbols'] if s['symbol'] == symbol)
+            symbol_info = next(s for s in exchange_info['symbols'] if s['symbol'] == trading_pair)
             for f in symbol_info['filters']:
                 if f['filterType'] == 'LOT_SIZE':
-                    return float(f['minQty']), float(f['stepSize'])
+                    step_size = float(f['stepSize'])
+                    min_qty = float(f['minQty'])
+                    break
         except Exception:
-            pass
-        return 0.0, 0.000001
+            min_qty = 0.0
 
-    # Cache all min_qty for all symbols for quick lookup
-    symbol_min_qty = {}
-    symbol_step_size = {}
-    if exchange_info:
-        for s in exchange_info['symbols']:
-            if s['status'] == 'TRADING':
-                minq, steps = get_symbol_lot_info(s['symbol'], exchange_info)
-                symbol_min_qty[s['symbol']] = minq
-                symbol_step_size[s['symbol']] = steps
-    # Get for current trading pair
-    min_qty, step_size = get_symbol_lot_info(trading_pair, exchange_info) if exchange_info else (0.0, 0.000001)
     import math
     def round_step(qty, step):
         if step == 0:
             return qty
         return math.floor(qty / step) * step
 
-
-    # --- Calculate minimum allowed quantity for this symbol ---
-    # User can set a percentage of portfolio or a manual amount, but must not go below min_qty
+    # Quantity input (no balance check, as user may not hold asset yet)
     if trade_direction == "Buy":
         if order_type == "MARKET":
             quote_amount = st.number_input(
@@ -467,55 +457,26 @@ def render_manual_trading_tab():
                 step=1.0
             )
             if current_price is not None and current_price > 0:
-                raw_qty = quote_amount / current_price
+                quantity = quote_amount / current_price
             else:
-                raw_qty = 0.0
+                quantity = 0.0
         else:
-            raw_qty = st.number_input(
+            quantity = st.number_input(
                 f"{base_asset} Quantity",
                 min_value=0.0,
                 value=0.001,
                 format="%.8f"
             )
     else:
-        raw_qty = st.number_input(
+        quantity = st.number_input(
             f"{base_asset} Quantity to sell",
             min_value=0.0,
             value=0.001,
             format="%.8f"
         )
 
-
-    # --- Enforce minimum notional value: greater of 10% of portfolio or 50 USDT equivalent ---
-    min_notional_usdt = 50.0
-    # Calculate 10% of portfolio value in USDT
-    portfolio, _ = get_real_portfolio()
-    total_usdt = sum([v.get('usd_value', 0.0) for v in portfolio.values()])
-    ten_percent_usdt = total_usdt * 0.10 if total_usdt > 0 else 0.0
-    min_required_notional = max(min_notional_usdt, ten_percent_usdt)
-
-    # Try to get the current price in USDT for the trading pair
-    notional = 0.0
-    if current_price is not None and current_price > 0:
-        notional = current_price * raw_qty
-    # If quote asset is a stablecoin, notional is just the quote amount
-    stablecoins = ['USDT', 'BUSD', 'USDC']
-    if quote_asset in stablecoins:
-        if trade_direction == "Buy" and order_type == "MARKET":
-            notional = quote_amount
-        else:
-            notional = current_price * raw_qty
-
-    # Adjust quantity to meet min notional if needed
-    if notional < min_required_notional and current_price is not None and current_price > 0:
-        min_qty_by_notional = min_required_notional / current_price
-        quantity = max(raw_qty, min_qty, min_qty_by_notional)
-        quantity = round_step(quantity, step_size)
-        if quantity * current_price < min_required_notional:
-            st.warning(f"Order must be at least {min_required_notional:.2f} {quote_asset} equivalent (greater of 10% portfolio or 50 USDT). Adjusting quantity.")
-    else:
-        quantity = max(raw_qty, min_qty)
-        quantity = round_step(quantity, step_size)
+    # Round quantity to allowed precision
+    quantity = round_step(quantity, step_size)
     if quantity < min_qty:
         st.warning(f"Quantity must be at least {min_qty}")
 
@@ -935,6 +896,46 @@ def render_strategy_tab():
     st.caption("Detailed strategy information and methodology explanations")
     
     # Current strategy display
+    # --- Auto-update strategy and risk level based on live market condition ---
+    portfolio, _ = get_real_portfolio()
+    market_condition, condition_score, avg_volatility = simulate_market_analysis(portfolio)
+    recommendations = {
+        'BULL_TRENDING': {
+            'recommended': ['Swing', 'Breakout'],
+            'risk': 'Aggressive',
+            'avoid': ['Conservative'],
+            'reason': 'Strong uptrend favors momentum strategies'
+        },
+        'BEAR_TRENDING': {
+            'recommended': ['Conservative', 'Scalping'],
+            'risk': 'Conservative',
+            'avoid': ['Swing'],
+            'reason': 'Downtrend requires defensive positioning'
+        },
+        'HIGH_VOLATILITY': {
+            'recommended': ['Scalping', 'Breakout'],
+            'risk': 'Balanced',
+            'avoid': ['Swing'],
+            'reason': 'High volatility creates quick profit opportunities'
+        },
+        'CONSOLIDATING': {
+            'recommended': ['Scalping', 'Conservative'],
+            'risk': 'Conservative',
+            'avoid': ['Swing'],
+            'reason': 'Sideways markets favor range trading'
+        }
+    }
+    rec = recommendations.get(market_condition, {
+        'recommended': ['Balanced'],
+        'risk': 'Balanced',
+        'avoid': [],
+        'reason': 'Mixed market conditions'
+    })
+    # Set recommended strategy and risk level in session state
+    recommended_strategy = rec['recommended'][0]
+    recommended_risk = rec['risk']
+    st.session_state['selected_strategy'] = recommended_strategy
+    st.session_state['selected_risk_level'] = recommended_risk
     current_strategy = st.session_state['selected_strategy']
     current_risk = st.session_state['selected_risk_level']
     
