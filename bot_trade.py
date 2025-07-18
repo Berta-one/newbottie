@@ -238,28 +238,13 @@ def start_auto_trader():
                         volatility = float(np.std(closes) / np.mean(closes))
                 except Exception as e:
                     logging.info(f"Volatility calculation failed for {symbol}: {e}")
-                # --- Enforce minimum notional: greater of 10% portfolio or 50 USDT equivalent ---
-                min_notional_usdt = 50.0
-                ten_percent_usdt = balance * 0.10 if balance > 0 else 0.0
-                min_required_notional = max(min_notional_usdt, ten_percent_usdt)
-                # Get symbol info for step size and price
-                symbol_info = None
-                try:
-                    from trader import get_symbol_info
-                    symbol_info = get_symbol_info(client, symbol)
-                except Exception:
-                    pass
-                step_size = symbol_info['stepSize'] if symbol_info else 0.000001
-                # Calculate notional for qty
-                notional = price * qty if price and qty else 0.0
-                if notional < min_required_notional and price and price > 0:
-                    min_qty_by_notional = min_required_notional / price
-                    qty = max(qty, min_qty_by_notional)
-                    # Round to step size
-                    import math
-                    qty = math.floor(qty / step_size) * step_size
-                    logging.info(f"Adjusted qty to meet min notional: {qty} (min_required_notional={min_required_notional})")
-                # Final log and trade
+                qty = calculate_dynamic_position_size(
+                    account_balance=balance,
+                    base_quantity=base_quantity,
+                    confidence=confidence,
+                    volatility=volatility,
+                    risk_percentage=risk_per_trade
+                )
                 logging.info(f"Trade sizing: balance={balance}, base_quantity={base_quantity}, confidence={confidence}, volatility={volatility}, risk_percentage={risk_per_trade}, qty={qty}")
                 logging.info(f"Placing trade: {symbol}, qty={qty}, price={price}, volatility={volatility}, confidence={confidence}")
                 result = execute_entry(client, symbol, qty, signal_type)
@@ -292,33 +277,6 @@ def start_auto_trader():
                 if entry_price:
                     should_exit, reason = monitor_position_enhanced(client, symbol, entry_price)
                     if should_exit:
-                        # --- Enforce minimum notional for exit: greater of 10% portfolio or 50 USDT equivalent ---
-                        balance = get_account_balance(client, 'USDT')
-                        min_notional_usdt = 50.0
-                        ten_percent_usdt = balance * 0.10 if balance > 0 else 0.0
-                        min_required_notional = max(min_notional_usdt, ten_percent_usdt)
-                        # Get price for symbol
-                        price = None
-                        try:
-                            klines = client.get_klines(symbol=symbol, interval='5m', limit=1)
-                            price = float(klines[-1][4])
-                        except Exception:
-                            pass
-                        # Get step size
-                        symbol_info = None
-                        try:
-                            from trader import get_symbol_info
-                            symbol_info = get_symbol_info(client, symbol)
-                        except Exception:
-                            pass
-                        step_size = symbol_info['stepSize'] if symbol_info else 0.000001
-                        # Adjust qty if needed
-                        notional = price * qty if price and qty else 0.0
-                        if notional < min_required_notional and price and price > 0:
-                            min_qty_by_notional = min_required_notional / price
-                            qty = max(qty, min_qty_by_notional)
-                            import math
-                            qty = math.floor(qty / step_size) * step_size
                         result = execute_exit(client, symbol, qty, None, entry_price, reason)
                         log_trade_execution('EXIT', symbol, qty, entry_price, result)
                         # --- Write exit trade to logs/trades.csv ---
@@ -331,8 +289,8 @@ def start_auto_trader():
                             with open('logs/trade_errors.log', 'a') as ferr:
                                 ferr.write(f"{datetime.now().isoformat()} Error writing exit trade: {e}\n")
                         st.session_state['last_action'] = f"Closed {symbol} ({reason})"
-            # 5. Sleep for a very short interval to react to signals quickly
-            time.sleep(2)  # Reduced from scan_interval to 2 seconds for near-instant reaction
+            # 5. Sleep for scan interval
+            time.sleep(st.session_state.get('scan_interval', 60))
     t = threading.Thread(target=trading_loop, daemon=True)
     t.start()
 
