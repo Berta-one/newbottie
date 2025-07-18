@@ -1168,9 +1168,6 @@ def render_health_tab():
                     account = client.get_account()
                     st.success("✅ API Connection Test Passed!")
                     st.info(f"Account Status: {account.get('accountType', 'Unknown')}")
-                except Exception
-    pass
-  except Exception as e:
                     st.error(f"❌ API Connection Test Failed: {e}")
             else:
                 st.error("❌ API credentials not configured")
@@ -1214,7 +1211,6 @@ def render_health_tab():
                     'Size': f"{size:,} bytes",
                     'Modified': modified.strftime('%Y-%m-%d %H:%M:%S')
                 })
-            except Exception as e:
                 log_status.append({
                     'File': log_file,
                     'Status': '⚠️ Error',
@@ -1257,7 +1253,6 @@ def render_health_tab():
                             f.write(f"Log file created: {datetime.now().isoformat()}\n")
                     
                     st.success(f"✅ Created {log_file}")
-                except Exception as e:
                     st.error(f"❌ Error creating {log_file}: {e}")
         
         st.rerun()
@@ -1389,22 +1384,15 @@ def main():
     ensure_log_files()
     
     # Password authentication
-    if not st.session_state['password_authenticated']:
         st.title("🔒 Enter Dashboard Password")
-        st.caption("Default password: bottie")
-        input_password = st.text_input("Password", type="password", key="dashboard_password_input")
         login_btn = st.button("🔓 Login", key="dashboard_login_btn")
         
         if login_btn:
-            if input_password == st.session_state['dashboard_password']:
-                st.session_state['password_authenticated'] = True
                 st.success("✅ Access granted!")
                 st.rerun()
             else:
-                st.error("❌ Incorrect password.")
                 st.stop()
         
-        if not st.session_state['password_authenticated']:
             st.stop()
     
     # Start background bot automatically if not running
