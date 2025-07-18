@@ -1,3 +1,313 @@
+try:
+    from quantum_engine import QuantumTradingEngine
+    from quantum_trading_integration import get_quantum_trader
+    QUANTUM_AVAILABLE = True
+except ImportError:
+    QUANTUM_AVAILABLE = False
+    class QuantumTradingEngine:
+        def __init__(self): pass
+        def generate_quantum_trading_recommendation(self, *args, **kwargs):
+            return {'quantum_signal': 'UNAVAILABLE', 'quantum_confidence': 0}
+    if 'quantum_engine' not in st.session_state:
+        st.session_state['quantum_engine'] = QuantumTradingEngine()
+
+    if 'quantum_trader' not in st.session_state and QUANTUM_AVAILABLE:
+        client = None
+        if BINANCE_AVAILABLE and API_KEY and API_SECRET:
+            try:
+                client = Client(API_KEY, API_SECRET)
+                if USE_TESTNET:
+                    client.API_URL = "https://testnet.binance.vision/api"
+            except Exception as e:
+                st.error(f"Failed to initialize Binance client: {e}")
+        st.session_state['quantum_trader'] = get_quantum_trader(client)
+def render_quantum_analysis_tab():
+    """Enhanced quantum analysis tab with actual trading functionality"""
+    st.header("🔬 Quantum Market Analysis & Trading")
+    st.caption("Advanced quantum mechanics principles applied to cryptocurrency trading with live execution")
+    if not QUANTUM_AVAILABLE:
+        st.error("❌ Quantum engine not available. Please install quantum_engine.py and quantum_trading_integration.py")
+        return
+    portfolio, _ = get_real_portfolio()
+    market_condition, condition_score, avg_volatility = simulate_market_analysis(portfolio)
+    current_strategy = st.session_state.get('selected_strategy', 'Breakout')
+    current_risk = st.session_state.get('selected_risk_level', 'Balanced')
+    with st.spinner("🌀 Analyzing quantum market states..."):
+        quantum_result = st.session_state['quantum_engine'].generate_quantum_trading_recommendation(
+            portfolio_data=portfolio,
+            market_condition=market_condition,
+            strategy=current_strategy,
+            risk_level=current_risk,
+            portfolio_value=sum(data.get('usd_value', 0) for data in portfolio.values()) if portfolio else 10000
+        )
+    st.subheader("🎯 Quantum Trading Signal")
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        signal_color = "🟢" if quantum_result['quantum_signal'] == 'BUY_LONG' else "🔴" if quantum_result['quantum_signal'] == 'BUY_SHORT' else "🟡"
+        st.metric("Quantum Signal", f"{signal_color} {quantum_result['quantum_signal']}")
+    with col2:
+        confidence_color = "🟢" if quantum_result['quantum_confidence'] > 0.7 else "🟡" if quantum_result['quantum_confidence'] > 0.5 else "🔴"
+        st.metric("Quantum Confidence", f"{confidence_color} {quantum_result['quantum_confidence']:.1%}")
+    with col3:
+        st.metric("Position Size", f"${quantum_result['quantum_position_size']:,.0f}")
+    with col4:
+        st.metric("Hold Time", f"{quantum_result['quantum_holding_time']:.0f}m")
+    st.subheader("🚀 Quantum Trading Execution")
+    trading_symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'SOLUSDT', 'DOGEUSDT']
+    selected_symbol = st.selectbox("Select Trading Symbol", trading_symbols, key="quantum_symbol")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        trade_enabled = quantum_result['quantum_signal'] != 'HOLD' and quantum_result['quantum_confidence'] > 0.5
+        if st.button("🔬 Execute Quantum Trade", type="primary", disabled=not trade_enabled):
+            if not BINANCE_AVAILABLE:
+                st.error("❌ Binance client not available")
+            elif quantum_result['quantum_confidence'] < 0.5:
+                st.warning("⚠️ Quantum confidence too low for safe trading")
+            else:
+                with st.spinner("🌀 Executing quantum trade..."):
+                    trade_result = st.session_state['quantum_trader'].execute_quantum_signal(
+                        quantum_result, 
+                        selected_symbol
+                    )
+                    if trade_result['status'] == 'SUCCESS':
+                        st.success(f"✅ Quantum trade executed successfully!")
+                        st.success(f"Position ID: {trade_result['position_id']}")
+                        st.success(f"Entry Price: ${trade_result['entry_price']:.8f}")
+                        st.success(f"Quantity: {trade_result['quantity']:.8f}")
+                        st.json(trade_result)
+                    elif trade_result['status'] == 'HOLD':
+                        st.info(f"⏸️ {trade_result['reason']}")
+                    elif trade_result['status'] == 'SKIPPED':
+                        st.warning(f"⚠️ Trade skipped: {trade_result['reason']}")
+                    elif trade_result['status'] == 'BLOCKED':
+                        st.error(f"🚫 Trade blocked: {trade_result['reason']}")
+                    else:
+                        st.error(f"❌ Trade failed: {trade_result.get('message', 'Unknown error')}")
+                        st.json(trade_result)
+        if not trade_enabled:
+            if quantum_result['quantum_signal'] == 'HOLD':
+                st.info("⏸️ Quantum signal is HOLD - no trade recommended")
+            else:
+                st.warning("⚠️ Quantum confidence too low for trading")
+    with col2:
+        if st.button("📊 Monitor Quantum Positions", type="secondary"):
+            with st.spinner("🔍 Monitoring quantum positions..."):
+                monitor_result = st.session_state['quantum_trader'].monitor_quantum_positions()
+                if monitor_result['status'] == 'NO_POSITIONS':
+                    st.info("📭 No active quantum positions")
+                elif monitor_result['status'] == 'SUCCESS':
+                    st.success(f"✅ Monitoring {monitor_result['monitored']} positions")
+                    if monitor_result['closed'] > 0:
+                        st.success(f"🔄 Closed {monitor_result['closed']} positions")
+                    for result in monitor_result['results']:
+                        if result['action'] == 'MONITORING':
+                            st.info(f"📊 {result['symbol']} {result['direction']}: {result['current_pnl_pct']:.2f}% P&L")
+                        elif result['action'] == 'CLOSED':
+                            profit_color = "🟢" if result['pnl_pct'] > 0 else "🔴"
+                            st.success(f"{profit_color} Closed: {result['pnl_pct']:.2f}% - {result['reason']}")
+                else:
+                    st.error(f"❌ Monitoring failed: {monitor_result.get('message', 'Unknown error')}")
+    with col3:
+        manual_override = st.checkbox("🔓 Manual Override", help="Allow trading with lower confidence")
+        if manual_override and st.button("⚠️ Force Execute", type="secondary"):
+            st.warning("⚠️ Manual override enabled - trading with reduced safety checks")
+            with st.spinner("🌀 Executing with manual override..."):
+                trade_result = st.session_state['quantum_trader'].execute_quantum_signal(
+                    quantum_result, 
+                    selected_symbol,
+                    manual_override=True
+                )
+                if trade_result['status'] == 'SUCCESS':
+                    st.success(f"✅ Manual override trade executed!")
+                    st.json(trade_result)
+                else:
+                    st.error(f"❌ Manual override failed: {trade_result.get('message', 'Unknown error')}")
+    st.subheader("⚖️ Quantum vs Classical Analysis")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("**🔬 Quantum Analysis**")
+        st.success(f"Signal: {quantum_result['quantum_signal']}")
+        st.info(f"Confidence: {quantum_result['quantum_confidence']:.1%}")
+        st.info(f"Stop Loss: {quantum_result['quantum_stop_loss']:.1f}%")
+        st.info(f"Take Profit: {quantum_result['quantum_take_profit']:.1f}%")
+        st.info(f"Position Size: ${quantum_result['quantum_position_size']:,.0f}")
+    with col2:
+        st.markdown("**📊 Classical Analysis**")
+        st.info(f"Market Condition: {market_condition}")
+        st.info(f"Confidence: {condition_score:.1%}")
+        st.info(f"Strategy: {current_strategy}")
+        st.info(f"Risk Level: {current_risk}")
+        st.info(f"Volatility: {avg_volatility:.1f}%")
+    recommendation = quantum_result['classical_comparison']['recommendation']
+    quantum_advantage = quantum_result['quantum_confidence'] - condition_score
+    if quantum_advantage > 0.15:
+        st.success(f"✨ Strong Quantum Advantage! {recommendation}")
+        st.success(f"Quantum provides {quantum_advantage:.1%} higher confidence")
+    elif quantum_advantage > 0.05:
+        st.info(f"🔬 Moderate Quantum Advantage: {recommendation}")
+    else:
+        st.warning(f"📊 Classical analysis recommended: {recommendation}")
+    st.subheader("📋 Active Quantum Positions")
+    if hasattr(st.session_state['quantum_trader'], 'active_quantum_positions'):
+        active_positions = st.session_state['quantum_trader'].active_quantum_positions
+        if active_positions:
+            positions_data = []
+            for pos_id, position in active_positions.items():
+                current_price = st.session_state['quantum_trader'].get_current_price(position['symbol'])
+                if current_price:
+                    pnl_data = st.session_state['quantum_trader'].calculate_position_pnl(position, current_price)
+                    positions_data.append({
+                        'Position ID': pos_id[-8:],
+                        'Symbol': position['symbol'],
+                        'Direction': position['direction'],
+                        'Entry Price': f"${position['entry_price']:.8f}",
+                        'Current Price': f"${current_price:.8f}",
+                        'P&L %': f"{pnl_data['pnl_pct']:+.2f}%",
+                        'Confidence': f"{position['quantum_confidence']:.1%}",
+                        'Time Held': f"{pnl_data['time_held_minutes']:.0f}m",
+                        'Strategy': position['strategy']
+                    })
+            if positions_data:
+                st.dataframe(pd.DataFrame(positions_data), use_container_width=True)
+            else:
+                st.info("📭 No active quantum positions")
+        else:
+            st.info("📭 No active quantum positions")
+    st.subheader("📈 Quantum Trading Performance")
+    performance = st.session_state['quantum_trader'].get_quantum_performance()
+    if performance['status'] == 'SUCCESS':
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Total Trades", performance['total_trades'])
+        with col2:
+            st.metric("Closed Trades", performance['closed_trades'])
+        with col3:
+            profit_color = "🟢" if performance['total_pnl_pct'] > 0 else "🔴"
+            st.metric("Total P&L", f"{profit_color} {performance['total_pnl_pct']:.1f}%")
+        with col4:
+            st.metric("Win Rate", f"{performance['win_rate']:.1%}")
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Avg P&L/Trade", f"{performance['avg_pnl_per_trade']:.1f}%")
+        with col2:
+            st.metric("Winning Trades", performance['winning_trades'])
+        with col3:
+            st.metric("Losing Trades", performance['losing_trades'])
+        with col4:
+            st.metric("Avg Confidence", f"{performance['avg_quantum_confidence']:.1%}")
+    elif performance['status'] == 'PARTIAL':
+        st.info(f"📊 {performance['message']}")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Total Trades", performance['total_trades'])
+        with col2:
+            st.metric("Active Trades", performance['active_trades'])
+    else:
+        st.info("📊 No quantum trading performance data available yet")
+    tabs = st.tabs(["🌀 Superposition", "🔗 Entanglement", "⚖️ Uncertainty", "🌊 Interference", "🚇 Tunneling"])
+    with tabs[0]:
+        st.subheader("🌀 Quantum Market Superposition")
+        if quantum_result['market_quantum_state'] and 'states' in quantum_result['market_quantum_state']:
+            states_df = pd.DataFrame(quantum_result['market_quantum_state']['states']).T
+            st.dataframe(states_df, use_container_width=True)
+            fig = px.bar(
+                x=list(quantum_result['market_quantum_state']['states'].keys()),
+                y=[state['probability'] for state in quantum_result['market_quantum_state']['states'].values()],
+                title="Market State Probabilities",
+                labels={'x': 'Quantum State', 'y': 'Probability'}
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No quantum superposition data available")
+    with tabs[1]:
+        st.subheader("🔗 Quantum Entanglement")
+        entanglement = quantum_result['entangled_pairs']
+        if entanglement['entangled_pairs']:
+            st.success(f"Found {entanglement['total_entangled_pairs']} entangled pairs!")
+            for pair, data in entanglement['entangled_pairs'].items():
+                with st.expander(f"🔗 {pair} (Strength: {data['entanglement_strength']:.2f})"):
+                    st.write(f"**Price Correlation:** {data['price_correlation']:.3f}")
+                    st.write(f"**Volume Correlation:** {data['volume_correlation']:.3f}")
+                    st.write(f"**Bell Parameter:** {data['bell_parameter']:.3f}")
+                    st.info(f"**Trading Advice:** {data['trading_implication']}")
+        else:
+            st.info("No quantum entanglement detected between assets")
+    with tabs[2]:
+        st.subheader("⚖️ Heisenberg Uncertainty Principle")
+        uncertainty = quantum_result['uncertainty_analysis']
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write(f"**Position Uncertainty:** {uncertainty['position_uncertainty']:.3f}")
+            st.write(f"**Time Uncertainty:** {uncertainty['time_uncertainty']:.3f}")
+            st.write(f"**Uncertainty Product:** {uncertainty['uncertainty_product']:.3f}")
+        with col2:
+            st.write(f"**Optimal Stop Loss:** {uncertainty['quantum_stop_loss_pct']:.1f}%")
+            st.write(f"**Optimal Take Profit:** {uncertainty['quantum_take_profit_pct']:.1f}%")
+            st.write(f"**Optimal Hold Time:** {uncertainty['quantum_holding_time_minutes']:.0f}m")
+        st.info(f"**Recommendation:** {uncertainty['recommendation']}")
+        if uncertainty['quantum_advantage'] > 0:
+            st.success(f"🎯 Quantum advantage: {uncertainty['quantum_advantage']:.3f}")
+    with tabs[3]:
+        st.subheader("🌊 Quantum Signal Interference")
+        interference = quantum_result['signal_interference']
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write(f"**Final Signal:** {interference['final_signal']}")
+            st.write(f"**Confidence:** {interference['confidence']:.1%}")
+            st.write(f"**Interference Type:** {interference['interference_type']}")
+        with col2:
+            st.write(f"**Signal Quality:** {interference['signal_quality']}")
+            st.write(f"**Constructive:** {interference['constructive_interference']:.3f}")
+            st.write(f"**Destructive:** {interference['destructive_interference']:.3f}")
+        if interference['quantum_waves']:
+            waves_df = pd.DataFrame(interference['quantum_waves'])
+            st.dataframe(waves_df, use_container_width=True)
+    with tabs[4]:
+        st.subheader("🚇 Quantum Tunneling Analysis")
+        tunneling = quantum_result['tunneling_analysis']
+        if tunneling['tunneling_events']:
+            st.success(f"Found {tunneling['total_tunnel_opportunities']} tunneling opportunities!")
+            for event in tunneling['tunneling_events']:
+                tunnel_type = "🔴 Resistance" if event['type'] == 'resistance_tunnel' else "🟢 Support"
+                st.write(f"{tunnel_type} Tunnel at ${event['level']:,.0f}")
+                st.write(f"Current Price: ${event['current_price']:,.0f}")
+                st.write(f"Tunneling Probability: {event['tunneling_probability']:.1%}")
+                st.write(f"Trading Signal: {event['trading_signal']}")
+                st.markdown("---")
+            if tunneling['quantum_breakthrough_likely']:
+                st.success("🚀 Quantum breakthrough highly likely!")
+        else:
+            st.info("No quantum tunneling opportunities detected")
+    st.subheader("📥 Export Quantum Analysis")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("📥 Export Quantum Analysis"):
+            quantum_json = json.dumps(quantum_result, indent=2, default=str)
+            st.download_button(
+                "Download Quantum Analysis",
+                data=quantum_json,
+                file_name=f"quantum_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                mime="application/json"
+            )
+    with col2:
+        if st.button("📥 Export Trading Log"):
+            try:
+                if os.path.exists('logs/quantum_trades.csv'):
+                    with open('logs/quantum_trades.csv', 'r') as f:
+                        csv_data = f.read()
+                    st.download_button(
+                        "Download Trading Log",
+                        data=csv_data,
+                        file_name=f"quantum_trades_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        mime="text/csv"
+                    )
+                else:
+                    st.info("No trading log available yet")
+            except Exception as e:
+                st.error(f"Error exporting trading log: {e}")
+    if st.checkbox("🔄 Auto-refresh (30s)", key="quantum_auto_refresh"):
+        time.sleep(30)
+        st.rerun()
 # Trigger redeploy: harmless comment for Railway
 #!/usr/bin/env python3
 """
@@ -42,6 +352,16 @@ import sys
 import signal
 import requests
 import random
+# Add this import after your existing imports
+try:
+    from quantum_engine import QuantumTradingEngine
+    QUANTUM_AVAILABLE = True
+except ImportError:
+    QUANTUM_AVAILABLE = False
+    class QuantumTradingEngine:
+        def __init__(self): pass
+        def generate_quantum_trading_recommendation(self, *args, **kwargs):
+            return {'quantum_signal': 'UNAVAILABLE', 'quantum_confidence': 0}
 # Add dotenv support
 
 def render_mode_switch():
@@ -1549,8 +1869,8 @@ def dashboard():
 
     # Sidebar navigation - Unified tabs, Bot Demo before Manual Trading
     tab_options = [
-        "Portfolio Overview", "Market Indicators", "Bot Trade", "Trading", "Performance", "Logs", "Settings", "Strategy", "Health"
-    ]
+    "Portfolio Overview", "Market Indicators", "Quantum Analysis", "Bot Trade", "Trading", "Performance", "Logs", "Settings", "Strategy", "Health"
+]
     # Add company logo at the very top of the sidebar
     st.sidebar.markdown("<div style='text-align:center; margin-bottom:0.5em;'>" 
         "<img src='https://static.wixstatic.com/media/80aa29_3bdfcbab4dd34671915e3b66b0b596e4~mv2.jpeg/v1/fill/w_146,h_104,al_c,q_80,usm_0.66_1.00_0.01,enc_avif,quality_auto/LRC_1719585575250.jpeg' width='146'/><br>"
@@ -1571,6 +1891,8 @@ def dashboard():
         render_portfolio_overview_tab()
     elif selected_tab == "Market Indicators":
         render_market_indicators_tab()
+        elif selected_tab == "Quantum Analysis":
+        render_quantum_analysis_tab()
     elif selected_tab == "Bot Trade":
         from bot_trade import bot_trade_dashboard
         bot_trade_dashboard()
@@ -1601,7 +1923,10 @@ def main():
         page_icon="🤖",
         layout="wide"
     )
-    
+    # Add this with your other session state initializations
+if 'quantum_engine' not in st.session_state:
+    st.session_state['quantum_engine'] = QuantumTradingEngine()
+
     # Password authentication (persist for session, use .env password)
     if 'dashboard_password' not in st.session_state:
         st.session_state['dashboard_password'] = os.getenv('DASHBOARD_PASSWORD', 'bottie')

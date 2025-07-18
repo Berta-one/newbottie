@@ -2,8 +2,26 @@
 builder = "nixpacks"
 
 [deploy]
-# Run hybrid bot (dashboard + background bot)
-startCommand = "streamlit run hybrid_bot.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true --server.enableCORS=false --server.enableXsrfProtection=false"
+startCommand = "python railway_deployment_main.py"
 
 [environment]
 BOT_MODE = "hybrid"
+RAILWAY_ENVIRONMENT = "production"
+# railway.toml - Updated configuration for always-on hybrid bot
+[build]
+builder = "nixpacks"
+
+[deploy]
+# Run enhanced hybrid bot (dashboard + always-on background bot)
+startCommand = "streamlit run enhanced_hybrid_bot.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true --server.enableCORS=false --server.enableXsrfProtection=false"
+
+[environment]
+BOT_MODE = "hybrid"
+# Add these for enhanced always-on functionality
+STREAMLIT_SERVER_ENABLE_CORS = "false"
+STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION = "false"
+
+# Optional: Resource limits for Railway
+# [resources]
+# memory = "1Gi"
+# cpu = "1.0"
