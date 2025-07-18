@@ -53,7 +53,7 @@ class AutonomousQuantumBot:
             'STRATEGY': os.getenv('STRATEGY', 'Breakout'),
             'TRADING_SYMBOLS': os.getenv('TRADING_SYMBOLS', 'BTCUSDT,ETHUSDT,BNBUSDT').split(','),
             'PORTFOLIO_VALUE': float(os.getenv('PORTFOLIO_VALUE', '10000')),
-            'TESTNET_MODE': os.getenv('USE_TESTNET', 'True').lower() == 'true'
+            'TESTNET_MODE': os.getenv('USE_TESTNET', 'True').lower() == 'false'
         }
         
         # Setup logging
@@ -91,8 +91,8 @@ class AutonomousQuantumBot:
             
             if api_key and api_secret:
                 self.client = Client(api_key, api_secret)
-                if self.config['TESTNET_MODE']:
-                    self.client.API_URL = "https://testnet.binance.vision/api"
+              #  if self.config['TESTNET_MODE']:
+                    #self.client.API_URL = "https://testnet.binance.vision/api"
                     self.logger.info("✅ Binance client initialized (TESTNET)")
                 else:
                     self.logger.info("✅ Binance client initialized (LIVE)")
