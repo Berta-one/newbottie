@@ -394,6 +394,7 @@ def initialize_session_state():
             try:
                 client = Client(API_KEY, API_SECRET)
                 if get_use_testnet():
+        pass
                    # client.API_URL = "https://testnet.binance.vision/api"
             except Exception as e:
                 st.error(f"Failed to initialize Binance client: {e}")
