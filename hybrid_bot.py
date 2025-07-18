@@ -395,7 +395,7 @@ def initialize_session_state():
             try:
                 client = Client(API_KEY, API_SECRET)
                 if get_use_testnet():
-                    client.API_URL = "https://testnet.binance.vision/api"
+                   # client.API_URL = "https://testnet.binance.vision/api"
             except Exception as e:
                 st.error(f"Failed to initialize Binance client: {e}")
         st.session_state['quantum_trader'] = get_quantum_trader(client) if QUANTUM_AVAILABLE else None
