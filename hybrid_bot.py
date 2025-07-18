@@ -3,7 +3,7 @@
 Complete Enhanced Crypto Trading Bot Dashboard
 ===========================================
 
-Company: Rondanini Publishing Ltd.  
+Company: Rondanini Publishing Ltd.
 Website: https://www.rondanini.net
 
 Copyright (c) 2025 Rondanini Publishing Ltd.
@@ -12,22 +12,21 @@ Usage:
     streamlit run hybrid_bot.py
 """
 
+# ===== STEP 1: IMPORT STREAMLIT FIRST =====
 import streamlit as st
+
+# ===== STEP 2: OTHER IMPORTS =====
 import pandas as pd
-import plotly.graph_objects as go
 import plotly.express as px
-from datetime import datetime, timedelta
+from datetime import datetime
 import json
 import os
-import time
-import threading
 import subprocess
 import sys
-import signal
 import requests
-import random
 import csv
 
+# ===== STEP 3: CONDITIONAL IMPORTS =====
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -36,7 +35,6 @@ except ImportError:
 
 try:
     from binance.client import Client
-    from binance.exceptions import BinanceAPIException
     BINANCE_AVAILABLE = True
 except ImportError:
     BINANCE_AVAILABLE = False
@@ -47,78 +45,56 @@ try:
     QUANTUM_AVAILABLE = True
 except ImportError:
     QUANTUM_AVAILABLE = False
+
     class QuantumTradingEngine:
         def __init__(self): pass
         def generate_quantum_trading_recommendation(self, *args, **kwargs):
             return {'quantum_signal': 'UNAVAILABLE', 'quantum_confidence': 0}
 
+# ===== CONFIGURATION =====
 API_KEY = os.getenv('BINANCE_API_KEY')
 API_SECRET = os.getenv('BINANCE_API_SECRET')
 SCAN_INTERVAL = int(os.getenv('SCAN_INTERVAL', '300').split('#')[0].strip())
 MIN_BALANCE_USD = float(os.getenv('MIN_BALANCE_USD', '10.0'))
 
 TRADING_STRATEGIES = {
-    'Scalping': {
-        'description': 'Quick trades on 2-3% moves with high volume',
-        'threshold': 2.0,
-        'volume_req': 1.5,
-        'hold_time': '30 minutes',
-        'take_profit': '3-5%',
-        'stop_loss': '2-3%',
-        'confidence_min': 0.65
-    },
-    'Breakout': {
-        'description': 'Trade 5% price breakouts with volume confirmation',
-        'threshold': 5.0,
-        'volume_req': 2.0,
-        'hold_time': '2-4 hours',
-        'take_profit': '8-15%',
-        'stop_loss': '8-12%',
-        'confidence_min': 0.70
-    },
-    'Swing': {
-        'description': 'Capture 10-20% moves over longer periods',
-        'threshold': 8.0,
-        'volume_req': 1.2,
-        'hold_time': '4-24 hours',
-        'take_profit': '15-25%',
-        'stop_loss': '10-15%',
-        'confidence_min': 0.60
-    },
-    'Conservative': {
-        'description': 'Safe trading with reduced risk and smaller positions',
-        'threshold': 3.0,
-        'volume_req': 1.8,
-        'hold_time': '1-2 hours',
-        'take_profit': '5-8%',
-        'stop_loss': '3-5%',
-        'confidence_min': 0.75
-    }
+    'Scalping': {'description': 'Quick trades on 2-3% moves', 'threshold': 2.0, 'confidence_min': 0.65},
+    'Breakout': {'description': 'Trade 5% price breakouts', 'threshold': 5.0, 'confidence_min': 0.70},
+    'Swing': {'description': 'Capture 10-20% moves', 'threshold': 8.0, 'confidence_min': 0.60},
+    'Conservative': {'description': 'Safe trading with reduced risk', 'threshold': 3.0, 'confidence_min': 0.75}
 }
 
 RISK_LEVELS = {
-    'Conservative': {
-        'position_size_multiplier': 0.7,
-        'max_positions': 2,
-        'risk_per_trade': 0.01,
-        'description': 'Lower risk, smaller positions'
-    },
-    'Balanced': {
-        'position_size_multiplier': 1.0,
-        'max_positions': 3,
-        'risk_per_trade': 0.015,
-        'description': 'Moderate risk, balanced approach'
-    },
-    'Aggressive': {
-        'position_size_multiplier': 1.3,
-        'max_positions': 5,
-        'risk_per_trade': 0.025,
-        'description': 'Higher risk, larger positions'
-    }
+    'Conservative': {'position_size_multiplier': 0.7, 'max_positions': 2, 'risk_per_trade': 0.01},
+    'Balanced': {'position_size_multiplier': 1.0, 'max_positions': 3, 'risk_per_trade': 0.015},
+    'Aggressive': {'position_size_multiplier': 1.3, 'max_positions': 5, 'risk_per_trade': 0.025}
 }
 
+# ===== UTILITIES =====
+def ensure_log_files():
+    os.makedirs('logs', exist_ok=True)
+    trades_path = 'logs/trades.csv'
+    if not os.path.exists(trades_path):
+        with open(trades_path, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['timestamp','symbol','direction','entry_price','exit_price','quantity','change_pct','status','strategy'])
+
+    log_files = ['logs/manual_trades.log', 'logs/portfolio_scans.log', 'logs/console_output.log']
+    for log_file in log_files:
+        if not os.path.exists(log_file):
+            with open(log_file, 'a') as f:
+                pass
+
+    status_path = 'logs/bot_status.json'
+    if not os.path.exists(status_path):
+        with open(status_path, 'w') as f:
+            json.dump({'timestamp': datetime.now().isoformat(), 'running': False, 'scan_count': 0}, f, indent=2)
+
+def get_use_testnet():
+    return st.session_state.get('bot_mode', 'Demo') == 'Demo'
+
+# ===== SESSION STATE INITIALIZATION =====
 def initialize_session_state():
-    """Initialize all session state variables"""
     if 'dashboard_password' not in st.session_state:
         st.session_state['dashboard_password'] = os.getenv('DASHBOARD_PASSWORD', 'bottie')
     if 'password_authenticated' not in st.session_state:
@@ -161,13 +137,13 @@ def initialize_session_state():
     if 'last_opportunities' not in st.session_state:
         st.session_state['last_opportunities'] = []
 
+# ===== MAIN DASHBOARD PLACEHOLDER =====
+def dashboard():
+    st.write("✅ Dashboard placeholder loaded successfully. Add your rendering logic here.")
+
+# ===== MAIN FUNCTION =====
 def main():
-    """Main application entry point"""
-    st.set_page_config(
-        page_title="🤖 Crypto Trading Bot Dashboard",
-        page_icon="🤖",
-        layout="wide"
-    )
+    st.set_page_config(page_title="🤖 Crypto Trading Bot Dashboard", page_icon="🤖", layout="wide")
 
     initialize_session_state()
     ensure_log_files()
@@ -175,7 +151,7 @@ def main():
     if not st.session_state['password_authenticated']:
         st.title("🔒 Enter Dashboard Password")
         password_input = st.text_input("Password", type="password")
-        login_btn = st.button("🔓 Login", key="dashboard_login_btn")
+        login_btn = st.button("🔓 Login")
 
         if login_btn:
             if password_input == st.session_state['dashboard_password']:
@@ -187,9 +163,6 @@ def main():
                 st.stop()
         else:
             st.stop()
-
-    if 'background_bot_running' not in st.session_state or not st.session_state['background_bot_running']:
-        start_background_bot()
 
     st.title("🤖 Crypto Trading Bot Dashboard")
     st.caption("Professional cryptocurrency trading with advanced market analysis and risk management")
