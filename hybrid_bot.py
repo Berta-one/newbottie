@@ -7,6 +7,7 @@ Main Streamlit UI for:
 - Manual Trading
 - Auto-Trader Control
 - Quantum Analysis & Trading
+- Settings
 - System Health
 - Logs
 - Advanced Analytics
@@ -112,7 +113,7 @@ st.caption("Advanced Crypto Trading with Technical, ML & Quantum Strategies")
 
 tabs = st.tabs([
     "📊 Portfolio", "✋ Manual Trading", "🤖 Auto-Trader",
-    "⚛ Quantum Analysis", "🩺 Health", "📜 Logs", "📈 Analytics"
+    "⚛ Quantum Analysis", "🛠 Settings", "🩺 Health", "📜 Logs", "📈 Analytics"
 ])
 
 # ----------------------------------------
@@ -151,6 +152,7 @@ with tabs[0]:
             st.warning("⚠️ No assets found in your portfolio.")
     except Exception as e:
         st.error(f"Portfolio fetch error: {e}")
+
 # ----------------------------------------
 # Manual Trading Tab
 # ----------------------------------------
@@ -248,12 +250,12 @@ with tabs[4]:
         "technical": tech_weight
     }
 
-    st.success("✅ Settings updated successfully!") 
-#
-----------------------------------------
+    st.success("✅ Settings updated successfully!")
+
+# ----------------------------------------
 # Health Tab
 # ----------------------------------------
-with tabs[4]:
+with tabs[5]:
     st.header("🩺 System Health")
     health = get_system_health()
     st.metric("CPU", health["CPU"])
@@ -267,7 +269,7 @@ with tabs[4]:
 # ----------------------------------------
 # Logs Tab
 # ----------------------------------------
-with tabs[5]:
+with tabs[6]:
     st.header("📜 Activity Logs")
     for log in st.session_state["logs"][-50:]:
         st.text(log)
@@ -275,6 +277,6 @@ with tabs[5]:
 # ----------------------------------------
 # Analytics Tab
 # ----------------------------------------
-with tabs[6]:
+with tabs[7]:
     st.header("📈 Advanced Analytics")
     analytics_dashboard.render_analytics_dashboard()
