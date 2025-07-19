@@ -208,7 +208,49 @@ with tabs[3]:
     except Exception as e:
         st.error(f"Quantum analysis error: {e}")
 
+#
+ ----------------------------------------
+# Settings Tab
 # ----------------------------------------
+with tabs[4]:
+    st.header("🛠 Bot Settings")
+    st.caption("Configure risk and strategy parameters")
+
+    # Risk % slider
+    risk_pct = st.slider("Risk per Trade (%)", min_value=0.1, max_value=5.0,
+                         value=st.session_state.get("risk_pct", 1.5), step=0.1)
+    st.session_state["risk_pct"] = risk_pct
+
+    # Max Positions
+    max_positions = st.slider("Max Open Positions", min_value=1, max_value=10,
+                              value=st.session_state.get("max_positions", 3))
+    st.session_state["max_positions"] = max_positions
+
+    # Confidence threshold
+    min_confidence = st.slider("Minimum Signal Confidence", min_value=0.5, max_value=1.0,
+                                value=st.session_state.get("min_confidence", 0.65), step=0.01)
+    st.session_state["min_confidence"] = min_confidence
+
+    # Strategy Weights
+    st.subheader("📈 Strategy Weights")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        quantum_weight = st.number_input("Quantum (%)", min_value=0.0, max_value=100.0,
+                                         value=st.session_state.get("quantum_weight", 30.0), step=1.0)
+    with col2:
+        ml_weight = st.number_input("ML (%)", min_value=0.0, max_value=100.0,
+                                    value=st.session_state.get("ml_weight", 30.0), step=1.0)
+    with col3:
+        tech_weight = st.number_input("Technical (%)", min_value=0.0, max_value=100.0,
+                                      value=st.session_state.get("tech_weight", 40.0), step=1.0)
+
+    st.session_state["strategy_weights"] = {
+        "quantum": quantum_weight,
+        "ml": ml_weight,
+        "technical": tech_weight
+    }
+
+    st.success("✅ Settings updated successfully!") ----------------------------------------
 # Health Tab
 # ----------------------------------------
 with tabs[4]:
