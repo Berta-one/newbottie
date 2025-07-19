@@ -181,35 +181,59 @@ with tabs[2]:
     st.write(position_monitor.get_active_positions())
 
 # ----------------------------------------
-# Quantum Analysis Tab (ALL Portfolio Pairs)
+# Multi-Strategy Analysis Tab
 # ----------------------------------------
+from ensemble_signal_engine import EnsembleSignalEngine
+
+ensemble_engine = EnsembleSignalEngine(client, quantum_trader, market_analyzer)
+
 with tabs[3]:
-    st.header("⚛ Quantum Analysis & Trading (All Portfolio Pairs)")
+    st.header("⚛ Multi-Strategy Analysis (Quantum + ML + Technical)")
+
+    # Get portfolio assets for analysis
     try:
-        portfolio_data = portfolio_mgr.get_portfolio()
-        assets = list(portfolio_data.keys())
-        if len(assets) < 2:
-            st.warning("⚠️ Need at least 2 assets in portfolio for pair analysis.")
-        else:
-            for i in range(len(assets)):
-                for j in range(i + 1, len(assets)):
-                    pair = f"{assets[i]}{assets[j]}"
-                    st.subheader(f"Quantum Analysis for {pair}")
-                    market_data = {
-                        "rsi": market_analyzer.get_latest_rsi(pair),
-                        "momentum": market_analyzer.get_latest_momentum(pair),
-                        "price_volatility": market_analyzer.get_volatility(pair)
-                    }
-                    signal = quantum_trader.evaluate_signal(market_data)
-                    st.json(signal["distribution"])
-                    st.write(f"Decision: **{signal['decision']}** (Confidence: {signal['confidence']})")
-                    qty = st.number_input(f"Trade Qty for {pair}", min_value=0.0001, step=0.0001, key=f"quantum_qty_{pair}")
-                    if st.button(f"Execute Quantum Trade for {pair}"):
-                        result = quantum_trader.execute_quantum_trade(pair, market_data, qty)
-                        st.session_state["logs"].append(f"[Quantum {pair}] {result}")
-                        st.success(result)
-    except Exception as e:
-        st.error(f"Quantum analysis error: {e}")
+        portfolio, *_ = portfolio_mgr.get_portfolio().items()
+        portfolio_symbols = [f"{asset}USDT" for asset, _ in portfolio_mgr.get_portfolio().items()]
+    except Exception:
+        portfolio_symbols = ["BTCUSDT", "ETHUSDT"]  # Fallback
+
+    weights = st.session_state.get("strategy_weights", {"quantum": 30, "ml": 30, "technical": 40})
+    min_confidence = st.session_state.get("min_confidence", 0.65)
+
+    st.info(f"Using weights: Quantum {weights['quantum']}%, ML {weights['ml']}%, Technical {weights['technical']}%")
+
+    signals_data = []
+    for symbol in portfolio_symbols:
+        try:
+            signal = ensemble_engine.get_signals(symbol, weights, min_confidence)
+            signals_data.append(signal)
+        except Exception as e:
+            st.error(f"Error fetching signal for {symbol}: {e}")
+
+    if signals_data:
+        df = pd.DataFrame([
+            {
+                "Symbol": s["symbol"],
+                "Quantum": f"{s['quantum']['decision']} ({s['quantum']['confidence']:.2f})",
+                "ML": f"{s['ml']['decision']} ({s['ml']['confidence']:.2f})",
+                "Technical": f"{s['technical']['decision']} ({s['technical']['confidence']:.2f})",
+                "Final": f"{s['final']['decision']} ({s['final']['confidence']:.2f})"
+            }
+            for s in signals_data
+        ])
+        st.dataframe(df, use_container_width=True)
+
+        for s in signals_data:
+            with st.expander(f"Quantum Circuit for {s['symbol']}"):
+                st.text(s["circuit"])
+
+            qty = st.number_input(f"Trade Quantity for {s['symbol']}", min_value=0.0001, step=0.0001, key=f"qty_{s['symbol']}")
+            if st.button(f"Execute Trade for {s['symbol']}"):
+                result = trade_exec.manual_trade(s["symbol"], qty, s["final"]["decision"])
+                st.success(result)
+                st.session_state["logs"].append(f"[Multi-Strategy] {result}")
+    else:
+        st.warning("No signals generated.")
 
 # ----------------------------------------
 # Settings Tab
