@@ -456,7 +456,7 @@ class MultiCoinPortfolioBot:
             return {}
 
 def main():
-    st.set_page_config(page_title="🎯 Adaptive Risk Management Bot", layout="wide")
+
     
     st.title("🎯 Adaptive Risk Management Trading Bot")
     st.caption("Professional, emotion-free trading with dynamic risk adjustment")
