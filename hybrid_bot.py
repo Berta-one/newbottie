@@ -21,6 +21,9 @@ import plotly.express as px
 import streamlit as st
 import psutil
 
+# ✅ MUST be the very first Streamlit call
+st.set_page_config(page_title="Hybrid Quantum Trading Bot", layout="wide")
+
 # Core modules
 from portfolio_manager import PortfolioManager
 from trade_executor import TradeExecutor
@@ -104,7 +107,6 @@ if "logs" not in st.session_state:
 # ----------------------------------------
 # Streamlit UI
 # ----------------------------------------
-st.set_page_config(page_title="Hybrid Quantum Trading Bot", layout="wide")
 st.title("🧠 Hybrid Quantum Crypto Trading Bot")
 st.caption("Advanced Crypto Trading with Technical, ML & Quantum Strategies")
 
@@ -134,8 +136,8 @@ with tabs[0]:
 # ----------------------------------------
 with tabs[1]:
     st.header("✋ Manual Trading")
-    pairs = market_analyzer.get_trading_pairs()
-    symbol = st.selectbox("Select Pair", pairs)
+    pairs = market_analyzer.scan_markets()  # This ensures list of pairs dynamically
+    symbol = st.selectbox("Select Pair", [p['symbol'] for p in pairs if 'symbol' in p])
     qty = st.number_input("Quantity", min_value=0.0001, step=0.0001)
     side = st.radio("Side", ["BUY", "SELL"])
     if st.button("Execute Trade"):
