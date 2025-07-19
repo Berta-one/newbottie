@@ -1,21 +1,30 @@
+#!/usr/bin/env python3
 """
-app.py
-========================
-Legacy entry point for the bot.
-Redirects to hybrid_bot.py (Streamlit dashboard) for UI.
-Quantum-related initialization uses BasicAer for compatibility.
+App starter to fix Railway port issues
 """
 
 import os
 import subprocess
+import sys
 
-# Ensure environment variables for Streamlit
-os.environ["STREAMLIT_SERVER_PORT"] = os.getenv("PORT", "8080")
-os.environ["STREAMLIT_SERVER_ADDRESS"] = "0.0.0.0"
-
-def run_dashboard():
-    """Start the main Streamlit dashboard."""
-    subprocess.run(["streamlit", "run", "hybrid_bot.py"])
+def main():
+    # Remove the problematic environment variable
+    if 'STREAMLIT_SERVER_PORT' in os.environ:
+        del os.environ['STREAMLIT_SERVER_PORT']
+    
+    # Get the port from Railway
+    port = os.environ.get('PORT', '8501')
+    
+    # Start Streamlit
+    cmd = [
+        sys.executable, '-m', 'streamlit', 'run', 'hybrid_bot.py',
+        '--server.port', port,
+        '--server.address', '0.0.0.0',
+        '--server.headless', 'true'
+    ]
+    
+    print(f"Starting Streamlit on port {port}")
+    subprocess.run(cmd)
 
 if __name__ == "__main__":
-    run_dashboard()
+    main()
