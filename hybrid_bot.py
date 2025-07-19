@@ -1,3 +1,86 @@
+#!/usr/bin/env python3
+"""
+Hybrid Crypto Trading Bot Dashboard with Quantum Analysis
+========================================================
+Complete self-contained trading bot with quantum computing modules
+and dynamic dependency management
+"""
+
+import streamlit as st
+import pandas as pd
+import plotly.graph_objects as go
+import plotly.express as px
+from plotly.subplots import make_subplots
+from datetime import datetime, timedelta
+import json, os, time, threading, requests
+import numpy as np
+import warnings
+import asyncio
+import sys
+import signal
+import atexit
+import logging
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Tuple
+import concurrent.futures
+
+warnings.filterwarnings('ignore')
+
+# Railway environment detection
+RAILWAY_ENV = os.getenv('RAILWAY_ENVIRONMENT') == 'production'
+PORT = int(os.getenv('PORT', 8080))
+
+# Configuration with environment variable fallbacks
+CONFIG = {
+    'BINANCE_API_KEY': os.getenv('BINANCE_API_KEY', ''),
+    'BINANCE_API_SECRET': os.getenv('BINANCE_API_SECRET', ''),
+    'MIN_BALANCE_USD': float(os.getenv('MIN_BALANCE_USD', '10.0')),
+    'SCAN_INTERVAL': int(os.getenv('SCAN_INTERVAL', '300')),
+    'MIN_CONFIDENCE': float(os.getenv('MIN_CONFIDENCE', '0.65')),
+    'RISK_PERCENTAGE': float(os.getenv('RISK_PERCENTAGE', '0.015')),
+    'MAX_POSITIONS': int(os.getenv('MAX_POSITIONS', '3')),
+    'QUANTUM_ENABLED': os.getenv('QUANTUM_ENABLED', 'True').lower() == 'true',
+    'ML_ENABLED': os.getenv('ML_ENABLED', 'True').lower() == 'true',
+    'USE_TESTNET': os.getenv('USE_TESTNET', 'False').lower() == 'true',
+    'LOG_LEVEL': os.getenv('LOG_LEVEL', 'INFO'),
+    'TRADING_PAIRS': os.getenv('TRADING_PAIRS', 'BTCUSDT,ETHUSDT,BNBUSDT,XRPUSDT,ADAUSDT,SOLUSDT,DOTUSDT,LINKUSDT,LTCUSDT,BCHUSDT').split(','),
+    'STRATEGY_WEIGHTS': {
+        'quantum': float(os.getenv('QUANTUM_WEIGHT', '0.3')),
+        'technical': float(os.getenv('TECHNICAL_WEIGHT', '0.4')),
+        'ml': float(os.getenv('ML_WEIGHT', '0.3'))
+    },
+    'RAILWAY_DEPLOYMENT': RAILWAY_ENV
+}
+
+# WebSocket configuration for Railway
+if RAILWAY_ENV:
+    os.environ['STREAMLIT_SERVER_ENABLE_WEBSOCKET_COMPRESSION'] = 'false'
+    os.environ['STREAMLIT_SERVER_MAX_MESSAGE_SIZE'] = '200'
+    os.environ['STREAMLIT_SERVER_MAX_UPLOAD_SIZE'] = '200'
+
+# Session state persistence for Railway
+if 'railway_session_id' not in st.session_state:
+    st.session_state['railway_session_id'] = f"railway_{int(time.time())}"
+
+# Railway logging configuration
+def setup_railway_logging():
+    """Setup logging optimized for Railway"""
+    import logging
+    
+    logging.basicConfig(
+        level=getattr(logging, CONFIG.get('LOG_LEVEL', 'INFO')),
+        format='[%(asctime)s] %(levelname)s: %(message)s',
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+            logging.FileHandler('logs/railway.log') if not RAILWAY_ENV else logging.NullHandler()
+        ]
+    )
+    
+    return logging.getLogger(__name__)
+
+logger = setup_railway_logging()
+
+
 # Continue with remaining tabs...
 
 # Hybrid Intelligence Scanner Tab
@@ -588,7 +671,8 @@ st.markdown("""
 # Auto-refresh for active features
 if st.session_state.get('auto_running', False) or st.session_state.get('advanced_features_enabled', True):
     time.sleep(30)  # Refresh every 30 seconds for active systems
-    st.rerun()        if win_or_loss == 'win':
+    st.rerun()
+if win_or_loss == 'win':
             condition = df['pnl'] > 0
         else:
             condition = df['pnl'] < 0
