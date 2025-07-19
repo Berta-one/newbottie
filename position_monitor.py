@@ -9,8 +9,8 @@ __all__ = ["PositionMonitor"]
 class PositionMonitor:
     """Lightweight in-memory position registry.
 
-    A production implementation should persist this data (e.g. database, Redis). For the
-    dashboard demo we keep it simple.
+    A production implementation should persist this data (e.g. database, Redis).
+    For the dashboard demo we keep it simple.
     """
 
     def __init__(self) -> None:
@@ -27,18 +27,16 @@ class PositionMonitor:
     def remove(self, symbol: str) -> None:
         self._positions.pop(symbol, None)
 
-    def update(self, symbol: str, **fields: Any) -> None:
+    def update(self, symbol: str, updates: Dict[str, Any]) -> None:
         if symbol in self._positions:
-            self._positions[symbol].update(fields)
+            self._positions[symbol].update(updates)
 
-    # ------------------------------------------------------------------
-    # Getters
-    # ------------------------------------------------------------------
-    def get(self, symbol: str) -> Dict[str, Any] | None:
-        return self._positions.get(symbol)
-
-    def all(self) -> List[Dict[str, Any]]:
-        return list(self._positions.values())
-
-    def is_open(self, symbol: str) -> bool:
+    def exists(self, symbol: str) -> bool:
         return symbol in self._positions
+
+    # ------------------------------------------------------------------
+    # New method required by hybrid_bot.py
+    # ------------------------------------------------------------------
+    def get_active_positions(self) -> Dict[str, Dict[str, Any]]:
+        """Return all currently tracked active positions."""
+        return self._positions
