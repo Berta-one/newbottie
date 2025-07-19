@@ -1,32 +1,46 @@
-from datetime import datetime
-from typing import Dict, Any
+"""
+position_monitor.py
+========================
+Tracks open positions for manual and automated trades.
+"""
 
-__all__ = ["PositionMonitor"]
+from __future__ import annotations
+from typing import Dict, Any
+from datetime import datetime
+
 
 class PositionMonitor:
-    """Tracks active positions for manual and auto trades."""
-
     def __init__(self):
-        self._positions: Dict[str, Dict[str, Any]] = {}
+        self.positions: Dict[str, Dict[str, Any]] = {}
 
-    def add(self, symbol: str, data: Dict[str, Any]):
-        data.setdefault("opened_at", datetime.now().isoformat())
-        self._positions[symbol] = data
+    # -------------------------------
+    # Add or Update Position
+    # -------------------------------
+    def add_position(self, symbol: str, details: Dict[str, Any]):
+        details["opened_at"] = details.get("opened_at", datetime.now().isoformat())
+        self.positions[symbol] = details
 
-    def add_position(self, symbol: str, data: Dict[str, Any]):
-        """Alias for backward compatibility."""
-        self.add(symbol, data)
+    # -------------------------------
+    # Remove Position
+    # -------------------------------
+    def remove_position(self, symbol: str):
+        if symbol in self.positions:
+            del self.positions[symbol]
 
-    def remove(self, symbol: str):
-        self._positions.pop(symbol, None)
+    # -------------------------------
+    # Get Position by Symbol
+    # -------------------------------
+    def get_position(self, symbol: str) -> Dict[str, Any]:
+        return self.positions.get(symbol, {})
 
-    def update(self, symbol: str, updates: Dict[str, Any]):
-        if symbol in self._positions:
-            self._positions[symbol].update(updates)
+    # -------------------------------
+    # Get All Active Positions
+    # -------------------------------
+    def get_active_positions(self) -> Dict[str, Any]:
+        return self.positions
 
-    def exists(self, symbol: str) -> bool:
-        return symbol in self._positions
-
-    def get_active_positions(self) -> Dict[str, Dict[str, Any]]:
-        """Return all currently tracked active positions."""
-        return self._positions
+    # -------------------------------
+    # Check if Position Exists
+    # -------------------------------
+    def is_open(self, symbol: str) -> bool:
+        return symbol in self.positions
