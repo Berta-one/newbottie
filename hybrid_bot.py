@@ -12,8 +12,11 @@ Streamlit UI for:
 - Logs
 - Analytics
 """
-
 import os
+import streamlit as st
+
+port = int(os.environ.get("PORT", 8501))
+st.set_page_config(page_title="Hybrid Quantum Trading Bot", layout="wide")
 import time
 import threading
 from datetime import datetime
