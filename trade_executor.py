@@ -2,16 +2,15 @@
 """
 Trade Executor for Hybrid Quantum Trading Bot
 =============================================
-Handles:
-- Manual trades with OCO orders
-- Auto trades based on signals
-- Dynamic SL/TP using ATR & risk rules
-- Real-time order updates via WebSocket
-- PnL tracking and logging
+Features:
+- Manual & Auto trade execution with OCO orders
+- ATR-based SL & TP
+- Real-time PnL tracking and equity curve
+- Binance WebSocket integration for order status
 """
 
 from __future__ import annotations
-from typing import Dict, Any, Callable
+from typing import Dict, Any, Callable, List
 from binance.client import Client
 from binance.exceptions import BinanceAPIException
 from binance import ThreadedWebsocketManager
@@ -19,17 +18,18 @@ import pandas as pd
 import threading
 import time
 import logging
-import math
 
 class TradeExecutor:
     def __init__(self, client: Client, risk_mgr, log_callback: Callable[[str], None] = None):
         self.client = client
         self.risk_mgr = risk_mgr
         self.log = log_callback or print
-        self.active_orders = {}  # Track open OCO orders
+        self.active_orders: Dict[str, Dict[str, Any]] = {}
+        self.trade_history: List[Dict[str, Any]] = []  # Store all trades for PnL
         self.twm = ThreadedWebsocketManager(api_key=client.API_KEY, api_secret=client.API_SECRET)
         self.twm.start()
         self.lock = threading.Lock()
+        self.equity = 0  # Running equity in USD
 
     # -------------------------------
     # Manual Trade with OCO
@@ -41,24 +41,26 @@ class TradeExecutor:
             sl_price = round(price - atr * sl_mult, 2)
             tp_price = round(price + atr * tp_mult, 2)
 
-            self.log(f"[Manual] Placing OCO for {symbol} at {price}, SL={sl_price}, TP={tp_price}")
-
+            self.log(f"[Manual] OCO for {symbol} Entry={price}, SL={sl_price}, TP={tp_price}")
             order = self._place_oco_order(symbol, qty, sl_price, tp_price)
-            return f"OCO Order Placed for {symbol} - Qty: {qty}, Entry: {price}, SL: {sl_price}, TP: {tp_price}"
+
+            # Record trade in history
+            self._record_trade(symbol, qty, price, sl_price, tp_price, "OPEN")
+
+            return f"OCO Order Placed for {symbol} (Qty: {qty}, Entry: {price}, SL: {sl_price}, TP: {tp_price})"
         except Exception as e:
             self.log(f"[ERROR] Manual trade failed: {e}")
             return f"Error placing manual trade: {e}"
 
     # -------------------------------
-    # Auto Trade from Signal
+    # Auto Trade
     # -------------------------------
     def auto_execute(self, signal: Dict[str, Any], total_balance_usd: float, open_positions: int, sl_mult: float, tp_mult: float):
         try:
             symbol = signal["symbol"]
             price = float(self.client.get_symbol_ticker(symbol=symbol)["price"])
-
-            # Risk check
             qty = self._calculate_position_size(price, total_balance_usd)
+
             validation = self.risk_mgr.validate_trade(symbol, qty, price, total_balance_usd, open_positions)
             if not validation["status"]:
                 self.log(f"[AUTO] Trade Blocked: {validation['reason']}")
@@ -68,11 +70,10 @@ class TradeExecutor:
             sl_price = round(price - atr * sl_mult, 2)
             tp_price = round(price + atr * tp_mult, 2)
 
-            self.log(f"[AUTO] Executing trade: {symbol}, Qty: {qty}, SL={sl_price}, TP={tp_price}")
-
+            self.log(f"[AUTO] OCO for {symbol} Entry={price}, SL={sl_price}, TP={tp_price}")
             order = self._place_oco_order(symbol, qty, sl_price, tp_price)
-            self._track_order(symbol, order)
 
+            self._record_trade(symbol, qty, price, sl_price, tp_price, "OPEN")
         except Exception as e:
             self.log(f"[ERROR] Auto trade failed: {e}")
 
@@ -81,7 +82,6 @@ class TradeExecutor:
     # -------------------------------
     def _place_oco_order(self, symbol: str, qty: float, sl_price: float, tp_price: float) -> Dict[str, Any]:
         try:
-            # Market Buy + OCO for SL/TP
             order = self.client.create_oco_order(
                 symbol=symbol,
                 side="SELL",
@@ -92,26 +92,64 @@ class TradeExecutor:
                 stopLimitTimeInForce="GTC"
             )
             with self.lock:
-                self.active_orders[symbol] = order
+                self.active_orders[symbol] = {
+                    "entry_price": float(self.client.get_symbol_ticker(symbol=symbol)["price"]),
+                    "qty": qty,
+                    "sl_price": sl_price,
+                    "tp_price": tp_price,
+                    "order_data": order
+                }
+            self._track_order(symbol)
             return order
         except BinanceAPIException as e:
             raise Exception(f"Binance API Error: {e.message}")
 
     # -------------------------------
-    # Track Orders via WebSocket
+    # Track Orders & Update PnL
     # -------------------------------
-    def _track_order(self, symbol: str, order: Dict[str, Any]):
+    def _track_order(self, symbol: str):
         def callback(msg):
-            if msg["e"] == "executionReport" and msg["s"] == symbol:
+            if msg.get("e") == "executionReport" and msg.get("s") == symbol:
                 status = msg.get("X", "")
                 if status in ["FILLED", "CANCELED", "REJECTED"]:
                     with self.lock:
-                        self.active_orders.pop(symbol, None)
-                    self.log(f"[ORDER UPDATE] {symbol} - Status: {status}")
+                        trade = self.active_orders.pop(symbol, None)
+                    if trade and status == "FILLED":
+                        exit_price = float(msg.get("L", trade["tp_price"]))
+                        pnl = (exit_price - trade["entry_price"]) * trade["qty"]
+                        self.equity += pnl
+                        self._update_trade_history(symbol, exit_price, pnl, "CLOSED")
+                        self.log(f"[ORDER FILLED] {symbol} | Exit={exit_price} | PnL=${pnl:.2f}")
         self.twm.start_user_socket(callback)
 
     # -------------------------------
-    # Calculate ATR for SL/TP
+    # Trade History Management
+    # -------------------------------
+    def _record_trade(self, symbol: str, qty: float, entry: float, sl: float, tp: float, status: str):
+        self.trade_history.append({
+            "symbol": symbol,
+            "qty": qty,
+            "entry_price": entry,
+            "sl_price": sl,
+            "tp_price": tp,
+            "status": status,
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+        })
+
+    def _update_trade_history(self, symbol: str, exit_price: float, pnl: float, status: str):
+        for trade in self.trade_history:
+            if trade["symbol"] == symbol and trade["status"] == "OPEN":
+                trade.update({"exit_price": exit_price, "pnl": pnl, "status": status})
+                break
+
+    def get_trade_history(self) -> pd.DataFrame:
+        return pd.DataFrame(self.trade_history)
+
+    def get_equity(self) -> float:
+        return self.equity
+
+    # -------------------------------
+    # Calculate ATR
     # -------------------------------
     def _calculate_atr(self, symbol: str, period: int = 14) -> float:
         try:
