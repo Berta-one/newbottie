@@ -1,23 +1,6 @@
-# Core Libraries
-streamlit==1.34.0
-pandas==2.2.2
-numpy==1.26.4
-requests==2.32.0
-
-# Binance API
-python-binance==1.0.19
-
-# Machine Learning
-scikit-learn==1.4.2
-
-# Plotting
-plotly==5.20.0
-
-# Quantum Computing
-qiskit==0.45.3
-
-# NOTE: We use BasicAer from qiskit-terra (included in qiskit)
-# No need to install qiskit-aer for Railway
-
-# Utility
-psutil==5.9.8
+streamlit
+pandas
+plotly
+psutil
+binance
+websocket-client
