@@ -28,7 +28,6 @@ class TradingBot:
         return signal, confidence
 
 def main():
-    st.set_page_config(page_title="🚀 Live Trading Bot", layout="wide")
     
     st.title("🚀 Live Crypto Trading Bot - Enhanced Version")
     st.caption("Real-time trading simulation with advanced features")
