@@ -1,151 +1,137 @@
 #!/usr/bin/env python3
 """
-Trade Executor Module
-========================
+Trade Executor for Hybrid Quantum Trading Bot
+=============================================
 Handles:
-- Market Buy Orders
-- OCO Sell Orders (Stop Loss + Take Profit)
-- ATR-based SL/TP Calculation
-- Risk Management Integration
-- PnL Tracking & Trade History
+- Manual trades with OCO orders
+- Auto trades based on signals
+- Dynamic SL/TP using ATR & risk rules
+- Real-time order updates via WebSocket
+- PnL tracking and logging
 """
 
-import math
-from datetime import datetime
-from typing import Dict, Any, Optional, List
+from __future__ import annotations
+from typing import Dict, Any, Callable
 from binance.client import Client
-from binance.enums import SIDE_BUY, SIDE_SELL
-from binance.streams import BinanceSocketManager
+from binance.exceptions import BinanceAPIException
+from binance import ThreadedWebsocketManager
 import pandas as pd
-import numpy as np
-
+import threading
+import time
+import logging
+import math
 
 class TradeExecutor:
-    def __init__(self, client: Client, risk_mgr, log_callback=None):
+    def __init__(self, client: Client, risk_mgr, log_callback: Callable[[str], None] = None):
         self.client = client
         self.risk_mgr = risk_mgr
-        self.log_callback = log_callback or print
-        self.active_orders: Dict[str, Dict[str, Any]] = {}
-        self.closed_trades: List[Dict[str, Any]] = []
-        self.socket_manager = BinanceSocketManager(client)
-        self.ws_conn_key = None
+        self.log = log_callback or print
+        self.active_orders = {}  # Track open OCO orders
+        self.twm = ThreadedWebsocketManager(api_key=client.API_KEY, api_secret=client.API_SECRET)
+        self.twm.start()
+        self.lock = threading.Lock()
 
-    # -----------------------------
-    # Core Execution Logic
-    # -----------------------------
-    def manual_trade(self, symbol: str, qty: float, sl_mult: float, tp_mult: float, dynamic_sizing=False) -> str:
-        return self._execute_trade(symbol, qty, sl_mult, tp_mult, dynamic_sizing)
-
-    def auto_execute(self, signal: Dict, total_balance: float, open_positions: int,
-                     sl_mult: float, tp_mult: float, dynamic_sizing=False) -> str:
-        symbol = signal["symbol"]
-        price = signal.get("price", self._get_market_price(symbol))
-        qty = signal.get("qty", 0.001)
-
-        # Risk validation
-        validation = self.risk_mgr.validate_trade(symbol, qty, price, total_balance, open_positions)
-        if not validation["status"]:
-            self._log(f"❌ Risk check failed for {symbol}: {validation['reason']}")
-            return validation["reason"]
-
-        return self._execute_trade(symbol, qty, sl_mult, tp_mult, dynamic_sizing)
-
-    # -----------------------------
-    # Execute with SL & TP via OCO
-    # -----------------------------
-    def _execute_trade(self, symbol: str, qty: float, sl_mult: float, tp_mult: float, dynamic_sizing=False) -> str:
+    # -------------------------------
+    # Manual Trade with OCO
+    # -------------------------------
+    def manual_trade(self, symbol: str, qty: float, sl_mult: float, tp_mult: float) -> str:
         try:
-            price = self._get_market_price(symbol)
+            price = float(self.client.get_symbol_ticker(symbol=symbol)["price"])
             atr = self._calculate_atr(symbol)
+            sl_price = round(price - atr * sl_mult, 2)
+            tp_price = round(price + atr * tp_mult, 2)
 
-            if dynamic_sizing:
-                max_risk = self.risk_mgr.max_risk_percent * 100  # example risk percent
-                qty = round(max_risk / (atr * sl_mult), 6)
+            self.log(f"[Manual] Placing OCO for {symbol} at {price}, SL={sl_price}, TP={tp_price}")
 
-            # Place Market Buy
-            order = self.client.order_market_buy(symbol=symbol, quantity=qty)
-            buy_price = float(order["fills"][0]["price"])
-            self._log(f"✅ Bought {qty} {symbol} @ {buy_price}")
+            order = self._place_oco_order(symbol, qty, sl_price, tp_price)
+            return f"OCO Order Placed for {symbol} - Qty: {qty}, Entry: {price}, SL: {sl_price}, TP: {tp_price}"
+        except Exception as e:
+            self.log(f"[ERROR] Manual trade failed: {e}")
+            return f"Error placing manual trade: {e}"
 
-            # Calculate SL & TP based on ATR
-            sl_price = round(buy_price - (atr * sl_mult), 2)
-            tp_price = round(buy_price + (atr * tp_mult), 2)
+    # -------------------------------
+    # Auto Trade from Signal
+    # -------------------------------
+    def auto_execute(self, signal: Dict[str, Any], total_balance_usd: float, open_positions: int, sl_mult: float, tp_mult: float):
+        try:
+            symbol = signal["symbol"]
+            price = float(self.client.get_symbol_ticker(symbol=symbol)["price"])
 
-            # Place OCO Sell Order
-            oco_order = self.client.create_oco_order(
+            # Risk check
+            qty = self._calculate_position_size(price, total_balance_usd)
+            validation = self.risk_mgr.validate_trade(symbol, qty, price, total_balance_usd, open_positions)
+            if not validation["status"]:
+                self.log(f"[AUTO] Trade Blocked: {validation['reason']}")
+                return
+
+            atr = self._calculate_atr(symbol)
+            sl_price = round(price - atr * sl_mult, 2)
+            tp_price = round(price + atr * tp_mult, 2)
+
+            self.log(f"[AUTO] Executing trade: {symbol}, Qty: {qty}, SL={sl_price}, TP={tp_price}")
+
+            order = self._place_oco_order(symbol, qty, sl_price, tp_price)
+            self._track_order(symbol, order)
+
+        except Exception as e:
+            self.log(f"[ERROR] Auto trade failed: {e}")
+
+    # -------------------------------
+    # Place OCO Order
+    # -------------------------------
+    def _place_oco_order(self, symbol: str, qty: float, sl_price: float, tp_price: float) -> Dict[str, Any]:
+        try:
+            # Market Buy + OCO for SL/TP
+            order = self.client.create_oco_order(
                 symbol=symbol,
-                side=SIDE_SELL,
+                side="SELL",
                 quantity=qty,
                 price=f"{tp_price:.2f}",
-                stopPrice=f"{sl_price * 1.001:.2f}",  # Slight buffer
+                stopPrice=f"{sl_price:.2f}",
                 stopLimitPrice=f"{sl_price:.2f}",
                 stopLimitTimeInForce="GTC"
             )
+            with self.lock:
+                self.active_orders[symbol] = order
+            return order
+        except BinanceAPIException as e:
+            raise Exception(f"Binance API Error: {e.message}")
 
-            self.active_orders[symbol] = {
-                "entry_price": buy_price,
-                "sl_price": sl_price,
-                "tp_price": tp_price,
-                "qty": qty,
-                "oco_order": oco_order,
-                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            }
+    # -------------------------------
+    # Track Orders via WebSocket
+    # -------------------------------
+    def _track_order(self, symbol: str, order: Dict[str, Any]):
+        def callback(msg):
+            if msg["e"] == "executionReport" and msg["s"] == symbol:
+                status = msg.get("X", "")
+                if status in ["FILLED", "CANCELED", "REJECTED"]:
+                    with self.lock:
+                        self.active_orders.pop(symbol, None)
+                    self.log(f"[ORDER UPDATE] {symbol} - Status: {status}")
+        self.twm.start_user_socket(callback)
 
-            if not self.ws_conn_key:
-                self._start_websocket_listener()
-
-            return f"✅ Trade executed: {symbol}, SL={sl_price}, TP={tp_price}, Qty={qty}"
-        except Exception as e:
-            return f"❌ Execution failed: {e}"
-
-    # -----------------------------
-    # Market Data Helpers
-    # -----------------------------
-    def _get_market_price(self, symbol: str) -> float:
-        ticker = self.client.get_symbol_ticker(symbol=symbol)
-        return float(ticker["price"])
-
+    # -------------------------------
+    # Calculate ATR for SL/TP
+    # -------------------------------
     def _calculate_atr(self, symbol: str, period: int = 14) -> float:
-        klines = self.client.get_klines(symbol=symbol, interval="1h", limit=period + 1)
-        highs = np.array([float(k[2]) for k in klines])
-        lows = np.array([float(k[3]) for k in klines])
-        closes = np.array([float(k[4]) for k in klines])
+        try:
+            klines = self.client.get_klines(symbol=symbol, interval="1h", limit=period+1)
+            df = pd.DataFrame(klines, columns=[
+                "time", "open", "high", "low", "close", "volume", "close_time", "quote_asset_volume",
+                "number_of_trades", "taker_buy_base", "taker_buy_quote", "ignore"
+            ])
+            df = df.astype({"high": float, "low": float, "close": float})
+            df["tr"] = df["high"] - df["low"]
+            df["tr"] = df[["tr", df["high"] - df["close"].shift(), df["low"] - df["close"].shift()]].abs().max(axis=1)
+            atr = df["tr"].rolling(period).mean().iloc[-1]
+            return atr if not pd.isna(atr) else 1.0
+        except Exception:
+            return 1.0
 
-        trs = [max(highs[i] - lows[i], abs(highs[i] - closes[i - 1]), abs(lows[i] - closes[i - 1]))
-               for i in range(1, len(highs))]
-        return round(np.mean(trs), 2)
-
-    # -----------------------------
-    # WebSocket Listener for OCO
-    # -----------------------------
-    def _start_websocket_listener(self):
-        def handle_msg(msg):
-            if msg.get("e") == "executionReport":
-                symbol = msg["s"]
-                status = msg["X"]
-                if status == "FILLED" and msg["x"] == "TRADE" and msg["S"] == "SELL":
-                    entry_price = self.active_orders[symbol]["entry_price"]
-                    exit_price = float(msg["L"])
-                    qty = self.active_orders[symbol]["qty"]
-                    pnl = (exit_price - entry_price) * qty
-                    self.closed_trades.append({
-                        "symbol": symbol,
-                        "entry_price": entry_price,
-                        "exit_price": exit_price,
-                        "pnl": pnl,
-                        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    })
-                    self._log(f"💰 Closed {symbol} @ {exit_price}, PnL: {pnl:.2f} USDT")
-                    self.active_orders.pop(symbol, None)
-
-        self.ws_conn_key = self.socket_manager.start_user_socket(handle_msg)
-        self.socket_manager.start()
-
-    # -----------------------------
-    # Logging Helper
-    # -----------------------------
-    def _log(self, message: str):
-        if self.log_callback:
-            self.log_callback(message)
-        else:
-            print(message)
+    # -------------------------------
+    # Position Sizing
+    # -------------------------------
+    def _calculate_position_size(self, price: float, total_balance_usd: float) -> float:
+        max_risk = total_balance_usd * self.risk_mgr.max_risk_percent
+        qty = max_risk / price
+        return round(qty, 6)  # Binance precision
