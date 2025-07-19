@@ -2,12 +2,12 @@
 """
 Hybrid Quantum Crypto Trading Bot Dashboard
 ===========================================
-Streamlit UI for:
+UI Features:
 - Portfolio Overview
 - Manual Trading
-- Auto-Trader
+- Auto-Trader Control
 - Multi-Strategy Analysis (Quantum + ML + Technical)
-- Settings
+- Risk Settings
 - System Health
 - Logs
 - Advanced Analytics
@@ -22,7 +22,7 @@ import plotly.express as px
 import streamlit as st
 import psutil
 
-# ✅ Must be first Streamlit call
+# ✅ Must be the first Streamlit call
 st.set_page_config(page_title="Hybrid Quantum Trading Bot", layout="wide")
 
 # Core modules
@@ -52,7 +52,7 @@ if not API_KEY or not API_SECRET:
 
 client = Client(API_KEY, API_SECRET)
 
-# Initialize core objects
+# Initialize modules
 portfolio_mgr = PortfolioManager(API_KEY, API_SECRET)
 risk_mgr = RiskManager(max_risk_percent=0.02, max_positions=5)
 trade_exec = TradeExecutor(client, risk_mgr)
