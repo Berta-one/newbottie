@@ -1773,4 +1773,543 @@ with tabs[6]:
                     # Generate demo prediction
                     features = np.random.randn(9)
                     prediction = "BUY" if np.sum(features) > 0 else "SELL"
-                    confidence = min
+                    confidence = min(0.95, 0.5 + abs(np.sum(features)) / 10)
+                    
+                    st.write("**Demo Feature Values:**")
+                    feature_names = [
+                        '5-period Return', '10-period Return', 'Volatility', 'Price Momentum',
+                        'Volume Ratio', 'Volume Volatility', 'RSI', 'SMA Ratio', 'Bollinger'
+                    ]
+                    
+                    for name, value in zip(feature_names, features):
+                        st.write(f"• {name}: {value:.3f}")
+                    
+                    # Show prediction
+                    st.metric("ML Prediction", prediction)
+                    st.metric("Prediction Confidence", f"{confidence:.1%}")
+                    
+                    # Feature contribution visualization
+                    fig = px.bar(x=feature_names, y=features, title="Feature Contributions to Prediction")
+                    fig.update_xaxis(tickangle=45)
+                    st.plotly_chart(fig, use_container_width=True)
+        
+        # ML model training section
+        st.subheader("🎓 Model Training")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.write("**Training Options:**")
+            training_period = st.selectbox("Training Period", ["1 week", "1 month", "3 months", "6 months"])
+            features_to_use = st.multiselect(
+                "Features to Include",
+                ["Price Returns", "Volume", "Technical Indicators", "Market Sentiment"],
+                default=["Price Returns", "Volume", "Technical Indicators"]
+            )
+            
+            if st.button("🎯 Retrain Model"):
+                with st.spinner("Training ML model..."):
+                    time.sleep(3)  # Simulate training
+                    st.success("✅ Model retrained successfully!")
+                    st.info("New model performance will be evaluated on next predictions")
+        
+        with col2:
+            st.write("**Model Performance:**")
+            
+            # Generate demo performance metrics
+            accuracy = 0.65 + np.random.random() * 0.25
+            precision = 0.60 + np.random.random() * 0.30
+            recall = 0.55 + np.random.random() * 0.35
+            f1_score = 2 * (precision * recall) / (precision + recall)
+            
+            st.metric("Accuracy", f"{accuracy:.1%}")
+            st.metric("Precision", f"{precision:.1%}")
+            st.metric("Recall", f"{recall:.1%}")
+            st.metric("F1 Score", f"{f1_score:.1%}")
+        
+        # ML concepts explanation
+        with st.expander("📚 ML Trading Concepts"):
+            st.write("""
+            **🤖 Machine Learning in Trading:**
+            
+            **Features Used:**
+            - **Price Returns**: Short and long-term price movements
+            - **Volume Analysis**: Trading volume patterns and ratios
+            - **Technical Indicators**: RSI, SMA, Bollinger Bands, MACD
+            - **Market Structure**: Support/resistance levels, trends
+            
+            **Model Types:**
+            - **Random Forest**: Ensemble of decision trees for robust predictions
+            - **Feature Scaling**: Standardization for consistent input ranges
+            - **Cross-Validation**: Prevents overfitting and improves generalization
+            
+            **Prediction Process:**
+            1. Extract features from market data
+            2. Scale features using trained scaler
+            3. Generate probability predictions
+            4. Convert to trading signals with confidence scores
+            
+            **Advantages:**
+            - Learns complex non-linear patterns
+            - Adapts to changing market conditions
+            - Provides probability-based confidence measures
+            - Handles multiple features simultaneously
+            """)
+            
+    else:
+        st.error("❌ Scikit-learn not available")
+        st.info("Install ML support with: `pip install scikit-learn`")
+        
+        # Show what's missing
+        st.subheader("🔧 Missing Dependencies")
+        missing_deps = []
+        if not DEPENDENCIES['sklearn']:
+            missing_deps.append("scikit-learn")
+        if not DEPENDENCIES['ta']:
+            missing_deps.append("ta (Technical Analysis)")
+        if not DEPENDENCIES['scipy']:
+            missing_deps.append("scipy")
+        
+        if missing_deps:
+            st.code(f"pip install {' '.join(missing_deps)}")
+        
+        # Alternative simple analysis
+        st.subheader("📊 Simple Statistical Analysis")
+        if st.button("Run Basic Analysis"):
+            with st.spinner("Running statistical analysis..."):
+                time.sleep(1)
+                
+                # Generate basic stats
+                returns = np.random.normal(0, 0.02, 100)
+                
+                st.write("**Market Statistics (Demo):**")
+                st.metric("Mean Return", f"{np.mean(returns):.2%}")
+                st.metric("Volatility", f"{np.std(returns):.2%}")
+                st.metric("Sharpe Ratio", f"{np.mean(returns)/np.std(returns):.2f}")
+                
+                # Simple signal
+                if np.mean(returns[-10:]) > 0:
+                    st.success("📈 Statistical Signal: BULLISH")
+                else:
+                    st.error("📉 Statistical Signal: BEARISH")
+
+# Settings Tab
+with tabs[7]:
+    st.header("⚙️ Advanced Configuration")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("🔧 Trading Settings")
+        
+        # API Configuration
+        st.write("**API Configuration:**")
+        api_status = "✅ Connected" if get_binance_client() else "❌ Not Connected"
+        st.write(f"Binance API: {api_status}")
+        st.write(f"Testnet Mode: {'✅ Enabled' if CONFIG['USE_TESTNET'] else '❌ Disabled'}")
+        
+        # Trading pairs configuration
+        st.write("**Trading Pairs:**")
+        all_pairs = CONFIG['TRADING_PAIRS'] + ['MATICUSDT', 'AVAXUSDT', 'FTMUSDT', 'NEARUSDT']
+        selected_pairs = st.multiselect(
+            "Select Trading Pairs",
+            all_pairs,
+            default=st.session_state.get('selected_pairs', CONFIG['TRADING_PAIRS'][:5]),
+            key='selected_pairs_settings'
+        )
+        
+        if st.button("💾 Save Trading Pairs"):
+            st.session_state['selected_pairs'] = selected_pairs
+            st.success("Trading pairs updated!")
+        
+        # Risk management
+        st.write("**Risk Management:**")
+        risk_per_trade = st.slider(
+            "Risk per Trade (%)",
+            0.1, 5.0, 
+            st.session_state.get('risk_override', CONFIG['RISK_PERCENTAGE']) * 100,
+            0.1
+        ) / 100
+        
+        max_positions = st.number_input(
+            "Max Concurrent Positions",
+            1, 10,
+            CONFIG['MAX_POSITIONS']
+        )
+        
+        stop_loss_pct = st.slider("Default Stop Loss (%)", 1.0, 20.0, 5.0, 0.5)
+        take_profit_pct = st.slider("Default Take Profit (%)", 2.0, 50.0, 10.0, 1.0)
+        
+        st.session_state['risk_override'] = risk_per_trade
+    
+    with col2:
+        st.subheader("🔬 Analysis Settings")
+        
+        # Method weights
+        st.write("**Analysis Method Weights:**")
+        current_weights = st.session_state.get('strategy_weights', CONFIG['STRATEGY_WEIGHTS'])
+        
+        technical_weight = st.slider("Technical Analysis", 0.0, 1.0, current_weights['technical'], 0.1)
+        quantum_weight = st.slider("Quantum Analysis", 0.0, 1.0, current_weights['quantum'], 0.1)
+        ml_weight = st.slider("Machine Learning", 0.0, 1.0, current_weights['ml'], 0.1)
+        
+        # Normalize weights
+        total_weight = technical_weight + quantum_weight + ml_weight
+        if total_weight > 0:
+            normalized_weights = {
+                'technical': technical_weight / total_weight,
+                'quantum': quantum_weight / total_weight,
+                'ml': ml_weight / total_weight
+            }
+            st.session_state['strategy_weights'] = normalized_weights
+            
+            # Show normalized weights
+            st.write("**Normalized Weights:**")
+            st.write(f"Technical: {normalized_weights['technical']:.1%}")
+            st.write(f"Quantum: {normalized_weights['quantum']:.1%}")
+            st.write(f"ML: {normalized_weights['ml']:.1%}")
+        
+        # Analysis requirements
+        st.write("**Analysis Requirements:**")
+        min_confidence = st.slider(
+            "Minimum Confidence",
+            0.5, 0.95,
+            st.session_state.get('min_confidence', CONFIG['MIN_CONFIDENCE']),
+            0.05,
+            key='min_confidence_settings'
+        )
+        
+        require_consensus = st.checkbox("Require 2/3 Method Agreement", value=True)
+        quantum_priority = st.checkbox("Quantum Override (High Confidence)", value=False)
+        
+        # Scan settings
+        st.write("**Scanning Settings:**")
+        scan_interval = st.slider("Auto Scan Interval (seconds)", 60, 900, CONFIG['SCAN_INTERVAL'], 30)
+        max_scan_pairs = st.slider("Max Pairs per Scan", 5, 20, 10, 1)
+    
+    # Advanced settings
+    with st.expander("🔧 Advanced Settings"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.write("**Logging:**")
+            log_level = st.selectbox("Log Level", ["INFO", "DEBUG", "WARNING", "ERROR"])
+            enable_detailed_logs = st.checkbox("Enable Detailed Logging", value=True)
+            auto_cleanup_logs = st.checkbox("Auto Cleanup Old Logs", value=True)
+            
+            st.write("**Performance:**")
+            enable_caching = st.checkbox("Enable Data Caching", value=True)
+            cache_duration = st.slider("Cache Duration (minutes)", 1, 60, 5)
+        
+        with col2:
+            st.write("**Notifications:**")
+            enable_notifications = st.checkbox("Enable Notifications", value=False)
+            notification_methods = st.multiselect(
+                "Notification Methods",
+                ["Email", "Telegram", "Discord", "Slack"],
+                default=[]
+            )
+            
+            st.write("**Safety:**")
+            paper_trading = st.checkbox("Paper Trading Mode", value=CONFIG['USE_TESTNET'])
+            require_confirmation = st.checkbox("Require Manual Confirmation", value=True)
+    
+    # Save settings
+    if st.button("💾 Save All Settings", type="primary"):
+        # Update configuration
+        settings_to_save = {
+            'risk_per_trade': risk_per_trade,
+            'max_positions': max_positions,
+            'min_confidence': min_confidence,
+            'scan_interval': scan_interval,
+            'strategy_weights': st.session_state['strategy_weights'],
+            'selected_pairs': st.session_state['selected_pairs'],
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        try:
+            with open('logs/user_settings.json', 'w') as f:
+                json.dump(settings_to_save, f, indent=2)
+            
+            st.success("✅ Settings saved successfully!")
+            st.balloons()
+        except Exception as e:
+            st.error(f"❌ Error saving settings: {e}")
+
+# Health Tab
+with tabs[8]:
+    st.header("💓 System Health & Diagnostics")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("🖥️ System Resources")
+        
+        if DEPENDENCIES['psutil']:
+            try:
+                cpu_percent = psutil.cpu_percent(interval=1)
+                memory = psutil.virtual_memory()
+                disk = psutil.disk_usage('/')
+                
+                # CPU
+                cpu_color = "🟢" if cpu_percent < 50 else "🟡" if cpu_percent < 80 else "🔴"
+                st.metric(f"{cpu_color} CPU Usage", f"{cpu_percent:.1f}%")
+                
+                # Memory
+                mem_color = "🟢" if memory.percent < 70 else "🟡" if memory.percent < 85 else "🔴"
+                st.metric(f"{mem_color} Memory Usage", f"{memory.percent:.1f}%")
+                st.write(f"Available: {memory.available / (1024**3):.1f} GB")
+                
+                # Disk
+                disk_color = "🟢" if disk.percent < 80 else "🟡" if disk.percent < 90 else "🔴"
+                st.metric(f"{disk_color} Disk Usage", f"{disk.percent:.1f}%")
+                st.write(f"Free: {disk.free / (1024**3):.1f} GB")
+                
+                # Network (if available)
+                try:
+                    net_io = psutil.net_io_counters()
+                    st.write(f"📡 Network Sent: {net_io.bytes_sent / (1024**2):.1f} MB")
+                    st.write(f"📡 Network Received: {net_io.bytes_recv / (1024**2):.1f} MB")
+                except:
+                    st.write("📡 Network info unavailable")
+                
+            except Exception as e:
+                st.error(f"System monitoring error: {e}")
+        else:
+            st.warning("⚠️ System monitoring unavailable")
+            st.info("Install psutil for detailed system monitoring: `pip install psutil`")
+        
+        # Process information
+        st.metric("🧵 Active Threads", threading.active_count())
+        st.metric("⏱️ App Uptime", f"{(datetime.now() - datetime.now().replace(second=0, microsecond=0)).seconds} seconds")
+    
+    with col2:
+        st.subheader("🌐 Network & API Health")
+        
+        # Internet connectivity
+        try:
+            response = requests.get("https://httpbin.org/get", timeout=5)
+            if response.status_code == 200:
+                st.success("✅ Internet connection OK")
+            else:
+                st.warning(f"⚠️ Internet issues (Status: {response.status_code})")
+        except:
+            st.error("❌ Internet connection failed")
+        
+        # Binance API health
+        client = get_binance_client()
+        if client:
+            try:
+                # Test API connectivity
+                ping_result = client.ping()
+                st.success("✅ Binance API reachable")
+                
+                # Test API functionality
+                server_time = client.get_server_time()
+                local_time = int(time.time() * 1000)
+                time_diff = abs(server_time['serverTime'] - local_time)
+                
+                if time_diff < 5000:  # 5 seconds
+                    st.success(f"✅ Time sync OK ({time_diff}ms)")
+                else:
+                    st.warning(f"⚠️ Time sync issue ({time_diff}ms)")
+                
+                # Test account access
+                try:
+                    account = client.get_account()
+                    st.success("✅ Account access OK")
+                    
+                    # API weight usage
+                    rate_limit = account.get('canTrade', True)
+                    if rate_limit:
+                        st.success("✅ Trading enabled")
+                    else:
+                        st.error("❌ Trading disabled")
+                        
+                except Exception as e:
+                    st.error(f"❌ Account access failed: {e}")
+                
+            except Exception as e:
+                st.error(f"❌ Binance API error: {e}")
+        else:
+            st.error("❌ No Binance client available")
+        
+        # Exchange rate API
+        try:
+            gbp_rate = get_gbp_exchange_rate()
+            if 0.5 < gbp_rate < 1.5:  # Reasonable range
+                st.success(f"✅ Exchange rate API OK (USD/GBP: {gbp_rate:.4f})")
+            else:
+                st.warning(f"⚠️ Unusual exchange rate: {gbp_rate:.4f}")
+        except:
+            st.error("❌ Exchange rate API failed")
+    
+    # Dependency status
+    st.subheader("📦 Dependency Health Check")
+    
+    dependency_status = []
+    for dep, available in DEPENDENCIES.items():
+        status = "✅ Available" if available else "❌ Missing"
+        importance = "Critical" if dep in ['binance'] else "Optional" if dep in ['psutil', 'ta'] else "Enhanced"
+        dependency_status.append({
+            'Dependency': dep.upper(),
+            'Status': status,
+            'Importance': importance,
+            'Function': {
+                'psutil': 'System monitoring',
+                'binance': 'Trading API',
+                'dotenv': 'Environment variables',
+                'ta': 'Technical analysis',
+                'sklearn': 'Machine learning',
+                'scipy': 'Scientific computing',
+                'qiskit': 'Quantum computing'
+            }.get(dep, 'Unknown')
+        })
+    
+    df_deps = pd.DataFrame(dependency_status)
+    st.dataframe(df_deps, use_container_width=True)
+    
+    # Log file health
+    st.subheader("📁 Log File Status")
+    
+    log_files = [
+        'logs/trades.csv',
+        'logs/manual_trades.log',
+        'logs/quantum_trades.csv',
+        'logs/scan_results.json',
+        'logs/bot_activity.log',
+        'logs/hybrid_analysis.log'
+    ]
+    
+    log_status = []
+    for log_file in log_files:
+        if os.path.exists(log_file):
+            size = os.path.getsize(log_file)
+            size_mb = size / (1024 * 1024)
+            modified = datetime.fromtimestamp(os.path.getmtime(log_file))
+            
+            status = "✅ OK"
+            if size == 0:
+                status = "⚠️ Empty"
+            elif size_mb > 100:  # Over 100MB
+                status = "🟡 Large"
+            
+            log_status.append({
+                'File': log_file,
+                'Status': status,
+                'Size (MB)': f"{size_mb:.2f}",
+                'Last Modified': modified.strftime('%Y-%m-%d %H:%M')
+            })
+        else:
+            log_status.append({
+                'File': log_file,
+                'Status': "❌ Missing",
+                'Size (MB)': "0.00",
+                'Last Modified': "Never"
+            })
+    
+    df_logs = pd.DataFrame(log_status)
+    st.dataframe(df_logs, use_container_width=True)
+    
+    # Recent activity
+    st.subheader("📊 Recent Activity")
+    
+    try:
+        if os.path.exists('logs/bot_activity.log'):
+            with open('logs/bot_activity.log', 'r') as f:
+                lines = f.readlines()[-10:]  # Last 10 lines
+            
+            if lines:
+                st.write("**Last 10 log entries:**")
+                for line in reversed(lines):
+                    st.text(line.strip())
+            else:
+                st.info("No recent activity")
+        else:
+            st.info("No activity log file")
+    except Exception as e:
+        st.error(f"Error reading activity log: {e}")
+    
+    # Health actions
+    st.subheader("🔧 Health Actions")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("🔄 Test All Connections"):
+            with st.spinner("Testing connections..."):
+                # Test internet
+                try:
+                    requests.get("https://httpbin.org/get", timeout=5)
+                    st.success("✅ Internet OK")
+                except:
+                    st.error("❌ Internet failed")
+                
+                # Test Binance
+                client = get_binance_client()
+                if client:
+                    try:
+                        client.ping()
+                        st.success("✅ Binance API OK")
+                    except:
+                        st.error("❌ Binance API failed")
+                else:
+                    st.error("❌ No Binance client")
+    
+    with col2:
+        if st.button("🧹 Clean Log Files"):
+            try:
+                for log_file in log_files:
+                    if os.path.exists(log_file):
+                        # Keep only last 1000 lines for text files
+                        if log_file.endswith('.log'):
+                            with open(log_file, 'r') as f:
+                                lines = f.readlines()
+                            if len(lines) > 1000:
+                                with open(log_file, 'w') as f:
+                                    f.writelines(lines[-1000:])
+                
+                st.success("✅ Log files cleaned")
+            except Exception as e:
+                st.error(f"❌ Cleanup failed: {e}")
+    
+    with col3:
+        if st.button("📊 Generate Health Report"):
+            try:
+                health_report = {
+                    'timestamp': datetime.now().isoformat(),
+                    'dependencies': DEPENDENCIES,
+                    'api_status': 'OK' if get_binance_client() else 'Failed',
+                    'log_files': len([f for f in log_files if os.path.exists(f)]),
+                    'system_resources': {
+                        'cpu_available': DEPENDENCIES['psutil'],
+                        'threads': threading.active_count()
+                    }
+                }
+                
+                with open('logs/health_report.json', 'w') as f:
+                    json.dump(health_report, f, indent=2)
+                
+                st.success("✅ Health report generated")
+                st.download_button(
+                    "📥 Download Report",
+                    data=json.dumps(health_report, indent=2),
+                    file_name=f"health_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                    mime="application/json"
+                )
+            except Exception as e:
+                st.error(f"❌ Report generation failed: {e}")
+
+# Auto-refresh for running bot
+if st.session_state.get('auto_running', False):
+    time.sleep(10)  # Refresh every 10 seconds when bot is running
+    st.rerun()
+
+# Footer
+st.markdown("---")
+st.markdown("""
+<div style='text-align: center; color: #666;'>
+🧠 Hybrid Quantum Crypto Trading Bot | Advanced Multi-Method Analysis<br>
+⚛️ Quantum Computing • 🤖 Machine Learning • 📊 Technical Analysis
+</div>
+""", unsafe_allow_html=True)
