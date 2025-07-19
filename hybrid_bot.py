@@ -115,22 +115,43 @@ tabs = st.tabs([
     "⚛ Quantum Analysis", "🩺 Health", "📜 Logs", "📈 Analytics"
 ])
 
-# ----------------------------------------
+# # ----------------------------------------
 # Portfolio Tab
 # ----------------------------------------
 with tabs[0]:
     st.header("📊 Portfolio Overview")
     try:
-        portfolio, total_value = portfolio_mgr.get_portfolio()
-        st.metric("Total Value (USD)", f"${total_value:,.2f}")
-        df = pd.DataFrame(portfolio)
-        st.dataframe(df, use_container_width=True)
-        if not df.empty:
-            fig = px.pie(df, names='asset', values='usd_value', title="Portfolio Allocation")
-            st.plotly_chart(fig, use_container_width=True)
-    except BinanceAPIException as e:
-        st.error(f"Portfolio fetch error: {e}")
+        # Updated unpacking for 3 return values
+        portfolio, total_usd, total_gbp = portfolio_mgr.get_portfolio()
 
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Total Value (USD)", f"${total_usd:,.2f}")
+        with col2:
+            st.metric("Total Value (GBP)", f"£{total_gbp:,.2f}")
+
+        # Convert portfolio dict to DataFrame
+        if portfolio:
+            df = pd.DataFrame([
+                {
+                    "Asset": asset,
+                    "Balance": data["balance"],
+                    "Price (USD)": data["price_usd"],
+                    "Value (USD)": data["usd_value"],
+                    "24h Change": f"{data['price_change_24h']}%"
+                }
+                for asset, data in portfolio.items()
+            ])
+
+            st.dataframe(df, use_container_width=True)
+
+            # Pie chart for allocation
+            fig = px.pie(df, names='Asset', values='Value (USD)', title="Portfolio Allocation")
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.warning("⚠️ No assets found in your portfolio.")
+    except Exception as e:
+        st.error(f"Portfolio fetch error: {e}")
 # ----------------------------------------
 # Manual Trading Tab
 # ----------------------------------------
