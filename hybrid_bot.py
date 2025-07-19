@@ -724,92 +724,99 @@ def perform_scan():
         st.error(f"Scan error: {e}")
 
 def dashboard():
-    """Main dashboard with tabs"""
-    # Sidebar
-    st.sidebar.title("🤖 Bot Control")
-    st.sidebar.markdown("### 🔴 LIVE TRADING")
-    st.sidebar.markdown("**Real Money Trading Active**")
+    """Main dashboard with tabs - this renders the complete interface"""
     
-    # Bot status
-    auto_status = st.session_state.get('auto_trader_running', False)
-    st.sidebar.markdown(f"**Auto Trader:** {'🟢 Running' if auto_status else '🔴 Stopped'}")
+    # Create columns for main layout
+    sidebar_col, main_col = st.columns([1, 4])
     
-    # Quick stats with GBP
-    if TRADING_MODULES_AVAILABLE:
-        client = get_binance_client()
-        if client:
-            try:
-                balance = get_account_balance(client, 'USDT')
-                st.sidebar.metric("USDT Balance", f"${balance:,.2f}")
-                
-                # Show GBP equivalent
-                gbp_rate = get_gbp_exchange_rate()
-                gbp_balance = balance * gbp_rate
-                st.sidebar.metric("GBP Equivalent", f"£{gbp_balance:,.2f}")
-                
-            except:
-                st.sidebar.metric("USDT Balance", "Error")
-    
-    # Show active positions count
-    try:
-        active_positions = len(get_open_positions())
-        st.sidebar.metric("Active Positions", active_positions)
-    except:
-        st.sidebar.metric("Active Positions", "Error")
-    
-    # Emergency stop
-    st.sidebar.markdown("---")
-    if st.sidebar.button("🚨 EMERGENCY STOP", type="primary"):
-        st.session_state['auto_trader_running'] = False
-        st.sidebar.error("🛑 Emergency stop activated!")
+    # Sidebar content
+    with sidebar_col:
+        st.markdown("### 🤖 Bot Control")
+        st.markdown("**🔴 LIVE TRADING MODE**")
+        st.markdown("Real Money Trading Active")
         
-        # Try to show positions that need manual closure
+        # Bot status
+        auto_status = st.session_state.get('auto_trader_running', False)
+        status_text = "🟢 Running" if auto_status else "🔴 Stopped"
+        st.markdown(f"**Auto Trader:** {status_text}")
+        
+        # Quick stats with GBP
+        if TRADING_MODULES_AVAILABLE:
+            client = get_binance_client()
+            if client:
+                try:
+                    balance = get_account_balance(client, 'USDT')
+                    st.metric("USDT Balance", f"${balance:,.2f}")
+                    
+                    # Show GBP equivalent
+                    gbp_rate = get_gbp_exchange_rate()
+                    gbp_balance = balance * gbp_rate
+                    st.metric("GBP Equivalent", f"£{gbp_balance:,.2f}")
+                    
+                except:
+                    st.metric("USDT Balance", "Error")
+        
+        # Show active positions count
         try:
-            positions = get_open_positions()
-            if positions:
-                st.sidebar.warning("⚠️ Manual position closure may be required:")
-                for pos in positions[:3]:  # Show first 3
-                    st.sidebar.text(f"• {pos['Asset']}: ${pos['USD Value']:.2f}")
+            active_positions = len(get_open_positions())
+            st.metric("Active Positions", active_positions)
         except:
-            pass
+            st.metric("Active Positions", "Error")
+        
+        # Emergency stop
+        st.markdown("---")
+        if st.button("🚨 EMERGENCY STOP", type="primary", key="emergency_stop"):
+            st.session_state['auto_trader_running'] = False
+            st.error("🛑 Emergency stop activated!")
+            
+            # Try to show positions that need manual closure
+            try:
+                positions = get_open_positions()
+                if positions:
+                    st.warning("⚠️ Manual position closure may be required:")
+                    for pos in positions[:3]:  # Show first 3
+                        st.text(f"• {pos['Asset']}: ${pos['USD Value']:.2f}")
+            except:
+                pass
+        
+        # Add refresh rate info
+        st.markdown("---")
+        st.markdown("**Dashboard Info:**")
+        st.text(f"Last Update: {datetime.now().strftime('%H:%M:%S')}")
+        st.text("Auto-refresh: Manual")
     
-    # Add refresh rate info
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("**Dashboard Info:**")
-    st.sidebar.text(f"Last Update: {datetime.now().strftime('%H:%M:%S')}")
-    st.sidebar.text("Auto-refresh: Manual")
-    
-    # Main content with tabs
-    st.subheader("📊 Trading Dashboard")
-    
-    # Create the tabs - this is the key fix!
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-        "🎯 Overview", 
-        "⚙️ Strategy", 
-        "🔬 Quantum",
-        "💹 Manual", 
-        "📈 Performance", 
-        "📋 Logs"
-    ])
-    
-    # Tab content
-    with tab1:
-        render_overview_tab()
-    
-    with tab2:
-        render_strategy_tab()
-    
-    with tab3:
-        render_quantum_analysis_tab()
-    
-    with tab4:
-        render_manual_trading_tab()
-    
-    with tab5:
-        render_performance_tab()
-    
-    with tab6:
-        render_logs_tab()
+    # Main content area with tabs
+    with main_col:
+        st.subheader("📊 Trading Dashboard")
+        
+        # THIS IS THE KEY - Create tabs in the main content area
+        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+            "🎯 Overview", 
+            "⚙️ Strategy", 
+            "🔬 Quantum",
+            "💹 Manual", 
+            "📈 Performance", 
+            "📋 Logs"
+        ])
+        
+        # Tab content - each function renders in its respective tab
+        with tab1:
+            render_overview_tab()
+        
+        with tab2:
+            render_strategy_tab()
+        
+        with tab3:
+            render_quantum_analysis_tab()
+        
+        with tab4:
+            render_manual_trading_tab()
+        
+        with tab5:
+            render_performance_tab()
+        
+        with tab6:
+            render_logs_tab()
 
 def render_quantum_analysis_tab():
     """Quantum analysis tab"""
@@ -934,7 +941,7 @@ def main():
         
         st.stop()
     
-    # Main app
+    # Main app header
     st.title("🤖 Crypto Trading Bot - LIVE MODE")
     st.caption("Professional cryptocurrency trading dashboard")
     
@@ -949,6 +956,8 @@ def main():
         st.success("✅ All systems operational - Live trading ready")
     
     st.markdown("---")
+    
+    # Call dashboard function which contains the tabs
     dashboard()
 
 if __name__ == "__main__":
