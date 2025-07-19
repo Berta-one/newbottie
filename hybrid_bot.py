@@ -196,24 +196,44 @@ with tabs[2]:
 # ----------------------------------------
 with tabs[3]:
     st.header("⚛ Quantum Analysis & Trading")
+
+    # Dynamic pair selection (from available pairs)
+    available_pairs = [p['symbol'] for p in market_analyzer.scan_markets() if 'symbol' in p]
+    if not available_pairs:
+        available_pairs = ["BTCUSDT"]  # Fallback default
+
+    selected_pair = st.selectbox("Select Pair for Quantum Analysis", available_pairs)
+
+    # Fetch market data for selected pair
     market_data = {
-        "rsi": market_analyzer.get_latest_rsi("BTCUSDT"),
-        "momentum": market_analyzer.get_latest_momentum("BTCUSDT"),
-        "price_volatility": market_analyzer.get_volatility("BTCUSDT")
+        "rsi": market_analyzer.get_latest_rsi(selected_pair),
+        "momentum": market_analyzer.get_latest_momentum(selected_pair),
+        "price_volatility": market_analyzer.get_volatility(selected_pair)
     }
+
+    st.write(f"Performing Quantum Analysis for **{selected_pair}**")
+
     try:
+        # Generate quantum signal
         signal = quantum_trader.evaluate_signal(market_data)
+
         st.subheader("Quantum Signal")
         st.json(signal["distribution"])
         st.write(f"**Decision:** {signal['decision']} (Confidence: {signal['confidence']})")
+
+        # Display quantum circuit representation
         st.text(signal["circuit"])
+
         st.subheader("Quantum Diagnostics")
         st.json(quantum_analyzer.get_quantum_diagnostics())
+
+        # Execute trade based on quantum signal
         qty = st.number_input("Trade Quantity", min_value=0.0001, step=0.0001, key="quantum_qty")
         if st.button("Execute Quantum Trade"):
-            result = quantum_trader.execute_quantum_trade("BTCUSDT", market_data, qty)
+            result = quantum_trader.execute_quantum_trade(selected_pair, market_data, qty)
             st.session_state["logs"].append(f"[Quantum] {result}")
             st.success(result)
+
     except Exception as e:
         st.error(f"Quantum analysis error: {e}")
 
