@@ -6,7 +6,7 @@ Streamlit UI for:
 - Portfolio Overview
 - Manual Trading
 - Auto-Trader Control
-- Quantum Analysis & Trading
+- Multi-Strategy Analysis (Quantum + ML + Technical)
 - Settings
 - System Health
 - Logs
@@ -22,7 +22,7 @@ import plotly.express as px
 import streamlit as st
 import psutil
 
-# ✅ MUST be first Streamlit command
+# ✅ MUST be the first Streamlit call
 st.set_page_config(page_title="Hybrid Quantum Trading Bot", layout="wide")
 
 # Core modules
@@ -34,6 +34,7 @@ from market_analyzer import MarketAnalyzer
 from quantum_trading_integration import QuantumTrader
 from quantum_engine import QuantumAnalyzer
 from dashboard import TradingDashboard
+from ensemble_signal_engine import EnsembleSignalEngine
 
 # Binance client
 from binance.client import Client
@@ -53,13 +54,14 @@ client = Client(API_KEY, API_SECRET)
 
 # Initialize core objects
 portfolio_mgr = PortfolioManager(API_KEY, API_SECRET)
-risk_mgr = RiskManager()
+risk_mgr = RiskManager(max_risk_percent=0.02, max_positions=5)
 trade_exec = TradeExecutor(client, risk_mgr)
 position_monitor = PositionMonitor()
 market_analyzer = MarketAnalyzer(client)
 quantum_trader = QuantumTrader(client)
 quantum_analyzer = QuantumAnalyzer()
 analytics_dashboard = TradingDashboard()
+ensemble_engine = EnsembleSignalEngine(client, quantum_trader, market_analyzer)
 
 # Auto-Trader state
 AUTO_TRADING = False
@@ -86,8 +88,17 @@ def auto_trading_loop():
         try:
             signals = market_analyzer.scan_markets()
             for sig in signals:
-                result = trade_exec.auto_execute(sig)
-                st.session_state["logs"].append(f"[AUTO] {datetime.now().isoformat()} {result}")
+                price = sig.get("price", 0)
+                qty = sig.get("qty", 0.001)
+                open_positions = len(position_monitor.get_active_positions())
+                total_balance_usd = portfolio_mgr.total_value()
+
+                validation = risk_mgr.validate_trade(sig["symbol"], qty, price, total_balance_usd, open_positions)
+                if validation["status"]:
+                    result = trade_exec.auto_execute(sig)
+                    st.session_state["logs"].append(f"[AUTO] {datetime.now().isoformat()} {result}")
+                else:
+                    st.session_state["logs"].append(f"[RISK BLOCKED] {sig['symbol']} - {validation['reason']}")
         except Exception as e:
             st.session_state["logs"].append(f"[AUTO ERROR] {e}")
         time.sleep(30)
@@ -113,7 +124,7 @@ st.caption("Advanced Crypto Trading with Technical, ML & Quantum Strategies")
 
 tabs = st.tabs([
     "📊 Portfolio", "✋ Manual Trading", "🤖 Auto-Trader",
-    "⚛ Quantum Analysis", "🛠 Settings", "🩺 Health", "📜 Logs", "📈 Analytics"
+    "⚛ Multi-Strategy", "🛠 Settings", "🩺 Health", "📜 Logs", "📈 Analytics"
 ])
 
 # ----------------------------------------
@@ -122,9 +133,9 @@ tabs = st.tabs([
 with tabs[0]:
     st.header("📊 Portfolio Overview")
     try:
-        portfolio_data = portfolio_mgr.get_portfolio()
-        if isinstance(portfolio_data, dict):
-            total_usd = sum(v["value"] for v in portfolio_data.values())
+        portfolio = portfolio_mgr.get_portfolio()
+        if isinstance(portfolio, dict):
+            total_usd = sum(v["value"] for v in portfolio.values())
             col1, col2 = st.columns(2)
             with col1:
                 st.metric("Total Value (USD)", f"${total_usd:,.2f}")
@@ -139,7 +150,7 @@ with tabs[0]:
                     "Value (USD)": data["value"],
                     "24h Change": f"{data['change']}%"
                 }
-                for asset, data in portfolio_data.items()
+                for asset, data in portfolio.items()
             ])
             st.dataframe(df, use_container_width=True)
             if not df.empty:
@@ -160,9 +171,16 @@ with tabs[1]:
     qty = st.number_input("Quantity", min_value=0.0001, step=0.0001)
     side = st.radio("Side", ["BUY", "SELL"])
     if st.button("Execute Trade"):
-        result = trade_exec.manual_trade(symbol, qty, side)
-        st.session_state["logs"].append(f"[Manual] {result}")
-        st.success(result)
+        total_balance_usd = portfolio_mgr.total_value()
+        open_positions = len(position_monitor.get_active_positions())
+        price = market_analyzer.get_price(symbol)
+        validation = risk_mgr.validate_trade(symbol, qty, price, total_balance_usd, open_positions)
+        if validation["status"]:
+            result = trade_exec.manual_trade(symbol, qty, side)
+            st.session_state["logs"].append(f"[Manual] {result}")
+            st.success(result)
+        else:
+            st.error(f"❌ Trade blocked: {validation['reason']}")
 
 # ----------------------------------------
 # Auto-Trader Tab
@@ -181,34 +199,23 @@ with tabs[2]:
     st.write(position_monitor.get_active_positions())
 
 # ----------------------------------------
-# Multi-Strategy Analysis Tab
+# Multi-Strategy Tab (Quantum + ML + Technical)
 # ----------------------------------------
-from ensemble_signal_engine import EnsembleSignalEngine
-
-ensemble_engine = EnsembleSignalEngine(client, quantum_trader, market_analyzer)
-
 with tabs[3]:
-    st.header("⚛ Multi-Strategy Analysis (Quantum + ML + Technical)")
-
-    # Get portfolio assets for analysis
-    try:
-        portfolio, *_ = portfolio_mgr.get_portfolio().items()
-        portfolio_symbols = [f"{asset}USDT" for asset, _ in portfolio_mgr.get_portfolio().items()]
-    except Exception:
-        portfolio_symbols = ["BTCUSDT", "ETHUSDT"]  # Fallback
-
+    st.header("⚛ Multi-Strategy Analysis")
     weights = st.session_state.get("strategy_weights", {"quantum": 30, "ml": 30, "technical": 40})
     min_confidence = st.session_state.get("min_confidence", 0.65)
+    st.info(f"Weights: {weights}, Min Confidence: {min_confidence}")
 
-    st.info(f"Using weights: Quantum {weights['quantum']}%, ML {weights['ml']}%, Technical {weights['technical']}%")
-
+    # Analyze portfolio pairs
+    portfolio_pairs = [f"{asset}USDT" for asset in portfolio.keys()]
     signals_data = []
-    for symbol in portfolio_symbols:
+    for symbol in portfolio_pairs:
         try:
             signal = ensemble_engine.get_signals(symbol, weights, min_confidence)
             signals_data.append(signal)
         except Exception as e:
-            st.error(f"Error fetching signal for {symbol}: {e}")
+            st.error(f"Signal error for {symbol}: {e}")
 
     if signals_data:
         df = pd.DataFrame([
@@ -222,59 +229,24 @@ with tabs[3]:
             for s in signals_data
         ])
         st.dataframe(df, use_container_width=True)
-
-        for s in signals_data:
-            with st.expander(f"Quantum Circuit for {s['symbol']}"):
-                st.text(s["circuit"])
-
-            qty = st.number_input(f"Trade Quantity for {s['symbol']}", min_value=0.0001, step=0.0001, key=f"qty_{s['symbol']}")
-            if st.button(f"Execute Trade for {s['symbol']}"):
-                result = trade_exec.manual_trade(s["symbol"], qty, s["final"]["decision"])
-                st.success(result)
-                st.session_state["logs"].append(f"[Multi-Strategy] {result}")
     else:
-        st.warning("No signals generated.")
+        st.warning("No signals generated yet.")
 
 # ----------------------------------------
 # Settings Tab
 # ----------------------------------------
 with tabs[4]:
-    st.header("⚙️ Bot Settings & Risk Control")
-
-    # Risk Management Section
-    st.subheader("Risk Management")
-    risk_pct = st.slider("Risk per Trade (%)", min_value=0.1, max_value=5.0,
-                         value=st.session_state.get("risk_pct", 1.5), step=0.1)
-    st.session_state["risk_pct"] = risk_pct
-
-    max_positions = st.slider("Max Open Positions", min_value=1, max_value=10,
-                              value=st.session_state.get("max_positions", 3))
-    st.session_state["max_positions"] = max_positions
-
-    min_confidence = st.slider("Minimum Signal Confidence", min_value=0.5, max_value=1.0,
-                                value=st.session_state.get("min_confidence", 0.65), step=0.01)
-    st.session_state["min_confidence"] = min_confidence
-
-    # Strategy Weights
-    st.subheader("📈 Strategy Weights")
+    st.header("🛠 Bot Settings")
+    risk_pct = st.slider("Risk per Trade (%)", 0.1, 5.0, st.session_state.get("risk_pct", 2.0), 0.1)
+    max_positions = st.slider("Max Positions", 1, 10, st.session_state.get("max_positions", 5))
+    min_confidence = st.slider("Min Signal Confidence", 0.5, 1.0, st.session_state.get("min_confidence", 0.65), 0.01)
+    st.session_state.update({"risk_pct": risk_pct, "max_positions": max_positions, "min_confidence": min_confidence})
     col1, col2, col3 = st.columns(3)
-    with col1:
-        quantum_weight = st.number_input("Quantum (%)", min_value=0.0, max_value=100.0,
-                                         value=st.session_state.get("quantum_weight", 30.0), step=1.0)
-    with col2:
-        ml_weight = st.number_input("ML (%)", min_value=0.0, max_value=100.0,
-                                    value=st.session_state.get("ml_weight", 30.0), step=1.0)
-    with col3:
-        tech_weight = st.number_input("Technical (%)", min_value=0.0, max_value=100.0,
-                                      value=st.session_state.get("tech_weight", 40.0), step=1.0)
-
-    st.session_state["strategy_weights"] = {
-        "quantum": quantum_weight,
-        "ml": ml_weight,
-        "technical": tech_weight
-    }
-
-    st.success("✅ Settings updated successfully!")
+    quantum_weight = col1.number_input("Quantum (%)", 0.0, 100.0, weights["quantum"], 1.0)
+    ml_weight = col2.number_input("ML (%)", 0.0, 100.0, weights["ml"], 1.0)
+    tech_weight = col3.number_input("Technical (%)", 0.0, 100.0, weights["technical"], 1.0)
+    st.session_state["strategy_weights"] = {"quantum": quantum_weight, "ml": ml_weight, "technical": tech_weight}
+    st.success("✅ Settings updated!")
 
 # ----------------------------------------
 # Health Tab
