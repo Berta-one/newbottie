@@ -125,11 +125,19 @@ with tabs[0]:
         # Flexible unpacking for any extra values
         portfolio, total_usd, total_gbp, *_ = portfolio_mgr.get_portfolio()
 
+        # Safely cast to float
+        try:
+            total_usd_val = float(total_usd)
+            total_gbp_val = float(total_gbp)
+        except (ValueError, TypeError):
+            total_usd_val = 0.0
+            total_gbp_val = 0.0
+
         col1, col2 = st.columns(2)
         with col1:
-            st.metric("Total Value (USD)", f"${total_usd:,.2f}")
+            st.metric("Total Value (USD)", f"${total_usd_val:,.2f}")
         with col2:
-            st.metric("Total Value (GBP)", f"£{total_gbp:,.2f}")
+            st.metric("Total Value (GBP)", f"£{total_gbp_val:,.2f}")
 
         if portfolio:
             df = pd.DataFrame([
