@@ -207,8 +207,7 @@ with tabs[3]:
     except Exception as e:
         st.error(f"Quantum analysis error: {e}")
 
-#
- ----------------------------------------
+# ----------------------------------------
 # Settings Tab
 # ----------------------------------------
 with tabs[4]:
@@ -249,7 +248,9 @@ with tabs[4]:
         "technical": tech_weight
     }
 
-    st.success("✅ Settings updated successfully!") ----------------------------------------
+    st.success("✅ Settings updated successfully!") 
+#
+----------------------------------------
 # Health Tab
 # ----------------------------------------
 with tabs[4]:
