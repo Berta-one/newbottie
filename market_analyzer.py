@@ -1,97 +1,44 @@
-"""
-market_analyzer.py
-========================
-Handles technical analysis and signal generation for multiple pairs.
-"""
-
-from __future__ import annotations
-from typing import Dict, Any, List
 import pandas as pd
 import numpy as np
 from binance.client import Client
-
+from typing import List, Dict
 
 class MarketAnalyzer:
-    def __init__(self, client: Client, interval="1h", lookback=100):
+    def __init__(self, client: Client):
         self.client = client
-        self.interval = interval
-        self.lookback = lookback
 
-    # -------------------------------
-    # Data Fetch
-    # -------------------------------
-    def _fetch_klines(self, symbol: str) -> pd.DataFrame:
-        """Fetch historical candles from Binance."""
-        candles = self.client.get_klines(symbol=symbol, interval=self.interval, limit=self.lookback)
-        df = pd.DataFrame(candles, columns=[
-            "timestamp", "open", "high", "low", "close", "volume",
-            "close_time", "quote_asset_volume", "trades", "taker_base", "taker_quote", "ignore"
-        ])
+    def get_trading_pairs(self) -> List[str]:
+        return [s["symbol"] for s in self.client.get_exchange_info()["symbols"] if s["quoteAsset"] == "USDT"]
+
+    def get_price(self, symbol: str) -> float:
+        ticker = self.client.get_symbol_ticker(symbol=symbol)
+        return float(ticker["price"])
+
+    def get_klines(self, symbol: str, interval="1h", limit=100):
+        return self.client.get_klines(symbol=symbol, interval=interval, limit=limit)
+
+    def compute_indicators(self, symbol: str) -> Dict[str, float]:
+        klines = self.get_klines(symbol)
+        df = pd.DataFrame(klines, columns=["time","open","high","low","close","volume","ct","qv","t","tb","tq","i"])
         df["close"] = df["close"].astype(float)
-        return df
 
-    # -------------------------------
-    # Indicators
-    # -------------------------------
-    def calculate_rsi(self, prices: pd.Series, period: int = 14) -> float:
-        delta = prices.diff()
-        gain = delta.where(delta > 0, 0).rolling(window=period).mean()
-        loss = -delta.where(delta < 0, 0).rolling(window=period).mean()
+        close = df["close"]
+        # RSI
+        delta = close.diff()
+        gain = (delta.where(delta > 0, 0)).rolling(14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
         rs = gain / loss
-        rsi = 100 - (100 / (1 + rs))
-        return rsi.iloc[-1]
+        rsi = 100 - (100 / (1 + rs.iloc[-1])) if loss.iloc[-1] != 0 else 100
 
-    def calculate_momentum(self, prices: pd.Series, period: int = 10) -> float:
-        return ((prices.iloc[-1] - prices.iloc[-period]) / prices.iloc[-period]) * 100
+        # MACD
+        ema12 = close.ewm(span=12, adjust=False).mean()
+        ema26 = close.ewm(span=26, adjust=False).mean()
+        macd = ema12.iloc[-1] - ema26.iloc[-1]
 
-    def calculate_volatility(self, prices: pd.Series, period: int = 20) -> float:
-        return prices.pct_change().rolling(window=period).std().iloc[-1]
+        # Bollinger Bands
+        sma20 = close.rolling(20).mean().iloc[-1]
+        std20 = close.rolling(20).std().iloc[-1]
+        upper = sma20 + (2 * std20)
+        lower = sma20 - (2 * std20)
 
-    # -------------------------------
-    # Public Methods for Dashboard
-    # -------------------------------
-    def get_latest_rsi(self, symbol: str) -> float:
-        df = self._fetch_klines(symbol)
-        return self.calculate_rsi(df["close"])
-
-    def get_latest_momentum(self, symbol: str) -> float:
-        df = self._fetch_klines(symbol)
-        return self.calculate_momentum(df["close"])
-
-    def get_volatility(self, symbol: str) -> float:
-        df = self._fetch_klines(symbol)
-        return self.calculate_volatility(df["close"])
-
-    # -------------------------------
-    # Market Scan
-    # -------------------------------
-    def scan_markets(self, pairs: List[str] = None) -> List[Dict[str, Any]]:
-        """Scan all pairs and return signals."""
-        if not pairs:
-            pairs = ["BTCUSDT", "ETHUSDT", "BNBUSDT"]
-
-        signals = []
-        for symbol in pairs:
-            try:
-                df = self._fetch_klines(symbol)
-                rsi = self.calculate_rsi(df["close"])
-                momentum = self.calculate_momentum(df["close"])
-                volatility = self.calculate_volatility(df["close"])
-
-                decision = "HOLD"
-                if rsi < 30 and momentum > 0:
-                    decision = "BUY"
-                elif rsi > 70 and momentum < 0:
-                    decision = "SELL"
-
-                signals.append({
-                    "symbol": symbol,
-                    "rsi": round(rsi, 2),
-                    "momentum": round(momentum, 2),
-                    "volatility": round(volatility, 4),
-                    "decision": decision
-                })
-            except Exception as e:
-                signals.append({"symbol": symbol, "error": str(e)})
-
-        return signals
+        return {"rsi": rsi, "macd": macd, "bollinger_upper": upper, "bollinger_lower": lower}
