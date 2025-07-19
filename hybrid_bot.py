@@ -1,19 +1,16 @@
 
 #!/usr/bin/env python3
 """
-Hybrid Crypto Trading Bot Dashboard (hybrid_bot.py)
-==================================================
-Company: Rondanini Publishing Ltd.
-Website: https://www.rondanini.net
-
-Features:
-- Live trading with Binance integration (live only, no testnet)
-- Three modes: Auto Bot (always-on), Quantum-enhanced, Manual trading
-- Integrates breakout, ML-enhanced, relaxed strategies
-- AdaptiveRiskManager for dynamic position sizing/risk rules
-- Full logging, health monitoring, performance metrics
-- GBP conversion, portfolio analysis, streaming UI dashboard
-- Background trading loop managed via threading
+Hybrid Crypto Trading Bot Dashboard
+==================================
+- 8 Tabs: Portfolio, Scanner, Manual Trade, Auto Bot, Performance, Quantum, Risk Settings, Health
+- Features:
+  - Live Binance trading (no testnet)
+  - Auto Bot with multiple strategies & Quantum integration
+  - Manual trading + Quantum force trade
+  - Risk management with dynamic override
+  - Performance metrics & charts
+  - Health monitor (psutil optional)
 """
 
 import streamlit as st
@@ -23,12 +20,14 @@ import plotly.express as px
 from datetime import datetime
 import json, os, time, threading, requests, random, uuid
 import numpy as np
+
+# psutil optional
 try:
     import psutil
     PSUTIL_AVAILABLE = True
 except ImportError:
     PSUTIL_AVAILABLE = False
-from concurrent.futures import ThreadPoolExecutor
+
 try:
     from dotenv import load_dotenv; load_dotenv()
 except ImportError:
@@ -37,12 +36,11 @@ except ImportError:
 # Binance client
 try:
     from binance.client import Client
-    from binance.exceptions import BinanceAPIException
     BINANCE_AVAILABLE = True
 except ImportError:
     BINANCE_AVAILABLE = False
 
-# Trading modules
+# Modules
 TRADING_MODULES_AVAILABLE = False
 try:
     from strategy import check_breakout_enhanced, get_strategy_confidence
@@ -52,17 +50,18 @@ try:
     from multi_pair_scanner import CryptoPairScanner
     from bot_controller import AdaptiveRiskManager
     TRADING_MODULES_AVAILABLE = True
-except ImportError as e:
-    st.warning(f"Trading modules unavailable: {e}")
+except:
+    pass
 
-# Quantum modules
+# Quantum
 QUANTUM_AVAILABLE = False
 try:
     from quantum_engine import QuantumTradingEngine
     QUANTUM_AVAILABLE = True
-except ImportError as e:
-    st.warning(f"Quantum modules unavailable: {e}")
+except:
+    pass
 
+# Env Config
 API_KEY = os.getenv('BINANCE_API_KEY')
 API_SECRET = os.getenv('BINANCE_API_SECRET')
 MIN_BALANCE_USD = float(os.getenv('MIN_BALANCE_USD', '10.0'))
@@ -70,16 +69,23 @@ SCAN_INTERVAL = int(os.getenv('SCAN_INTERVAL', '300'))
 MIN_CONFIDENCE = float(os.getenv('MIN_CONFIDENCE', '0.65'))
 MAX_POSITIONS = int(os.getenv('MAX_POSITIONS', '3'))
 RISK_PERCENTAGE = float(os.getenv('RISK_PERCENTAGE', '0.015'))
-SCAN_MODE = os.getenv('SCAN_MODE', 'SELECTED')
+QUANTUM_CONF_THRESHOLD = 0.7
 
+# State Defaults
+if 'auto_running' not in st.session_state:
+    st.session_state['auto_running'] = False
+if 'last_action' not in st.session_state:
+    st.session_state['last_action'] = 'None'
+if 'quantum_only' not in st.session_state:
+    st.session_state['quantum_only'] = True
+if 'risk_override' not in st.session_state:
+    st.session_state['risk_override'] = RISK_PERCENTAGE
+
+# Utils
 def get_binance_client():
     if not BINANCE_AVAILABLE or not API_KEY or not API_SECRET:
         return None
-    try:
-        return Client(API_KEY, API_SECRET)
-    except Exception as e:
-        st.error(f"Binance init error: {e}")
-        return None
+    return Client(API_KEY, API_SECRET)
 
 def get_gbp_exchange_rate():
     try:
@@ -93,21 +99,28 @@ def ensure_log_files():
     if not os.path.exists('logs/trades.csv'):
         with open('logs/trades.csv','w') as f:
             f.write('timestamp,symbol,direction,entry_price,exit_price,quantity,change_pct,status,strategy,confidence,quantum_signal,risk_level\n')
-    for log in [
-        'logs/manual_trades.log','logs/trade_executions.json','logs/auto_trader_debug.log',
-        'logs/bot_heartbeat.log'
-    ]:
+    for log in ['logs/manual_trades.log','logs/trade_executions.json','logs/auto_trader_debug.log','logs/bot_heartbeat.log','logs/quantum_trades.csv']:
         if not os.path.exists(log):
-            with open(log,'w') as f: f.write('')
+            open(log,'w').close()
+
+def log_trade(tr):
+    ts=datetime.now().isoformat()
+    with open('logs/trade_executions.json','a') as f: f.write(json.dumps({**tr,'timestamp':ts})+"\n")
+    with open('logs/trades.csv','a') as f:
+        f.write(f"{ts},{tr['symbol']},{tr['type']},{tr['price']},{tr.get('exit_price','')},{tr['quantity']},,"
+                f"{'OPEN' if tr['type']=='ENTRY' else 'CLOSED'},{tr['strategy']},{tr.get('confidence',1)},"
+                f"{tr.get('quantum_signal','N/A')},{tr.get('risk_level','')}\n")
+    if 'Quantum' in tr['strategy']:
+        with open('logs/quantum_trades.csv','a') as f:
+            f.write(f"{ts},{tr['symbol']},{tr['type']},{tr['price']},{tr['quantity']},{tr.get('confidence',1)},"
+                    f"{tr.get('quantum_signal','')},{tr['strategy']}\n")
 
 def get_portfolio():
     client=get_binance_client()
-    if not client:
-        return {},0,0
+    if not client: return {},0,0
     acct=client.get_account()
     tickers={t['symbol']:float(t['price']) for t in client.get_all_tickers()}
-    port={}
-    total_usd=0
+    port={}; total_usd=0
     for bal in acct['balances']:
         tot=float(bal['free'])+float(bal['locked'])
         if tot>0:
@@ -121,10 +134,10 @@ def get_portfolio():
 
 def get_open_positions():
     client=get_binance_client()
-    res=[]
-    if not client: return res
+    if not client: return []
     acct=client.get_account()
     tickers={t['symbol']:float(t['price']) for t in client.get_all_tickers()}
+    res=[]
     for bal in acct['balances']:
         tot=float(bal['free'])+float(bal['locked'])
         if tot>0 and bal['asset']!='USDT':
@@ -135,64 +148,158 @@ def get_open_positions():
                 res.append({'Asset':bal['asset'],'Symbol':sym,'Total':tot,'USD Value':val,'GBP Value':val*get_gbp_exchange_rate(),'Price':price})
     return res
 
-def log_trade(tr):
-    ts=datetime.now().isoformat()
-    with open('logs/trade_executions.json','a') as f:
-        f.write(json.dumps({**tr,'timestamp':ts})+"\n")
-    with open('logs/trades.csv','a') as f:
-        f.write(f"{ts},{tr['symbol']},{tr['type']},{tr['price']},{tr.get('exit_price','')},{tr['quantity']},,"
-                f"{'OPEN' if tr['type']=='ENTRY' else 'CLOSED'},{tr['strategy']},{tr.get('confidence',1)},"
-                f"{tr.get('quantum_signal','N/A')},{tr.get('risk_level','')}\n")
-
-# Background Auto Bot
+# Auto Bot Logic
 def start_auto_bot():
-    if st.session_state.get('auto_running'): return
+    if st.session_state['auto_running']: return
     st.session_state['auto_running']=True
 
     def loop():
         client=get_binance_client()
-        rm = AdaptiveRiskManager() if TRADING_MODULES_AVAILABLE else None
-        quantum_eng = QuantumTradingEngine() if QUANTUM_AVAILABLE else None
-        scanner = CryptoPairScanner(client) if TRADING_MODULES_AVAILABLE else None
+        rm=AdaptiveRiskManager() if TRADING_MODULES_AVAILABLE else None
+        quantum_eng=QuantumTradingEngine() if QUANTUM_AVAILABLE else None
+        scanner=CryptoPairScanner(client) if TRADING_MODULES_AVAILABLE else None
         cycle=0
-        while st.session_state.get('auto_running',False):
+        while st.session_state['auto_running']:
             cycle+=1
-            start = datetime.now()
-            with open('logs/bot_heartbeat.log','a') as f: f.write(f"{start.isoformat()} - cycle {cycle}\n")
-            open_pos = get_open_positions()
-            open_syms=[p['Symbol'] for p in open_pos]
-            port,usd,gbp = get_portfolio()
-            # Monitor exits and entries logic remains unchanged
-            time.sleep(60)
+            with open('logs/bot_heartbeat.log','a') as f: f.write(f"{datetime.now().isoformat()} cycle {cycle}\n")
+            try:
+                open_pos=get_open_positions()
+                open_syms=[p['Symbol'] for p in open_pos]
+                port,usd,_=get_portfolio()
+                if len(open_pos)<MAX_POSITIONS and scanner:
+                    pairs=scanner.get_selected_pairs()
+                    opps=scanner.scan_multiple_pairs(pairs,max_workers=5)
+                    filtered=[o for o in opps if o['confidence']>=MIN_CONFIDENCE and o['decision']!='HOLD' and o['symbol'] not in open_syms]
+                    enhanced=[]
+                    for opp in filtered:
+                        sym=opp['symbol']; klines=client.get_klines(sym,"1m",120)
+                        sigs=[]; confs=[]
+                        for fn in [(check_breakout_enhanced,get_strategy_confidence),(get_ml_enhanced_signal,None),(enhanced_strategy_check,None)]:
+                            try:
+                                if fn[0]==get_ml_enhanced_signal:
+                                    s,c=fn[0](klines)
+                                elif fn[0]==enhanced_strategy_check:
+                                    res=fn[0](klines); s=res.get('signal','HOLD'); c=res.get('confidence',0.5)
+                                else:
+                                    s=fn[0](klines); c=fn[1](klines)
+                                if s!='HOLD': sigs.append(s); confs.append(c)
+                            except: continue
+                        if len(sigs)>=2:
+                            lv=sigs.count('BUY_LONG'); sv=sigs.count('BUY_SHORT')
+                            if lv>=2:
+                                final='BUY_LONG'; final_conf=np.mean([c for s,c in zip(sigs,confs) if s=='BUY_LONG'])
+                            elif sv>=2:
+                                final='BUY_SHORT'; final_conf=np.mean([c for s,c in zip(sigs,confs) if s=='BUY_SHORT'])
+                            else: continue
+                            dyn=rm.get_dynamic_rules(sym.replace('USDT',''),final_conf,'TREND',0.03) if rm else {}
+                            final_conf*=dyn.get('confidence_factor',1)
+                            if final_conf>=MIN_CONFIDENCE:
+                                enhanced.append({'symbol':sym,'signal':final,'confidence':final_conf,'dyn':dyn})
+                    executed=False
+                    if enhanced:
+                        for e in enhanced:
+                            q=None
+                            if QUANTUM_AVAILABLE and quantum_eng:
+                                q=quantum_eng.generate_quantum_trading_recommendation(portfolio_data=port,market_condition='TREND',strategy='Ensemble',risk_level='BALANCED',portfolio_value=usd)
+                            if q and q['quantum_signal']==e['signal'] and q['quantum_confidence']>=QUANTUM_CONF_THRESHOLD:
+                                price=float(client.get_symbol_ticker(e['symbol'])['price'])
+                                bal=get_account_balance(client,'USDT')
+                                size=calculate_dynamic_position_size(bal,0.001,e['confidence'],0.03,st.session_state['risk_override'])
+                                res=execute_entry(client,e['symbol'],size,e['signal'])
+                                log_trade({'symbol':e['symbol'],'type':'ENTRY','price':price,'quantity':size,'strategy':'QuantumAuto','confidence':e['confidence'],'quantum_signal':q['quantum_signal'],'risk_level':str(e['dyn'])})
+                                st.session_state['last_action']=f"Quantum trade: {e['symbol']}"
+                                executed=True
+                                break
+                        if not executed and not st.session_state['quantum_only']:
+                            e=max(enhanced,key=lambda x:x['confidence'])
+                            price=float(client.get_symbol_ticker(e['symbol'])['price'])
+                            bal=get_account_balance(client,'USDT')
+                            size=calculate_dynamic_position_size(bal,0.001,e['confidence'],0.03,st.session_state['risk_override'])
+                            res=execute_entry(client,e['symbol'],size,e['signal'])
+                            log_trade({'symbol':e['symbol'],'type':'ENTRY','price':price,'quantity':size,'strategy':'EnhancedAuto','confidence':e['confidence'],'quantum_signal':'N/A','risk_level':str(e['dyn'])})
+                            st.session_state['last_action']=f"Auto trade: {e['symbol']}"
+            except Exception as e:
+                with open('logs/auto_trader_debug.log','a') as f: f.write(str(e)+"\n")
+            time.sleep(SCAN_INTERVAL)
     threading.Thread(target=loop,daemon=True).start()
 
-def stop_auto_bot():
-    st.session_state['auto_running']=False
+def stop_auto_bot(): st.session_state['auto_running']=False
 
 # Streamlit UI
 st.set_page_config(page_title="Hybrid Crypto Bot", layout="wide")
 ensure_log_files()
-st.title("🧠 Hybrid Crypto Bot (Auto + Quantum + Manual)")
+st.title("🧠 Hybrid Crypto Bot")
 
-tabs=st.tabs(["Portfolio","Health"])
+tabs=st.tabs(["Portfolio","Scanner","Manual Trade","Auto Bot","Performance","Quantum","Risk Settings","Health"])
 
+# Portfolio
 with tabs[0]:
     st.header("Portfolio Overview")
     port,usd,gbp=get_portfolio()
-    st.write("Total USD:", usd)
-    st.write("Total GBP:", gbp)
+    st.metric("Total USD",f"${usd:,.2f}"); st.metric("Total GBP",f"£{gbp:,.2f}")
     if port:
         df=pd.DataFrame([{'Asset':a,'Balance':d['balance'],'USD Value':d['usd_value']} for a,d in port.items()])
-        st.dataframe(df)
+        st.dataframe(df); st.plotly_chart(px.pie(df, values='USD Value', names='Asset'), use_container_width=True)
 
+# Scanner
 with tabs[1]:
+    st.header("Market Scanner")
+    if st.button("Run Scan"):
+        client=get_binance_client(); scanner=CryptoPairScanner(client)
+        pairs=scanner.get_selected_pairs(); opps=scanner.scan_multiple_pairs(pairs,max_workers=5)
+        st.session_state['scan_results']=opps
+    for o in st.session_state.get('scan_results',[])[:20]:
+        st.write(f"{o['symbol']} | {o['decision']} | {o['confidence']:.2%}")
+
+# Manual Trade
+with tabs[2]:
+    st.header("Manual Trade")
+    sym=st.text_input("Symbol (e.g. ETHUSDT)")
+    qty=st.number_input("Quantity",min_value=0.0)
+    side=st.selectbox("Side",["BUY","SELL"])
+    if st.button("Execute Trade"):
+        try:
+            price=float(get_binance_client().get_symbol_ticker(symbol=sym)['price'])
+            res=execute_entry(get_binance_client(),sym,qty,"BUY_LONG" if side=="BUY" else "BUY_SHORT")
+            log_trade({'symbol':sym,'type':'MANUAL_'+side,'price':price,'quantity':qty,'strategy':'Manual'})
+            st.success(f"Manual {side} executed: {qty} {sym}")
+        except Exception as e: st.error(f"Failed: {e}")
+
+# Auto Bot
+with tabs[3]:
+    st.header("Auto Bot Control")
+    st.write("Status:","Running" if st.session_state['auto_running'] else "Stopped")
+    st.write("Last Action:",st.session_state['last_action'])
+    if st.button("Start Auto Bot"): start_auto_bot()
+    if st.button("Stop Auto Bot"): stop_auto_bot()
+
+# Performance
+with tabs[4]:
+    st.header("Performance Metrics")
+    if os.path.exists('logs/trades.csv'):
+        df=pd.read_csv('logs/trades.csv')
+        df['pnl_pct']=df['change_pct'].fillna(0)
+        cum=df['pnl_pct'].cumsum(); fig=go.Figure(); fig.add_trace(go.Scatter(x=list(range(len(cum))),y=cum,name="PnL%")); st.plotly_chart(fig)
+        st.write(f"Total Trades: {len(df)}")
+
+# Quantum
+with tabs[5]:
+    st.header("Quantum Analysis")
+    if os.path.exists('logs/quantum_trades.csv'):
+        st.subheader("Quantum Trade History"); st.text("".join(open('logs/quantum_trades.csv').read().splitlines()[-10:]))
+    if st.button("Force Quantum Trade"):
+        st.info("Would execute quantum recommendation here (placeholder for UI input)")
+
+# Risk Settings
+with tabs[6]:
+    st.header("Risk Settings")
+    st.slider("Risk % Override",0.001,0.05,st.session_state['risk_override'],0.001,key='risk_override')
+    st.checkbox("Require Quantum Confirmation",value=st.session_state['quantum_only'],key='quantum_only')
+
+# Health
+with tabs[7]:
     st.header("System Health")
     if PSUTIL_AVAILABLE:
-        mem=psutil.virtual_memory()
-        cpu=psutil.cpu_percent()
-        threads=threading.active_count()
-        st.write(f"CPU Usage: {cpu}%")
-        st.write(f"Memory Usage: {mem.percent}%")
-        st.write(f"Active Threads: {threads}")
+        st.write(f"CPU: {psutil.cpu_percent()}% | Memory: {psutil.virtual_memory().percent}% | Threads: {threading.active_count()}")
     else:
         st.warning("psutil not installed. Install with: pip install psutil")
