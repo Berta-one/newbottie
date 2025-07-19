@@ -1,22 +1,23 @@
 #!/usr/bin/env python3
 """
-Pure Flask Crypto Trading Bot Dashboard
-Railway-compatible without Streamlit issues
+Pure Flask Crypto Trading Bot - No Streamlit Dependencies
 """
 
 import os
 import json
-from datetime import datetime
-from flask import Flask, render_template_string, request, jsonify, redirect, url_for
+from datetime import datetime, timedelta
+from flask import Flask, render_template_string, request, jsonify, redirect, url_for, flash
 from dotenv import load_dotenv
 
 load_dotenv()
 
 app = Flask(__name__)
+app.secret_key = os.urandom(24)
 
 # Try to import Binance
 try:
     from binance.client import Client
+    from binance.exceptions import BinanceAPIException
     BINANCE_AVAILABLE = True
 except ImportError:
     BINANCE_AVAILABLE = False
@@ -26,363 +27,687 @@ API_KEY = os.getenv('BINANCE_API_KEY')
 API_SECRET = os.getenv('BINANCE_API_SECRET')
 USE_TESTNET = os.getenv('USE_TESTNET', 'true').lower() == 'true'
 
-# In-memory storage (you could use a database in production)
-trades = []
-logs = []
+# In-memory storage
+trades_history = []
+activity_logs = []
+bot_status = {
+    'auto_trading': False,
+    'last_scan': None,
+    'total_trades': 0,
+    'total_pnl': 0.0
+}
 
-def log_message(message):
-    """Add log message"""
+def log_activity(message):
+    """Log activity with timestamp"""
     timestamp = datetime.now().strftime("%H:%M:%S")
     log_entry = f"[{timestamp}] {message}"
-    logs.append(log_entry)
-    if len(logs) > 100:
-        logs.pop(0)
+    activity_logs.append(log_entry)
+    if len(activity_logs) > 200:
+        activity_logs.pop(0)
+    print(log_entry)  # Also print to console
 
 def get_binance_client():
-    """Get Binance client"""
-    if not BINANCE_AVAILABLE or not API_KEY or not API_SECRET:
-        return None
+    """Initialize Binance client"""
+    if not BINANCE_AVAILABLE:
+        return None, "Binance library not available"
+    
+    if not API_KEY or not API_SECRET:
+        return None, "API credentials not configured"
     
     try:
         client = Client(API_KEY, API_SECRET)
         if USE_TESTNET:
             client.API_URL = 'https://testnet.binance.vision/api'
-        return client
-    except:
-        return None
+        
+        # Test connection
+        client.get_server_time()
+        return client, "Connected"
+    except Exception as e:
+        return None, str(e)
 
-# HTML Templates
-MAIN_TEMPLATE = """
+def get_portfolio_data():
+    """Get portfolio information"""
+    client, status = get_binance_client()
+    
+    if not client:
+        return {}, 0.0, status
+    
+    try:
+        account = client.get_account()
+        portfolio = {}
+        total_value = 0.0
+        
+        for balance in account['balances']:
+            free = float(balance['free'])
+            locked = float(balance['locked'])
+            total = free + locked
+            
+            if total > 0:
+                asset = balance['asset']
+                usd_value = total
+                
+                # Convert to USD (simplified - just use USDT rate)
+                if asset != 'USDT':
+                    try:
+                        ticker = client.get_symbol_ticker(symbol=f"{asset}USDT")
+                        usd_value = total * float(ticker['price'])
+                    except:
+                        usd_value = 0
+                
+                portfolio[asset] = {
+                    'free': free,
+                    'locked': locked,
+                    'total': total,
+                    'usd_value': usd_value
+                }
+                total_value += usd_value
+        
+        return portfolio, total_value, "Success"
+    
+    except Exception as e:
+        return {}, 0.0, str(e)
+
+# HTML Template
+BASE_TEMPLATE = """
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🤖 Crypto Trading Bot</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
+        :root {
+            --primary: #667eea;
+            --secondary: #764ba2;
+            --accent: #ff6b6b;
+            --success: #2ecc71;
+            --warning: #f39c12;
+            --danger: #e74c3c;
+            --dark: rgba(0,0,0,0.8);
+            --light: rgba(255,255,255,0.1);
+        }
+        
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
+        
+        body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white; min-height: 100vh;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            min-height: 100vh;
+            line-height: 1.6;
         }
-        .navbar { 
-            background: rgba(0,0,0,0.3); padding: 1rem; display: flex; 
-            justify-content: space-between; align-items: center;
+        
+        .navbar {
+            background: var(--dark);
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
         }
-        .nav-links { display: flex; gap: 1rem; }
-        .nav-links a { 
-            color: white; text-decoration: none; padding: 0.5rem 1rem; 
-            border-radius: 5px; transition: background 0.3s;
+        
+        .logo { font-size: 1.5rem; font-weight: bold; }
+        
+        .nav-links {
+            display: flex;
+            gap: 1rem;
+            list-style: none;
         }
-        .nav-links a:hover { background: rgba(255,255,255,0.2); }
-        .nav-links a.active { background: rgba(255,255,255,0.3); }
-        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; }
-        .card { 
-            background: rgba(255,255,255,0.1); border-radius: 15px; 
-            padding: 1.5rem; backdrop-filter: blur(10px);
+        
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            transition: all 0.3s ease;
         }
-        .metric { text-align: center; }
-        .metric h3 { font-size: 2rem; margin-bottom: 0.5rem; }
-        .metric p { opacity: 0.8; }
-        .btn { 
-            background: #ff6b6b; color: white; border: none; 
-            padding: 0.75rem 1.5rem; border-radius: 25px; 
-            cursor: pointer; font-size: 1rem; transition: all 0.3s;
+        
+        .nav-links a:hover, .nav-links a.active {
+            background: var(--light);
+            transform: translateY(-2px);
         }
-        .btn:hover { background: #ff5252; transform: translateY(-2px); }
-        .btn-secondary { background: #4ecdc4; }
-        .btn-secondary:hover { background: #45b7b8; }
-        .form-group { margin-bottom: 1rem; }
-        .form-group label { display: block; margin-bottom: 0.5rem; }
-        .form-group input, .form-group select { 
-            width: 100%; padding: 0.75rem; border: none; 
-            border-radius: 8px; font-size: 1rem;
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
         }
-        .status { 
-            display: inline-block; padding: 0.25rem 0.75rem; 
-            border-radius: 15px; font-size: 0.875rem;
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
         }
-        .status.connected { background: #2ecc71; }
-        .status.disconnected { background: #e74c3c; }
-        .log-container { 
-            background: rgba(0,0,0,0.3); padding: 1rem; 
-            border-radius: 8px; max-height: 300px; overflow-y: auto;
+        
+        .card {
+            background: var(--light);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 1.5rem;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: transform 0.3s ease;
         }
-        .log-entry { font-family: monospace; font-size: 0.875rem; margin-bottom: 0.25rem; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        th { background: rgba(255,255,255,0.1); }
+        
+        .card:hover { transform: translateY(-5px); }
+        
+        .card h3 {
+            margin-bottom: 1rem;
+            color: #fff;
+            font-size: 1.2rem;
+        }
+        
+        .metric {
+            text-align: center;
+            padding: 1rem;
+        }
+        
+        .metric .value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+        
+        .metric .label {
+            opacity: 0.8;
+            font-size: 0.9rem;
+        }
+        
+        .btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        
+        .btn:hover {
+            background: #ff5252;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(255,107,107,0.4);
+        }
+        
+        .btn-success { background: var(--success); }
+        .btn-success:hover { background: #27ae60; }
+        
+        .btn-warning { background: var(--warning); }
+        .btn-warning:hover { background: #e67e22; }
+        
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+        
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            background: rgba(255,255,255,0.9);
+            color: #333;
+        }
+        
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 15px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        
+        .status-connected { background: var(--success); }
+        .status-disconnected { background: var(--danger); }
+        .status-testnet { background: var(--warning); }
+        
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        
+        .table th,
+        .table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .table th {
+            background: var(--light);
+            font-weight: 600;
+        }
+        
+        .logs-container {
+            background: var(--dark);
+            padding: 1rem;
+            border-radius: 8px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+        }
+        
+        .log-entry {
+            margin-bottom: 0.25rem;
+            padding: 0.25rem;
+            border-radius: 4px;
+        }
+        
+        .log-entry:hover {
+            background: rgba(255,255,255,0.05);
+        }
+        
+        .flash-messages {
+            margin-bottom: 1rem;
+        }
+        
+        .flash-message {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+        }
+        
+        .flash-success { background: var(--success); }
+        .flash-error { background: var(--danger); }
+        .flash-warning { background: var(--warning); }
+        
+        @media (max-width: 768px) {
+            .navbar {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .nav-links {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            
+            .container {
+                padding: 1rem;
+            }
+            
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
     <nav class="navbar">
-        <h1>🤖 Crypto Trading Bot</h1>
-        <div class="nav-links">
-            <a href="/" class="{{ 'active' if page == 'dashboard' else '' }}">🏠 Dashboard</a>
-            <a href="/portfolio" class="{{ 'active' if page == 'portfolio' else '' }}">📊 Portfolio</a>
-            <a href="/trade" class="{{ 'active' if page == 'trade' else '' }}">✋ Trade</a>
-            <a href="/logs" class="{{ 'active' if page == 'logs' else '' }}">📜 Logs</a>
-        </div>
+        <div class="logo">🤖 Crypto Trading Bot</div>
+        <ul class="nav-links">
+            <li><a href="/" class="{{ 'active' if request.endpoint == 'dashboard' else '' }}">🏠 Dashboard</a></li>
+            <li><a href="/portfolio" class="{{ 'active' if request.endpoint == 'portfolio' else '' }}">📊 Portfolio</a></li>
+            <li><a href="/trade" class="{{ 'active' if request.endpoint == 'trade' else '' }}">💰 Trade</a></li>
+            <li><a href="/logs" class="{{ 'active' if request.endpoint == 'logs_page' else '' }}">📜 Logs</a></li>
+        </ul>
     </nav>
     
     <div class="container">
+        <div class="flash-messages">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+        
         {% block content %}{% endblock %}
     </div>
     
     <script>
-        // Auto-refresh every 30 seconds
-        setTimeout(() => location.reload(), 30000);
+        // Auto-refresh every 60 seconds for dashboard
+        if (window.location.pathname === '/') {
+            setTimeout(() => {
+                window.location.reload();
+            }, 60000);
+        }
+        
+        // Add some interactivity
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add loading state to buttons
+            const buttons = document.querySelectorAll('.btn');
+            buttons.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    if (this.type === 'submit') {
+                        this.innerHTML = '⏳ Processing...';
+                        this.disabled = true;
+                    }
+                });
+            });
+        });
     </script>
 </body>
 </html>
 """
 
-DASHBOARD_CONTENT = """
-{% extends "base" %}
-{% block content %}
-<div style="text-align: center; margin-bottom: 2rem;">
-    <h2>Trading Dashboard</h2>
-    <span class="status {{ 'connected' if connected else 'disconnected' }}">
-        {{ '✅ Connected' if connected else '❌ Disconnected' }}
-    </span>
-    <span class="status" style="background: #f39c12; margin-left: 1rem;">
-        🧪 {{ 'Testnet' if testnet else 'Live' }} Mode
-    </span>
-</div>
-
-<div class="grid">
-    <div class="card metric">
-        <h3>${{ balance }}</h3>
-        <p>Portfolio Value</p>
+@app.route('/')
+def dashboard():
+    """Main dashboard"""
+    log_activity("Dashboard accessed")
+    
+    # Get connection status
+    client, connection_status = get_binance_client()
+    connected = client is not None
+    
+    # Get portfolio data
+    portfolio, total_value, portfolio_status = get_portfolio_data()
+    
+    # Calculate metrics
+    assets_count = len(portfolio)
+    recent_trades = len([t for t in trades_history if 
+                        datetime.fromisoformat(t.get('timestamp', '2000-01-01')) > 
+                        datetime.now() - timedelta(hours=24)])
+    
+    dashboard_html = f"""
+    {{% extends "base" %}}
+    {{% block content %}}
+    <div style="text-align: center; margin-bottom: 2rem;">
+        <h1 style="font-size: 2.5rem; margin-bottom: 1rem;">Trading Dashboard</h1>
+        <div>
+            <span class="status-badge status-{'connected' if connected else 'disconnected'}">
+                {'🟢 Connected' if connected else '🔴 Disconnected'}
+            </span>
+            <span class="status-badge status-testnet" style="margin-left: 1rem;">
+                {'🧪 Testnet Mode' if USE_TESTNET else '⚠️ Live Trading'}
+            </span>
+        </div>
     </div>
-    <div class="card metric">
-        <h3>{{ trades_count }}</h3>
-        <p>Total Trades</p>
+    
+    <div class="grid">
+        <div class="card metric">
+            <span class="value">${total_value:,.2f}</span>
+            <span class="label">Portfolio Value</span>
+        </div>
+        <div class="card metric">
+            <span class="value">{assets_count}</span>
+            <span class="label">Assets Held</span>
+        </div>
+        <div class="card metric">
+            <span class="value">{len(trades_history)}</span>
+            <span class="label">Total Trades</span>
+        </div>
+        <div class="card metric">
+            <span class="value">{recent_trades}</span>
+            <span class="label">24h Trades</span>
+        </div>
     </div>
-    <div class="card metric">
-        <h3>{{ assets_count }}</h3>
-        <p>Assets Held</p>
-    </div>
-    <div class="card metric">
-        <h3>{{ 'ON' if auto_trading else 'OFF' }}</h3>
-        <p>Auto Trading</p>
-    </div>
-</div>
-
-<div class="grid" style="margin-top: 2rem;">
-    <div class="card">
-        <h3>⚡ Quick Actions</h3>
-        <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-            <button class="btn" onclick="location.href='/trade'">📈 Manual Trade</button>
-            <button class="btn btn-secondary" onclick="location.href='/portfolio'">📊 View Portfolio</button>
+    
+    <div class="grid">
+        <div class="card">
+            <h3>⚡ Quick Actions</h3>
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                <a href="/trade" class="btn">💰 Manual Trade</a>
+                <a href="/portfolio" class="btn btn-success">📊 View Portfolio</a>
+                <a href="/api/refresh" class="btn btn-warning">🔄 Refresh Data</a>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h3>📊 System Status</h3>
+            <p><strong>API Connection:</strong> {connection_status}</p>
+            <p><strong>Portfolio Status:</strong> {portfolio_status}</p>
+            <p><strong>Trading Mode:</strong> {'Testnet' if USE_TESTNET else 'Live'}</p>
+            <p><strong>Last Update:</strong> {datetime.now().strftime('%H:%M:%S')}</p>
+            <p><strong>Server:</strong> Railway Cloud</p>
         </div>
     </div>
     
     <div class="card">
-        <h3>📊 System Status</h3>
-        <p>🔗 API: {{ 'Connected' if connected else 'Disconnected' }}</p>
-        <p>⏰ Last Update: {{ timestamp }}</p>
-        <p>🖥️ Server: Railway</p>
+        <h3>📈 Recent Activity</h3>
+        <div class="logs-container">
+    """
+    
+    for log in activity_logs[-20:]:
+        dashboard_html += f'<div class="log-entry">{log}</div>'
+    
+    dashboard_html += """
+        </div>
     </div>
-</div>
-{% endblock %}
-"""
-
-@app.route('/')
-def dashboard():
-    """Main dashboard"""
-    client = get_binance_client()
-    connected = client is not None
+    {% endblock %}
+    """
     
-    # Get basic info
-    balance = "0.00"
-    assets_count = 0
-    
-    if connected:
-        try:
-            account = client.get_account()
-            balances = [b for b in account['balances'] if float(b['free']) > 0 or float(b['locked']) > 0]
-            assets_count = len(balances)
-            
-            # Calculate total USDT value (simplified)
-            usdt_balance = next((float(b['free']) for b in balances if b['asset'] == 'USDT'), 0)
-            balance = f"{usdt_balance:.2f}"
-            
-        except Exception as e:
-            log_message(f"Error fetching account: {e}")
-    
-    data = {
-        'page': 'dashboard',
-        'connected': connected,
-        'testnet': USE_TESTNET,
-        'balance': balance,
-        'trades_count': len(trades),
-        'assets_count': assets_count,
-        'auto_trading': False,  # Placeholder
-        'timestamp': datetime.now().strftime("%H:%M:%S")
-    }
-    
-    return render_template_string(MAIN_TEMPLATE.replace('{% block content %}{% endblock %}', DASHBOARD_CONTENT), **data)
+    return render_template_string(BASE_TEMPLATE + dashboard_html)
 
 @app.route('/portfolio')
 def portfolio():
     """Portfolio page"""
-    client = get_binance_client()
+    log_activity("Portfolio page accessed")
     
-    portfolio_html = """
-    <h2>📊 Portfolio Overview</h2>
+    portfolio, total_value, status = get_portfolio_data()
+    
+    portfolio_html = f"""
+    {{% extends "base" %}}
+    {{% block content %}}
+    <h1>📊 Portfolio Overview</h1>
+    
+    <div class="grid">
+        <div class="card metric">
+            <span class="value">${total_value:,.2f}</span>
+            <span class="label">Total Portfolio Value</span>
+        </div>
+        <div class="card metric">
+            <span class="value">{len(portfolio)}</span>
+            <span class="label">Assets Held</span>
+        </div>
+    </div>
+    
+    <div class="card">
+        <h3>💰 Asset Holdings</h3>
+        <p><strong>Status:</strong> {status}</p>
     """
     
-    if client:
-        try:
-            account = client.get_account()
-            balances = [b for b in account['balances'] if float(b['free']) > 0 or float(b['locked']) > 0]
-            
-            portfolio_html += f"""
-            <div class="card">
-                <h3>💰 Holdings ({len(balances)} assets)</h3>
-                <table>
-                    <tr><th>Asset</th><th>Free</th><th>Locked</th><th>Total</th></tr>
-            """
-            
-            for balance in balances:
-                free = float(balance['free'])
-                locked = float(balance['locked'])
-                total = free + locked
-                
-                portfolio_html += f"""
+    if portfolio:
+        portfolio_html += """
+        <table class="table">
+            <thead>
                 <tr>
-                    <td>{balance['asset']}</td>
-                    <td>{free:.6f}</td>
-                    <td>{locked:.6f}</td>
-                    <td>{total:.6f}</td>
+                    <th>Asset</th>
+                    <th>Free</th>
+                    <th>Locked</th>
+                    <th>Total</th>
+                    <th>USD Value</th>
                 </tr>
-                """
-            
-            portfolio_html += "</table></div>"
-            
-        except Exception as e:
-            portfolio_html += f"<div class='card'><p>❌ Error: {e}</p></div>"
+            </thead>
+            <tbody>
+        """
+        
+        for asset, data in portfolio.items():
+            portfolio_html += f"""
+                <tr>
+                    <td><strong>{asset}</strong></td>
+                    <td>{data['free']:.6f}</td>
+                    <td>{data['locked']:.6f}</td>
+                    <td>{data['total']:.6f}</td>
+                    <td>${data['usd_value']:.2f}</td>
+                </tr>
+            """
+        
+        portfolio_html += "</tbody></table>"
     else:
-        portfolio_html += "<div class='card'><p>❌ No API connection</p></div>"
+        portfolio_html += "<p>No assets found or unable to fetch portfolio data.</p>"
     
-    return render_template_string(MAIN_TEMPLATE.replace('{% block content %}{% endblock %}', portfolio_html), page='portfolio')
+    portfolio_html += """
+    </div>
+    {% endblock %}
+    """
+    
+    return render_template_string(BASE_TEMPLATE + portfolio_html)
 
 @app.route('/trade', methods=['GET', 'POST'])
 def trade():
-    """Trading page"""
+    """Trading interface"""
     if request.method == 'POST':
-        # Handle trade execution
         symbol = request.form.get('symbol')
         side = request.form.get('side')
         amount = float(request.form.get('amount', 0))
         
-        client = get_binance_client()
-        if client and amount > 0:
-            try:
-                # Simplified trade execution
-                log_message(f"Trade simulation: {side} {symbol} ${amount}")
-                trades.append({
-                    'timestamp': datetime.now().isoformat(),
-                    'symbol': symbol,
-                    'side': side,
-                    'amount': amount,
-                    'status': 'SIMULATED'
-                })
-                return redirect(url_for('trade'))
-            except Exception as e:
-                log_message(f"Trade error: {e}")
+        if amount < 10:
+            flash('Minimum trade amount is $10', 'error')
+        else:
+            # Simulate trade execution
+            trade_record = {
+                'timestamp': datetime.now().isoformat(),
+                'symbol': symbol,
+                'side': side,
+                'amount': amount,
+                'status': 'SIMULATED',
+                'price': 0  # Would get real price in actual implementation
+            }
+            
+            trades_history.append(trade_record)
+            log_activity(f"Trade executed: {side} {symbol} ${amount}")
+            flash(f'Trade simulated: {side} {symbol} ${amount}', 'success')
+            
+            return redirect(url_for('trade'))
     
     trade_html = """
-    <h2>✋ Manual Trading</h2>
+    {% extends "base" %}
+    {% block content %}
+    <h1>💰 Manual Trading</h1>
+    
     <div class="grid">
         <div class="card">
             <h3>📈 Execute Trade</h3>
             <form method="POST">
                 <div class="form-group">
-                    <label>Trading Pair</label>
-                    <select name="symbol">
-                        <option>BTCUSDT</option>
-                        <option>ETHUSDT</option>
-                        <option>BNBUSDT</option>
-                        <option>ADAUSDT</option>
+                    <label for="symbol">Trading Pair</label>
+                    <select name="symbol" id="symbol" required>
+                        <option value="BTCUSDT">BTC/USDT</option>
+                        <option value="ETHUSDT">ETH/USDT</option>
+                        <option value="BNBUSDT">BNB/USDT</option>
+                        <option value="ADAUSDT">ADA/USDT</option>
+                        <option value="SOLUSDT">SOL/USDT</option>
+                        <option value="XRPUSDT">XRP/USDT</option>
                     </select>
                 </div>
+                
                 <div class="form-group">
-                    <label>Order Type</label>
-                    <select name="side">
-                        <option value="BUY">BUY</option>
-                        <option value="SELL">SELL</option>
+                    <label for="side">Order Type</label>
+                    <select name="side" id="side" required>
+                        <option value="BUY">🟢 BUY (Long)</option>
+                        <option value="SELL">🔴 SELL (Short)</option>
                     </select>
                 </div>
+                
                 <div class="form-group">
-                    <label>Amount (USDT)</label>
-                    <input type="number" name="amount" min="10" step="0.01" value="50">
+                    <label for="amount">Amount (USDT)</label>
+                    <input type="number" name="amount" id="amount" min="10" step="0.01" value="50" required>
                 </div>
-                <button type="submit" class="btn">🚀 Execute Trade</button>
+                
+                <button type="submit" class="btn" style="width: 100%;">🚀 Execute Trade</button>
             </form>
         </div>
         
         <div class="card">
             <h3>📋 Recent Trades</h3>
-            <div style="max-height: 300px; overflow-y: auto;">
+            <div style="max-height: 400px; overflow-y: auto;">
     """
     
-    for trade in trades[-10:]:
+    for trade in trades_history[-10:]:
+        timestamp = trade['timestamp'][:19].replace('T', ' ')
         trade_html += f"""
-        <div style="padding: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.1);">
-            <strong>{trade['symbol']}</strong> - {trade['side']} ${trade['amount']}<br>
-            <small>{trade['timestamp'][:19]} - {trade['status']}</small>
-        </div>
+            <div style="padding: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <strong>{trade['symbol']}</strong>
+                    <span class="status-badge status-{'connected' if trade['status'] == 'FILLED' else 'testnet'}">{trade['status']}</span>
+                </div>
+                <div>{trade['side']} ${trade['amount']}</div>
+                <small style="opacity: 0.7;">{timestamp}</small>
+            </div>
         """
+    
+    if not trades_history:
+        trade_html += "<p style='text-align: center; opacity: 0.7;'>No trades executed yet</p>"
     
     trade_html += """
             </div>
         </div>
     </div>
+    {% endblock %}
     """
     
-    return render_template_string(MAIN_TEMPLATE.replace('{% block content %}{% endblock %}', trade_html), page='trade')
+    return render_template_string(BASE_TEMPLATE + trade_html)
 
 @app.route('/logs')
 def logs_page():
-    """Logs page"""
+    """Activity logs page"""
     logs_html = f"""
-    <h2>📜 Activity Logs</h2>
+    {{% extends "base" %}}
+    {{% block content %}}
+    <h1>📜 Activity Logs</h1>
+    
     <div class="card">
-        <h3>Recent Activity ({len(logs)} entries)</h3>
-        <div class="log-container">
+        <h3>Recent Activity ({len(activity_logs)} total entries)</h3>
+        <div class="logs-container">
     """
     
-    for log in logs[-50:]:
+    for log in reversed(activity_logs[-100:]):
         logs_html += f'<div class="log-entry">{log}</div>'
+    
+    if not activity_logs:
+        logs_html += "<p style='text-align: center; opacity: 0.7;'>No activity logs yet</p>"
     
     logs_html += """
         </div>
     </div>
+    {% endblock %}
     """
     
-    return render_template_string(MAIN_TEMPLATE.replace('{% block content %}{% endblock %}', logs_html), page='logs')
+    return render_template_string(BASE_TEMPLATE + logs_html)
 
 @app.route('/api/status')
 def api_status():
     """API status endpoint"""
-    client = get_binance_client()
+    client, status = get_binance_client()
+    portfolio, total_value, portfolio_status = get_portfolio_data()
+    
     return jsonify({
         'connected': client is not None,
-        'testnet': USE_TESTNET,
-        'trades': len(trades),
-        'logs': len(logs),
+        'connection_status': status,
+        'testnet_mode': USE_TESTNET,
+        'portfolio_value': total_value,
+        'assets_count': len(portfolio),
+        'total_trades': len(trades_history),
+        'logs_count': len(activity_logs),
         'timestamp': datetime.now().isoformat()
     })
 
+@app.route('/api/refresh')
+def refresh_data():
+    """Refresh data endpoint"""
+    log_activity("Data refresh requested")
+    flash('Data refreshed successfully', 'success')
+    return redirect(url_for('dashboard'))
+
 @app.route('/health')
 def health():
-    """Health check"""
-    return jsonify({'status': 'healthy'})
+    """Health check endpoint"""
+    return jsonify({
+        'status': 'healthy',
+        'timestamp': datetime.now().isoformat(),
+        'version': '1.0.0'
+    })
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8501))
-    log_message("🚀 Flask Trading Bot started")
+    log_activity(f"🚀 Pure Flask Trading Bot starting on port {port}")
+    log_activity(f"Mode: {'Testnet' if USE_TESTNET else 'Live Trading'}")
+    
     app.run(host='0.0.0.0', port=port, debug=False)
