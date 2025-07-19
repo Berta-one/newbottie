@@ -1,41 +1,68 @@
+"""
+trade_executor.py
+========================
+Handles trade execution for manual and automated strategies.
+"""
+
+from __future__ import annotations
 from typing import Dict, Any
-
-try:
-    from binance.client import Client
-    BINANCE_AVAILABLE = True
-except ImportError:
-    BINANCE_AVAILABLE = False
-    Client = None
-
-from trader import execute_entry, execute_exit, validate_trade_parameters
+from binance.client import Client
+from position_monitor import PositionMonitor
 from risk_manager import RiskManager
 
-__all__ = ["TradeExecutor"]
 
 class TradeExecutor:
-    """Unified trade execution for manual and auto-trading."""
+    def __init__(self, client: Client, risk_mgr: RiskManager):
+        self.client = client
+        self.risk_mgr = risk_mgr
+        self.position_monitor = PositionMonitor()
 
-    def __init__(self, client: Client | None = None, risk_mgr: RiskManager | None = None):
-        self._client = client
-        self._risk = risk_mgr or RiskManager()
+    # -------------------------------
+    # Manual Trade Execution
+    # -------------------------------
+    def manual_trade(self, symbol: str, qty: float, side: str) -> Dict[str, Any]:
+        try:
+            # Get account balance for risk validation
+            account = self.client.get_account()
+            total_balance_usd = sum(float(b["free"]) for b in account["balances"] if b["asset"] == "USDT")
+            price = float(self.client.get_symbol_ticker(symbol=symbol)["price"])
 
-    def manual_trade(self, symbol: str, quantity: float, side: str, price: float | None = None) -> Dict[str, Any]:
-        """Perform a manual BUY or SELL after risk validation."""
-        side = side.upper()
-        ok, err = validate_trade_parameters(symbol, quantity, price)
-        if not ok:
-            return {"status": "FAILED", "error": err}
+            # Validate risk
+            open_positions = len(self.position_monitor.get_active_positions())
+            risk_check = self.risk_mgr.validate_trade(symbol, qty, price, total_balance_usd, open_positions)
+            if not risk_check["status"]:
+                return {"status": "FAILED", "reason": risk_check["reason"]}
 
-        if not self._risk._risk_below_position_limit(symbol, quantity):
-            return {"status": "FAILED", "error": "Position size exceeds risk limits"}
+            # Execute order
+            if side.upper() == "BUY":
+                order = self.client.order_market_buy(symbol=symbol, quantity=qty)
+                self.position_monitor.add_position(symbol, {"qty": qty, "side": "BUY", "price": price})
+            elif side.upper() == "SELL":
+                order = self.client.order_market_sell(symbol=symbol, quantity=qty)
+                self.position_monitor.remove_position(symbol)
+            else:
+                return {"status": "FAILED", "reason": f"Invalid side {side}"}
 
-        if side == "BUY":
-            return execute_entry(self._client, symbol, quantity, "BUY_LONG")
-        elif side == "SELL":
-            return execute_exit(self._client, symbol, quantity, 0, 0, "Manual exit")
-        else:
-            return {"status": "FAILED", "error": f"Unsupported side '{side}'"}
+            return {"status": "SUCCESS", "orderId": order["orderId"], "symbol": symbol, "side": side}
 
-    def auto_execute(self, trade_signal: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute signals from autonomous strategy pipeline."""
-        return {"status": "NOT_IMPLEMENTED"}
+        except Exception as e:
+            return {"status": "ERROR", "error": str(e)}
+
+    # -------------------------------
+    # Auto-Trade Execution
+    # -------------------------------
+    def auto_execute(self, signal: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            symbol = signal["symbol"]
+            decision = signal["decision"]
+            qty = 0.001  # Default minimal lot size (could be dynamic)
+
+            if decision == "BUY":
+                return self.manual_trade(symbol, qty, "BUY")
+            elif decision == "SELL":
+                return self.manual_trade(symbol, qty, "SELL")
+            else:
+                return {"status": "SKIPPED", "reason": "HOLD signal"}
+
+        except Exception as e:
+            return {"status": "ERROR", "error": str(e)}
