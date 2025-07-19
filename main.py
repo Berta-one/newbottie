@@ -3,6 +3,24 @@ import time
 import json
 from datetime import datetime
 
+# --- API Validation for Railway Environment ---
+import os
+from binance.client import Client
+
+api_key = os.getenv("BINANCE_API_KEY")
+api_secret = os.getenv("BINANCE_API_SECRET")
+
+if not api_key or not api_secret:
+    raise SystemExit("❌ Missing Binance API keys in environment variables. Set them in Railway dashboard.")
+
+try:
+    client = Client(api_key, api_secret)
+    account = client.get_account()
+    print("✅ Binance Live API validation successful! Account Type:", account.get("accountType"))
+except Exception as e:
+    raise SystemExit(f"❌ Binance API validation failed: {e}")
+# ------------------------------------------------
+
 LOG_DIR = 'logs'
 CONSOLE_LOG = os.path.join(LOG_DIR, 'console_output.log')
 SCAN_LOG = os.path.join(LOG_DIR, 'portfolio_scans.log')

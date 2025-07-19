@@ -1,4 +1,4 @@
-﻿# strategy.py - Enhanced Breakout Strategy with Filters
+# strategy.py - Enhanced Breakout Strategy with Filters
 from datetime import datetime
 import pytz
 import statistics

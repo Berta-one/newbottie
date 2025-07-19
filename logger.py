@@ -1,4 +1,4 @@
-﻿# logger.py - Comprehensive Logging System
+# logger.py - Comprehensive Logging System
 import json
 import csv
 import os

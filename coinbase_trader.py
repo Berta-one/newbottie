@@ -1,4 +1,4 @@
-﻿# coinbase_trader.py - Coinbase Pro API Integration
+# coinbase_trader.py - Coinbase Pro API Integration
 import time
 import json
 import hmac
