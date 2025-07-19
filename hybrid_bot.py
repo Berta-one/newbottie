@@ -3,33 +3,30 @@
 Hybrid Quantum Crypto Trading Bot Dashboard
 ===========================================
 Features:
-- Real-time portfolio with PnL tracking
-- Manual Trading (Spot Only)
-- Auto-Trader with Risk Management & OCO
+- Portfolio Overview
+- Manual Trading
+- Auto-Trader Control
 - Multi-Strategy Analysis (Quantum + ML + Technical)
-- ATR-based SL/TP calculation
-- Live WebSocket price updates
+- Settings
+- Real-Time Order WebSocket
+- PnL Tracking (Realized & Unrealized)
+- Logs
 - Advanced Analytics
 """
 
 import os
 import time
 import threading
-import json
 from datetime import datetime
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 import psutil
-from binance.client import Client
-from binance.streams import ThreadedWebsocketManager
 
-# ✅ Streamlit Config
+# ✅ First Streamlit command
 st.set_page_config(page_title="Hybrid Quantum Trading Bot", layout="wide")
 
-# ----------------------------
-# Import Core Modules
-# ----------------------------
+# Core imports
 from portfolio_manager import PortfolioManager
 from trade_executor import TradeExecutor
 from risk_manager import RiskManager
@@ -39,59 +36,68 @@ from quantum_trading_integration import QuantumTrader
 from quantum_engine import QuantumAnalyzer
 from dashboard import TradingDashboard
 from ensemble_signal_engine import EnsembleSignalEngine
+from order_websocket import OrderWebSocket
 
-# ----------------------------
-# Binance API Setup
-# ----------------------------
+# Binance
+from binance.client import Client
+
+# ----------------------------------------
+# Config
+# ----------------------------------------
 API_KEY = os.getenv("BINANCE_API_KEY")
 API_SECRET = os.getenv("BINANCE_API_SECRET")
 if not API_KEY or not API_SECRET:
-    st.error("❌ Binance API keys missing.")
+    st.error("❌ Binance API keys missing. Set BINANCE_API_KEY and BINANCE_API_SECRET.")
     st.stop()
 
 client = Client(API_KEY, API_SECRET)
-ws_manager = ThreadedWebsocketManager(API_KEY, API_SECRET)
 
-# ----------------------------
-# Initialize Components
-# ----------------------------
+# Initialize objects
 portfolio_mgr = PortfolioManager(API_KEY, API_SECRET)
 risk_mgr = RiskManager(max_risk_percent=0.02, max_positions=5)
-trade_exec = TradeExecutor(client, risk_mgr)
 position_monitor = PositionMonitor()
+trade_exec = TradeExecutor(client, risk_mgr, log_callback=lambda msg: st.session_state["logs"].append(msg))
 market_analyzer = MarketAnalyzer(client)
 quantum_trader = QuantumTrader(client)
 quantum_analyzer = QuantumAnalyzer()
 analytics_dashboard = TradingDashboard()
 ensemble_engine = EnsembleSignalEngine(client, quantum_trader, market_analyzer)
 
-# ----------------------------
-# Global State
-# ----------------------------
+# Auto-Trader
 AUTO_TRADING = False
 STOP_FLAG = threading.Event()
-price_data = {}
+
 if "logs" not in st.session_state:
     st.session_state["logs"] = []
 
-# ----------------------------
-# WebSocket for Live Prices
-# ----------------------------
-def start_price_stream():
-    ws_manager.start()
+# SL/TP multipliers
+if "sl_mult" not in st.session_state:
+    st.session_state["sl_mult"] = 1.5
+if "tp_mult" not in st.session_state:
+    st.session_state["tp_mult"] = 3.0
 
-    def handle_message(msg):
-        if msg['e'] == '24hrTicker':
-            symbol = msg['s']
-            price_data[symbol] = float(msg['c'])
+# ----------------------------------------
+# WebSocket for Orders & Positions
+# ----------------------------------------
+order_ws = OrderWebSocket(client, trade_exec, position_monitor, log_callback=lambda msg: st.session_state["logs"].append(msg))
+order_ws.start()
 
-    ws_manager.start_symbol_ticker_socket(callback=handle_message)
+# ----------------------------------------
+# Auto-Trader Loop
+# ----------------------------------------
+def auto_trading_loop():
+    while not STOP_FLAG.is_set():
+        signals = market_analyzer.scan_markets()
+        total_balance = portfolio_mgr.total_value()
+        open_pos = len(position_monitor.get_active_positions())
 
-start_price_stream()
+        for sig in signals:
+            trade_exec.auto_execute(sig, total_balance, open_pos, st.session_state["sl_mult"], st.session_state["tp_mult"])
+        time.sleep(30)
 
-# ----------------------------
-# Utility Functions
-# ----------------------------
+# ----------------------------------------
+# Utilities
+# ----------------------------------------
 def get_system_health():
     return {
         "CPU": f"{psutil.cpu_percent()}%",
@@ -99,30 +105,11 @@ def get_system_health():
         "Threads": threading.active_count()
     }
 
-def get_price(symbol: str):
-    return price_data.get(symbol, float(client.get_symbol_ticker(symbol=symbol)["price"]))
-
-# ----------------------------
-# Auto-Trader Logic
-# ----------------------------
-def auto_trading_loop():
-    while not STOP_FLAG.is_set():
-        try:
-            signals = market_analyzer.scan_markets()
-            total_balance = portfolio_mgr.total_value()
-            open_pos = len(position_monitor.get_active_positions())
-
-            for sig in signals:
-                trade_exec.auto_execute(sig, total_balance, open_pos, st.session_state["sl_mult"], st.session_state["tp_mult"])
-        except Exception as e:
-            st.session_state["logs"].append(f"[AUTO ERROR] {e}")
-        time.sleep(30)
-
-# ----------------------------
-# Streamlit Tabs
-# ----------------------------
+# ----------------------------------------
+# Streamlit UI
+# ----------------------------------------
 st.title("🧠 Hybrid Quantum Crypto Trading Bot")
-st.caption("Advanced Crypto Trading with Quantum + ML + Technical Strategies")
+st.caption("Spot-only bot with OCO SL/TP, Risk Control & Real-Time Tracking")
 
 tabs = st.tabs([
     "📊 Portfolio", "✋ Manual Trading", "🤖 Auto-Trader",
@@ -130,41 +117,34 @@ tabs = st.tabs([
 ])
 
 # ----------------------------------------
-# Portfolio Tab
+# 1. Portfolio & PnL
 # ----------------------------------------
 with tabs[0]:
     st.header("📊 Portfolio Overview")
     try:
         portfolio = portfolio_mgr.get_portfolio()
         total_usd = sum(v["value"] for v in portfolio.values())
+        st.metric("Total Value (USD)", f"${total_usd:,.2f}")
 
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("Total Value (USD)", f"${total_usd:,.2f}")
-        with col2:
-            st.metric("Last Updated", datetime.now().strftime("%H:%M:%S"))
+        # Realized PnL
+        st.metric("Realized PnL (USD)", f"${position_monitor.get_realized_pnl():,.2f}")
 
-        df = pd.DataFrame([
-            {
-                "Asset": asset,
-                "Balance": data["balance"],
-                "Price (USD)": data["price"],
-                "Value (USD)": data["value"],
-                "Unrealized PnL (%)": data.get("pnl_pct", 0),
-                "Unrealized PnL ($)": data.get("pnl_usd", 0)
-            }
-            for asset, data in portfolio.items()
-        ])
+        # Unrealized PnL
+        unrealized = position_monitor.get_unrealized_pnl(lambda s: float(client.get_symbol_ticker(symbol=s)["price"]))
+        if unrealized:
+            st.write("Unrealized PnL:", unrealized)
 
+        df = pd.DataFrame([{"Asset": a, **d} for a, d in portfolio.items()])
         st.dataframe(df, use_container_width=True)
+
         if not df.empty:
-            fig = px.pie(df, names='Asset', values='Value (USD)', title="Portfolio Allocation")
+            fig = px.pie(df, names="Asset", values="value", title="Portfolio Allocation")
             st.plotly_chart(fig)
     except Exception as e:
         st.error(f"Portfolio fetch error: {e}")
 
 # ----------------------------------------
-# Manual Trading Tab
+# 2. Manual Trading
 # ----------------------------------------
 with tabs[1]:
     st.header("✋ Manual Trading")
@@ -172,20 +152,19 @@ with tabs[1]:
     symbol = st.selectbox("Select Pair", pairs)
     qty = st.number_input("Quantity", min_value=0.0001)
     if st.button("Execute Trade"):
-        price = get_price(symbol)
         total_balance = portfolio_mgr.total_value()
         open_pos = len(position_monitor.get_active_positions())
-
+        price = market_analyzer.get_price(symbol)
         validation = risk_mgr.validate_trade(symbol, qty, price, total_balance, open_pos)
         if validation["status"]:
-            result = trade_exec.manual_trade(symbol, qty, st.session_state["sl_mult"], st.session_state["tp_mult"])
+            atr = market_analyzer.get_atr(symbol)
+            result = trade_exec.manual_trade(symbol, qty, st.session_state["sl_mult"], st.session_state["tp_mult"], atr)
             st.success(result)
-            st.session_state["logs"].append(f"[Manual] {result}")
         else:
             st.error(validation["reason"])
 
 # ----------------------------------------
-# Auto-Trader Tab
+# 3. Auto-Trader
 # ----------------------------------------
 with tabs[2]:
     st.header("🤖 Auto-Trader")
@@ -193,16 +172,19 @@ with tabs[2]:
         if st.button("🛑 Stop"):
             STOP_FLAG.set()
             AUTO_TRADING = False
+            st.success("Auto-Trader stopped.")
     else:
         if st.button("▶️ Start"):
-            AUTO_TRADING = True
             STOP_FLAG.clear()
+            AUTO_TRADING = True
             threading.Thread(target=auto_trading_loop, daemon=True).start()
-    st.subheader("Active Positions")
-    st.write(position_monitor.get_active_positions())
+            st.success("Auto-Trader started.")
+
+    st.subheader("Active OCO Orders")
+    st.write(trade_exec.active_orders)
 
 # ----------------------------------------
-# Multi-Strategy Tab
+# 4. Multi-Strategy Signals
 # ----------------------------------------
 with tabs[3]:
     st.header("⚛ Multi-Strategy Analysis")
@@ -210,7 +192,7 @@ with tabs[3]:
     min_confidence = st.session_state.get("min_confidence", 0.65)
     st.info(f"Weights: {weights}, Min Confidence: {min_confidence}")
 
-    portfolio_pairs = [f"{asset}USDT" for asset in portfolio.keys()]
+    portfolio_pairs = [f"{a}USDT" for a in portfolio.keys()]
     signals_data = []
     for symbol in portfolio_pairs:
         try:
@@ -232,19 +214,19 @@ with tabs[3]:
         ])
         st.dataframe(df, use_container_width=True)
     else:
-        st.warning("No signals generated.")
+        st.warning("No signals generated yet.")
 
 # ----------------------------------------
-# Settings Tab
+# 5. Settings
 # ----------------------------------------
 with tabs[4]:
-    st.header("🛠 Settings")
-    st.session_state["sl_mult"] = st.slider("Stop Loss Multiplier (ATR)", 0.5, 5.0, st.session_state.get("sl_mult", 1.5), 0.1)
-    st.session_state["tp_mult"] = st.slider("Take Profit Multiplier (ATR)", 1.0, 10.0, st.session_state.get("tp_mult", 3.0), 0.5)
+    st.header("🛠 Bot Settings")
+    st.session_state["sl_mult"] = st.slider("Stop Loss Multiplier (ATR)", 0.5, 5.0, st.session_state["sl_mult"], 0.1)
+    st.session_state["tp_mult"] = st.slider("Take Profit Multiplier (ATR)", 1.0, 10.0, st.session_state["tp_mult"], 0.5)
     st.success("✅ Settings updated")
 
 # ----------------------------------------
-# Health Tab
+# 6. Health
 # ----------------------------------------
 with tabs[5]:
     st.header("🩺 System Health")
@@ -258,7 +240,7 @@ with tabs[5]:
         st.write("❌ API Check Failed")
 
 # ----------------------------------------
-# Logs Tab
+# 7. Logs
 # ----------------------------------------
 with tabs[6]:
     st.header("📜 Activity Logs")
@@ -266,7 +248,7 @@ with tabs[6]:
         st.text(log)
 
 # ----------------------------------------
-# Analytics Tab
+# 8. Analytics
 # ----------------------------------------
 with tabs[7]:
     st.header("📈 Advanced Analytics")
