@@ -2,9 +2,12 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "streamlit run hybrid_bot.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true --server.enableCORS=false"
+startCommand = "streamlit run hybrid_bot.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true --server.enableCORS=false --server.enableXsrfProtection=false --server.enableWebsocketCompression=false"
 healthcheckPath = "/"
 healthcheckTimeout = 300
 
 [environment]
 USE_TESTNET = "false"
+STREAMLIT_SERVER_ENABLE_CORS = "false"
+STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION = "false"
+STREAMLIT_SERVER_ENABLE_WEBSOCKET_COMPRESSION = "false"
