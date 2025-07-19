@@ -31,15 +31,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 import io
 
-# Set page configuration
-st.set_page_config(
-    page_title="📊 Trading Bot Analytics",
-    page_icon="📈",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
 
-class TradingDashboard:
     """
     Advanced trading dashboard with comprehensive analytics and visualization
     """
