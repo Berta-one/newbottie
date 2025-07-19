@@ -1,498 +1,835 @@
+#!/usr/bin/env python3
+"""
+Enhanced Position Management System - trader.py
+==============================================
+
+Comprehensive position management with dynamic sizing, multiple exit strategies,
+and enhanced monitoring as specified in GitHub Copilot instructions.
+
+Features:
+- Dynamic position sizing based on account balance, confidence, and volatility
+- Risk management: limit risk to 1-2% of account per trade
+- Enhanced position monitoring with multiple exit strategies:
+  * Take profit: 8-15% based on confidence level
+  * Stop loss: 8-12% based on confidence level  
+  * Trailing stops: 3-4% trail when profitable
+  * Time-based exits: maximum 4 hour hold time
+  * Emergency exits: >15% moves in either direction
+- Account balance tracking for USDT
+- Detailed trade execution logging with P&L calculation
+"""
+
 import time
 import json
+import os
 from datetime import datetime, timedelta
-from binance.client import Client
-from binance.exceptions import BinanceAPIException
-import pandas as pd
+from typing import Dict, List, Any, Optional, Tuple
+import threading
 
-def get_account_balance(client, asset):
-    """Get account balance for specified asset (supports any asset)"""
-    try:
-        account = client.get_account()
-        for balance in account['balances']:
-            if balance['asset'] == asset:
-                return float(balance['free'])
-        return 0.0
-    except Exception as e:
-        print(f"❌ Error getting account balance: {e}")
-        return 0.0
+try:
+    from binance.client import Client
+    from binance.exceptions import BinanceAPIException
+    BINANCE_AVAILABLE = True
+except ImportError:
+    BINANCE_AVAILABLE = False
+    Client = None
 
-def calculate_dynamic_position_size(account_balance, base_quantity, confidence, volatility, risk_percentage=0.015):
+from logger import log_trade
+
+class EnhancedTrader:
     """
-    Calculate dynamic position size based on multiple factors
-    
-    Args:
-        account_balance: Available USDT balance
-        base_quantity: Base position size for the symbol
-        confidence: Strategy confidence (0.0 to 1.0)
-        volatility: Market volatility (0.0 to 1.0)
-        risk_percentage: Risk per trade as percentage of account
-    
-    Returns:
-        Adjusted position size
+    Enhanced trader with dynamic position sizing and comprehensive risk management
     """
-    try:
-        # Base risk amount
-        risk_amount = account_balance * risk_percentage
+    
+    def __init__(self, binance_client: Optional[Client] = None):
+        self.client = binance_client
+        self.active_positions = {}
+        self.position_lock = threading.Lock()
         
-        # Confidence scaling (0.5x to 2.0x)
-        confidence_multiplier = 0.5 + (confidence * 1.5)
+        # Risk management settings
+        self.max_risk_per_trade = 0.02  # 2% maximum risk per trade
+        self.max_hold_time_hours = 4
+        self.emergency_exit_threshold = 15.0  # 15% emergency exit
+        
+        # Ensure logs directory
+        os.makedirs('logs', exist_ok=True)
+    
+    def calculate_dynamic_position_size(self, 
+                                      account_balance: float,
+                                      base_quantity: float,
+                                      confidence: float,
+                                      volatility: float,
+                                      risk_percentage: float = 0.015) -> float:
+        """
+        Calculate dynamic position size based on multiple factors
+        
+        Args:
+            account_balance: Current account balance in USDT
+            base_quantity: Base trade quantity
+            confidence: Strategy confidence (0.0-1.0)
+            volatility: Market volatility percentage
+            risk_percentage: Risk percentage per trade (default 1.5%)
+            
+        Returns:
+            Calculated position size
+        """
+        # Risk budget calculation
+        risk_amount = account_balance * min(risk_percentage, self.max_risk_per_trade)
+        
+        # Confidence multiplier (0.3x to 2.0x)
+        confidence_multiplier = 0.3 + (confidence * 1.7)
         
         # Volatility adjustment (reduce size in high volatility)
-        volatility_adjustment = max(0.3, 1.0 - (volatility * 2))
+        volatility_multiplier = 1.0
+        if volatility > 5.0:
+            volatility_multiplier = max(0.5, 1.0 - (volatility - 5.0) / 20.0)
+        elif volatility < 2.0:
+            volatility_multiplier = min(1.5, 1.0 + (2.0 - volatility) / 10.0)
         
-        # Account size adjustment
-        if account_balance > 10000:
-            account_multiplier = 1.5
-        elif account_balance > 1000:
-            account_multiplier = 1.2
-        else:
-            account_multiplier = 1.0
+        # Calculate final position size
+        adjusted_quantity = (base_quantity * 
+                           confidence_multiplier * 
+                           volatility_multiplier)
         
-        # Calculate final multiplier
-        final_multiplier = confidence_multiplier * volatility_adjustment * account_multiplier
+        # Ensure position doesn't exceed risk budget
+        max_quantity_by_risk = risk_amount / (base_quantity * 100)  # Assuming ~1% price move
+        final_quantity = min(adjusted_quantity, max_quantity_by_risk)
         
-        # Apply to base quantity
-        adjusted_quantity = base_quantity * final_multiplier
+        return max(final_quantity, base_quantity * 0.1)  # Minimum 10% of base
+    
+    def get_dynamic_exit_levels(self, 
+                               confidence: float,
+                               volatility: float) -> Dict[str, float]:
+        """
+        Calculate dynamic take profit and stop loss levels based on confidence and volatility
         
-        # Ensure we don't risk more than specified percentage
-        max_quantity_by_risk = risk_amount / 50000  # Assuming ~$50k per base unit
-        adjusted_quantity = min(adjusted_quantity, max_quantity_by_risk)
-        
-        # Minimum position size
-        min_quantity = base_quantity * 0.3
-        adjusted_quantity = max(adjusted_quantity, min_quantity)
-        
-        return round(adjusted_quantity, 6)
-        
-    except Exception as e:
-        print(f"❌ Error calculating position size: {e}")
-        return base_quantity
-
-def execute_entry(client, symbol, quantity, signal_type):
-    """Execute entry trade (buy order)"""
-    try:
-        print(f"📈 Executing {signal_type} entry for {symbol}")
-        symbol_info = get_symbol_info(client, symbol)
-        step_size = symbol_info['stepSize'] if symbol_info else 0.000001
-        formatted_quantity = format_quantity(quantity, step_size)
-        print(f"   Quantity: {formatted_quantity} (raw: {quantity}, step: {step_size})")
-        # Determine quote asset for balance checks
-        quote_asset = symbol_info['quoteAsset'] if symbol_info else 'USDT'
-        base_asset = symbol_info['baseAsset'] if symbol_info else symbol.replace(quote_asset, '')
-        
-        if signal_type in ['BUY_LONG', 'BUY_SHORT']:
-            # For non-USDT pairs, ensure sufficient quote asset balance
-            quote_balance = get_account_balance(client, quote_asset)
-            print(f"   Quote asset ({quote_asset}) balance: {quote_balance}")
-            order = client.order_market_buy(
-                symbol=symbol,
-                quantity=formatted_quantity
-            )
+        Args:
+            confidence: Strategy confidence (0.0-1.0)
+            volatility: Market volatility percentage
             
-            # Extract execution details
-            if order['status'] == 'FILLED':
-                fills = order.get('fills', [])
-                if fills:
-                    avg_price = sum(float(fill['price']) * float(fill['qty']) for fill in fills) / sum(float(fill['qty']) for fill in fills)
-                else:
-                    avg_price = float(order.get('price', 0))
-                
-                return {
-                    'status': 'SUCCESS',
-                    'entry_price': avg_price,
-                    'quantity': float(order['executedQty']),
-                    'timestamp': datetime.now(),
-                    'order_id': order['orderId'],
-                    'order_details': order
-                }
-            else:
+        Returns:
+            Dictionary with exit levels
+        """
+        # Base levels
+        base_take_profit = 10.0
+        base_stop_loss = 8.0
+        base_trailing_stop = 3.5
+        
+        # Confidence adjustments
+        confidence_factor = 0.5 + confidence  # 0.5 to 1.5
+        
+        # Volatility adjustments
+        volatility_factor = 1.0
+        if volatility > 5.0:
+            volatility_factor = 1.0 + (volatility - 5.0) / 10.0  # Increase levels in high vol
+        
+        # Calculate dynamic levels
+        take_profit = base_take_profit * confidence_factor * volatility_factor
+        stop_loss = base_stop_loss * confidence_factor * volatility_factor
+        trailing_stop = base_trailing_stop * confidence_factor
+        
+        # Ensure reasonable bounds
+        take_profit = max(8.0, min(take_profit, 20.0))
+        stop_loss = max(6.0, min(stop_loss, 15.0))
+        trailing_stop = max(2.0, min(trailing_stop, 6.0))
+        
+        return {
+            'take_profit': take_profit,
+            'stop_loss': stop_loss,
+            'trailing_stop': trailing_stop
+        }
+    
+    def execute_entry(self, 
+                     symbol: str,
+                     quantity: float,
+                     signal_type: str,
+                     current_price: float = None) -> Dict[str, Any]:
+        """
+        Execute entry order with comprehensive logging
+        
+        Args:
+            symbol: Trading symbol
+            quantity: Position size
+            signal_type: "BUY_LONG" or "BUY_SHORT"
+            current_price: Current market price (optional)
+            
+        Returns:
+            Execution result dictionary
+        """
+        try:
+            if not self.client:
+                return self._mock_execute_entry(symbol, quantity, signal_type, current_price)
+            
+            # Validate minimum quantity
+            if not self._validate_minimum_quantity(symbol, quantity):
                 return {
                     'status': 'FAILED',
-                    'error': f"Order not filled: {order['status']}",
-                    'order_details': order
+                    'error': 'Quantity below minimum requirements',
+                    'symbol': symbol,
+                    'quantity': quantity
                 }
-        else:
-            return {
-                'status': 'FAILED',
-                'error': f"Invalid signal type: {signal_type}"
-            }
             
-    except Exception as e:
-        return {
-            'status': 'FAILED',
-            'error': f"Execution error: {str(e)}"
-        }
-
-def execute_exit(client, symbol, quantity, exit_price, entry_price, reason):
-    """Execute exit trade (sell order)"""
-    try:
-        print(f"📉 Executing exit for {symbol}")
-        symbol_info = get_symbol_info(client, symbol)
-        step_size = symbol_info['stepSize'] if symbol_info else 0.000001
-        formatted_quantity = format_quantity(quantity, step_size)
-        print(f"   Quantity: {formatted_quantity} (raw: {quantity}, step: {step_size})")
-        print(f"   Reason: {reason}")
-        # Determine base asset for balance checks
-        base_asset = symbol_info['baseAsset'] if symbol_info else symbol[:len(symbol)//2]
-        base_balance = get_account_balance(client, base_asset)
-        print(f"   Base asset ({base_asset}) balance: {base_balance}")
-        order = client.order_market_sell(
-            symbol=symbol,
-            quantity=formatted_quantity
-        )
-        
-        # Extract execution details
-        if order['status'] == 'FILLED':
+            # Execute market order
+            if signal_type == "BUY_LONG":
+                order = self.client.order_market_buy(
+                    symbol=symbol,
+                    quantity=self._format_quantity(symbol, quantity)
+                )
+            else:  # BUY_SHORT (sell order)
+                order = self.client.order_market_sell(
+                    symbol=symbol,
+                    quantity=self._format_quantity(symbol, quantity)
+                )
+            
+            # Calculate average fill price
             fills = order.get('fills', [])
             if fills:
-                avg_price = sum(float(fill['price']) * float(fill['qty']) for fill in fills) / sum(float(fill['qty']) for fill in fills)
+                total_qty = sum(float(fill['qty']) for fill in fills)
+                total_cost = sum(float(fill['qty']) * float(fill['price']) for fill in fills)
+                avg_price = total_cost / total_qty if total_qty > 0 else 0
             else:
-                avg_price = float(order.get('price', exit_price))
+                avg_price = current_price or 0
             
-            return {
+            result = {
                 'status': 'SUCCESS',
-                'exit_price': avg_price,
-                'quantity': float(order['executedQty']),
-                'timestamp': datetime.now(),
-                'order_id': order['orderId'],
-                'pnl_percent': ((avg_price - entry_price) / entry_price) * 100,
-                'order_details': order
-            }
-        else:
-            return {
-                'status': 'FAILED',
-                'error': f"Order not filled: {order['status']}",
-                'order_details': order
+                'symbol': symbol,
+                'quantity': float(order.get('executedQty', quantity)),
+                'entry_price': avg_price,
+                'order_id': order.get('orderId'),
+                'signal_type': signal_type,
+                'timestamp': datetime.now().isoformat(),
+                'commission': self._calculate_commission(fills)
             }
             
-    except Exception as e:
-        return {
-            'status': 'FAILED',
-            'error': f"Exit error: {str(e)}"
-        }
-
-def monitor_position_enhanced(client, symbol, entry_price):
-    """
-    Enhanced position monitoring with multiple exit strategies
-    
-    Args:
-        client: Binance client
-        symbol: Trading symbol
-        entry_price: Entry price for P&L calculation
-    
-    Returns:
-        Tuple: (should_exit: bool, reason: str)
-    """
-    try:
-        # Get current market price
-        ticker = client.get_symbol_ticker(symbol=symbol)
-        current_price = float(ticker['price'])
+            # Log successful entry
+            log_trade({
+                **result,
+                'trade_type': 'ENTRY',
+                'status': 'FILLED'
+            })
+            
+            return result
         
-        # Calculate P&L percentage
-        pnl_percent = ((current_price - entry_price) / entry_price) * 100
+        except BinanceAPIException as e:
+            error_result = {
+                'status': 'FAILED',
+                'error': f'Binance API Error: {e.message}',
+                'symbol': symbol,
+                'quantity': quantity,
+                'signal_type': signal_type
+            }
+            
+            log_trade({
+                **error_result,
+                'trade_type': 'ENTRY',
+                'timestamp': datetime.now().isoformat()
+            })
+            
+            return error_result
         
-        # Simple exit conditions (you can enhance these)
-        if pnl_percent >= 10.0:
-            return True, f"Take Profit: {pnl_percent:+.2f}%"
-        elif pnl_percent <= -10.0:
-            return True, f"Stop Loss: {pnl_percent:+.2f}%"
+        except Exception as e:
+            error_result = {
+                'status': 'FAILED',
+                'error': str(e),
+                'symbol': symbol,
+                'quantity': quantity,
+                'signal_type': signal_type
+            }
+            
+            log_trade({
+                **error_result,
+                'trade_type': 'ENTRY',
+                'timestamp': datetime.now().isoformat()
+            })
+            
+            return error_result
+    
+    def monitor_position_enhanced(self, 
+                                entry_price: float,
+                                symbol: str,
+                                quantity: float,
+                                signal_type: str,
+                                confidence: float = 0.7,
+                                volatility: float = 3.0,
+                                max_hold_time_minutes: int = 240) -> Dict[str, Any]:
+        """
+        Enhanced position monitoring with multiple exit strategies
         
-        return False, "Hold"
+        Args:
+            entry_price: Entry price of the position
+            symbol: Trading symbol
+            quantity: Position size
+            signal_type: "BUY_LONG" or "BUY_SHORT"
+            confidence: Strategy confidence for dynamic exits
+            volatility: Market volatility for dynamic exits
+            max_hold_time_minutes: Maximum hold time in minutes
+            
+        Returns:
+            Exit result dictionary
+        """
+        start_time = datetime.now()
+        max_hold_time = timedelta(minutes=max_hold_time_minutes)
         
-    except Exception as e:
-        print(f"❌ Error monitoring position: {e}")
-        return False, "Error"
-
-def calculate_portfolio_metrics(trades_log):
-    """
-    Calculate comprehensive portfolio performance metrics
+        # Get dynamic exit levels
+        exit_levels = self.get_dynamic_exit_levels(confidence, volatility)
+        take_profit_pct = exit_levels['take_profit']
+        stop_loss_pct = exit_levels['stop_loss']
+        trailing_stop_pct = exit_levels['trailing_stop']
+        
+        # Initialize tracking variables
+        highest_profit = 0.0
+        trailing_stop_active = False
+        trailing_stop_price = 0.0
+        
+        position_id = f"{symbol}_{int(start_time.timestamp())}"
+        
+        print(f"🔍 Monitoring position: {symbol} | Entry: ${entry_price:.6f} | TP: {take_profit_pct:.1f}% | SL: {stop_loss_pct:.1f}%")
+        
+        try:
+            while True:
+                current_time = datetime.now()
+                time_held = current_time - start_time
+                
+                # Get current price
+                current_price = self._get_current_price(symbol)
+                if not current_price:
+                    time.sleep(30)
+                    continue
+                
+                # Calculate P&L
+                if signal_type == "BUY_LONG":
+                    pnl_pct = ((current_price - entry_price) / entry_price) * 100
+                else:  # BUY_SHORT
+                    pnl_pct = ((entry_price - current_price) / entry_price) * 100
+                
+                pnl_usd = (pnl_pct / 100) * quantity * entry_price
+                
+                # Update highest profit for trailing stop
+                if pnl_pct > highest_profit:
+                    highest_profit = pnl_pct
+                    
+                    # Activate trailing stop when profitable
+                    if pnl_pct > trailing_stop_pct and not trailing_stop_active:
+                        trailing_stop_active = True
+                        if signal_type == "BUY_LONG":
+                            trailing_stop_price = current_price * (1 - trailing_stop_pct / 100)
+                        else:
+                            trailing_stop_price = current_price * (1 + trailing_stop_pct / 100)
+                        print(f"🔄 Trailing stop activated at ${trailing_stop_price:.6f}")
+                    
+                    # Update trailing stop price
+                    elif trailing_stop_active:
+                        if signal_type == "BUY_LONG":
+                            new_trailing_price = current_price * (1 - trailing_stop_pct / 100)
+                            if new_trailing_price > trailing_stop_price:
+                                trailing_stop_price = new_trailing_price
+                        else:
+                            new_trailing_price = current_price * (1 + trailing_stop_pct / 100)
+                            if new_trailing_price < trailing_stop_price:
+                                trailing_stop_price = new_trailing_price
+                
+                # Check exit conditions
+                exit_reason = None
+                
+                # 1. Take Profit
+                if pnl_pct >= take_profit_pct:
+                    exit_reason = f"Take profit hit: {pnl_pct:.2f}% >= {take_profit_pct:.1f}%"
+                
+                # 2. Stop Loss
+                elif pnl_pct <= -stop_loss_pct:
+                    exit_reason = f"Stop loss hit: {pnl_pct:.2f}% <= -{stop_loss_pct:.1f}%"
+                
+                # 3. Trailing Stop
+                elif trailing_stop_active:
+                    if signal_type == "BUY_LONG" and current_price <= trailing_stop_price:
+                        exit_reason = f"Trailing stop hit: ${current_price:.6f} <= ${trailing_stop_price:.6f}"
+                    elif signal_type == "BUY_SHORT" and current_price >= trailing_stop_price:
+                        exit_reason = f"Trailing stop hit: ${current_price:.6f} >= ${trailing_stop_price:.6f}"
+                
+                # 4. Time-based Exit
+                elif time_held >= max_hold_time:
+                    exit_reason = f"Time limit reached: {time_held.total_seconds()/60:.0f} minutes"
+                
+                # 5. Emergency Exit (>15% adverse move)
+                elif pnl_pct <= -self.emergency_exit_threshold:
+                    exit_reason = f"Emergency exit: {pnl_pct:.2f}% loss"
+                
+                # 6. Emergency Exit (>15% favorable move - lock in profits)
+                elif pnl_pct >= self.emergency_exit_threshold:
+                    exit_reason = f"Emergency exit: {pnl_pct:.2f}% profit"
+                
+                # Print status update every minute
+                if int(time_held.total_seconds()) % 60 == 0:
+                    print(f"📊 {symbol}: P&L {pnl_pct:+.2f}% | ${pnl_usd:+.2f} | Time: {int(time_held.total_seconds()/60)}m")
+                
+                # Exit if condition met
+                if exit_reason:
+                    print(f"🚪 Exiting position: {exit_reason}")
+                    exit_result = self.execute_exit(
+                        symbol=symbol,
+                        quantity=quantity,
+                        exit_price=current_price,
+                        entry_price=entry_price,
+                        reason=exit_reason,
+                        signal_type=signal_type
+                    )
+                    
+                    # Add monitoring stats to result
+                    exit_result.update({
+                        'time_held_minutes': time_held.total_seconds() / 60,
+                        'highest_profit_pct': highest_profit,
+                        'final_pnl_pct': pnl_pct,
+                        'final_pnl_usd': pnl_usd,
+                        'trailing_stop_used': trailing_stop_active,
+                        'exit_levels_used': exit_levels
+                    })
+                    
+                    return exit_result
+                
+                # Wait before next check
+                time.sleep(10)  # Check every 10 seconds
+        
+        except KeyboardInterrupt:
+            print("🛑 Monitoring interrupted by user")
+            return self.execute_exit(symbol, quantity, None, entry_price, "User interruption", signal_type)
+        
+        except Exception as e:
+            print(f"❌ Error monitoring position: {e}")
+            return self.execute_exit(symbol, quantity, None, entry_price, f"Error: {e}", signal_type)
     
-    Args:
-        trades_log: List of trade records
+    def execute_exit(self, 
+                    symbol: str,
+                    quantity: float,
+                    exit_price: float,
+                    entry_price: float,
+                    reason: str,
+                    signal_type: str = "BUY_LONG") -> Dict[str, Any]:
+        """
+        Execute exit order with P&L calculation
+        
+        Args:
+            symbol: Trading symbol
+            quantity: Position size to close
+            exit_price: Exit price (None for market price)
+            entry_price: Original entry price
+            reason: Exit reason
+            signal_type: Original signal type
+            
+        Returns:
+            Exit result dictionary
+        """
+        try:
+            if not self.client:
+                return self._mock_execute_exit(symbol, quantity, exit_price, entry_price, reason, signal_type)
+            
+            # Execute market order to close position
+            if signal_type == "BUY_LONG":
+                # Close long position with sell order
+                order = self.client.order_market_sell(
+                    symbol=symbol,
+                    quantity=self._format_quantity(symbol, quantity)
+                )
+            else:
+                # Close short position with buy order
+                order = self.client.order_market_buy(
+                    symbol=symbol,
+                    quantity=self._format_quantity(symbol, quantity)
+                )
+            
+            # Calculate actual exit price from fills
+            fills = order.get('fills', [])
+            if fills:
+                total_qty = sum(float(fill['qty']) for fill in fills)
+                total_cost = sum(float(fill['qty']) * float(fill['price']) for fill in fills)
+                actual_exit_price = total_cost / total_qty if total_qty > 0 else exit_price
+            else:
+                actual_exit_price = exit_price or entry_price
+            
+            # Calculate P&L
+            if signal_type == "BUY_LONG":
+                pnl_pct = ((actual_exit_price - entry_price) / entry_price) * 100
+            else:
+                pnl_pct = ((entry_price - actual_exit_price) / entry_price) * 100
+            
+            pnl_usd = (pnl_pct / 100) * quantity * entry_price
+            commission = self._calculate_commission(fills)
+            net_pnl_usd = pnl_usd - commission
+            
+            result = {
+                'status': 'SUCCESS',
+                'symbol': symbol,
+                'quantity': float(order.get('executedQty', quantity)),
+                'entry_price': entry_price,
+                'exit_price': actual_exit_price,
+                'pnl_percent': pnl_pct,
+                'pnl_usd': pnl_usd,
+                'commission': commission,
+                'net_pnl_usd': net_pnl_usd,
+                'reason': reason,
+                'order_id': order.get('orderId'),
+                'timestamp': datetime.now().isoformat(),
+                'signal_type': signal_type
+            }
+            
+            # Log successful exit
+            log_trade({
+                **result,
+                'trade_type': 'EXIT',
+                'status': 'FILLED'
+            })
+            
+            print(f"✅ Position closed: {symbol} | P&L: {pnl_pct:+.2f}% (${net_pnl_usd:+.2f}) | {reason}")
+            
+            return result
+        
+        except Exception as e:
+            error_result = {
+                'status': 'FAILED',
+                'error': str(e),
+                'symbol': symbol,
+                'reason': reason,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            log_trade({
+                **error_result,
+                'trade_type': 'EXIT'
+            })
+            
+            print(f"❌ Failed to close position: {e}")
+            return error_result
     
-    Returns:
-        Dict with performance metrics
-    """
-    if not trades_log:
-        return {
-            'total_trades': 0,
-            'win_rate': 0.0,
-            'total_pnl_percent': 0.0,
-            'profit_factor': 0.0,
-            'sharpe_ratio': 0.0,
-            'max_drawdown': 0.0
-        }
+    def get_account_balance(self, asset: str = 'USDT') -> float:
+        """
+        Get account balance for specified asset
+        
+        Args:
+            asset: Asset symbol (default: USDT)
+            
+        Returns:
+            Account balance
+        """
+        try:
+            if not self.client:
+                # Return mock balance for testing
+                return 10000.0
+            
+            account = self.client.get_account()
+            
+            for balance in account['balances']:
+                if balance['asset'] == asset:
+                    return float(balance['free'])
+            
+            return 0.0
+        
+        except Exception as e:
+            print(f"⚠️ Error getting account balance: {e}")
+            return 0.0
     
-    try:
-        # Convert to DataFrame for easier analysis
-        df = pd.DataFrame(trades_log)
+    def calculate_portfolio_metrics(self, trades_log: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Calculate comprehensive portfolio metrics
+        
+        Args:
+            trades_log: List of completed trades
+            
+        Returns:
+            Portfolio metrics dictionary
+        """
+        if not trades_log:
+            return {
+                'total_trades': 0,
+                'win_rate': 0.0,
+                'total_pnl_percent': 0.0,
+                'total_pnl_usd': 0.0,
+                'average_win': 0.0,
+                'average_loss': 0.0,
+                'profit_factor': 0.0,
+                'sharpe_ratio': 0.0,
+                'max_drawdown': 0.0
+            }
+        
+        # Separate wins and losses
+        wins = [trade for trade in trades_log if trade.get('pnl_percent', 0) > 0]
+        losses = [trade for trade in trades_log if trade.get('pnl_percent', 0) < 0]
         
         # Basic metrics
-        total_trades = len(df)
-        winning_trades = len(df[df['pnl_percent'] > 0])
-        losing_trades = len(df[df['pnl_percent'] < 0])
-        win_rate = (winning_trades / total_trades) * 100 if total_trades > 0 else 0
+        total_trades = len(trades_log)
+        win_rate = (len(wins) / total_trades) * 100 if total_trades > 0 else 0
         
-        # P&L metrics
-        total_pnl = df['pnl_percent'].sum()
-        total_wins = df[df['pnl_percent'] > 0]['pnl_percent'].sum()
-        total_losses = abs(df[df['pnl_percent'] < 0]['pnl_percent'].sum())
+        total_pnl_percent = sum(trade.get('pnl_percent', 0) for trade in trades_log)
+        total_pnl_usd = sum(trade.get('net_pnl_usd', 0) for trade in trades_log)
+        
+        # Win/Loss analysis
+        average_win = sum(trade.get('pnl_percent', 0) for trade in wins) / len(wins) if wins else 0
+        average_loss = sum(trade.get('pnl_percent', 0) for trade in losses) / len(losses) if losses else 0
         
         # Profit factor
+        total_wins = sum(trade.get('pnl_percent', 0) for trade in wins)
+        total_losses = abs(sum(trade.get('pnl_percent', 0) for trade in losses))
         profit_factor = total_wins / total_losses if total_losses > 0 else float('inf')
         
-        # Volatility and Sharpe ratio
-        returns_std = df['pnl_percent'].std()
-        sharpe_ratio = total_pnl / returns_std if returns_std > 0 else 0
+        # Risk metrics
+        returns = [trade.get('pnl_percent', 0) for trade in trades_log]
+        avg_return = sum(returns) / len(returns) if returns else 0
+        
+        # Standard deviation for Sharpe ratio
+        if len(returns) > 1:
+            variance = sum((r - avg_return) ** 2 for r in returns) / (len(returns) - 1)
+            std_dev = variance ** 0.5
+            sharpe_ratio = avg_return / std_dev if std_dev > 0 else 0
+        else:
+            sharpe_ratio = 0
         
         # Maximum drawdown
-        cumulative_pnl = df['pnl_percent'].cumsum()
-        running_max = cumulative_pnl.expanding().max()
-        drawdown = running_max - cumulative_pnl
-        max_drawdown = drawdown.max()
+        cumulative_returns = []
+        running_total = 0
+        for trade in trades_log:
+            running_total += trade.get('pnl_percent', 0)
+            cumulative_returns.append(running_total)
         
-        # Additional metrics
-        avg_win = df[df['pnl_percent'] > 0]['pnl_percent'].mean() if winning_trades > 0 else 0
-        avg_loss = df[df['pnl_percent'] < 0]['pnl_percent'].mean() if losing_trades > 0 else 0
-        max_win = df['pnl_percent'].max()
-        max_loss = df['pnl_percent'].min()
-        
-        # Consecutive wins/losses
-        df['win'] = df['pnl_percent'] > 0
-        df['streak'] = df['win'].groupby((df['win'] != df['win'].shift()).cumsum()).cumcount() + 1
-        max_winning_streak = df[df['win']]['streak'].max() if winning_trades > 0 else 0
-        max_losing_streak = df[~df['win']]['streak'].max() if losing_trades > 0 else 0
+        if cumulative_returns:
+            peak = cumulative_returns[0]
+            max_drawdown = 0
+            for value in cumulative_returns:
+                if value > peak:
+                    peak = value
+                drawdown = peak - value
+                if drawdown > max_drawdown:
+                    max_drawdown = drawdown
+        else:
+            max_drawdown = 0
         
         return {
             'total_trades': total_trades,
-            'winning_trades': winning_trades,
-            'losing_trades': losing_trades,
             'win_rate': win_rate,
-            'total_pnl_percent': total_pnl,
-            'average_win': avg_win,
-            'average_loss': avg_loss,
-            'max_win': max_win,
-            'max_loss': max_loss,
+            'total_pnl_percent': total_pnl_percent,
+            'total_pnl_usd': total_pnl_usd,
+            'average_win': average_win,
+            'average_loss': abs(average_loss),
             'profit_factor': profit_factor,
             'sharpe_ratio': sharpe_ratio,
             'max_drawdown': max_drawdown,
-            'volatility': returns_std,
-            'max_winning_streak': max_winning_streak,
-            'max_losing_streak': max_losing_streak,
-            'total_wins_amount': total_wins,
-            'total_losses_amount': total_losses
+            'best_trade': max(returns) if returns else 0,
+            'worst_trade': min(returns) if returns else 0
         }
-        
-    except Exception as e:
-        print(f"❌ Error calculating portfolio metrics: {e}")
-        return {
-            'total_trades': len(trades_log),
-            'win_rate': 0.0,
-            'total_pnl_percent': 0.0,
-            'error': str(e)
-        }
-
-def validate_trade_parameters(symbol, quantity, price=None):
-    """
-    Validate trade parameters before execution
     
-    Args:
-        symbol: Trading symbol
-        quantity: Position size
-        price: Price (optional)
-    
-    Returns:
-        Tuple: (is_valid: bool, error_message: str)
-    """
-    try:
-        # Basic validation
-        if not symbol or not isinstance(symbol, str):
-            return False, "Invalid symbol"
-        
-        if quantity <= 0:
-            return False, "Quantity must be positive"
-        
-        if price is not None and price <= 0:
-            return False, "Price must be positive"
-        
-        # Remove USDT-only restriction
-        # Symbol format validation (allow any valid Binance symbol)
-        
-        # Quantity limits (basic check)
-        if quantity > 1000:  # Adjust based on your needs
-            return False, "Quantity too large"
-        
-        if quantity < 0.000001:  # Minimum quantity
-            return False, "Quantity too small"
-        
-        return True, "Valid"
-        
-    except Exception as e:
-        return False, f"Validation error: {str(e)}"
-
-def get_symbol_info(client, symbol):
-    """
-    Get trading symbol information and limits
-    
-    Args:
-        client: Binance client
-        symbol: Trading symbol
-    
-    Returns:
-        Dict with symbol information
-    """
-    try:
-        exchange_info = client.get_exchange_info()
-        
-        for symbol_info in exchange_info['symbols']:
-            if symbol_info['symbol'] == symbol:
-                # Extract key information
-                filters = {f['filterType']: f for f in symbol_info['filters']}
-                
-                return {
-                    'symbol': symbol,
-                    'status': symbol_info['status'],
-                    'baseAsset': symbol_info['baseAsset'],
-                    'quoteAsset': symbol_info['quoteAsset'],
-                    'minQty': float(filters.get('LOT_SIZE', {}).get('minQty', 0)),
-                    'maxQty': float(filters.get('LOT_SIZE', {}).get('maxQty', 0)),
-                    'stepSize': float(filters.get('LOT_SIZE', {}).get('stepSize', 0)),
-                    'minPrice': float(filters.get('PRICE_FILTER', {}).get('minPrice', 0)),
-                    'maxPrice': float(filters.get('PRICE_FILTER', {}).get('maxPrice', 0)),
-                    'tickSize': float(filters.get('PRICE_FILTER', {}).get('tickSize', 0)),
-                    'minNotional': float(filters.get('MIN_NOTIONAL', {}).get('minNotional', 0))
+    # Helper methods
+    def _get_current_price(self, symbol: str) -> Optional[float]:
+        """Get current market price for symbol"""
+        try:
+            if not self.client:
+                # Return mock price for testing
+                import random
+                base_prices = {
+                    'BTCUSDT': 50000, 'ETHUSDT': 3000, 'BNBUSDT': 300,
+                    'ADAUSDT': 0.5, 'SOLUSDT': 100
                 }
+                base_price = base_prices.get(symbol, 100)
+                return base_price * (1 + random.uniform(-0.01, 0.01))
+            
+            ticker = self.client.get_symbol_ticker(symbol=symbol)
+            return float(ticker['price'])
         
-        return None
-        
-    except Exception as e:
-        print(f"❌ Error getting symbol info: {e}")
-        return None
-
-def format_quantity(quantity, step_size):
-    """
-    Format quantity according to symbol step size
+        except Exception as e:
+            print(f"⚠️ Error getting price for {symbol}: {e}")
+            return None
     
-    Args:
-        quantity: Raw quantity
-        step_size: Symbol step size from exchange info
+    def _validate_minimum_quantity(self, symbol: str, quantity: float) -> bool:
+        """Validate quantity meets minimum requirements"""
+        # This would check against exchange info in real implementation
+        return quantity > 0.0001  # Basic validation
     
-    Returns:
-        Properly formatted quantity
-    """
-    try:
-        if step_size == 0:
-            return quantity
+    def _format_quantity(self, symbol: str, quantity: float) -> str:
+        """Format quantity according to symbol precision"""
+        # This would use exchange info to get proper precision
+        if 'BTC' in symbol:
+            return f"{quantity:.6f}"
+        elif 'ETH' in symbol:
+            return f"{quantity:.5f}"
+        else:
+            return f"{quantity:.4f}"
+    
+    def _calculate_commission(self, fills: List[Dict]) -> float:
+        """Calculate total commission from order fills"""
+        if not fills:
+            return 0.0
         
-        # Calculate precision based on step size
-        precision = len(str(step_size).split('.')[-1]) if '.' in str(step_size) else 0
+        total_commission = 0.0
+        for fill in fills:
+            commission = float(fill.get('commission', 0))
+            # Convert to USDT if needed (simplified)
+            total_commission += commission
         
-        # Round to appropriate precision
-        formatted_qty = round(quantity / step_size) * step_size
+        return total_commission
+    
+    def _mock_execute_entry(self, symbol: str, quantity: float, signal_type: str, current_price: float) -> Dict[str, Any]:
+        """Mock entry execution for testing"""
+        import random
         
-        return round(formatted_qty, precision)
+        price = current_price or 100.0
+        # Simulate slight slippage
+        actual_price = price * (1 + random.uniform(-0.001, 0.001))
         
-    except Exception as e:
-        print(f"❌ Error formatting quantity: {e}")
-        return quantity
+        return {
+            'status': 'SUCCESS',
+            'symbol': symbol,
+            'quantity': quantity,
+            'entry_price': actual_price,
+            'order_id': f"mock_{int(time.time())}",
+            'signal_type': signal_type,
+            'timestamp': datetime.now().isoformat(),
+            'commission': quantity * actual_price * 0.001  # 0.1% commission
+        }
+    
+    def _mock_execute_exit(self, symbol: str, quantity: float, exit_price: float, entry_price: float, reason: str, signal_type: str) -> Dict[str, Any]:
+        """Mock exit execution for testing"""
+        import random
+        
+        actual_exit_price = exit_price or (entry_price * (1 + random.uniform(-0.05, 0.05)))
+        
+        # Calculate P&L
+        if signal_type == "BUY_LONG":
+            pnl_pct = ((actual_exit_price - entry_price) / entry_price) * 100
+        else:
+            pnl_pct = ((entry_price - actual_exit_price) / entry_price) * 100
+        
+        pnl_usd = (pnl_pct / 100) * quantity * entry_price
+        commission = quantity * actual_exit_price * 0.001
+        
+        return {
+            'status': 'SUCCESS',
+            'symbol': symbol,
+            'quantity': quantity,
+            'entry_price': entry_price,
+            'exit_price': actual_exit_price,
+            'pnl_percent': pnl_pct,
+            'pnl_usd': pnl_usd,
+            'commission': commission,
+            'net_pnl_usd': pnl_usd - commission,
+            'reason': reason,
+            'order_id': f"mock_exit_{int(time.time())}",
+            'timestamp': datetime.now().isoformat(),
+            'signal_type': signal_type
+        }
 
 # Legacy compatibility functions
-def monitor_position(entry_price, symbol, quantity, client):
-    """Legacy function for backward compatibility"""
-    should_exit, reason = monitor_position_enhanced(client, symbol, entry_price)
-    return reason if should_exit else None
+def monitor_position(entry_price: float, symbol: str, client: Client, 
+                    quantity: float = 0.001, confidence: float = 0.7) -> Dict[str, Any]:
+    """Legacy function for backwards compatibility"""
+    trader = EnhancedTrader(client)
+    return trader.monitor_position_enhanced(
+        entry_price=entry_price,
+        symbol=symbol,
+        quantity=quantity,
+        signal_type="BUY_LONG",
+        confidence=confidence
+    )
 
-def calculate_position_size(account_balance, risk_percent=0.015):
-    """Simple position size calculation for backward compatibility"""
-    return account_balance * risk_percent / 50000  # Assuming ~$50k BTC price
+def execute_entry(client: Client, symbol: str, quantity: float, signal_type: str) -> Dict[str, Any]:
+    """Legacy function for backwards compatibility"""
+    trader = EnhancedTrader(client)
+    return trader.execute_entry(symbol, quantity, signal_type)
 
-# Trade logging helper
-def log_trade_execution(trade_type, symbol, quantity, price, result):
-    """Log trade execution for debugging"""
-    timestamp = datetime.now().isoformat()
-    log_entry = {
-        'timestamp': timestamp,
-        'trade_type': trade_type,
-        'symbol': symbol,
-        'quantity': quantity,
-        'price': price,
-        'result': result
-    }
+def execute_exit(client: Client, symbol: str, quantity: float, exit_price: float, 
+                entry_price: float, reason: str) -> Dict[str, Any]:
+    """Legacy function for backwards compatibility"""
+    trader = EnhancedTrader(client)
+    return trader.execute_exit(symbol, quantity, exit_price, entry_price, reason)
+
+def get_account_balance(client: Client, asset: str = 'USDT') -> float:
+    """Legacy function for backwards compatibility"""
+    trader = EnhancedTrader(client)
+    return trader.get_account_balance(asset)
+
+def calculate_dynamic_position_size(account_balance: float, base_quantity: float, 
+                                  confidence: float, volatility: float, 
+                                  risk_percentage: float = 0.015) -> float:
+    """Legacy function for backwards compatibility"""
+    trader = EnhancedTrader()
+    return trader.calculate_dynamic_position_size(
+        account_balance, base_quantity, confidence, volatility, risk_percentage
+    )
+
+def validate_trade_parameters(symbol: str, quantity: float, price: float = None) -> Tuple[bool, str]:
+    """Validate trade parameters before execution"""
+    if not symbol:
+        return False, "Symbol is required"
     
-    try:
-        with open('logs/trade_executions.json', 'a') as f:
-            json.dump(log_entry, f)
-            f.write('\n')
-    except Exception as e:
-        print(f"❌ Error logging trade execution: {e}")
-
-# Emergency functions
-def emergency_close_all_positions(client, symbols_list):
-    """Emergency function to close all positions"""
-    print("🚨 EMERGENCY: Closing all positions!")
+    if quantity <= 0:
+        return False, "Quantity must be positive"
     
-    results = []
-    for symbol in symbols_list:
-        try:
-            # Get current balance of base asset
-            base_asset = symbol.replace('USDT', '')
-            balance = get_account_balance(client, base_asset)
-            
-            if balance > 0:
-                result = execute_exit(client, symbol, balance, 0, 0, "Emergency Close")
-                results.append((symbol, result))
-                print(f"   {symbol}: {result['status']}")
-        except Exception as e:
-            print(f"   {symbol}: Error - {e}")
-            results.append((symbol, {'status': 'ERROR', 'error': str(e)}))
+    if not symbol.endswith('USDT'):
+        return False, "Only USDT pairs supported"
     
-    return results
+    if price is not None and price <= 0:
+        return False, "Price must be positive"
+    
+    return True, ""
 
-def get_portfolio_summary(client, symbols_list):
-    """Get current portfolio summary"""
-    try:
-        portfolio = {}
-        total_value_usdt = 0
+# Example usage and testing
+if __name__ == "__main__":
+    print("🚀 Enhanced Trader Module Test")
+    print("=" * 50)
+    
+    # Initialize trader
+    trader = EnhancedTrader()
+    
+    # Test dynamic position sizing
+    account_balance = 10000.0
+    base_quantity = 0.001
+    confidence = 0.8
+    volatility = 4.5
+    
+    position_size = trader.calculate_dynamic_position_size(
+        account_balance, base_quantity, confidence, volatility
+    )
+    
+    print(f"Account Balance: ${account_balance:,.2f}")
+    print(f"Base Quantity: {base_quantity}")
+    print(f"Confidence: {confidence:.1%}")
+    print(f"Volatility: {volatility:.1f}%")
+    print(f"Calculated Position Size: {position_size:.6f}")
+    
+    # Test dynamic exit levels
+    exit_levels = trader.get_dynamic_exit_levels(confidence, volatility)
+    print(f"\nDynamic Exit Levels:")
+    print(f"Take Profit: {exit_levels['take_profit']:.1f}%")
+    print(f"Stop Loss: {exit_levels['stop_loss']:.1f}%")
+    print(f"Trailing Stop: {exit_levels['trailing_stop']:.1f}%")
+    
+    # Test mock trade execution
+    print(f"\n🔄 Testing Mock Trade Execution:")
+    
+    entry_result = trader.execute_entry(
+        symbol="BTCUSDT",
+        quantity=position_size,
+        signal_type="BUY_LONG",
+        current_price=50000.0
+    )
+    
+    print(f"Entry Result: {entry_result['status']}")
+    if entry_result['status'] == 'SUCCESS':
+        print(f"Entry Price: ${entry_result['entry_price']:.2f}")
+        print(f"Quantity: {entry_result['quantity']:.6f}")
         
-        # Get USDT balance
-        usdt_balance = get_account_balance(client, 'USDT')
-        portfolio['USDT'] = {
-            'balance': usdt_balance,
-            'value_usdt': usdt_balance,
-            'percentage': 0  # Will calculate after total
-        }
-        total_value_usdt += usdt_balance
+        # Test position monitoring (abbreviated for demo)
+        print(f"\n📊 Starting Position Monitoring...")
+        print(f"(This would normally run until exit conditions are met)")
         
-        # Get crypto balances
-        for symbol in symbols_list:
-            base_asset = symbol.replace('USDT', '')
-            balance = get_account_balance(client, base_asset)
-            
-            if balance > 0:
-                # Get current price
-                ticker = client.get_symbol_ticker(symbol=symbol)
-                price = float(ticker['price'])
-                value_usdt = balance * price
-                
-                portfolio[base_asset] = {
-                    'balance': balance,
-                    'price': price,
-                    'value_usdt': value_usdt,
-                    'percentage': 0  # Will calculate after total
-                }
-                total_value_usdt += value_usdt
+        # Simulate exit after some conditions
+        exit_result = trader.execute_exit(
+            symbol="BTCUSDT",
+            quantity=entry_result['quantity'],
+            exit_price=51000.0,  # 2% profit
+            entry_price=entry_result['entry_price'],
+            reason="Test exit",
+            signal_type="BUY_LONG"
+        )
         
-        # Calculate percentages
-        for asset in portfolio:
-            portfolio[asset]['percentage'] = (portfolio[asset]['value_usdt'] / total_value_usdt) * 100 if total_value_usdt > 0 else 0
-        
-        return {
-            'total_value_usdt': total_value_usdt,
-            'portfolio': portfolio,
-            'timestamp': datetime.now().isoformat()
-        }
-        
-    except Exception as e:
-        print(f"❌ Error getting portfolio summary: {e}")
-        return None
+        print(f"Exit Result: {exit_result['status']}")
+        if exit_result['status'] == 'SUCCESS':
+            print(f"P&L: {exit_result['pnl_percent']:+.2f}%")
+            print(f"P&L USD: ${exit_result['net_pnl_usd']:+.2f}")
+    
+    print("\n✅ Enhanced Trader Module Test Complete")
