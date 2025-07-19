@@ -1,85 +1,76 @@
 """
-ensemble_signal_engine.py
-==========================
-Combines Quantum, ML, and Technical signals into an ensemble strategy decision.
+Ensemble Signal Engine
+========================
+Combines Quantum, ML, and Technical signals with weighted scoring.
 """
 
 from typing import Dict, Any
 from quantum_trading_integration import QuantumTrader
-from quantum_engine import QuantumAnalyzer
-from simplified_ml_strategy import MLStrategy
 from market_analyzer import MarketAnalyzer
+from simplified_ml_strategy import MLStrategy
 
 
 class EnsembleSignalEngine:
     def __init__(self, client, quantum_trader: QuantumTrader, market_analyzer: MarketAnalyzer):
         self.client = client
         self.quantum_trader = quantum_trader
-        self.quantum_analyzer = QuantumAnalyzer()
         self.market_analyzer = market_analyzer
         self.ml_strategy = MLStrategy()
 
     def get_signals(self, symbol: str, weights: Dict[str, float], min_confidence: float = 0.65) -> Dict[str, Any]:
         """
-        Compute ensemble signal for a given trading pair.
-
-        Args:
-            symbol (str): Trading pair, e.g., 'BTCUSDT'
-            weights (dict): {'quantum': %, 'ml': %, 'technical': %}
-            min_confidence (float): Minimum confidence threshold for final signal
-
-        Returns:
-            dict: Combined signal details
+        Get combined signal using ensemble from Quantum, ML, and Technical strategies.
         """
-
-        # Fetch technical indicators
-        rsi = self.market_analyzer.get_latest_rsi(symbol)
-        momentum = self.market_analyzer.get_latest_momentum(symbol)
-        volatility = self.market_analyzer.get_volatility(symbol)
-
         # Quantum signal
         quantum_signal = self.quantum_trader.evaluate_signal({
-            "rsi": rsi,
-            "momentum": momentum,
-            "price_volatility": volatility
+            "rsi": self.market_analyzer.get_latest_rsi(symbol),
+            "momentum": self.market_analyzer.get_latest_momentum(symbol),
+            "price_volatility": self.market_analyzer.get_volatility(symbol)
         })
 
         # ML signal
-        ml_signal = self.ml_strategy.predict(symbol)
+        klines = self.client.get_klines(symbol=symbol, interval='1h', limit=100)
+        ml_signal, ml_confidence, ml_distribution = self.ml_strategy.predict_market_direction(klines)
 
-        # Technical decision
-        tech_decision, tech_conf = self._technical_decision(rsi, momentum)
+        # Technical signal (simplified: using RSI & Momentum only)
+        tech_rsi = self.market_analyzer.get_latest_rsi(symbol)
+        tech_decision = "BUY" if tech_rsi < 30 else "SELL" if tech_rsi > 70 else "HOLD"
+        tech_confidence = abs((50 - tech_rsi) / 50)  # normalize to [0, 1]
 
-        # Normalize weights
-        total_weight = weights['quantum'] + weights['ml'] + weights['technical']
-        q_w = weights['quantum'] / total_weight
-        m_w = weights['ml'] / total_weight
-        t_w = weights['technical'] / total_weight
+        # Combine weighted score
+        combined_score = (
+            quantum_signal["confidence"] * weights["quantum"] +
+            ml_confidence * weights["ml"] +
+            tech_confidence * weights["technical"]
+        ) / sum(weights.values())
 
-        # Compute final score
-        final_conf = (
-            quantum_signal["confidence"] * q_w +
-            ml_signal["confidence"] * m_w +
-            tech_conf * t_w
-        )
-        final_decision = "BUY" if final_conf >= min_confidence else "SELL"
+        # Final decision
+        decision = "HOLD"
+        if combined_score > min_confidence:
+            if quantum_signal["decision"] == "BUY" or ml_signal.startswith("BUY") or tech_decision == "BUY":
+                decision = "BUY"
+            elif quantum_signal["decision"] == "SELL" or ml_signal == "BUY_SHORT" or tech_decision == "SELL":
+                decision = "SELL"
 
         return {
             "symbol": symbol,
-            "quantum": {"decision": quantum_signal["decision"], "confidence": quantum_signal["confidence"]},
-            "ml": {"decision": ml_signal["decision"], "confidence": ml_signal["confidence"]},
-            "technical": {"decision": tech_decision, "confidence": tech_conf},
-            "final": {"decision": final_decision, "confidence": round(final_conf, 2)},
-            "circuit": quantum_signal.get("circuit", "")
+            "quantum": {
+                "decision": quantum_signal["decision"],
+                "confidence": quantum_signal["confidence"],
+                "distribution": quantum_signal["distribution"]
+            },
+            "ml": {
+                "decision": ml_signal,
+                "confidence": ml_confidence,
+                "distribution": ml_distribution
+            },
+            "technical": {
+                "decision": tech_decision,
+                "confidence": tech_confidence
+            },
+            "final": {
+                "decision": decision,
+                "confidence": combined_score
+            },
+            "circuit": quantum_signal["circuit"]
         }
-
-    def _technical_decision(self, rsi: float, momentum: float) -> (str, float):
-        """
-        Simple RSI & Momentum based decision.
-        """
-        if rsi < 30 and momentum > 0:
-            return "BUY", 0.8
-        elif rsi > 70 and momentum < 0:
-            return "SELL", 0.8
-        else:
-            return "HOLD", 0.5
