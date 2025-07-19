@@ -1134,7 +1134,42 @@ def stop_auto_bot():
     """Stop the auto trading bot"""
     st.session_state['auto_running'] = False
     log_activity("Hybrid auto trading bot stopped")
+# Railway WebSocket optimization
+def optimize_for_railway():
+    """Apply Railway-specific optimizations"""
+    if RAILWAY_ENV:
+        # Configure Streamlit for Railway's WebSocket infrastructure
+        st.set_page_config(
+            page_title="🧠 Hybrid Quantum Crypto Bot",
+            layout="wide",
+            initial_sidebar_state="expanded",
+            menu_items={
+                'Get Help': None,
+                'Report a bug': None,
+                'About': "Hybrid Crypto Trading Bot running on Railway"
+            }
+        )
+        
+        # Railway session persistence
+        session_id = st.session_state.get('railway_session_id')
+        if session_id and 'session_manager' in globals():
+            # Save current session state periodically
+            if st.session_state.get('auto_running', False):
+                session_data = {
+                    'auto_running': st.session_state['auto_running'],
+                    'selected_strategy': st.session_state.get('selected_strategy', 'Breakout'),
+                    'risk_override': st.session_state.get('risk_override', 0.015),
+                    'last_action': st.session_state.get('last_action', 'None')
+                }
+                session_manager.save_session(session_id, session_data)
+    else:
+        st.set_page_config(
+            page_title="🧠 Hybrid Quantum Crypto Bot",
+            layout="wide"
+        )
 
+# Apply Railway optimizations
+optimize_for_railway()
 # Main UI
 st.set_page_config(page_title="🧠 Hybrid Quantum Crypto Bot", layout="wide")
 ensure_log_files()
