@@ -2,7 +2,7 @@
 """
 Hybrid Quantum Crypto Trading Bot Dashboard
 ===========================================
-Main Streamlit UI for:
+Streamlit UI for:
 - Portfolio Overview
 - Manual Trading
 - Auto-Trader Control
@@ -22,7 +22,7 @@ import plotly.express as px
 import streamlit as st
 import psutil
 
-# ✅ MUST be the very first Streamlit call
+# ✅ MUST be first Streamlit command
 st.set_page_config(page_title="Hybrid Quantum Trading Bot", layout="wide")
 
 # Core modules
@@ -40,19 +40,19 @@ from binance.client import Client
 from binance.exceptions import BinanceAPIException
 
 # ----------------------------------------
-# Environment and Config
+# Environment & Config
 # ----------------------------------------
 API_KEY = os.getenv("BINANCE_API_KEY")
 API_SECRET = os.getenv("BINANCE_API_SECRET")
 
 if not API_KEY or not API_SECRET:
-    st.error("❌ Binance API keys are missing. Configure BINANCE_API_KEY and BINANCE_API_SECRET.")
+    st.error("❌ Binance API keys missing. Configure BINANCE_API_KEY and BINANCE_API_SECRET.")
     st.stop()
 
 client = Client(API_KEY, API_SECRET)
 
 # Initialize core objects
-portfolio_mgr = PortfolioManager(client)
+portfolio_mgr = PortfolioManager(API_KEY, API_SECRET)
 risk_mgr = RiskManager()
 trade_exec = TradeExecutor(client, risk_mgr)
 position_monitor = PositionMonitor()
@@ -61,7 +61,7 @@ quantum_trader = QuantumTrader(client)
 quantum_analyzer = QuantumAnalyzer()
 analytics_dashboard = TradingDashboard()
 
-# Auto-trader state
+# Auto-Trader state
 AUTO_TRADING = False
 AUTO_THREAD = None
 STOP_FLAG = threading.Event()
@@ -122,34 +122,31 @@ tabs = st.tabs([
 with tabs[0]:
     st.header("📊 Portfolio Overview")
     try:
-        portfolio = portfolio_mgr.get_portfolio()
-        total_value = portfolio_mgr.total_value()
+        portfolio_data = portfolio_mgr.get_portfolio()
+        if isinstance(portfolio_data, dict):
+            total_usd = sum(v["value"] for v in portfolio_data.values())
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Total Value (USD)", f"${total_usd:,.2f}")
+            with col2:
+                st.metric("Last Updated", datetime.now().strftime("%H:%M:%S"))
 
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("Total Value (USD)", f"${total_value:,.2f}")
-        with col2:
-            st.metric("Last Updated", portfolio_mgr.last_updated())
-
-        if portfolio:
             df = pd.DataFrame([
                 {
                     "Asset": asset,
                     "Balance": data["balance"],
-                    "Price (USD)": f"${data['price']:.2f}",
-                    "Value (USD)": f"${data['value']:.2f}",
+                    "Price (USD)": data["price"],
+                    "Value (USD)": data["value"],
                     "24h Change": f"{data['change']}%"
                 }
-                for asset, data in portfolio.items()
+                for asset, data in portfolio_data.items()
             ])
-
             st.dataframe(df, use_container_width=True)
-
-            # Pie chart
-            fig = px.pie(df, names='Asset', values='Value (USD)', title="Portfolio Allocation")
-            st.plotly_chart(fig, use_container_width=True)
+            if not df.empty:
+                fig = px.pie(df, names='Asset', values='Value (USD)', title="Portfolio Allocation")
+                st.plotly_chart(fig, use_container_width=True)
         else:
-            st.warning("⚠️ No assets found in your portfolio.")
+            st.warning("⚠️ Unable to fetch portfolio data.")
     except Exception as e:
         st.error(f"Portfolio fetch error: {e}")
 
@@ -158,8 +155,8 @@ with tabs[0]:
 # ----------------------------------------
 with tabs[1]:
     st.header("✋ Manual Trading")
-    pairs = market_analyzer.scan_markets()  # Ensure dynamic pair list
-    symbol = st.selectbox("Select Pair", [p['symbol'] for p in pairs if 'symbol' in p])
+    pairs = market_analyzer.get_trading_pairs()
+    symbol = st.selectbox("Select Pair", pairs)
     qty = st.number_input("Quantity", min_value=0.0001, step=0.0001)
     side = st.radio("Side", ["BUY", "SELL"])
     if st.button("Execute Trade"):
@@ -184,48 +181,33 @@ with tabs[2]:
     st.write(position_monitor.get_active_positions())
 
 # ----------------------------------------
-# Quantum Analysis Tab
+# Quantum Analysis Tab (ALL Portfolio Pairs)
 # ----------------------------------------
 with tabs[3]:
-    st.header("⚛ Quantum Analysis & Trading")
-
-    # Dynamic pair selection (from available pairs)
-    available_pairs = [p['symbol'] for p in market_analyzer.scan_markets() if 'symbol' in p]
-    if not available_pairs:
-        available_pairs = ["BTCUSDT"]  # Fallback default
-
-    selected_pair = st.selectbox("Select Pair for Quantum Analysis", available_pairs)
-
-    # Fetch market data for selected pair
-    market_data = {
-        "rsi": market_analyzer.get_latest_rsi(selected_pair),
-        "momentum": market_analyzer.get_latest_momentum(selected_pair),
-        "price_volatility": market_analyzer.get_volatility(selected_pair)
-    }
-
-    st.write(f"Performing Quantum Analysis for **{selected_pair}**")
-
+    st.header("⚛ Quantum Analysis & Trading (All Portfolio Pairs)")
     try:
-        # Generate quantum signal
-        signal = quantum_trader.evaluate_signal(market_data)
-
-        st.subheader("Quantum Signal")
-        st.json(signal["distribution"])
-        st.write(f"**Decision:** {signal['decision']} (Confidence: {signal['confidence']})")
-
-        # Display quantum circuit representation
-        st.text(signal["circuit"])
-
-        st.subheader("Quantum Diagnostics")
-        st.json(quantum_analyzer.get_quantum_diagnostics())
-
-        # Execute trade based on quantum signal
-        qty = st.number_input("Trade Quantity", min_value=0.0001, step=0.0001, key="quantum_qty")
-        if st.button("Execute Quantum Trade"):
-            result = quantum_trader.execute_quantum_trade(selected_pair, market_data, qty)
-            st.session_state["logs"].append(f"[Quantum] {result}")
-            st.success(result)
-
+        portfolio_data = portfolio_mgr.get_portfolio()
+        assets = list(portfolio_data.keys())
+        if len(assets) < 2:
+            st.warning("⚠️ Need at least 2 assets in portfolio for pair analysis.")
+        else:
+            for i in range(len(assets)):
+                for j in range(i + 1, len(assets)):
+                    pair = f"{assets[i]}{assets[j]}"
+                    st.subheader(f"Quantum Analysis for {pair}")
+                    market_data = {
+                        "rsi": market_analyzer.get_latest_rsi(pair),
+                        "momentum": market_analyzer.get_latest_momentum(pair),
+                        "price_volatility": market_analyzer.get_volatility(pair)
+                    }
+                    signal = quantum_trader.evaluate_signal(market_data)
+                    st.json(signal["distribution"])
+                    st.write(f"Decision: **{signal['decision']}** (Confidence: {signal['confidence']})")
+                    qty = st.number_input(f"Trade Qty for {pair}", min_value=0.0001, step=0.0001, key=f"quantum_qty_{pair}")
+                    if st.button(f"Execute Quantum Trade for {pair}"):
+                        result = quantum_trader.execute_quantum_trade(pair, market_data, qty)
+                        st.session_state["logs"].append(f"[Quantum {pair}] {result}")
+                        st.success(result)
     except Exception as e:
         st.error(f"Quantum analysis error: {e}")
 
@@ -235,42 +217,17 @@ with tabs[3]:
 with tabs[4]:
     st.header("🛠 Bot Settings")
     st.caption("Configure risk and strategy parameters")
-
-    # Risk % slider
-    risk_pct = st.slider("Risk per Trade (%)", min_value=0.1, max_value=5.0,
-                         value=st.session_state.get("risk_pct", 1.5), step=0.1)
-    st.session_state["risk_pct"] = risk_pct
-
-    # Max Positions
-    max_positions = st.slider("Max Open Positions", min_value=1, max_value=10,
-                              value=st.session_state.get("max_positions", 3))
-    st.session_state["max_positions"] = max_positions
-
-    # Confidence threshold
-    min_confidence = st.slider("Minimum Signal Confidence", min_value=0.5, max_value=1.0,
-                                value=st.session_state.get("min_confidence", 0.65), step=0.01)
-    st.session_state["min_confidence"] = min_confidence
-
-    # Strategy Weights
+    risk_pct = st.slider("Risk per Trade (%)", 0.1, 5.0, st.session_state.get("risk_pct", 1.5), 0.1)
+    max_positions = st.slider("Max Open Positions", 1, 10, st.session_state.get("max_positions", 3))
+    min_confidence = st.slider("Minimum Signal Confidence", 0.5, 1.0, st.session_state.get("min_confidence", 0.65), 0.01)
+    st.session_state.update({"risk_pct": risk_pct, "max_positions": max_positions, "min_confidence": min_confidence})
     st.subheader("📈 Strategy Weights")
     col1, col2, col3 = st.columns(3)
-    with col1:
-        quantum_weight = st.number_input("Quantum (%)", min_value=0.0, max_value=100.0,
-                                         value=st.session_state.get("quantum_weight", 30.0), step=1.0)
-    with col2:
-        ml_weight = st.number_input("ML (%)", min_value=0.0, max_value=100.0,
-                                    value=st.session_state.get("ml_weight", 30.0), step=1.0)
-    with col3:
-        tech_weight = st.number_input("Technical (%)", min_value=0.0, max_value=100.0,
-                                      value=st.session_state.get("tech_weight", 40.0), step=1.0)
-
-    st.session_state["strategy_weights"] = {
-        "quantum": quantum_weight,
-        "ml": ml_weight,
-        "technical": tech_weight
-    }
-
-    st.success("✅ Settings updated successfully!")
+    quantum_weight = col1.number_input("Quantum (%)", 0.0, 100.0, st.session_state.get("quantum_weight", 30.0), 1.0)
+    ml_weight = col2.number_input("ML (%)", 0.0, 100.0, st.session_state.get("ml_weight", 30.0), 1.0)
+    tech_weight = col3.number_input("Technical (%)", 0.0, 100.0, st.session_state.get("tech_weight", 40.0), 1.0)
+    st.session_state["strategy_weights"] = {"quantum": quantum_weight, "ml": ml_weight, "technical": tech_weight}
+    st.success("✅ Settings updated!")
 
 # ----------------------------------------
 # Health Tab
@@ -280,9 +237,9 @@ with tabs[5]:
     health = get_system_health()
     st.metric("CPU", health["CPU"])
     st.metric("Memory", health["Memory"])
-    st.write("**Threads:**", health["Threads"])
+    st.write("Threads:", health["Threads"])
     try:
-        st.write("**API Status:** ✅" if client.ping() == {} else "❌ Failed")
+        st.write("API Status: ✅" if client.ping() == {} else "❌ Failed")
     except Exception:
         st.write("❌ API Check Failed")
 
