@@ -31,10 +31,7 @@ class AdvancedTradingDashboard:
     
     def run_dashboard(self):
         """Main dashboard application"""
-        st.set_page_config(
-            page_title="🤖 Advanced Crypto Trading Intelligence",
-            page_icon="🚀",
-            layout="wide",
+        
             initial_sidebar_state="expanded"
         )
         # ...existing code...
