@@ -207,7 +207,7 @@ with tabs[3]:
     min_confidence = st.session_state.get("min_confidence", 0.65)
     st.info(f"Weights: {weights}, Min Confidence: {min_confidence}")
 
-    # Analyze portfolio pairs
+    # Analyze portfolio pairs dynamically
     portfolio_pairs = [f"{asset}USDT" for asset in portfolio.keys()]
     signals_data = []
     for symbol in portfolio_pairs:
@@ -229,6 +229,22 @@ with tabs[3]:
             for s in signals_data
         ])
         st.dataframe(df, use_container_width=True)
+
+        # Show details & allow execution
+        for s in signals_data:
+            with st.expander(f"Details for {s['symbol']}"):
+                st.write("**Quantum Distribution:**", s['quantum']['distribution'])
+                st.write("**ML Distribution:**", s['ml']['distribution'])
+                st.text("Quantum Circuit:\n" + s["circuit"])
+
+                qty = st.number_input(f"Trade Qty for {s['symbol']}", min_value=0.0001, step=0.0001, key=f"qty_{s['symbol']}")
+                if st.button(f"Execute Trade ({s['final']['decision']}) for {s['symbol']}"):
+                    if s['final']['decision'] != "HOLD":
+                        result = trade_exec.manual_trade(s["symbol"], qty, s['final']['decision'])
+                        st.success(result)
+                        st.session_state["logs"].append(f"[Multi-Strategy] {result}")
+                    else:
+                        st.warning("Signal suggests HOLD. Trade not executed.")
     else:
         st.warning("No signals generated yet.")
 
