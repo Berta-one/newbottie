@@ -136,7 +136,7 @@ with tabs[0]:
 # ----------------------------------------
 with tabs[1]:
     st.header("✋ Manual Trading")
-    pairs = market_analyzer.scan_markets()  # This ensures list of pairs dynamically
+    pairs = market_analyzer.scan_markets()  # Ensure dynamic pair list
     symbol = st.selectbox("Select Pair", [p['symbol'] for p in pairs if 'symbol' in p])
     qty = st.number_input("Quantity", min_value=0.0001, step=0.0001)
     side = st.radio("Side", ["BUY", "SELL"])
@@ -214,6 +214,4 @@ with tabs[5]:
 # ----------------------------------------
 with tabs[6]:
     st.header("📈 Advanced Analytics")
-    analytics_dashboard.render_performance_overview()
-    analytics_dashboard.render_risk_metrics()
-    analytics_dashboard.render_scan_results()
+    analytics_dashboard.render_analytics_dashboard()
