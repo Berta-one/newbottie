@@ -122,31 +122,23 @@ tabs = st.tabs([
 with tabs[0]:
     st.header("📊 Portfolio Overview")
     try:
-        # Flexible unpacking for any extra values
-        portfolio, total_usd, total_gbp, *_ = portfolio_mgr.get_portfolio()
-
-        # Safely cast to float
-        try:
-            total_usd_val = float(total_usd)
-            total_gbp_val = float(total_gbp)
-        except (ValueError, TypeError):
-            total_usd_val = 0.0
-            total_gbp_val = 0.0
+        portfolio = portfolio_mgr.get_portfolio()
+        total_value = portfolio_mgr.total_value()
 
         col1, col2 = st.columns(2)
         with col1:
-            st.metric("Total Value (USD)", f"${total_usd_val:,.2f}")
+            st.metric("Total Value (USD)", f"${total_value:,.2f}")
         with col2:
-            st.metric("Total Value (GBP)", f"£{total_gbp_val:,.2f}")
+            st.metric("Last Updated", portfolio_mgr.last_updated())
 
         if portfolio:
             df = pd.DataFrame([
                 {
                     "Asset": asset,
                     "Balance": data["balance"],
-                    "Price (USD)": data["price_usd"],
-                    "Value (USD)": data["usd_value"],
-                    "24h Change": f"{data['price_change_24h']}%"
+                    "Price (USD)": f"${data['price']:.2f}",
+                    "Value (USD)": f"${data['value']:.2f}",
+                    "24h Change": f"{data['change']}%"
                 }
                 for asset, data in portfolio.items()
             ])
