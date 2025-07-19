@@ -2,12 +2,8 @@
 """
 Order WebSocket Listener
 =========================
-Listens for real-time Binance Spot account updates:
-- Order execution reports
-- Balance updates
-Updates:
-- PositionMonitor (PnL tracking)
-- TradeExecutor active orders
+- Tracks account changes via user data stream
+- Handles OCO updates, position PnL updates, and balance refresh
 """
 
 import threading
@@ -15,31 +11,27 @@ from binance import ThreadedWebsocketManager
 from datetime import datetime
 
 class OrderWebSocket:
-    def __init__(self, client, trade_executor, position_monitor, log_callback=None):
+    def __init__(self, client, trade_executor, position_monitor, portfolio_manager, ui_refresh=None, log_callback=None):
         self.client = client
         self.trade_executor = trade_executor
         self.position_monitor = position_monitor
+        self.portfolio_manager = portfolio_manager
         self.log = log_callback if log_callback else print
+        self.ui_refresh = ui_refresh
         self.ws_manager = None
-        self._thread = None
+        self.listen_key = None
         self._running = False
 
     def start(self):
         if self._running:
             self.log("[WebSocket] Already running.")
             return
-
         self.ws_manager = ThreadedWebsocketManager(api_key=self.client.API_KEY, api_secret=self.client.API_SECRET)
         self.ws_manager.start()
-
-        self._thread = threading.Thread(target=self._start_socket, daemon=True)
-        self._thread.start()
-        self._running = True
-        self.log("[WebSocket] Listening for account updates...")
-
-    def _start_socket(self):
+        self.listen_key = self.client.stream_get_listen_key()
         self.ws_manager.start_user_socket(callback=self._handle_event)
-        self.ws_manager.join()
+        self._running = True
+        self.log("[WebSocket] Started user data stream.")
 
     def stop(self):
         if self._running and self.ws_manager:
@@ -52,27 +44,23 @@ class OrderWebSocket:
         if event_type == "executionReport":
             self._process_order_update(msg)
         elif event_type == "outboundAccountPosition":
-            self._process_balance_update(msg)
+            self.log("[Portfolio] Balance update received.")
+            self.portfolio_manager.refresh_cache()
+            if self.ui_refresh:
+                self.ui_refresh()
 
     def _process_order_update(self, msg):
         symbol = msg["s"]
         status = msg["X"]
+        executed_qty = float(msg["l"])
+        price = float(msg["L"])
         side = msg["S"]
-        price = float(msg["L"]) if msg["L"] != "0.00000000" else None
-        qty = float(msg["l"]) if msg["l"] != "0.00000000" else None
 
         if status == "FILLED":
-            if side == "BUY":
-                self.position_monitor.open_position(symbol, price, qty)
-                self.log(f"[Order FILLED] BUY {symbol} @ {price} Qty={qty}")
-            elif side == "SELL":
+            if side == "SELL":
                 pnl = self.position_monitor.close_position(symbol, price)
-                self.log(f"[Order FILLED] SELL {symbol} @ {price} | PnL: {pnl:.2f}")
-                if symbol in self.trade_executor.active_orders:
-                    del self.trade_executor.active_orders[symbol]
-
-    def _process_balance_update(self, msg):
-        balances = msg.get("B", [])
-        changes = {b["a"]: b["f"] for b in balances if float(b["f"]) > 0}
-        if changes:
-            self.log(f"[Balance Update] {changes}")
+                self.log(f"[PnL] Closed {symbol} @ {price}, Realized PnL: {pnl:.2f}")
+                self.trade_executor.active_orders.pop(symbol, None)
+            elif side == "BUY":
+                self.position_monitor.open_position(symbol, executed_qty, price)
+                self.log(f"[Order] Buy filled for {symbol} @ {price}, Qty={executed_qty}")
