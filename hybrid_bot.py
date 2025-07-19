@@ -15,7 +15,93 @@ import json, os, time, threading, requests
 import numpy as np
 import warnings
 warnings.filterwarnings('ignore')
+# Railway WebSocket and Production Optimizations
+import asyncio
+import sys
+import signal
+import atexit
 
+# Railway environment detection
+RAILWAY_ENV = os.getenv('RAILWAY_ENVIRONMENT') == 'production'
+PORT = int(os.getenv('PORT', 8080))
+
+# WebSocket configuration for Railway
+if RAILWAY_ENV:
+    # Optimize for Railway's WebSocket infrastructure
+    os.environ['STREAMLIT_SERVER_ENABLE_WEBSOCKET_COMPRESSION'] = 'false'
+    os.environ['STREAMLIT_SERVER_MAX_MESSAGE_SIZE'] = '200'
+    os.environ['STREAMLIT_SERVER_MAX_UPLOAD_SIZE'] = '200'
+    
+    # Railway-specific optimizations
+    import uvloop
+    try:
+        asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+    except:
+        pass
+
+# Session state persistence for Railway
+if 'railway_session_id' not in st.session_state:
+    st.session_state['railway_session_id'] = f"railway_{int(time.time())}"
+
+# Railway logging configuration
+def setup_railway_logging():
+    """Setup logging optimized for Railway"""
+    import logging
+    
+    # Railway-friendly log format
+    logging.basicConfig(
+        level=getattr(logging, CONFIG.get('LOG_LEVEL', 'INFO')),
+        format='[%(asctime)s] %(levelname)s: %(message)s',
+        handlers=[
+            logging.StreamHandler(sys.stdout),  # Railway captures stdout
+            logging.FileHandler('logs/railway.log') if not RAILWAY_ENV else logging.NullHandler()
+        ]
+    )
+    
+    return logging.getLogger(__name__)
+
+logger = setup_railway_logging()
+
+# Railway-specific session management
+class RailwaySessionManager:
+    """Manage persistent sessions on Railway"""
+    
+    def __init__(self):
+        self.session_file = '/tmp/railway_sessions.json' if RAILWAY_ENV else 'logs/sessions.json'
+        self.load_sessions()
+    
+    def load_sessions(self):
+        """Load existing sessions"""
+        try:
+            if os.path.exists(self.session_file):
+                with open(self.session_file, 'r') as f:
+                    self.sessions = json.load(f)
+            else:
+                self.sessions = {}
+        except:
+            self.sessions = {}
+    
+    def save_session(self, session_id, data):
+        """Save session data"""
+        try:
+            self.sessions[session_id] = {
+                **data,
+                'last_updated': datetime.now().isoformat()
+            }
+            
+            os.makedirs(os.path.dirname(self.session_file), exist_ok=True)
+            with open(self.session_file, 'w') as f:
+                json.dump(self.sessions, f)
+        except Exception as e:
+            logger.error(f"Session save error: {e}")
+    
+    def get_session(self, session_id):
+        """Get session data"""
+        return self.sessions.get(session_id, {})
+
+# Initialize Railway session manager
+if RAILWAY_ENV:
+    session_manager = RailwaySessionManager()
 # Dynamic imports with fallbacks
 DEPENDENCIES = {
     'psutil': False,
