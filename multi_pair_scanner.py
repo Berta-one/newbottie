@@ -1,339 +1,365 @@
-# multi_pair_scanner.py - Multi-Pair Crypto Scanner
-import time
-from binance.client import Client
-from strategy import check_breakout_enhanced, get_strategy_confidence, analyze_pair_strength
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import json
-from datetime import datetime
+#!/usr/bin/env python3
+"""
+Complete Multi-Pair Cryptocurrency Scanner - multi_pair_scanner.py
+================================================================
+
+Comprehensive multi-pair scanning engine as specified in GitHub Copilot instructions.
+
+Features:
+- Scan ALL USDT pairs with minimum volume filtering
+- Maintain curated list of quality crypto pairs across categories
+- Accept custom symbol lists from environment variables
+- Analyze multiple pairs concurrently using ThreadPoolExecutor
+- Rank opportunities by combined score (confidence + volume + category)
+- Filter trading signals based on minimum confidence and volume thresholds
+- Display formatted results in tables with comprehensive data
+- Save scan results to timestamped JSON files
+"""
+
 import os
+import json
+import time
+import threading
+from datetime import datetime, timedelta
+from typing import Dict, List, Any, Optional, Tuple
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import statistics
+
+try:
+    from binance.client import Client
+    from binance.exceptions import BinanceAPIException
+    BINANCE_AVAILABLE = True
+except ImportError:
+    BINANCE_AVAILABLE = False
+    Client = None
+
+from strategy import check_breakout_enhanced, get_strategy_confidence
+from logger import log_scan
 
 class CryptoPairScanner:
-    def get_all_trading_pairs(self, base_assets=['USDT', 'BTC', 'ETH', 'BNB'], min_volume_24h=1000000):
-        """
-        Enhanced: Get ALL trading pairs, not just USDT pairs
-        Supports cross trading like ADABTC, ETHBTC, etc.
-        """
-        try:
-            print(f"🌍 Fetching ALL trading pairs with bases: {base_assets}")
-            ticker_24h = self.client.get_ticker()
-            all_pairs = []
-            excluded_keywords = ['UP', 'DOWN', 'BEAR', 'BULL']
-            for ticker in ticker_24h:
-                symbol = ticker['symbol']
-                volume = float(ticker['quoteVolume'])
-                price_change_24h = float(ticker['priceChangePercent'])
-                # Check if symbol ends with any of our base assets
-                quote_asset = None
-                for base in base_assets:
-                    if symbol.endswith(base):
-                        quote_asset = base
-                        break
-                # Filter criteria
-                if (quote_asset and 
-                    volume >= min_volume_24h and
-                    not any(keyword in symbol for keyword in excluded_keywords)):
-                    # Extract base asset (the crypto being traded)
-                    base_asset = symbol.replace(quote_asset, '')
-                    all_pairs.append({
-                        'symbol': symbol,
-                        'base_asset': base_asset,
-                        'quote_asset': quote_asset,
-                        'volume_24h': volume,
-                        'price_change_24h': price_change_24h,
-                        'category': f'{quote_asset}-Pairs',
-                        'base_qty': self._estimate_base_quantity(symbol, float(ticker['lastPrice'])),
-                        'risk_multiplier': self._get_risk_multiplier(quote_asset)
-                    })
-            # Sort by 24h volume (highest first)
-            all_pairs.sort(key=lambda x: x['volume_24h'], reverse=True)
-            print(f"🎯 Found {len(all_pairs)} qualifying trading pairs across {len(base_assets)} quote assets")
-            # Show breakdown by quote asset
-            for base in base_assets:
-                count = len([p for p in all_pairs if p['quote_asset'] == base])
-                print(f"   {base}: {count} pairs")
-            return all_pairs
-        except Exception as e:
-            print(f"❌ Error fetching trading pairs: {e}")
-            return []
-
-    def _get_risk_multiplier(self, quote_asset):
-        """Get risk multiplier based on quote asset volatility"""
-        risk_multipliers = {
-            'USDT': 1.0,    # Most stable
-            'USDC': 1.0,    # Stable
-            'BTC': 0.8,     # Volatile base
-            'ETH': 0.7,     # More volatile  
-            'BNB': 0.6,     # Exchange token
+    """
+    Comprehensive multi-pair cryptocurrency scanner with advanced filtering and ranking
+    """
+    
+    def __init__(self, binance_client: Optional[Client] = None):
+        self.client = binance_client
+        self.scan_results_dir = 'logs'
+        self.ensure_logs_directory()
+        
+        # Quality pairs with risk multipliers by category
+        self.QUALITY_PAIRS = {
+            'MAJOR': [
+                {'symbol': 'BTCUSDT', 'base_qty': 0.001, 'risk_multiplier': 1.0},
+                {'symbol': 'ETHUSDT', 'base_qty': 0.01, 'risk_multiplier': 1.0},
+                {'symbol': 'BNBUSDT', 'base_qty': 0.1, 'risk_multiplier': 1.0}
+            ],
+            'LARGE_CAP': [
+                {'symbol': 'ADAUSDT', 'base_qty': 10, 'risk_multiplier': 0.8},
+                {'symbol': 'SOLUSDT', 'base_qty': 0.1, 'risk_multiplier': 0.8},
+                {'symbol': 'XRPUSDT', 'base_qty': 10, 'risk_multiplier': 0.8},
+                {'symbol': 'DOTUSDT', 'base_qty': 1, 'risk_multiplier': 0.8},
+                {'symbol': 'AVAXUSDT', 'base_qty': 0.5, 'risk_multiplier': 0.8},
+                {'symbol': 'MATICUSDT', 'base_qty': 10, 'risk_multiplier': 0.8}
+            ],
+            'MID_CAP': [
+                {'symbol': 'LINKUSDT', 'base_qty': 1, 'risk_multiplier': 0.7},
+                {'symbol': 'UNIUSDT', 'base_qty': 1, 'risk_multiplier': 0.7},
+                {'symbol': 'LTCUSDT', 'base_qty': 0.1, 'risk_multiplier': 0.7},
+                {'symbol': 'ATOMUSDT', 'base_qty': 1, 'risk_multiplier': 0.7},
+                {'symbol': 'NEARUSDT', 'base_qty': 1, 'risk_multiplier': 0.7}
+            ],
+            'DEFI': [
+                {'symbol': 'AAVEUSDT', 'base_qty': 0.1, 'risk_multiplier': 0.6},
+                {'symbol': 'COMPUSDT', 'base_qty': 0.1, 'risk_multiplier': 0.6},
+                {'symbol': 'MKRUSDT', 'base_qty': 0.01, 'risk_multiplier': 0.6}
+            ],
+            'GAMING': [
+                {'symbol': 'SANDUSDT', 'base_qty': 10, 'risk_multiplier': 0.5},
+                {'symbol': 'MANAUSDT', 'base_qty': 10, 'risk_multiplier': 0.5}
+            ],
+            'MEME': [
+                {'symbol': 'DOGEUSDT', 'base_qty': 100, 'risk_multiplier': 0.4},
+                {'symbol': 'SHIBUSDT', 'base_qty': 1000000, 'risk_multiplier': 0.4}
+            ]
         }
-        return risk_multipliers.get(quote_asset, 0.5)
-
-    def get_cross_crypto_pairs(self):
-        """
-        Get popular cross-crypto pairs (non-stablecoin)
-        Examples: ETHBTC, ADABTC, LINKETH, etc.
-        """
-        cross_pairs = [
-            # ETH-based pairs
-            {'symbol': 'ADAETH', 'category': 'ETH-Cross', 'base_qty': 50, 'risk_multiplier': 0.7},
-            {'symbol': 'LINKETH', 'category': 'ETH-Cross', 'base_qty': 5, 'risk_multiplier': 0.7},
-            {'symbol': 'DOTETH', 'category': 'ETH-Cross', 'base_qty': 10, 'risk_multiplier': 0.7},
-            {'symbol': 'UNIETH', 'category': 'ETH-Cross', 'base_qty': 8, 'risk_multiplier': 0.7},
-            # BTC-based pairs  
-            {'symbol': 'ETHBTC', 'category': 'BTC-Cross', 'base_qty': 0.05, 'risk_multiplier': 0.8},
-            {'symbol': 'ADABTC', 'category': 'BTC-Cross', 'base_qty': 500, 'risk_multiplier': 0.8},
-            {'symbol': 'LINKBTC', 'category': 'BTC-Cross', 'base_qty': 5, 'risk_multiplier': 0.8},
-            {'symbol': 'LTCBTC', 'category': 'BTC-Cross', 'base_qty': 1, 'risk_multiplier': 0.8},
-            {'symbol': 'DOTBTC', 'category': 'BTC-Cross', 'base_qty': 10, 'risk_multiplier': 0.8},
-            {'symbol': 'BNBBTC', 'category': 'BTC-Cross', 'base_qty': 0.5, 'risk_multiplier': 0.8},
-            # BNB-based pairs
-            {'symbol': 'ETHBNB', 'category': 'BNB-Cross', 'base_qty': 0.1, 'risk_multiplier': 0.6},
-            {'symbol': 'ADABNB', 'category': 'BNB-Cross', 'base_qty': 50, 'risk_multiplier': 0.6},
-            {'symbol': 'LINKBNB', 'category': 'BNB-Cross', 'base_qty': 2, 'risk_multiplier': 0.6},
-        ]
-        print(f"🔄 Selected {len(cross_pairs)} cross-crypto pairs")
-        return cross_pairs
-
-    @staticmethod
-    def get_quote_asset_balance(client, symbol):
-        """
-        Get balance for the quote asset of a trading pair
-        Example: For ADABTC, returns BTC balance
-        """
-        try:
-            quote_assets = ['USDT', 'USDC', 'BTC', 'ETH', 'BNB']
-            quote_asset = None
-            for asset in quote_assets:
-                if symbol.endswith(asset):
-                    quote_asset = asset
-                    break
-            if not quote_asset:
-                return 0.0
-            account = client.get_account()
-            for balance in account['balances']:
-                if balance['asset'] == quote_asset:
-                    return float(balance['free'])
-            return 0.0
-        except Exception as e:
-            print(f"❌ Error getting quote asset balance: {e}")
-            return 0.0
-    def __init__(self, client):
-        self.client = client
-        self.active_positions = {}
-        self.scan_history = []
         
-    def get_all_usdt_pairs(self, min_volume_24h=2000000, exclude_leveraged=True):
+        # Exclude leveraged tokens and other problematic pairs
+        self.EXCLUDED_PATTERNS = [
+            'UP', 'DOWN', 'BEAR', 'BULL', '2L', '3L', '2S', '3S',
+            'BUSD', 'TUSD', 'PAX', 'USDC'  # Stablecoins
+        ]
+    
+    def ensure_logs_directory(self):
+        """Ensure logs directory exists"""
+        os.makedirs(self.scan_results_dir, exist_ok=True)
+    
+    def get_all_usdt_pairs(self, min_volume_24h: float = 1000000, exclude_leveraged: bool = True) -> List[Dict[str, Any]]:
         """
-        Get all USDT trading pairs with minimum 24h volume
+        Get all USDT trading pairs with volume filtering
+        
+        Args:
+            min_volume_24h: Minimum 24h volume in USDT
+            exclude_leveraged: Whether to exclude leveraged tokens
+            
+        Returns:
+            List of trading pair dictionaries
         """
+        if not self.client:
+            print("⚠️ Binance client not available, using mock data")
+            return self._get_mock_pairs()
+        
         try:
-            print(f"?? Fetching all USDT pairs with volume > ${min_volume_24h:,.0f}...")
-            ticker_24h = self.client.get_ticker()
+            print("📡 Fetching all USDT pairs from Binance...")
             
-            usdt_pairs = []
-            excluded_keywords = ['UP', 'DOWN', 'BEAR', 'BULL'] if exclude_leveraged else []
+            # Get exchange info
+            exchange_info = self.client.get_exchange_info()
+            active_symbols = [s['symbol'] for s in exchange_info['symbols'] 
+                            if s['status'] == 'TRADING' and s['symbol'].endswith('USDT')]
             
-            for ticker in ticker_24h:
-                symbol = ticker['symbol']
-                volume = float(ticker['quoteVolume'])
-                price_change_24h = float(ticker['priceChangePercent'])
+            # Get 24h ticker data
+            tickers = self.client.get_ticker()
+            ticker_dict = {t['symbol']: t for t in tickers}
+            
+            pairs = []
+            for symbol in active_symbols:
+                ticker = ticker_dict.get(symbol)
+                if not ticker:
+                    continue
                 
-                # Filter criteria
-                if (symbol.endswith('USDT') and 
-                    volume >= min_volume_24h and
-                    not any(keyword in symbol for keyword in excluded_keywords)):
-                    
-                    usdt_pairs.append({
-                        'symbol': symbol,
-                        'volume_24h': volume,
-                        'price_change_24h': price_change_24h,
-                        'category': 'Market',
-                        'base_qty': self._estimate_base_quantity(symbol, float(ticker['lastPrice']))
-                    })
+                # Volume filtering
+                volume_24h = float(ticker['quoteVolume'])
+                if volume_24h < min_volume_24h:
+                    continue
+                
+                # Exclude leveraged tokens if requested
+                if exclude_leveraged:
+                    base_asset = symbol.replace('USDT', '')
+                    if any(pattern in base_asset for pattern in self.EXCLUDED_PATTERNS):
+                        continue
+                
+                # Estimate base quantity (target ~$35 position)
+                price = float(ticker['lastPrice'])
+                base_qty = 35 / price if price > 0 else 0.001
+                
+                pair_info = {
+                    'symbol': symbol,
+                    'base_qty': base_qty,
+                    'risk_multiplier': 0.6,  # Default for unknown pairs
+                    'category': 'OTHER',
+                    'price': price,
+                    'volume_24h': volume_24h,
+                    'change_24h': float(ticker['priceChangePercent'])
+                }
+                
+                pairs.append(pair_info)
             
-            # Sort by 24h volume (highest first)
-            usdt_pairs.sort(key=lambda x: x['volume_24h'], reverse=True)
-            
-            print(f"?? Found {len(usdt_pairs)} qualifying USDT pairs")
-            return usdt_pairs
-            
+            print(f"✅ Found {len(pairs)} eligible USDT pairs")
+            return sorted(pairs, key=lambda x: x['volume_24h'], reverse=True)
+        
         except Exception as e:
-            print(f"? Error fetching USDT pairs: {e}")
-            return []
-
-    def get_selected_pairs(self):
+            print(f"❌ Error fetching USDT pairs: {e}")
+            return self._get_mock_pairs()
+    
+    def get_selected_pairs(self) -> List[Dict[str, Any]]:
         """
-        Curated list of quality crypto pairs across different categories
-        """
-        selected_pairs = [
-            # Major cryptocurrencies (highest liquidity, lowest risk)
-            {'symbol': 'BTCUSDT', 'category': 'Major', 'base_qty': 0.001, 'risk_multiplier': 1.0},
-            {'symbol': 'ETHUSDT', 'category': 'Major', 'base_qty': 0.01, 'risk_multiplier': 1.0},
-            {'symbol': 'BNBUSDT', 'category': 'Major', 'base_qty': 0.1, 'risk_multiplier': 1.0},
-            
-            # Large cap altcoins (established projects)
-            {'symbol': 'ADAUSDT', 'category': 'Large Cap', 'base_qty': 10, 'risk_multiplier': 0.8},
-            {'symbol': 'SOLUSDT', 'category': 'Large Cap', 'base_qty': 0.1, 'risk_multiplier': 0.8},
-            {'symbol': 'XRPUSDT', 'category': 'Large Cap', 'base_qty': 20, 'risk_multiplier': 0.8},
-            {'symbol': 'DOTUSDT', 'category': 'Large Cap', 'base_qty': 2, 'risk_multiplier': 0.8},
-            {'symbol': 'AVAXUSDT', 'category': 'Large Cap', 'base_qty': 0.5, 'risk_multiplier': 0.8},
-            {'symbol': 'POLYUSDT', 'category': 'Large Cap', 'base_qty': 20, 'risk_multiplier': 0.8},
-            
-            # Mid cap with strong fundamentals
-            {'symbol': 'LINKUSDT', 'category': 'Mid Cap', 'base_qty': 1, 'risk_multiplier': 0.7},
-            {'symbol': 'UNIUSDT', 'category': 'Mid Cap', 'base_qty': 2, 'risk_multiplier': 0.7},
-            {'symbol': 'LTCUSDT', 'category': 'Mid Cap', 'base_qty': 0.2, 'risk_multiplier': 0.7},
-            {'symbol': 'ATOMUSDT', 'category': 'Mid Cap', 'base_qty': 1, 'risk_multiplier': 0.7},
-            {'symbol': 'NEARUSDT', 'category': 'Mid Cap', 'base_qty': 5, 'risk_multiplier': 0.7},
-            
-            # DeFi tokens (higher volatility, focused use case)
-            {'symbol': 'AAVEUSDT', 'category': 'DeFi', 'base_qty': 0.1, 'risk_multiplier': 0.6},
-            {'symbol': 'COMPUSDT', 'category': 'DeFi', 'base_qty': 0.2, 'risk_multiplier': 0.6},
-            {'symbol': 'MKRUSDT', 'category': 'DeFi', 'base_qty': 0.01, 'risk_multiplier': 0.6},
-            
-            # Gaming/Metaverse (speculative but trending)
-            {'symbol': 'SANDUSDT', 'category': 'Gaming', 'base_qty': 20, 'risk_multiplier': 0.5},
-            {'symbol': 'MANAUSDT', 'category': 'Gaming', 'base_qty': 30, 'risk_multiplier': 0.5},
-            
-            # Meme coins (high risk, high reward potential)
-            {'symbol': 'DOGEUSDT', 'category': 'Meme', 'base_qty': 200, 'risk_multiplier': 0.4},
-            {'symbol': 'SHIBUSDT', 'category': 'Meme', 'base_qty': 2000000, 'risk_multiplier': 0.4},
-        ]
+        Get curated list of quality cryptocurrency pairs
         
-        print(f"?? Selected {len(selected_pairs)} curated crypto pairs across {len(set([p['category'] for p in selected_pairs]))} categories")
-        return selected_pairs
-
-    def get_custom_pairs(self, symbols):
+        Returns:
+            List of selected trading pairs with categories
         """
-        Convert custom symbol list to standard pair format
+        pairs = []
+        
+        for category, category_pairs in self.QUALITY_PAIRS.items():
+            for pair in category_pairs:
+                pair_info = pair.copy()
+                pair_info['category'] = category
+                
+                # Get current price and volume if client available
+                if self.client:
+                    try:
+                        ticker = self.client.get_ticker(symbol=pair['symbol'])
+                        pair_info['price'] = float(ticker['lastPrice'])
+                        pair_info['volume_24h'] = float(ticker['quoteVolume'])
+                        pair_info['change_24h'] = float(ticker['priceChangePercent'])
+                    except Exception as e:
+                        print(f"⚠️ Error getting data for {pair['symbol']}: {e}")
+                        pair_info.update({
+                            'price': 50000 if 'BTC' in pair['symbol'] else 100,
+                            'volume_24h': 10000000,
+                            'change_24h': 0.0
+                        })
+                else:
+                    # Mock data for testing
+                    pair_info.update({
+                        'price': 50000 if 'BTC' in pair['symbol'] else 100,
+                        'volume_24h': 10000000,
+                        'change_24h': 0.0
+                    })
+                
+                pairs.append(pair_info)
+        
+        return pairs
+    
+    def get_custom_pairs(self, symbols: List[str]) -> List[Dict[str, Any]]:
         """
-        custom_pairs = []
+        Get custom symbol list from environment variables or input
+        
+        Args:
+            symbols: List of symbol strings
+            
+        Returns:
+            List of custom trading pairs
+        """
+        pairs = []
+        
         for symbol in symbols:
-            # Estimate base quantity based on current price
-            try:
-                ticker = self.client.get_symbol_ticker(symbol=symbol)
-                price = float(ticker['price'])
-                base_qty = self._estimate_base_quantity(symbol, price)
-            except:
-                base_qty = 0.001  # Default fallback
+            symbol = symbol.strip().upper()
+            if not symbol.endswith('USDT'):
+                symbol += 'USDT'
             
-            custom_pairs.append({
+            # Default pair structure
+            pair_info = {
                 'symbol': symbol,
-                'category': 'Custom',
-                'base_qty': base_qty,
-                'risk_multiplier': 0.8
-            })
+                'base_qty': 0.001,
+                'risk_multiplier': 0.7,
+                'category': 'CUSTOM'
+            }
+            
+            # Get live data if client available
+            if self.client:
+                try:
+                    ticker = self.client.get_ticker(symbol=symbol)
+                    price = float(ticker['lastPrice'])
+                    pair_info.update({
+                        'price': price,
+                        'volume_24h': float(ticker['quoteVolume']),
+                        'change_24h': float(ticker['priceChangePercent']),
+                        'base_qty': 35 / price if price > 0 else 0.001
+                    })
+                except Exception as e:
+                    print(f"⚠️ Error getting data for {symbol}: {e}")
+                    pair_info.update({
+                        'price': 100,
+                        'volume_24h': 1000000,
+                        'change_24h': 0.0
+                    })
+            else:
+                pair_info.update({
+                    'price': 100,
+                    'volume_24h': 1000000,
+                    'change_24h': 0.0
+                })
+            
+            pairs.append(pair_info)
         
-        print(f"?? Created custom pair list with {len(custom_pairs)} symbols")
-        return custom_pairs
-
-    def _estimate_base_quantity(self, symbol, price):
+        return pairs
+    
+    def analyze_single_pair(self, pair_info: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Estimate appropriate base quantity based on price
-        Aims for ~$25-50 position sizes
-        """
-        target_value = 35  # Target $35 position
-        base_qty = target_value / price
+        Analyze a single trading pair for breakout opportunities
         
-        # Round to appropriate decimal places
-        if base_qty >= 1:
-            return round(base_qty, 2)
-        elif base_qty >= 0.1:
-            return round(base_qty, 3)
-        elif base_qty >= 0.01:
-            return round(base_qty, 4)
-        elif base_qty >= 0.001:
-            return round(base_qty, 5)
-        else:
-            return round(base_qty, 6)
-
-    def analyze_single_pair(self, pair_info):
-        """
-        Analyze a single trading pair for opportunities
+        Args:
+            pair_info: Trading pair information dictionary
+            
+        Returns:
+            Analysis result dictionary
         """
         symbol = pair_info['symbol']
         
         try:
-            # Get 2 hours of 1-minute candlestick data
-            klines = self.client.get_klines(
-                symbol=symbol,
-                interval=Client.KLINE_INTERVAL_1MINUTE,
-                limit=120
-            )
+            # Get klines data (120 1-minute candles for 2 hours)
+            if self.client:
+                klines = self.client.get_klines(
+                    symbol=symbol,
+                    interval=Client.KLINE_INTERVAL_1MINUTE,
+                    limit=120
+                )
+            else:
+                # Generate mock klines for testing
+                klines = self._generate_mock_klines(pair_info['price'])
             
             if len(klines) < 120:
-                return None
+                return {
+                    'symbol': symbol,
+                    'signal': 'HOLD',
+                    'confidence': 0.0,
+                    'error': 'Insufficient data'
+                }
             
-            # Get trading decision and confidence
-            decision = check_breakout_enhanced(klines)
+            # Run enhanced breakout strategy
+            signal = check_breakout_enhanced(klines)
             confidence = get_strategy_confidence(klines)
             
-            # Get detailed pair analysis
-            pair_analysis = analyze_pair_strength(klines, symbol)
+            # Calculate additional metrics
+            prices = [float(k[4]) for k in klines]
+            volumes = [float(k[5]) for k in klines]
             
-            if not pair_analysis:
-                return None
+            # Volume analysis
+            avg_volume = statistics.mean(volumes[:-10])
+            recent_volume = statistics.mean(volumes[-10:])
+            volume_ratio = recent_volume / avg_volume if avg_volume > 0 else 1.0
             
-            # Combine all data
+            # Price change analysis
+            price_change_2h = ((prices[-1] - prices[0]) / prices[0]) * 100
+            
+            # Volatility calculation
+            returns = [(prices[i] - prices[i-1]) / prices[i-1] * 100 
+                      for i in range(1, len(prices))]
+            volatility = statistics.stdev(returns) if len(returns) > 1 else 0.0
+            
+            # Combined score calculation
+            category_score = pair_info.get('risk_multiplier', 0.5)
+            volume_score = min(volume_ratio / 2.0, 1.0)
+            confidence_score = confidence
+            
+            combined_score = (confidence_score * 0.4 + 
+                            volume_score * 0.3 + 
+                            category_score * 0.3)
+            
             result = {
-                **pair_analysis,
-                'decision': decision,
+                'symbol': symbol,
+                'signal': signal,
                 'confidence': confidence,
-                'category': pair_info.get('category', 'Unknown'),
+                'price': pair_info.get('price', prices[-1]),
+                'change_24h': pair_info.get('change_24h', 0.0),
+                'change_2h': price_change_2h,
+                'volume_24h': pair_info.get('volume_24h', 0),
+                'volume_ratio': volume_ratio,
+                'volatility': volatility,
+                'category': pair_info.get('category', 'UNKNOWN'),
+                'risk_multiplier': pair_info.get('risk_multiplier', 0.5),
                 'base_qty': pair_info.get('base_qty', 0.001),
-                'risk_multiplier': pair_info.get('risk_multiplier', 1.0),
-                'timestamp': datetime.now(),
-                'in_position': symbol in self.active_positions,
-                'scan_score': self._calculate_scan_score(decision, confidence, pair_analysis)
+                'combined_score': combined_score,
+                'analysis_time': datetime.now().isoformat()
             }
             
             return result
-            
+        
         except Exception as e:
-            print(f"? Error analyzing {symbol}: {e}")
-            return None
-
-    def _calculate_scan_score(self, decision, confidence, analysis):
+            print(f"❌ Error analyzing {symbol}: {e}")
+            return {
+                'symbol': symbol,
+                'signal': 'HOLD',
+                'confidence': 0.0,
+                'error': str(e)
+            }
+    
+    def scan_multiple_pairs(self, pairs_list: List[Dict[str, Any]], max_workers: int = 8) -> List[Dict[str, Any]]:
         """
-        Calculate overall scan score for ranking opportunities
+        Analyze multiple pairs concurrently using ThreadPoolExecutor
+        
+        Args:
+            pairs_list: List of trading pairs to analyze
+            max_workers: Maximum number of concurrent workers
+            
+        Returns:
+            List of analysis results
         """
-        if decision == "HOLD":
-            return 0.0
+        print(f"🔍 Scanning {len(pairs_list)} pairs with {max_workers} workers...")
         
-        score = confidence * 0.6  # Base score from confidence
+        results = []
+        completed_count = 0
         
-        # Volume bonus
-        volume_ratio = analysis.get('volume_ratio', 0)
-        if volume_ratio > 2.0:
-            score += 0.2
-        elif volume_ratio > 1.5:
-            score += 0.1
-        
-        # RSI bonus (not too extreme)
-        rsi = analysis.get('rsi', 50)
-        if 30 < rsi < 70:
-            score += 0.1
-        
-        # Volatility penalty (too high is risky)
-        volatility = analysis.get('volatility', 0)
-        if volatility > 0.05:
-            score -= 0.1
-        
-        # Trading time bonus
-        if analysis.get('trading_time_quality', False):
-            score += 0.1
-        
-        return min(1.0, max(0.0, score))
-    def scan_multiple_pairs(self, pairs_list, max_workers=8):
-        """
-        Scan multiple pairs concurrently for trading opportunities
-        """
-        print(f"?? Scanning {len(pairs_list)} pairs for opportunities...")
-        start_time = datetime.now()
-        
-        opportunities = []
-        failed_scans = []
-        
-        # Use ThreadPoolExecutor for concurrent API calls
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Submit all analysis tasks
             future_to_pair = {
@@ -344,150 +370,319 @@ class CryptoPairScanner:
             # Collect results as they complete
             for future in as_completed(future_to_pair):
                 pair = future_to_pair[future]
+                
                 try:
                     result = future.result(timeout=30)  # 30 second timeout per pair
-                    if result:
-                        opportunities.append(result)
+                    results.append(result)
+                    completed_count += 1
+                    
+                    # Progress indicator
+                    if completed_count % 10 == 0 or completed_count == len(pairs_list):
+                        print(f"📊 Progress: {completed_count}/{len(pairs_list)} pairs analyzed")
+                
                 except Exception as e:
-                    failed_scans.append(pair['symbol'])
-                    print(f"?? Failed to scan {pair['symbol']}: {e}")
+                    print(f"⚠️ Error analyzing {pair.get('symbol', 'unknown')}: {e}")
+                    results.append({
+                        'symbol': pair.get('symbol', 'unknown'),
+                        'signal': 'HOLD',
+                        'confidence': 0.0,
+                        'error': str(e)
+                    })
         
-        # Sort by scan score (best opportunities first)
-        opportunities.sort(key=lambda x: x['scan_score'], reverse=True)
-        
-        scan_duration = (datetime.now() - start_time).total_seconds()
-        
-        print(f"? Scan completed in {scan_duration:.1f}s")
-        print(f"   Successful: {len(opportunities)}")
-        print(f"   Failed: {len(failed_scans)}")
-        
-        # Save scan history
-        scan_record = {
-            'timestamp': datetime.now().isoformat(),
-            'pairs_scanned': len(pairs_list),
-            'opportunities_found': len(opportunities),
-            'scan_duration': scan_duration,
-            'failed_scans': failed_scans
-        }
-        self.scan_history.append(scan_record)
-        
-        return opportunities
-
-    def filter_opportunities(self, opportunities, min_confidence=0.6, max_positions=5):
+        print(f"✅ Scan completed: {len(results)} pairs analyzed")
+        return results
+    
+    def filter_opportunities(self, opportunities: List[Dict[str, Any]], 
+                           min_confidence: float = 0.6, 
+                           max_positions: int = 5) -> List[Dict[str, Any]]:
         """
-        Filter opportunities based on trading criteria
-        """
-        trading_opportunities = []
+        Filter and rank trading opportunities
         
-        for opp in opportunities:
-            # Skip if already in position
-            if opp['in_position']:
-                continue
-                
-            # Must have trading signal
-            if opp['decision'] not in ['BUY_LONG', 'BUY_SHORT']:
-                continue
-                
-            # Must meet minimum confidence
-            if opp['confidence'] < min_confidence:
-                continue
+        Args:
+            opportunities: List of analysis results
+            min_confidence: Minimum confidence threshold
+            max_positions: Maximum number of positions to return
             
-            # Must have reasonable volume
-            if opp.get('volume_ratio', 0) < 1.2:
-                continue
-            
-            trading_opportunities.append(opp)
+        Returns:
+            Filtered and ranked opportunities
+        """
+        # Filter by confidence and valid signals
+        valid_opportunities = [
+            opp for opp in opportunities
+            if (opp.get('confidence', 0) >= min_confidence and 
+                opp.get('signal', 'HOLD') != 'HOLD' and
+                'error' not in opp)
+        ]
+        
+        # Sort by combined score
+        ranked_opportunities = sorted(
+            valid_opportunities,
+            key=lambda x: x.get('combined_score', 0),
+            reverse=True
+        )
         
         # Limit to max positions
-        return trading_opportunities[:max_positions]
-
-    def display_scan_results(self, opportunities, show_all=False, top_n=10):
+        return ranked_opportunities[:max_positions]
+    
+    def display_scan_results(self, opportunities: List[Dict[str, Any]], 
+                           show_all: bool = False, 
+                           top_n: int = 10) -> None:
         """
-        Display scan results in formatted tables
+        Display formatted scan results in tables
+        
+        Args:
+            opportunities: List of trading opportunities
+            show_all: Whether to show all results or just opportunities
+            top_n: Number of top results to display
         """
-        print(f"\n{'='*85}")
-        print(f"?? CRYPTO PAIR SCAN RESULTS - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"{'='*85}")
+        if not opportunities:
+            print("📭 No opportunities found in scan")
+            return
         
-        # Filter for trading opportunities
-        trading_opps = self.filter_opportunities(opportunities, min_confidence=0.5)
-        
-        if trading_opps:
-            print(f"\n?? TOP TRADING OPPORTUNITIES ({len(trading_opps)} found):")
-            print(f"{'Symbol':<12} {'Price':<12} {'Signal':<10} {'Conf':<6} {'Score':<6} {'2h Chg':<8} {'Vol':<6} {'Category':<10}")
-            print("-" * 85)
-            
-            for opp in trading_opps[:top_n]:
-                symbol = opp['symbol']
-                price = f"${opp['current_price']:.4f}"
-                signal = opp['decision']
-                confidence = f"{opp['confidence']:.2f}"
-                score = f"{opp['scan_score']:.2f}"
-                change_2h = f"{opp['price_change_2h']:+.1f}%"
-                volume_ratio = f"{opp.get('volume_ratio', 0):.1f}x"
-                category = opp['category']
-                
-                print(f"{symbol:<12} {price:<12} {signal:<10} {confidence:<6} {score:<6} {change_2h:<8} {volume_ratio:<6} {category:<10}")
+        # Filter opportunities vs all results
+        if not show_all:
+            display_ops = [op for op in opportunities if op.get('signal', 'HOLD') != 'HOLD']
         else:
-            print("\n?? No trading opportunities found meeting criteria")
-
-    def save_scan_results(self, opportunities, filename=None):
+            display_ops = opportunities
+        
+        if not display_ops:
+            print("📭 No trading opportunities found")
+            return
+        
+        # Limit results
+        display_ops = display_ops[:top_n]
+        
+        print(f"\n🎯 Trading Opportunities Found: {len(display_ops)}")
+        print("=" * 120)
+        
+        # Table header
+        header = f"{'Symbol':<12} {'Signal':<10} {'Confidence':<11} {'Price':<12} {'24h %':<8} {'2h %':<8} {'Vol Ratio':<10} {'Category':<10} {'Score':<8}"
+        print(header)
+        print("-" * 120)
+        
+        # Display each opportunity
+        for opp in display_ops:
+            symbol = opp.get('symbol', 'N/A')[:11]
+            signal = opp.get('signal', 'HOLD')[:9]
+            confidence = f"{opp.get('confidence', 0):.1%}"
+            price = f"${opp.get('price', 0):.6f}"[:11]
+            change_24h = f"{opp.get('change_24h', 0):+.1f}%"
+            change_2h = f"{opp.get('change_2h', 0):+.1f}%"
+            volume_ratio = f"{opp.get('volume_ratio', 1):.1f}x"
+            category = opp.get('category', 'N/A')[:9]
+            score = f"{opp.get('combined_score', 0):.2f}"
+            
+            row = f"{symbol:<12} {signal:<10} {confidence:<11} {price:<12} {change_24h:<8} {change_2h:<8} {volume_ratio:<10} {category:<10} {score:<8}"
+            print(row)
+        
+        print("=" * 120)
+    
+    def save_scan_results(self, opportunities: List[Dict[str, Any]], 
+                         filename: Optional[str] = None) -> str:
         """
-        Save scan results to JSON file
+        Save scan results to timestamped JSON file
+        
+        Args:
+            opportunities: List of analysis results
+            filename: Optional custom filename
+            
+        Returns:
+            Path to saved file
         """
         if filename is None:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f'logs/scan_results_{timestamp}.json'
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"scan_results_{timestamp}.json"
         
-        # Ensure logs directory exists
-        os.makedirs('logs', exist_ok=True)
+        filepath = os.path.join(self.scan_results_dir, filename)
         
-        # Convert datetime objects to strings for JSON serialization
-        serializable_data = []
+        # Prepare data for saving
+        scan_data = {
+            'scan_time': datetime.now().isoformat(),
+            'total_pairs_scanned': len(opportunities),
+            'opportunities_found': len([op for op in opportunities if op.get('signal', 'HOLD') != 'HOLD']),
+            'scan_summary': {
+                'avg_confidence': statistics.mean([op.get('confidence', 0) for op in opportunities]),
+                'max_confidence': max([op.get('confidence', 0) for op in opportunities]) if opportunities else 0,
+                'signals_by_type': self._count_signals(opportunities)
+            },
+            'opportunities': opportunities
+        }
+        
+        try:
+            with open(filepath, 'w') as f:
+                json.dump(scan_data, f, indent=2, default=str)
+            
+            # Also save as latest scan for dashboard
+            latest_filepath = os.path.join(self.scan_results_dir, 'latest_scan.json')
+            with open(latest_filepath, 'w') as f:
+                json.dump(scan_data, f, indent=2, default=str)
+            
+            print(f"💾 Scan results saved: {filepath}")
+            
+            # Log scan to logger
+            log_scan(scan_data)
+            
+            return filepath
+        
+        except Exception as e:
+            print(f"❌ Error saving scan results: {e}")
+            return ""
+    
+    def _count_signals(self, opportunities: List[Dict[str, Any]]) -> Dict[str, int]:
+        """Count signals by type"""
+        signal_counts = {'BUY_LONG': 0, 'BUY_SHORT': 0, 'HOLD': 0}
+        
         for opp in opportunities:
-            opp_copy = opp.copy()
-            if isinstance(opp_copy.get('timestamp'), datetime):
-                opp_copy['timestamp'] = opp_copy['timestamp'].isoformat()
-            serializable_data.append(opp_copy)
+            signal = opp.get('signal', 'HOLD')
+            if signal in signal_counts:
+                signal_counts[signal] += 1
         
-        # Save data
-        with open(filename, 'w') as f:
-            json.dump({
-                'scan_timestamp': datetime.now().isoformat(),
-                'total_opportunities': len(opportunities),
-                'trading_opportunities': len(self.filter_opportunities(opportunities)),
-                'scan_history': self.scan_history,
-                'opportunities': serializable_data
-            }, f, indent=2, default=str)
+        return signal_counts
+    
+    def _get_mock_pairs(self) -> List[Dict[str, Any]]:
+        """Generate mock pairs for testing when Binance client unavailable"""
+        import random
         
-        print(f"?? Scan results saved to {filename}")
-        return filename
+        mock_symbols = [
+            'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'SOLUSDT',
+            'XRPUSDT', 'DOTUSDT', 'AVAXUSDT', 'MATICUSDT', 'LINKUSDT'
+        ]
+        
+        pairs = []
+        for symbol in mock_symbols:
+            base_price = random.uniform(0.1, 50000)
+            pairs.append({
+                'symbol': symbol,
+                'base_qty': 35 / base_price,
+                'risk_multiplier': 0.7,
+                'category': 'MOCK',
+                'price': base_price,
+                'volume_24h': random.uniform(1000000, 100000000),
+                'change_24h': random.uniform(-10, 10)
+            })
+        
+        return pairs
+    
+    def _generate_mock_klines(self, base_price: float) -> List[List]:
+        """Generate mock klines data for testing"""
+        import random
+        
+        klines = []
+        current_price = base_price
+        
+        for i in range(120):
+            # Simulate price movement
+            change = random.uniform(-0.01, 0.01)
+            current_price *= (1 + change)
+            
+            # Simulate volume
+            volume = random.uniform(100, 1000)
+            
+            # Kline format: [open_time, open, high, low, close, volume, ...]
+            kline = [
+                int(time.time() * 1000) - (120 - i) * 60000,  # timestamp
+                str(current_price),  # open
+                str(current_price * 1.002),  # high
+                str(current_price * 0.998),  # low
+                str(current_price),  # close
+                str(volume),  # volume
+                0, 0, 0, 0, 0, 0  # other fields
+            ]
+            
+            klines.append(kline)
+        
+        return klines
 
 # Convenience functions for different scan modes
-def scan_all_pairs(client, min_volume=2000000, top_n=50):
-    """Scan all USDT pairs with minimum volume"""
-    scanner = CryptoPairScanner(client)
-    all_pairs = scanner.get_all_usdt_pairs(min_volume_24h=min_volume)
-    top_pairs = all_pairs[:top_n]  # Limit to avoid rate limits
-    opportunities = scanner.scan_multiple_pairs(top_pairs)
-    scanner.display_scan_results(opportunities)
-    scanner.save_scan_results(opportunities)
+def scan_all_pairs(scanner: CryptoPairScanner, 
+                  min_volume: float = 1000000,
+                  min_confidence: float = 0.6,
+                  max_workers: int = 8) -> List[Dict[str, Any]]:
+    """Scan all USDT pairs"""
+    pairs = scanner.get_all_usdt_pairs(min_volume_24h=min_volume)
+    opportunities = scanner.scan_multiple_pairs(pairs, max_workers=max_workers)
+    return scanner.filter_opportunities(opportunities, min_confidence=min_confidence)
+
+def scan_selected_pairs(scanner: CryptoPairScanner,
+                       min_confidence: float = 0.6,
+                       max_workers: int = 8) -> List[Dict[str, Any]]:
+    """Scan curated quality pairs"""
+    pairs = scanner.get_selected_pairs()
+    opportunities = scanner.scan_multiple_pairs(pairs, max_workers=max_workers)
+    return scanner.filter_opportunities(opportunities, min_confidence=min_confidence)
+
+def scan_custom_pairs(scanner: CryptoPairScanner,
+                     symbols: List[str],
+                     min_confidence: float = 0.6,
+                     max_workers: int = 8) -> List[Dict[str, Any]]:
+    """Scan custom symbol list"""
+    pairs = scanner.get_custom_pairs(symbols)
+    opportunities = scanner.scan_multiple_pairs(pairs, max_workers=max_workers)
+    return scanner.filter_opportunities(opportunities, min_confidence=min_confidence)
+
+# Main execution function
+def main():
+    """Main scanner execution for testing"""
+    print("🚀 Multi-Pair Cryptocurrency Scanner")
+    print("=" * 50)
+    
+    # Initialize scanner
+    try:
+        if BINANCE_AVAILABLE:
+            from binance.client import Client
+            api_key = os.getenv('BINANCE_API_KEY')
+            api_secret = os.getenv('BINANCE_API_SECRET')
+            
+            if api_key and api_secret:
+                client = Client(api_key, api_secret)
+                if os.getenv('USE_TESTNET', 'false').lower() == 'true':
+                    client.API_URL = "https://testnet.binance.vision/api"
+                scanner = CryptoPairScanner(client)
+                print("✅ Connected to Binance API")
+            else:
+                scanner = CryptoPairScanner()
+                print("⚠️ No API credentials, using mock data")
+        else:
+            scanner = CryptoPairScanner()
+            print("⚠️ Binance library not available, using mock data")
+    
+    except Exception as e:
+        scanner = CryptoPairScanner()
+        print(f"⚠️ Error initializing Binance client: {e}")
+    
+    # Get scan mode from environment
+    scan_mode = os.getenv('SCAN_MODE', 'SELECTED').upper()
+    min_confidence = float(os.getenv('MIN_CONFIDENCE', 0.65))
+    max_workers = int(os.getenv('MAX_WORKERS', 8))
+    
+    print(f"🎯 Scan Mode: {scan_mode}")
+    print(f"📊 Min Confidence: {min_confidence:.1%}")
+    print(f"🔄 Max Workers: {max_workers}")
+    print()
+    
+    # Execute scan based on mode
+    start_time = time.time()
+    
+    if scan_mode == 'ALL':
+        opportunities = scan_all_pairs(scanner, min_confidence=min_confidence, max_workers=max_workers)
+    elif scan_mode == 'CUSTOM':
+        custom_symbols = os.getenv('CUSTOM_SYMBOLS', 'BTCUSDT,ETHUSDT,ADAUSDT').split(',')
+        opportunities = scan_custom_pairs(scanner, custom_symbols, min_confidence=min_confidence, max_workers=max_workers)
+    else:  # SELECTED
+        opportunities = scan_selected_pairs(scanner, min_confidence=min_confidence, max_workers=max_workers)
+    
+    scan_time = time.time() - start_time
+    
+    # Display results
+    print(f"⏱️ Scan completed in {scan_time:.2f} seconds")
+    scanner.display_scan_results(opportunities, show_all=False, top_n=10)
+    
+    # Save results
+    if opportunities:
+        saved_file = scanner.save_scan_results(opportunities)
+        print(f"💾 Results saved to: {saved_file}")
+    
     return opportunities
 
-def scan_selected_pairs(client):
-    """Scan curated list of quality pairs"""
-    scanner = CryptoPairScanner(client)
-    selected_pairs = scanner.get_selected_pairs()
-    opportunities = scanner.scan_multiple_pairs(selected_pairs)
-    scanner.display_scan_results(opportunities, show_all=True)
-    scanner.save_scan_results(opportunities, 'logs/selected_scan_results.json')
-    return opportunities
-
-def scan_custom_pairs(client, custom_symbols):
-    """Scan custom list of symbols"""
-    scanner = CryptoPairScanner(client)
-    custom_pairs = scanner.get_custom_pairs(custom_symbols)
-    opportunities = scanner.scan_multiple_pairs(custom_pairs)
-    scanner.display_scan_results(opportunities, show_all=True)
-    scanner.save_scan_results(opportunities, 'logs/custom_scan_results.json')
-    return opportunities
+if __name__ == "__main__":
+    main()
