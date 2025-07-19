@@ -1,1 +1,1 @@
-web: sh -c "streamlit run hybrid_bot.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true & python3 health_server.py"
+web: streamlit run hybrid_bot.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true --server.enableCORS=false --server.enableXsrfProtection=false --server.enableWebsocketCompression=false
