@@ -15,6 +15,16 @@ import threading
 import json
 import numpy as np
 
+# ----------------------------------------------------------------------
+# NEW – Modular imports (risk, portfolio, quantum, trade execution, etc.)
+# ----------------------------------------------------------------------
+from risk_manager import RiskManager
+from portfolio_manager import PortfolioManager
+from quantum_engine import QuantumTradingEngine as QuantumAnalyzer
+from trade_executor import TradeExecutor
+from market_analyzer import MarketAnalyzer
+from position_monitor import PositionMonitor
+
 # Configuration
 st.set_page_config(
     page_title="🤖 Crypto Trading Bot",
@@ -60,32 +70,30 @@ def get_binance_client():
     except:
         return None
 
+# ----------------------------------------------------------------------
+# Instantiate core modules
+# ----------------------------------------------------------------------
+BINANCE_CLIENT = get_binance_client()
+
+risk_mgr = RiskManager()
+portfolio_mgr = PortfolioManager(API_KEY, API_SECRET, USE_TESTNET)
+market_analyzer = MarketAnalyzer(BINANCE_CLIENT)
+trade_executor = TradeExecutor(BINANCE_CLIENT, risk_mgr)
+position_monitor = PositionMonitor()
+quantum_analyzer = QuantumAnalyzer()
+
+# ----------------------------------------------------------------------
+# Legacy wrapper functions – now delegate to modules for full modularity
+# ----------------------------------------------------------------------
+
 def get_mock_portfolio():
-    """Generate mock portfolio data"""
-    return {
-        'USDT': {'balance': 1000.0, 'price': 1.0, 'value': 1000.0, 'change': 0.0},
-        'BTC': {'balance': 0.01, 'price': 45000.0, 'value': 450.0, 'change': 2.5},
-        'ETH': {'balance': 0.2, 'price': 3000.0, 'value': 600.0, 'change': -1.2},
-        'BNB': {'balance': 1.5, 'price': 300.0, 'value': 450.0, 'change': 0.8}
-    }
+    """Return portfolio data via PortfolioManager (live or demo)."""
+    return portfolio_mgr.get_portfolio()
+
 
 def get_mock_scan_results():
-    """Generate mock scan results"""
-    symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'SOLUSDT']
-    results = []
-    
-    for symbol in symbols:
-        results.append({
-            'symbol': symbol,
-            'signal': np.random.choice(['BUY', 'SELL', 'HOLD']),
-            'price': np.random.uniform(100, 50000),
-            'change_24h': np.random.uniform(-10, 10),
-            'confidence': np.random.uniform(0.5, 0.9),
-            'volume_ratio': np.random.uniform(0.8, 2.5),
-            'timestamp': datetime.now()
-        })
-    
-    return sorted(results, key=lambda x: x['confidence'], reverse=True)
+    """Return scan results via MarketAnalyzer (live or mock)."""
+    return market_analyzer.scan_market()
 
 def auto_trading_loop():
     """Simple auto trading loop"""
