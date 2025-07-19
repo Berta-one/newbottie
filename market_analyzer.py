@@ -1,75 +1,97 @@
+"""
+market_analyzer.py
+========================
+Handles technical analysis and signal generation for multiple pairs.
+"""
+
 from __future__ import annotations
-
-import random
-from datetime import datetime
-from typing import List, Dict, Any
-
-try:
-    from binance.client import Client
-    BINANCE_AVAILABLE = True
-except ImportError:
-    BINANCE_AVAILABLE = False
-    Client = None  # type: ignore
-
-# Local import only when Binance is present to avoid heavy dependencies during unit-tests
-if BINANCE_AVAILABLE:
-    from multi_pair_scanner import CryptoPairScanner  # pragma: no cover
-
-__all__ = ["MarketAnalyzer"]
+from typing import Dict, Any, List
+import pandas as pd
+import numpy as np
+from binance.client import Client
 
 
 class MarketAnalyzer:
-    """Thin abstraction over multi_pair_scanner.CryptoPairScanner.
+    def __init__(self, client: Client, interval="1h", lookback=100):
+        self.client = client
+        self.interval = interval
+        self.lookback = lookback
 
-    The class gracefully degrades to pseudo-random mock data when Binance
-    credentials are missing. This keeps the dashboard functional in demo
-    mode while still allowing full-featured scanning in production.
-    """
+    # -------------------------------
+    # Data Fetch
+    # -------------------------------
+    def _fetch_klines(self, symbol: str) -> pd.DataFrame:
+        """Fetch historical candles from Binance."""
+        candles = self.client.get_klines(symbol=symbol, interval=self.interval, limit=self.lookback)
+        df = pd.DataFrame(candles, columns=[
+            "timestamp", "open", "high", "low", "close", "volume",
+            "close_time", "quote_asset_volume", "trades", "taker_base", "taker_quote", "ignore"
+        ])
+        df["close"] = df["close"].astype(float)
+        return df
 
-    def __init__(self, client: Client | None = None):  # type: ignore[name-defined]
-        self._live = BINANCE_AVAILABLE and client is not None
-        self._scanner = CryptoPairScanner(client) if self._live else None  # pragma: no cover
+    # -------------------------------
+    # Indicators
+    # -------------------------------
+    def calculate_rsi(self, prices: pd.Series, period: int = 14) -> float:
+        delta = prices.diff()
+        gain = delta.where(delta > 0, 0).rolling(window=period).mean()
+        loss = -delta.where(delta < 0, 0).rolling(window=period).mean()
+        rs = gain / loss
+        rsi = 100 - (100 / (1 + rs))
+        return rsi.iloc[-1]
 
-    # ------------------------------------------------------------------
-    # Public API consumed by the Streamlit dashboard
-    # ------------------------------------------------------------------
-    def scan_market(self, limit: int = 50) -> List[Dict[str, Any]]:
-        """Return structured scan results ordered by confidence/score."""
-        if self._live and self._scanner:
-            # In live mode we offload heavy lifting to the scanner – this can be
-            # extended to run in a background thread/pool for responsiveness.
-            pairs = self._scanner.get_selected_pairs()
-            opportunities = self._scanner.scan_multiple_pairs(pairs[:limit])
-            return opportunities
-        # Fallback to mock results
-        return self._mock_scan_results()
+    def calculate_momentum(self, prices: pd.Series, period: int = 10) -> float:
+        return ((prices.iloc[-1] - prices.iloc[-period]) / prices.iloc[-period]) * 100
 
-    # Convenience alias utilised by the legacy code path
-    get_mock_scan_results = _mock_scan_results = lambda self: self._generate_mock()
+    def calculate_volatility(self, prices: pd.Series, period: int = 20) -> float:
+        return prices.pct_change().rolling(window=period).std().iloc[-1]
 
-    # ------------------------------------------------------------------
-    # Private helpers
-    # ------------------------------------------------------------------
-    def _generate_mock(self, n: int = 5) -> List[Dict[str, Any]]:
-        symbols = [
-            "BTCUSDT",
-            "ETHUSDT",
-            "BNBUSDT",
-            "ADAUSDT",
-            "SOLUSDT",
-        ]
-        results = []
-        for _ in range(n):
-            symbol = random.choice(symbols)
-            results.append(
-                {
+    # -------------------------------
+    # Public Methods for Dashboard
+    # -------------------------------
+    def get_latest_rsi(self, symbol: str) -> float:
+        df = self._fetch_klines(symbol)
+        return self.calculate_rsi(df["close"])
+
+    def get_latest_momentum(self, symbol: str) -> float:
+        df = self._fetch_klines(symbol)
+        return self.calculate_momentum(df["close"])
+
+    def get_volatility(self, symbol: str) -> float:
+        df = self._fetch_klines(symbol)
+        return self.calculate_volatility(df["close"])
+
+    # -------------------------------
+    # Market Scan
+    # -------------------------------
+    def scan_markets(self, pairs: List[str] = None) -> List[Dict[str, Any]]:
+        """Scan all pairs and return signals."""
+        if not pairs:
+            pairs = ["BTCUSDT", "ETHUSDT", "BNBUSDT"]
+
+        signals = []
+        for symbol in pairs:
+            try:
+                df = self._fetch_klines(symbol)
+                rsi = self.calculate_rsi(df["close"])
+                momentum = self.calculate_momentum(df["close"])
+                volatility = self.calculate_volatility(df["close"])
+
+                decision = "HOLD"
+                if rsi < 30 and momentum > 0:
+                    decision = "BUY"
+                elif rsi > 70 and momentum < 0:
+                    decision = "SELL"
+
+                signals.append({
                     "symbol": symbol,
-                    "signal": random.choice(["BUY", "SELL", "HOLD"]),
-                    "price": random.uniform(100, 50000),
-                    "change_24h": random.uniform(-10, 10),
-                    "confidence": random.uniform(0.5, 0.9),
-                    "volume_ratio": random.uniform(0.8, 2.5),
-                    "timestamp": datetime.now(),
-                }
-            )
-        return sorted(results, key=lambda x: x["confidence"], reverse=True)
+                    "rsi": round(rsi, 2),
+                    "momentum": round(momentum, 2),
+                    "volatility": round(volatility, 4),
+                    "decision": decision
+                })
+            except Exception as e:
+                signals.append({"symbol": symbol, "error": str(e)})
+
+        return signals
