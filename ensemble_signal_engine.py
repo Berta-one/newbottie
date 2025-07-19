@@ -1,39 +1,27 @@
-"""
-Ensemble Signal Engine
-Combines Quantum, ML, and Technical analysis for weighted signals.
-"""
+from simplified_ml_strategy import SimplifiedMLStrategy
 
 class EnsembleSignalEngine:
     def __init__(self, client, quantum_trader, market_analyzer):
         self.client = client
         self.quantum_trader = quantum_trader
         self.market_analyzer = market_analyzer
+        self.ml_strategy = SimplifiedMLStrategy()
 
-    def get_signals(self, symbol, weights, min_confidence=0.65):
-        # Quantum signal
-        quantum_signal = self.quantum_trader.evaluate_signal({"symbol": symbol})
-        quantum_decision = quantum_signal["decision"]
-        quantum_conf = quantum_signal["confidence"]
+    def get_signals(self, symbol, weights, min_confidence):
+        quantum_signal = self.quantum_trader.evaluate_signal({})
+        tech_indicators = self.market_analyzer.compute_indicators(symbol)
+        ml_signal, ml_conf, _ = self.ml_strategy.predict_market_direction(self.market_analyzer.get_klines(symbol))
 
-        # ML signal
-        ml_signal, ml_conf, _ = self.market_analyzer.ml_strategy.predict(symbol)
-        
-        # Technical signal
-        tech_signal, tech_conf = self.market_analyzer.technical_signal(symbol)
-
-        # Weighted ensemble
-        final_score = (
-            quantum_conf * weights["quantum"] +
-            ml_conf * weights["ml"] +
-            tech_conf * weights["technical"]
-        ) / 100
-        final_decision = "BUY" if final_score > 0.55 else "SELL" if final_score < 0.45 else "HOLD"
+        final_decision = quantum_signal["decision"]
+        final_confidence = (weights["quantum"] * quantum_signal["confidence"] +
+                            weights["ml"] * ml_conf +
+                            weights["technical"] * 0.5) / 100
 
         return {
             "symbol": symbol,
-            "quantum": {"decision": quantum_decision, "confidence": quantum_conf},
+            "quantum": quantum_signal,
             "ml": {"decision": ml_signal, "confidence": ml_conf},
-            "technical": {"decision": tech_signal, "confidence": tech_conf},
-            "final": {"decision": final_decision, "confidence": final_score},
+            "technical": {"decision": "BUY" if tech_indicators["rsi"] < 70 else "SELL", "confidence": 0.5},
+            "final": {"decision": final_decision, "confidence": final_confidence},
             "circuit": quantum_signal["circuit"]
         }
