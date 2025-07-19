@@ -86,27 +86,38 @@ def stop_auto_trader():
 def auto_trading_loop():
     while not STOP_FLAG.is_set():
         try:
-            weights = st.session_state.get("strategy_weights", {"quantum": 30, "ml": 30, "technical": 40})
-            min_confidence = st.session_state.get("min_confidence", 0.65)
-            portfolio_pairs = [f"{asset}USDT" for asset in portfolio_mgr.get_portfolio().keys()]
+            signals = market_analyzer.scan_markets()
+            for sig in signals:
+                symbol = sig["symbol"]
+                price = sig.get("price", 0)
+                qty = sig.get("qty", 0.001)
+                open_positions = len(position_monitor.get_active_positions())
+                total_balance_usd = portfolio_mgr.total_value()
 
-            for symbol in portfolio_pairs:
-                signal = ensemble_engine.get_signals(symbol, weights, min_confidence)
-                if signal and signal["final"]["confidence"] >= min_confidence:
-                    price = market_analyzer.get_price(symbol)
-                    qty = 0.001  # TODO: dynamic qty via risk manager
-                    open_positions = len(position_monitor.get_active_positions())
-                    total_balance_usd = portfolio_mgr.total_value()
-
-                    validation = risk_mgr.validate_trade(symbol, qty, price, total_balance_usd, open_positions)
-                    if validation["status"]:
-                        result = trade_exec.auto_execute(signal)
-                        st.session_state["logs"].append(f"[AUTO] {datetime.now().isoformat()} {result}")
-                    else:
-                        st.session_state["logs"].append(f"[RISK BLOCKED] {symbol} - {validation['reason']}")
+                validation = risk_mgr.validate_trade(symbol, qty, price, total_balance_usd, open_positions)
+                if validation["status"]:
+                    result = trade_exec.auto_execute(sig)
+                    st.session_state["logs"].append(f"[AUTO] {datetime.now().isoformat()} {result}")
+                else:
+                    st.session_state["logs"].append(f"[RISK BLOCKED] {symbol} - {validation['reason']}")
         except Exception as e:
             st.session_state["logs"].append(f"[AUTO ERROR] {e}")
         time.sleep(30)
+
+# ----------------------------------------
+# Auto Exit Logic (SL/TP Monitor)
+# ----------------------------------------
+def auto_exit_callback(symbol, qty):
+    """Called by PositionMonitor when SL or TP is hit."""
+    try:
+        result = trade_exec.close_position(symbol, qty)
+        st.session_state["logs"].append(f"[AUTO EXIT] {datetime.now().isoformat()} {result}")
+    except Exception as e:
+        st.session_state["logs"].append(f"[AUTO EXIT ERROR] {e}")
+
+# Start monitor in background
+exit_thread = threading.Thread(target=position_monitor.monitor_positions, args=(client, auto_exit_callback), daemon=True)
+exit_thread.start()
 
 # ----------------------------------------
 # Utilities
@@ -132,99 +143,156 @@ tabs = st.tabs([
     "⚛ Multi-Strategy", "🛠 Settings", "🩺 Health", "📜 Logs", "📈 Analytics"
 ])
 
-# 1. Portfolio Tab
+# ----------------------------------------
+# Portfolio Tab
+# ----------------------------------------
 with tabs[0]:
     st.header("📊 Portfolio Overview")
     try:
         portfolio = portfolio_mgr.get_portfolio()
-        total_usd = sum(v["value"] for v in portfolio.values())
-        col1, col2 = st.columns(2)
-        col1.metric("Total Value (USD)", f"${total_usd:,.2f}")
-        col2.metric("Last Updated", datetime.now().strftime("%H:%M:%S"))
+        if isinstance(portfolio, dict):
+            total_usd = sum(v["value"] for v in portfolio.values())
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Total Value (USD)", f"${total_usd:,.2f}")
+            with col2:
+                st.metric("Last Updated", datetime.now().strftime("%H:%M:%S"))
 
-        df = pd.DataFrame([
-            {"Asset": a, "Balance": d["balance"], "Price (USD)": d["price"], "Value (USD)": d["value"], "24h Change": f"{d['change']}%"}
-            for a, d in portfolio.items()
-        ])
-        st.dataframe(df, use_container_width=True)
-        if not df.empty:
-            fig = px.pie(df, names='Asset', values='Value (USD)', title="Portfolio Allocation")
-            st.plotly_chart(fig, use_container_width=True)
+            df = pd.DataFrame([
+                {
+                    "Asset": asset,
+                    "Balance": data["balance"],
+                    "Price (USD)": data["price"],
+                    "Value (USD)": data["value"],
+                    "24h Change": f"{data['change']}%"
+                }
+                for asset, data in portfolio.items()
+            ])
+            st.dataframe(df, use_container_width=True)
+            if not df.empty:
+                fig = px.pie(df, names='Asset', values='Value (USD)', title="Portfolio Allocation")
+                st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.warning("⚠️ Unable to fetch portfolio data.")
     except Exception as e:
         st.error(f"Portfolio fetch error: {e}")
 
-# 2. Manual Trading Tab
+# ----------------------------------------
+# Manual Trading Tab
+# ----------------------------------------
 with tabs[1]:
     st.header("✋ Manual Trading")
     pairs = market_analyzer.get_trading_pairs()
     symbol = st.selectbox("Select Pair", pairs)
     qty = st.number_input("Quantity", min_value=0.0001, step=0.0001)
-    side = st.radio("Side", ["BUY", "SELL"])
+    side = st.radio("Side", ["BUY"])
+    sl_price = st.number_input("Stop Loss Price", min_value=0.0, step=0.01)
+    tp_price = st.number_input("Take Profit Price", min_value=0.0, step=0.01)
+
     if st.button("Execute Trade"):
+        total_balance_usd = portfolio_mgr.total_value()
+        open_positions = len(position_monitor.get_active_positions())
         price = market_analyzer.get_price(symbol)
-        validation = risk_mgr.validate_trade(symbol, qty, price, portfolio_mgr.total_value(), len(position_monitor.get_active_positions()))
+        validation = risk_mgr.validate_trade(symbol, qty, price, total_balance_usd, open_positions)
+
         if validation["status"]:
             result = trade_exec.manual_trade(symbol, qty, side)
+            position_monitor.add_position(symbol, qty, price, sl_price, tp_price)
+            st.session_state["logs"].append(f"[Manual] {result}")
             st.success(result)
         else:
             st.error(f"❌ Trade blocked: {validation['reason']}")
 
-# 3. Auto-Trader Tab
+# ----------------------------------------
+# Auto-Trader Tab
+# ----------------------------------------
 with tabs[2]:
     st.header("🤖 Auto-Trader")
     if AUTO_TRADING:
-        if st.button("🛑 Stop Auto-Trader"): stop_auto_trader(); st.success("Stopped.")
+        if st.button("🛑 Stop Auto-Trader"):
+            stop_auto_trader()
+            st.success("Auto-Trader stopped.")
     else:
-        if st.button("▶️ Start Auto-Trader"): start_auto_trader(); st.success("Started.")
+        if st.button("▶️ Start Auto-Trader"):
+            start_auto_trader()
+            st.success("Auto-Trader started.")
     st.subheader("Active Positions")
     st.write(position_monitor.get_active_positions())
 
-# 4. Multi-Strategy Tab
+# ----------------------------------------
+# Multi-Strategy Tab
+# ----------------------------------------
 with tabs[3]:
     st.header("⚛ Multi-Strategy Analysis")
     weights = st.session_state.get("strategy_weights", {"quantum": 30, "ml": 30, "technical": 40})
     min_confidence = st.session_state.get("min_confidence", 0.65)
     st.info(f"Weights: {weights}, Min Confidence: {min_confidence}")
-    portfolio_pairs = [f"{asset}USDT" for asset in portfolio.keys()]
-    signals_data = [ensemble_engine.get_signals(sym, weights, min_confidence) for sym in portfolio_pairs]
-    df = pd.DataFrame([{
-        "Symbol": s["symbol"], "Quantum": f"{s['quantum']['decision']} ({s['quantum']['confidence']:.2f})",
-        "ML": f"{s['ml']['decision']} ({s['ml']['confidence']:.2f})",
-        "Technical": f"{s['technical']['decision']} ({s['technical']['confidence']:.2f})",
-        "Final": f"{s['final']['decision']} ({s['final']['confidence']:.2f})"
-    } for s in signals_data if s])
-    st.dataframe(df, use_container_width=True)
 
-# 5. Settings Tab
+    portfolio_pairs = [f"{asset}USDT" for asset in portfolio.keys()]
+    signals_data = []
+    for symbol in portfolio_pairs:
+        try:
+            signal = ensemble_engine.get_signals(symbol, weights, min_confidence)
+            signals_data.append(signal)
+        except Exception as e:
+            st.error(f"Signal error for {symbol}: {e}")
+
+    if signals_data:
+        df = pd.DataFrame([
+            {
+                "Symbol": s["symbol"],
+                "Quantum": f"{s['quantum']['decision']} ({s['quantum']['confidence']:.2f})",
+                "ML": f"{s['ml']['decision']} ({s['ml']['confidence']:.2f})",
+                "Technical": f"{s['technical']['decision']} ({s['technical']['confidence']:.2f})",
+                "Final": f"{s['final']['decision']} ({s['final']['confidence']:.2f})"
+            }
+            for s in signals_data
+        ])
+        st.dataframe(df, use_container_width=True)
+    else:
+        st.warning("No signals generated yet.")
+
+# ----------------------------------------
+# Settings Tab
+# ----------------------------------------
 with tabs[4]:
     st.header("🛠 Bot Settings")
-    risk_pct = st.slider("Risk per Trade (%)", 0.1, 5.0, 2.0, 0.1)
-    max_positions = st.slider("Max Positions", 1, 10, 5)
-    min_confidence = st.slider("Min Confidence", 0.5, 1.0, 0.65, 0.01)
+    risk_pct = st.slider("Risk per Trade (%)", 0.1, 5.0, st.session_state.get("risk_pct", 2.0), 0.1)
+    max_positions = st.slider("Max Positions", 1, 10, st.session_state.get("max_positions", 5))
+    min_confidence = st.slider("Min Signal Confidence", 0.5, 1.0, st.session_state.get("min_confidence", 0.65), 0.01)
+    st.session_state.update({"risk_pct": risk_pct, "max_positions": max_positions, "min_confidence": min_confidence})
     col1, col2, col3 = st.columns(3)
-    q = col1.number_input("Quantum (%)", 0.0, 100.0, 30.0, 1.0)
-    m = col2.number_input("ML (%)", 0.0, 100.0, 30.0, 1.0)
-    t = col3.number_input("Technical (%)", 0.0, 100.0, 40.0, 1.0)
-    st.session_state.update({"risk_pct": risk_pct, "max_positions": max_positions, "min_confidence": min_confidence,
-                             "strategy_weights": {"quantum": q, "ml": m, "technical": t}})
-    st.success("✅ Settings saved")
+    quantum_weight = col1.number_input("Quantum (%)", 0.0, 100.0, weights["quantum"], 1.0)
+    ml_weight = col2.number_input("ML (%)", 0.0, 100.0, weights["ml"], 1.0)
+    tech_weight = col3.number_input("Technical (%)", 0.0, 100.0, weights["technical"], 1.0)
+    st.session_state["strategy_weights"] = {"quantum": quantum_weight, "ml": ml_weight, "technical": tech_weight}
+    st.success("✅ Settings updated!")
 
-# 6. Health Tab
+# ----------------------------------------
+# Health Tab
+# ----------------------------------------
 with tabs[5]:
     st.header("🩺 System Health")
     health = get_system_health()
-    st.metric("CPU", health["CPU"]); st.metric("Memory", health["Memory"])
+    st.metric("CPU", health["CPU"])
+    st.metric("Memory", health["Memory"])
     st.write("Threads:", health["Threads"])
-    try: st.write("API Status: ✅" if client.ping() == {} else "❌ Failed")
-    except: st.write("❌ API Check Failed")
+    try:
+        st.write("API Status: ✅" if client.ping() == {} else "❌ Failed")
+    except Exception:
+        st.write("❌ API Check Failed")
 
-# 7. Logs Tab
+# ----------------------------------------
+# Logs Tab
+# ----------------------------------------
 with tabs[6]:
     st.header("📜 Activity Logs")
     for log in st.session_state["logs"][-50:]:
         st.text(log)
 
-# 8. Analytics Tab
+# ----------------------------------------
+# Analytics Tab
+# ----------------------------------------
 with tabs[7]:
     st.header("📈 Advanced Analytics")
     analytics_dashboard.render_analytics_dashboard()
