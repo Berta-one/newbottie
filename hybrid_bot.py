@@ -115,14 +115,14 @@ tabs = st.tabs([
     "⚛ Quantum Analysis", "🩺 Health", "📜 Logs", "📈 Analytics"
 ])
 
-# # ----------------------------------------
+#  # ----------------------------------------
 # Portfolio Tab
 # ----------------------------------------
 with tabs[0]:
     st.header("📊 Portfolio Overview")
     try:
-        # Updated unpacking for 3 return values
-        portfolio, total_usd, total_gbp = portfolio_mgr.get_portfolio()
+        # Flexible unpacking for any extra values
+        portfolio, total_usd, total_gbp, *_ = portfolio_mgr.get_portfolio()
 
         col1, col2 = st.columns(2)
         with col1:
@@ -130,7 +130,6 @@ with tabs[0]:
         with col2:
             st.metric("Total Value (GBP)", f"£{total_gbp:,.2f}")
 
-        # Convert portfolio dict to DataFrame
         if portfolio:
             df = pd.DataFrame([
                 {
@@ -145,7 +144,7 @@ with tabs[0]:
 
             st.dataframe(df, use_container_width=True)
 
-            # Pie chart for allocation
+            # Pie chart
             fig = px.pie(df, names='Asset', values='Value (USD)', title="Portfolio Allocation")
             st.plotly_chart(fig, use_container_width=True)
         else:
