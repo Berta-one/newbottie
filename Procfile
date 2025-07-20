@@ -1,1 +1,1 @@
-web: streamlit run hybrid_bot.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true --server.enableCORS=false --server.enableXsrfProtection=false --server.enableWebsocketCompression=true
+web: python quick_fix.py && streamlit run hybrid_bot.py --server.port=$PORT --server.address=0.0.0.0
