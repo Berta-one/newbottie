@@ -295,31 +295,230 @@ def setup_binance_client():
         return None, f"❌ Connection failed: {str(e)}"
 
 def initialize_components():
+    """Initialize components safely with better error handling"""
     components = {}
+    
+    # Binance client
     client, client_status = setup_binance_client()
-    force_live = force_live_components()
     
-    # If FORCE_LIVE_MODE=true, don't use fallback components
-    if force_live:
-        print("🚀 FORCE LIVE MODE: Using only live components")
+    # Check force live mode settings
+    force_live = os.getenv("FORCE_LIVE_MODE", "false").lower() == "true"
+    has_api_keys = os.getenv("BINANCE_API_KEY") and os.getenv("BINANCE_API_SECRET")
+    use_testnet = os.getenv("USE_TESTNET", "false").lower() == "true"
     
-    # Portfolio Manager
+    print(f"🔧 Force Live Mode: {force_live}")
+    print(f"🔑 Has API Keys: {bool(has_api_keys)}")
+    print(f"🧪 Use Testnet: {use_testnet}")
+    print(f"📦 Available modules: {[k for k, v in modules.items() if v is not None]}")
+    
+    # If force live mode but missing requirements, disable it
+    if force_live and (not has_api_keys or not client):
+        print("⚠️ FORCE_LIVE_MODE=true but missing requirements. Switching to mixed mode.")
+        force_live = False
+    
+    # Risk Manager
+    if modules.get('RiskManager'):
+        try:
+            components['risk_mgr'] = modules['RiskManager'](
+                max_risk_percent=0.02, 
+                max_positions=5
+            )
+            print("✅ Risk Manager initialized")
+        except Exception as e:
+            print(f"⚠️ Risk Manager failed: {e}")
+            components['risk_mgr'] = None
+    else:
+        components['risk_mgr'] = None
+    
+    # Portfolio Manager - Multiple fallback attempts
+    portfolio_mgr = None
+    
+    # Try Method 1: modules dictionary
     if modules.get('PortfolioManager') and client:
         try:
-            components['portfolio_mgr'] = modules['PortfolioManager'](
-                os.getenv("BINANCE_API_KEY"), 
-                os.getenv("BINANCE_API_SECRET")
+            portfolio_mgr = modules['PortfolioManager'](
+                api_key=os.getenv("BINANCE_API_KEY"),
+                api_secret=os.getenv("BINANCE_API_SECRET")
             )
-            print("✅ LIVE Portfolio Manager initialized")
+            print("✅ Portfolio Manager (modules) initialized")
         except Exception as e:
-            if force_live:
-                raise Exception(f"LIVE mode required but Portfolio Manager failed: {e}")
-            else:
-                components['portfolio_mgr'] = FallbackPortfolioManager()
+            print(f"⚠️ Portfolio Manager (modules) failed: {e}")
+    
+    # Try Method 2: Direct import
+    if not portfolio_mgr and client:
+        try:
+            from portfolio_manager import PortfolioManager
+            portfolio_mgr = PortfolioManager(
+                api_key=os.getenv("BINANCE_API_KEY"),
+                api_secret=os.getenv("BINANCE_API_SECRET")
+            )
+            print("✅ Portfolio Manager (direct import) initialized")
+        except Exception as e:
+            print(f"⚠️ Portfolio Manager (direct import) failed: {e}")
+    
+    # Try Method 3: Advanced Portfolio Manager
+    if not portfolio_mgr:
+        try:
+            from advanced_portfolio_manager import AdvancedPortfolioManager
+            portfolio_mgr = AdvancedPortfolioManager(total_capital=10000.0)
+            print("✅ Advanced Portfolio Manager initialized")
+        except Exception as e:
+            print(f"⚠️ Advanced Portfolio Manager failed: {e}")
+    
+    # Assign portfolio manager or fallback
+    if portfolio_mgr:
+        components['portfolio_mgr'] = portfolio_mgr
     else:
         if force_live:
-            raise Exception("LIVE mode required but no Portfolio Manager available")
+            print("❌ FORCE_LIVE_MODE requires Portfolio Manager but none available")
+            print("🔄 Switching to mixed mode...")
+            force_live = False
+        
+        print("📝 Using Fallback Portfolio Manager")
         components['portfolio_mgr'] = FallbackPortfolioManager()
+    
+    # Market Analyzer - Similar approach
+    market_analyzer = None
+    
+    # Try modules dictionary first
+    if modules.get('MarketAnalyzer') and client:
+        try:
+            market_analyzer = modules['MarketAnalyzer'](client)
+            print("✅ Market Analyzer (modules) initialized")
+        except Exception as e:
+            print(f"⚠️ Market Analyzer (modules) failed: {e}")
+    
+    # Try direct import
+    if not market_analyzer and client:
+        try:
+            from market_analyzer import MarketAnalyzer
+            market_analyzer = MarketAnalyzer(client)
+            print("✅ Market Analyzer (direct import) initialized")
+        except Exception as e:
+            print(f"⚠️ Market Analyzer (direct import) failed: {e}")
+    
+    # Assign market analyzer or fallback
+    if market_analyzer:
+        components['market_analyzer'] = market_analyzer
+    else:
+        if force_live:
+            print("❌ FORCE_LIVE_MODE requires Market Analyzer but none available")
+            print("🔄 Switching to mixed mode...")
+            force_live = False
+        
+        print("📝 Using Fallback Market Analyzer")
+        components['market_analyzer'] = FallbackMarketAnalyzer(client)
+    
+    # Trade Executor - Multiple attempts
+    trade_executor = None
+    
+    # Try balance-aware executor first
+    try:
+        from balance_aware_trade_executor import create_balance_aware_executor
+        trade_executor = create_balance_aware_executor(
+            client, 
+            components.get('risk_mgr'),
+            log_callback=lambda msg: st.session_state.setdefault("logs", []).append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
+        )
+        print("✅ Balance-Aware Trade Executor initialized")
+    except ImportError:
+        print("⚠️ Balance-aware executor not found, trying standard...")
+        
+        # Try standard trade executor
+        if modules.get('TradeExecutor'):
+            try:
+                trade_executor = modules['TradeExecutor'](
+                    client, 
+                    components.get('risk_mgr'),
+                    log_callback=lambda msg: st.session_state.setdefault("logs", []).append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
+                )
+                print("✅ Standard Trade Executor initialized")
+            except Exception as e:
+                print(f"⚠️ Standard Trade Executor failed: {e}")
+        
+        # Try direct import
+        if not trade_executor:
+            try:
+                from trade_executor import TradeExecutor
+                trade_executor = TradeExecutor(
+                    client, 
+                    components.get('risk_mgr'),
+                    log_callback=lambda msg: st.session_state.setdefault("logs", []).append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
+                )
+                print("✅ Trade Executor (direct import) initialized")
+            except Exception as e:
+                print(f"⚠️ Trade Executor (direct import) failed: {e}")
+    
+    except Exception as e:
+        print(f"⚠️ Balance-aware executor failed: {e}")
+    
+    # Assign trade executor or fallback
+    if trade_executor:
+        components['trade_exec'] = trade_executor
+    else:
+        if force_live:
+            print("❌ FORCE_LIVE_MODE requires Trade Executor but none available")
+            print("🔄 Switching to mixed mode...")
+            force_live = False
+        
+        print("📝 Using Fallback Trade Executor")
+        components['trade_exec'] = FallbackTradeExecutor(
+            client, 
+            components.get('risk_mgr'),
+            log_callback=lambda msg: st.session_state.setdefault("logs", []).append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
+        )
+    
+    # Quantum Components (optional)
+    if modules.get('QuantumTrader') and client:
+        try:
+            components['quantum_trader'] = modules['QuantumTrader'](client)
+            print("✅ Quantum Trader initialized")
+        except Exception as e:
+            print(f"⚠️ Quantum Trader failed: {e}")
+            components['quantum_trader'] = None
+    else:
+        components['quantum_trader'] = None
+    
+    if modules.get('QuantumAnalyzer'):
+        try:
+            components['quantum_analyzer'] = modules['QuantumAnalyzer']()
+            print("✅ Quantum Analyzer initialized")
+        except Exception as e:
+            print(f"⚠️ Quantum Analyzer failed: {e}")
+            components['quantum_analyzer'] = FallbackQuantumAnalyzer()
+    else:
+        components['quantum_analyzer'] = FallbackQuantumAnalyzer()
+    
+    # Other components (optional)
+    components['position_monitor'] = None
+    components['analytics_dashboard'] = None
+    components['ensemble_engine'] = None
+    
+    # Final status report
+    live_components = []
+    fallback_components = []
+    
+    for name, component in components.items():
+        if component is None:
+            continue
+        elif 'Fallback' in str(type(component)):
+            fallback_components.append(name)
+        else:
+            live_components.append(name)
+    
+    print(f"🎯 Component Status:")
+    print(f"  ✅ Live components: {len(live_components)} - {live_components}")
+    print(f"  📝 Fallback components: {len(fallback_components)} - {fallback_components}")
+    
+    if force_live and len(live_components) >= 3:  # Need at least 3 core components
+        print("🚀 LIVE MODE: All required components initialized successfully")
+    elif len(live_components) > 0:
+        print("🔄 MIXED MODE: Using combination of live and fallback components")
+        print("💡 This allows live API trading with demo backup features")
+    else:
+        print("📝 DEMO MODE: Using fallback components")
+    
+    return components, client, client_status
     
     # Continue for other components...
     components = {}
