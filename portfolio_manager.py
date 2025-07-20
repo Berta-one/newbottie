@@ -113,3 +113,144 @@ class PortfolioManager:
                 return self._get_demo_portfolio()
             
             # Get account information
+            account_info = self.client.get_account()
+            balances = account_info['balances']
+            
+            # Clear existing positions
+            self.positions.clear()
+            
+            # Process all non-zero balances
+            total_value_usdt = 0.0
+            
+            for balance in balances:
+                asset = balance['asset']
+                free = float(balance['free'])
+                locked = float(balance['locked'])
+                total_quantity = free + locked
+                
+                if total_quantity > 0.0000001:  # Minimum threshold
+                    # Get current price in USDT
+                    current_price = self._get_asset_price_usdt(asset)
+                    market_value = total_quantity * current_price
+                    
+                    # Calculate P&L (requires cost basis tracking)
+                    avg_cost = self._get_avg_cost(asset, current_price)
+                    unrealized_pnl = (current_price - avg_cost) * total_quantity
+                    unrealized_pnl_pct = ((current_price - avg_cost) / avg_cost) * 100 if avg_cost > 0 else 0
+                    
+                    # Create position
+                    position = AssetPosition(
+                        symbol=asset,
+                        quantity=total_quantity,
+                        avg_cost=avg_cost,
+                        current_price=current_price,
+                        market_value=market_value,
+                        unrealized_pnl=unrealized_pnl,
+                        unrealized_pnl_pct=unrealized_pnl_pct,
+                        allocation_pct=0.0,  # Will be calculated after total
+                        last_updated=datetime.now()
+                    )
+                    
+                    self.positions[asset] = position
+                    total_value_usdt += market_value
+            
+            # Calculate allocation percentages
+            for position in self.positions.values():
+                position.allocation_pct = (position.market_value / total_value_usdt) * 100 if total_value_usdt > 0 else 0
+            
+            # Create portfolio snapshot
+            snapshot = self._create_portfolio_snapshot(total_value_usdt)
+            self.historical_snapshots.append(snapshot)
+            
+            # Limit snapshot history
+            if len(self.historical_snapshots) > 10000:
+                self.historical_snapshots = self.historical_snapshots[-5000:]
+            
+            self.last_update = datetime.now()
+            
+            # Save state
+            self._save_portfolio_state()
+            self._save_historical_snapshots()
+            
+            return self.get_portfolio_summary()
+            
+        except Exception as e:
+            logger.error(f"Error updating portfolio: {e}")
+            return self._get_demo_portfolio()
+    
+    def get_portfolio_summary(self) -> Dict[str, Any]:
+        """Get comprehensive portfolio summary"""
+        try:
+            total_value = sum(pos.market_value for pos in self.positions.values())
+            total_pnl = sum(pos.unrealized_pnl for pos in self.positions.values())
+            total_pnl_pct = ((total_value - self.initial_balance) / self.initial_balance) * 100 if self.initial_balance > 0 else 0
+            
+            # Asset allocation
+            allocation = {pos.symbol: pos.allocation_pct for pos in self.positions.values()}
+            sorted_allocation = dict(sorted(allocation.items(), key=lambda x: x[1], reverse=True))
+            
+            # Top positions
+            top_positions = sorted(self.positions.values(), key=lambda x: x.market_value, reverse=True)[:5]
+            
+            # Risk metrics
+            risk_metrics = self._calculate_risk_metrics()
+            
+            return {
+                "total_value": round(total_value, 2),
+                "total_pnl": round(total_pnl, 2),
+                "total_pnl_pct": round(total_pnl_pct, 2),
+                "asset_count": len(self.positions),
+                "largest_position_pct": max([pos.allocation_pct for pos in self.positions.values()], default=0),
+                "base_currency": self.base_currency,
+                "last_update": self.last_update.isoformat(),
+                "allocation": sorted_allocation,
+                "top_positions": [
+                    {
+                        "symbol": pos.symbol,
+                        "value": round(pos.market_value, 2),
+                        "pnl_pct": round(pos.unrealized_pnl_pct, 2),
+                        "allocation": round(pos.allocation_pct, 2)
+                    } for pos in top_positions
+                ],
+                "risk_metrics": risk_metrics,
+                "daily_change": self._get_daily_change(),
+                "performance_metrics": self._get_performance_metrics()
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting portfolio summary: {e}")
+            return self._get_demo_portfolio()
+    
+    def get_asset_position(self, symbol: str) -> Optional[AssetPosition]:
+        """Get specific asset position"""
+        return self.positions.get(symbol)
+    
+    def get_portfolio(self) -> Dict[str, float]:
+        """Get simple portfolio dict for compatibility"""
+        return {pos.symbol: pos.quantity for pos in self.positions.values()}
+    
+    def total_value(self) -> float:
+        """Get total portfolio value in base currency"""
+        return sum(pos.market_value for pos in self.positions.values())
+    
+    def get_allocation_analysis(self) -> Dict[str, Any]:
+        """Get detailed allocation analysis"""
+        total_value = self.total_value()
+        
+        if total_value == 0:
+            return {"error": "No portfolio value"}
+        
+        # Calculate various allocation metrics
+        allocations = [pos.allocation_pct for pos in self.positions.values()]
+        
+        return {
+            "concentration_risk": max(allocations, default=0),
+            "diversification_score": self._calculate_diversification_score(),
+            "allocation_entropy": self._calculate_allocation_entropy(),
+            "rebalancing_needed": self._check_rebalancing_needed(),
+            "recommended_actions": self._get_rebalancing_recommendations()
+        }
+    
+    def get_performance_metrics(self) -> Dict[str, Any]:
+        """Get comprehensive performance metrics"""
+        if len(self
