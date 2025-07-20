@@ -161,15 +161,73 @@ class FallbackTradeExecutor:
         self.active_orders = {}
         self.log_callback = log_callback or (lambda msg: print(msg))
         self.client = client
+        self.trade_count = 0
+        self.total_pnl = 0.0
+        self.successful_trades = 0
     
     def manual_trade(self, symbol, qty, sl_mult, tp_mult, atr_value=None):
+        self.trade_count += 1
         price = FallbackMarketAnalyzer().get_price(symbol)
-        trade_msg = f"[Manual] BUY {symbol} @ {price} Qty={qty}"
-        self.log_callback(trade_msg)
-        return f"✅ Trade executed: {symbol} quantity {qty}"
+        
+        # Simulate trade execution with realistic outcomes
+        import random
+        success_rate = 0.75  # 75% success rate in demo
+        
+        if random.random() < success_rate:
+            # Successful trade
+            trade_value = qty * price
+            fee = trade_value * 0.001  # 0.1% fee
+            
+            # Simulate some profit/loss
+            pnl_pct = random.uniform(-0.02, 0.05)  # -2% to +5%
+            pnl = trade_value * pnl_pct
+            self.total_pnl += pnl
+            
+            self.successful_trades += 1
+            
+            trade_msg = f"[DEMO] ✅ BUY {symbol} @ ${price:,.4f} | Qty: {qty:.6f} | Value: ${trade_value:.2f} | Fee: ${fee:.4f} | P&L: ${pnl:+.2f}"
+            self.log_callback(trade_msg)
+            
+            # Add to active orders (simulate)
+            order_id = f"DEMO_{self.trade_count}"
+            self.active_orders[order_id] = {
+                'symbol': symbol,
+                'side': 'BUY',
+                'quantity': qty,
+                'price': price,
+                'status': 'FILLED',
+                'time': datetime.now().strftime('%H:%M:%S')
+            }
+            
+            return f"✅ DEMO Trade Successful: {symbol} | Qty: {qty:.6f} | Price: ${price:,.4f} | P&L: ${pnl:+.2f}"
+        
+        else:
+            # Failed trade (simulate API errors occasionally)
+            error_types = [
+                "Insufficient balance",
+                "Minimum quantity not met", 
+                "Market volatility too high",
+                "Order timeout"
+            ]
+            error = random.choice(error_types)
+            
+            trade_msg = f"[DEMO] ❌ Trade Failed: {error} - {symbol} @ ${price:,.4f}"
+            self.log_callback(trade_msg)
+            
+            return f"❌ DEMO Trade Failed: {error}"
     
     def auto_execute(self, signal, total_balance, open_positions, sl_mult, tp_mult):
-        return "✅ Auto-trade executed (demo)"
+        return self.manual_trade(signal.get('symbol', 'BTCUSDT'), 0.001, sl_mult, tp_mult)
+    
+    def get_demo_stats(self):
+        """Get demo trading statistics"""
+        win_rate = (self.successful_trades / max(self.trade_count, 1)) * 100
+        return {
+            'total_trades': self.trade_count,
+            'successful_trades': self.successful_trades,
+            'win_rate': win_rate,
+            'total_pnl': self.total_pnl
+        }
 
 # -------------------------
 # Auto-Scanner Class
@@ -230,15 +288,22 @@ class AutoScanner:
 # Setup Components
 # -------------------------
 def setup_binance_client():
-    """Setup Binance client"""
+    """Setup Binance client with enhanced demo mode"""
+    
+    # Check if demo mode is explicitly enabled
+    demo_mode = os.getenv("USE_DEMO_MODE", "false").lower() == "true"
+    
+    if demo_mode:
+        return None, "🎮 DEMO MODE - All trades are simulated"
+    
     if not modules.get('Client'):
-        return None, "❌ Binance client not available"
+        return None, "🎮 DEMO MODE - Binance client not available"
     
     api_key = os.getenv("BINANCE_API_KEY") or os.getenv("BINANCE_TESTNET_API_KEY")
     api_secret = os.getenv("BINANCE_API_SECRET") or os.getenv("BINANCE_TESTNET_API_SECRET")
     
     if not api_key or not api_secret:
-        return None, "⚠️ API keys not configured - using demo mode"
+        return None, "🎮 DEMO MODE - API keys not configured"
     
     try:
         client = modules['Client'](api_key, api_secret)
@@ -252,7 +317,7 @@ def setup_binance_client():
         return client, f"✅ Connected to Binance {mode}"
         
     except Exception as e:
-        return None, f"❌ Connection failed: {str(e)}"
+        return None, f"🎮 DEMO MODE - Connection failed, using demo trading: {str(e)[:50]}..."
 
 def initialize_components():
     """Initialize components safely"""
