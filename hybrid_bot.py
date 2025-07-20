@@ -38,6 +38,16 @@ import psutil
 import streamlit as st
 import numpy as np
 
+# Import modules with debug info
+print("🔄 Starting module imports...")
+modules = safe_import_modules()
+
+# Debug: Print what was actually imported
+print("📦 Available modules:")
+for name, module in modules.items():
+    status = "✅ Available" if module else "❌ Missing"
+    print(f"  - {name}: {status}")
+    
 # ✅ Streamlit Config
 st.set_page_config(page_title="Hybrid Quantum Trading Bot", layout="wide")
 
@@ -49,79 +59,97 @@ def safe_import_modules():
     modules = {}
     
     try:
-        from _manager import Manager
-        modules['Manager'] = Manager
-    except ImportError:
-        modules['Manager'] = None
-        st.warning("⚠️ Manager not available")
+        from portfolio_manager import PortfolioManager
+        modules['PortfolioManager'] = PortfolioManager
+        print("✅ PortfolioManager imported successfully")
+    except ImportError as e:
+        modules['PortfolioManager'] = None
+        print(f"⚠️ PortfolioManager not available: {e}")
+        st.warning("⚠️ PortfolioManager not available")
     
     try:
         from trade_executor import TradeExecutor
         modules['TradeExecutor'] = TradeExecutor
-    except ImportError:
+        print("✅ TradeExecutor imported successfully")
+    except ImportError as e:
         modules['TradeExecutor'] = None
+        print(f"⚠️ TradeExecutor not available: {e}")
         st.warning("⚠️ TradeExecutor not available")
     
     try:
         from risk_manager import RiskManager
         modules['RiskManager'] = RiskManager
-    except ImportError:
+        print("✅ RiskManager imported successfully")
+    except ImportError as e:
         modules['RiskManager'] = None
+        print(f"⚠️ RiskManager not available: {e}")
         st.warning("⚠️ RiskManager not available")
     
     try:
         from position_monitor import PositionMonitor
         modules['PositionMonitor'] = PositionMonitor
-    except ImportError:
+        print("✅ PositionMonitor imported successfully")
+    except ImportError as e:
         modules['PositionMonitor'] = None
+        print(f"⚠️ PositionMonitor not available: {e}")
         st.warning("⚠️ PositionMonitor not available")
     
     try:
         from market_analyzer import MarketAnalyzer
         modules['MarketAnalyzer'] = MarketAnalyzer
-    except ImportError:
+        print("✅ MarketAnalyzer imported successfully")
+    except ImportError as e:
         modules['MarketAnalyzer'] = None
+        print(f"❌ MarketAnalyzer not available: {e}")
         st.error("❌ MarketAnalyzer not available - Manual Trading disabled")
     
     try:
         from quantum_trading_integration import QuantumTrader
         modules['QuantumTrader'] = QuantumTrader
-    except ImportError:
+        print("✅ QuantumTrader imported successfully")
+    except ImportError as e:
         modules['QuantumTrader'] = None
+        print(f"⚠️ QuantumTrader not available: {e}")
         st.warning("⚠️ QuantumTrader not available - Using fallback")
     
     try:
         from quantum_engine import QuantumAnalyzer
         modules['QuantumAnalyzer'] = QuantumAnalyzer
-    except ImportError:
+        print("✅ QuantumAnalyzer imported successfully")
+    except ImportError as e:
         modules['QuantumAnalyzer'] = None
+        print(f"⚠️ QuantumAnalyzer not available: {e}")
         st.warning("⚠️ QuantumAnalyzer not available - Using fallback")
     
     try:
         from dashboard import TradingDashboard
         modules['TradingDashboard'] = TradingDashboard
-    except ImportError:
+        print("✅ TradingDashboard imported successfully")
+    except ImportError as e:
         modules['TradingDashboard'] = None
+        print(f"⚠️ TradingDashboard not available: {e}")
         st.warning("⚠️ TradingDashboard not available")
     
     try:
         from ensemble_signal_engine import EnsembleSignalEngine
         modules['EnsembleSignalEngine'] = EnsembleSignalEngine
-    except ImportError:
+        print("✅ EnsembleSignalEngine imported successfully")
+    except ImportError as e:
         modules['EnsembleSignalEngine'] = None
+        print(f"⚠️ EnsembleSignalEngine not available: {e}")
         st.warning("⚠️ EnsembleSignalEngine not available")
     
     try:
         from binance.client import Client
         modules['Client'] = Client
-    except ImportError:
+        print("✅ Binance Client imported successfully")
+    except ImportError as e:
         modules['Client'] = None
+        print(f"❌ Binance client not available: {e}")
         st.error("❌ Binance client not available")
     
+    print(f"📦 Module import summary: {sum(1 for v in modules.values() if v is not None)}/{len(modules)} modules loaded")
     return modules
-
-# Import modules
-modules = safe_import_modules()
 
 # -------------------------
 # Environment & API Setup
@@ -229,86 +257,165 @@ class FallbackTradeExecutor:
         return "Demo auto-trade executed"
 
 # -------------------------
-# Initialize Core Objects
+# Initialize Core Objects with Better Error Handling
 # -------------------------
 def initialize_components():
-    """Initialize all trading components"""
+    """Initialize all trading components with proper error handling"""
     components = {}
     
+    print("🔧 Initializing trading components...")
+    
     # Portfolio Manager
-    if modules['PortfolioManager'] and client:
-        try:
-            components['portfolio_mgr'] = modules['PortfolioManager'](client.API_KEY, client.API_SECRET)
-        except:
+    try:
+        if modules.get('PortfolioManager') and client:
+            # Get API keys from client or environment
+            api_key = getattr(client, 'API_KEY', None) or os.getenv("BINANCE_API_KEY") or os.getenv("BINANCE_TESTNET_API_KEY")
+            api_secret = getattr(client, 'API_SECRET', None) or os.getenv("BINANCE_API_SECRET") or os.getenv("BINANCE_TESTNET_API_SECRET")
+            use_testnet = os.getenv("USE_TESTNET", "true").lower() == "true"
+            
+            components['portfolio_mgr'] = modules['PortfolioManager'](api_key, api_secret, use_testnet)
+            print("✅ Portfolio Manager initialized successfully")
+        else:
             components['portfolio_mgr'] = FallbackPortfolioManager()
-    else:
+            print("⚠️ Using Fallback Portfolio Manager")
+    except Exception as e:
+        print(f"❌ Portfolio Manager initialization failed: {e}")
         components['portfolio_mgr'] = FallbackPortfolioManager()
     
     # Risk Manager
-    if modules['RiskManager']:
-        components['risk_mgr'] = modules['RiskManager'](max_risk_percent=0.02, max_positions=5)
-    else:
+    try:
+        if modules.get('RiskManager'):
+            components['risk_mgr'] = modules['RiskManager'](max_risk_percent=0.02, max_positions=5)
+            print("✅ Risk Manager initialized successfully")
+        else:
+            components['risk_mgr'] = None
+            print("⚠️ Risk Manager not available")
+    except Exception as e:
+        print(f"❌ Risk Manager initialization failed: {e}")
         components['risk_mgr'] = None
     
     # Position Monitor
-    if modules['PositionMonitor']:
-        components['position_monitor'] = modules['PositionMonitor']()
-    else:
+    try:
+        if modules.get('PositionMonitor'):
+            components['position_monitor'] = modules['PositionMonitor']()
+            print("✅ Position Monitor initialized successfully")
+        else:
+            components['position_monitor'] = None
+            print("⚠️ Position Monitor not available")
+    except Exception as e:
+        print(f"❌ Position Monitor initialization failed: {e}")
         components['position_monitor'] = None
     
     # Market Analyzer
-    if modules['MarketAnalyzer']:
-        components['market_analyzer'] = modules['MarketAnalyzer'](client)
-    else:
+    try:
+        if modules.get('MarketAnalyzer'):
+            components['market_analyzer'] = modules['MarketAnalyzer'](client)
+            print("✅ Market Analyzer initialized successfully")
+        else:
+            components['market_analyzer'] = FallbackMarketAnalyzer(client)
+            print("⚠️ Using Fallback Market Analyzer")
+    except Exception as e:
+        print(f"❌ Market Analyzer initialization failed: {e}")
         components['market_analyzer'] = FallbackMarketAnalyzer(client)
     
     # Quantum Components
-    if modules['QuantumTrader'] and client:
-        try:
+    try:
+        if modules.get('QuantumTrader') and client:
             components['quantum_trader'] = modules['QuantumTrader'](client)
-        except:
+            print("✅ Quantum Trader initialized successfully")
+        else:
             components['quantum_trader'] = None
-    else:
+            print("⚠️ Quantum Trader not available")
+    except Exception as e:
+        print(f"❌ Quantum Trader initialization failed: {e}")
         components['quantum_trader'] = None
     
-    if modules['QuantumAnalyzer']:
-        components['quantum_analyzer'] = modules['QuantumAnalyzer']()
-    else:
+    try:
+        if modules.get('QuantumAnalyzer'):
+            components['quantum_analyzer'] = modules['QuantumAnalyzer']()
+            print("✅ Quantum Analyzer initialized successfully")
+        else:
+            components['quantum_analyzer'] = FallbackQuantumAnalyzer()
+            print("⚠️ Using Fallback Quantum Analyzer")
+    except Exception as e:
+        print(f"❌ Quantum Analyzer initialization failed: {e}")
         components['quantum_analyzer'] = FallbackQuantumAnalyzer()
     
     # Dashboard
-    if modules['TradingDashboard']:
-        components['analytics_dashboard'] = modules['TradingDashboard']()
-    else:
+    try:
+        if modules.get('TradingDashboard'):
+            components['analytics_dashboard'] = modules['TradingDashboard']()
+            print("✅ Analytics Dashboard initialized successfully")
+        else:
+            components['analytics_dashboard'] = None
+            print("⚠️ Analytics Dashboard not available")
+    except Exception as e:
+        print(f"❌ Analytics Dashboard initialization failed: {e}")
         components['analytics_dashboard'] = None
     
     # Ensemble Engine
-    if modules['EnsembleSignalEngine'] and client:
-        try:
+    try:
+        if modules.get('EnsembleSignalEngine') and client:
             components['ensemble_engine'] = modules['EnsembleSignalEngine'](
-                client, components['quantum_trader'], components['market_analyzer']
+                client, components.get('quantum_trader'), components.get('market_analyzer')
             )
-        except:
+            print("✅ Ensemble Engine initialized successfully")
+        else:
             components['ensemble_engine'] = None
-    else:
+            print("⚠️ Ensemble Engine not available")
+    except Exception as e:
+        print(f"❌ Ensemble Engine initialization failed: {e}")
         components['ensemble_engine'] = None
     
     # Trade Executor
-    if modules['TradeExecutor']:
-        components['trade_exec'] = modules['TradeExecutor'](
-            client, components['risk_mgr'], 
-            log_callback=lambda msg: st.session_state.setdefault("logs", []).append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
-        )
-    else:
+    try:
+        if modules.get('TradeExecutor'):
+            components['trade_exec'] = modules['TradeExecutor'](
+                client, components.get('risk_mgr'), 
+                log_callback=lambda msg: st.session_state.setdefault("logs", []).append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
+            )
+            print("✅ Trade Executor initialized successfully")
+        else:
+            components['trade_exec'] = FallbackTradeExecutor(
+                client, components.get('risk_mgr'),
+                log_callback=lambda msg: st.session_state.setdefault("logs", []).append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
+            )
+            print("⚠️ Using Fallback Trade Executor")
+    except Exception as e:
+        print(f"❌ Trade Executor initialization failed: {e}")
         components['trade_exec'] = FallbackTradeExecutor(
-            client, components['risk_mgr'],
+            client, components.get('risk_mgr'),
             log_callback=lambda msg: st.session_state.setdefault("logs", []).append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
         )
     
+    # Summary
+    active_components = sum(1 for v in components.values() if v is not None)
+    print(f"🎯 Component initialization complete: {active_components}/{len(components)} components active")
+    
     return components
 
-# Initialize components
-components = initialize_components()
+# Initialize components with error handling
+print("🔧 Initializing components...")
+try:
+    components = initialize_components()
+    print("✅ All components initialized successfully")
+except Exception as e:
+    st.error(f"🚨 Critical error during component initialization: {e}")
+    st.code(traceback.format_exc())
+    
+    # Create minimal fallback components
+    components = {
+        'portfolio_mgr': FallbackPortfolioManager(),
+        'market_analyzer': FallbackMarketAnalyzer(client),
+        'quantum_analyzer': FallbackQuantumAnalyzer(),
+        'trade_exec': FallbackTradeExecutor(client, None),
+        'risk_mgr': None,
+        'position_monitor': None,
+        'quantum_trader': None,
+        'analytics_dashboard': None,
+        'ensemble_engine': None
+    }
+    print("🔄 Using minimal fallback components")
 # -------------------------
 # Auto-Scanner Class
 # -------------------------
