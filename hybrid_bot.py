@@ -1,5 +1,4 @@
-# FORCE DEMO MODE - Remove this line to re-enable API trading
-os.environ['USE_DEMO_MODE'] = 'true'
+
 #!/usr/bin/env python3
 """
 Hybrid Quantum Crypto Trading Bot Dashboard
@@ -37,7 +36,8 @@ import plotly.graph_objects as go
 import psutil
 import streamlit as st
 import numpy as np
-
+# FORCE DEMO MODE - Remove this line to re-enable API trading
+os.environ['USE_DEMO_MODE'] = 'true'
 # ✅ Streamlit Config
 st.set_page_config(page_title="Hybrid Quantum Trading Bot", layout="wide")
 
