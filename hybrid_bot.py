@@ -30,6 +30,15 @@ import numpy as np
 
 # ✅ Streamlit Config
 st.set_page_config(page_title="Hybrid Quantum Trading Bot", layout="wide")
+# ✅ Session state initialization (must come early)
+if "sl_mult" not in st.session_state:
+    st.session_state["sl_mult"] = 1.5  # Default Stop Loss multiplier
+if "tp_mult" not in st.session_state:
+    st.session_state["tp_mult"] = 3.0  # Default Take Profit multiplier
+if "logs" not in st.session_state:
+    st.session_state["logs"] = []
+if "auto_scanner" not in st.session_state:
+    st.session_state["auto_scanner"] = None
 
 # Authentication
 try:
