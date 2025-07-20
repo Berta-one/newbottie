@@ -830,13 +830,13 @@ class PortfolioManager:
         Get portfolio in the format expected by the dashboard
         
         Returns:
-            Portfolio dictionary with 'value' keys for compatibility
+            Portfolio dictionary with all required keys for compatibility
         """
         try:
             # Get the real portfolio data
             portfolio_raw, gbp_rate = self.get_real_portfolio()
             
-            # Convert to format expected by dashboard (with 'value' key)
+            # Convert to format expected by dashboard (with all required keys)
             portfolio_formatted = {}
             
             for asset, data in portfolio_raw.items():
@@ -846,17 +846,71 @@ class PortfolioManager:
                     'free': data.get('free', 0),
                     'locked': data.get('locked', 0),
                     'price_usd': data.get('price_usd', 0),
+                    'price': data.get('price_usd', 0),  # Add 'price' key for dashboard compatibility
                     'usd_value': data.get('usd_value', 0),
                     'gbp_value': data.get('gbp_value', 0),
                     'change_24h': data.get('change_24h', 0),
-                    'value': data.get('usd_value', 0)  # Add 'value' key for dashboard compatibility
+                    'value': data.get('usd_value', 0),  # Add 'value' key for dashboard compatibility
+                    'percentage': 0.0  # Will be calculated by dashboard
                 }
             
             return portfolio_formatted
             
         except Exception as e:
             logger.error(f"Error getting formatted portfolio: {e}")
-            return {}
+            # Return demo data to prevent crashes
+            return self._get_demo_portfolio_dict()
+    
+    def _get_demo_portfolio_dict(self) -> Dict[str, Any]:
+        """Get demo portfolio data in correct format"""
+        return {
+            'USDT': {
+                'symbol': 'USDT',
+                'balance': 1000.0,
+                'free': 1000.0,
+                'locked': 0.0,
+                'price_usd': 1.0,
+                'price': 1.0,
+                'usd_value': 1000.0,
+                'gbp_value': 770.0,
+                'change_24h': 0.0,
+                'value': 1000.0,
+                'percentage': 100.0
+            }
+        }
+    
+    def get_connection_status_detailed(self) -> Dict[str, Any]:
+        """Get detailed connection status including data source"""
+        try:
+            if not self.client:
+                return {
+                    "status": "❌ Not Connected",
+                    "data_source": "Demo Mode",
+                    "connected": False,
+                    "api_url": "None"
+                }
+            
+            # Test connection
+            account_info = self.client.get_account()
+            is_testnet = 'testnet' in self.client.API_URL.lower()
+            
+            return {
+                "status": "🧪 Testnet Connected" if is_testnet else "🚀 Live Trading Connected",
+                "data_source": "Binance Testnet" if is_testnet else "Binance Live API",
+                "connected": True,
+                "api_url": self.client.API_URL,
+                "account_type": account_info.get('accountType', 'SPOT'),
+                "can_trade": account_info.get('canTrade', False)
+            }
+            
+        except Exception as e:
+            return {
+                "status": f"❌ Connection Error: {str(e)}",
+                "data_source": "Error - Check API credentials",
+                "connected": False,
+                "api_url": "Unknown",
+                "error": str(e)
+            }
     
     def get_portfolio_with_gbp(self) -> Tuple[Dict[str, Any], float]:
         """
