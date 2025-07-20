@@ -1678,9 +1678,13 @@ with col4:
     else:
         st.warning(mode)
 
-# Auto-refresh option (SINGLE VERSION WITH UNIQUE KEY)
-if st.checkbox("🔄 Auto-refresh (30s)", value=False, key="main_auto_refresh"):
-    time.sleep(30)
+# Auto-refresh option (DISABLED TO PREVENT STALLING)
+# if st.checkbox("🔄 Auto-refresh (30s)", value=False, key="main_auto_refresh"):
+#     time.sleep(30)
+#     st.rerun()
+
+# Manual refresh instead
+if st.button("🔄 Manual Refresh", key="manual_page_refresh"):
     st.rerun()
 
 # -------------------------
