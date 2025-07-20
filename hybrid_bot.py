@@ -295,13 +295,28 @@ def initialize_components():
         components['risk_mgr'] = None
     
     # Trade Executor
+   # REPLACE the entire Trade Executor section with this:
+
+# Enhanced Trade Executor with Balance Management
+try:
+    # Try balance-aware executor first
+    from balance_aware_trade_executor import create_balance_aware_executor
+    components['trade_exec'] = create_balance_aware_executor(
+        client, 
+        components.get('risk_mgr'),
+        log_callback=lambda msg: st.session_state.setdefault("logs", []).append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
+    )
+    print("✅ Balance-Aware Trade Executor initialized")
+    
+except ImportError:
+    # Fallback to standard executor
     if modules.get('TradeExecutor'):
         try:
             components['trade_exec'] = modules['TradeExecutor'](
                 client, components.get('risk_mgr'),
                 log_callback=lambda msg: st.session_state.setdefault("logs", []).append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
             )
-            print("✅ Live Trade Executor initialized")
+            print("✅ Standard Trade Executor initialized")
         except Exception as e:
             print(f"⚠️ Trade Executor failed, using fallback: {e}")
             components['trade_exec'] = FallbackTradeExecutor(
@@ -312,6 +327,15 @@ def initialize_components():
         components['trade_exec'] = FallbackTradeExecutor(
             client, components.get('risk_mgr'),
             log_callback=lambda msg: st.session_state.setdefault("logs", []).append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
+        )
+        
+except Exception as e:
+    print(f"⚠️ Balance-aware executor failed: {e}")
+    # Ultimate fallback
+    components['trade_exec'] = FallbackTradeExecutor(
+        client, components.get('risk_mgr'),
+        log_callback=lambda msg: st.session_state.setdefault("logs", []).append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
+    )allback=lambda msg: st.session_state.setdefault("logs", []).append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
         )
     
     # Quantum Components
