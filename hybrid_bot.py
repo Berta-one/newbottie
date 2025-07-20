@@ -49,11 +49,11 @@ def safe_import_modules():
     modules = {}
     
     try:
-        from portfolio_manager import PortfolioManager
-        modules['PortfolioManager'] = PortfolioManager
+        from _manager import Manager
+        modules['Manager'] = Manager
     except ImportError:
-        modules['PortfolioManager'] = None
-        st.warning("⚠️ PortfolioManager not available")
+        modules['Manager'] = None
+        st.warning("⚠️ Manager not available")
     
     try:
         from trade_executor import TradeExecutor
@@ -163,7 +163,7 @@ client, client_status = setup_binance_client()
 # -------------------------
 # Fallback Classes
 # -------------------------
-class FallbackPortfolioManager:
+class FallbackManager:
     def __init__(self):
         self.dummy_portfolio = {
             'USDT': {'balance': 1000.0, 'price': 1.0, 'value': 1000.0, 'change': 0.0},
@@ -473,51 +473,107 @@ tabs = st.tabs([
 ])
 
 # -------------------------
-# Portfolio Tab
+# Enhanced Portfolio Tab
 # -------------------------
 with tabs[0]:
     st.header("📊 Portfolio Overview")
+    
+    # Add refresh button and connection status
+    col1, col2, col3 = st.columns([2, 1, 1])
+    with col1:
+        st.info(components['portfolio_mgr'].get_connection_status())
+    with col2:
+        if st.button("🔄 Refresh Portfolio"):
+            with st.spinner("Refreshing..."):
+                components['portfolio_mgr'].refresh_portfolio()
+            st.success("Portfolio refreshed!")
+            st.rerun()
+    with col3:
+        st.caption(f"Last updated: {components['portfolio_mgr'].last_updated()}")
+    
     try:
         portfolio = components['portfolio_mgr'].get_portfolio()
         if portfolio:
             total_usd = sum(v["value"] for v in portfolio.values())
             
-            col1, col2, col3 = st.columns(3)
+            # Main metrics
+            col1, col2, col3, col4 = st.columns(4)
             with col1:
                 st.metric("Total Value (USD)", f"${total_usd:,.2f}")
             with col2:
                 mode = "🧪 TESTNET" if os.getenv("USE_TESTNET", "true").lower() == "true" else "🚀 LIVE"
                 st.metric("Trading Mode", mode)
             with col3:
-                st.metric("Last Updated", datetime.now().strftime("%H:%M:%S"))
+                assets_count = len([k for k, v in portfolio.items() if v['balance'] > 0])
+                st.metric("Active Assets", assets_count)
+            with col4:
+                live_status = "🟢 Live" if components['portfolio_mgr'].is_live() else "🔴 Demo"
+                st.metric("Data Source", live_status)
 
-            # Portfolio table
-            df = pd.DataFrame([
-                {
-                    "Asset": asset, 
-                    "Balance": f"{data['balance']:.6f}", 
-                    "Price": f"${data['price']:.2f}", 
-                    "Value": f"${data['value']:.2f}", 
-                    "Change%": f"{data['change']:.2f}%"
-                } 
-                for asset, data in portfolio.items()
-            ])
-            st.dataframe(df, use_container_width=True)
+            # Enhanced portfolio table
+            portfolio_data = []
+            for asset, data in portfolio.items():
+                portfolio_data.append({
+                    "Asset": asset,
+                    "Balance": f"{data['balance']:.8f}".rstrip('0').rstrip('.'),
+                    "Free": f"{data.get('free', data['balance']):.8f}".rstrip('0').rstrip('.'),
+                    "Locked": f"{data.get('locked', 0):.8f}".rstrip('0').rstrip('.'),
+                    "Price (USD)": f"${data['price']:.4f}",
+                    "Value (USD)": f"${data['value']:.2f}",
+                    "24h Change": f"{data['change']:.2f}%"
+                })
             
-            # Portfolio allocation chart
-            if not df.empty and len(df) > 1:
+            df = pd.DataFrame(portfolio_data)
+            
+            # Color code the dataframe
+            def color_change(val):
+                if '%' in str(val):
+                    try:
+                        num_val = float(val.replace('%', ''))
+                        if num_val > 0:
+                            return 'background-color: #90EE90'  # Light green
+                        elif num_val < 0:
+                            return 'background-color: #FFB6C1'  # Light red
+                    except:
+                        pass
+                return ''
+            
+            styled_df = df.style.applymap(color_change, subset=['24h Change'])
+            st.dataframe(styled_df, use_container_width=True)
+            
+            # Portfolio allocation chart (only for assets with significant value)
+            significant_assets = {k: v for k, v in portfolio.items() if v['value'] > 1.0}
+            if len(significant_assets) > 1:
                 fig = px.pie(
-                    values=[data['value'] for data in portfolio.values()],
-                    names=list(portfolio.keys()),
-                    title="Portfolio Allocation"
+                    values=[data['value'] for data in significant_assets.values()],
+                    names=list(significant_assets.keys()),
+                    title="Portfolio Allocation (Assets > $1)"
                 )
                 st.plotly_chart(fig, use_container_width=True)
+            
+            # Recent trade history
+            if components['portfolio_mgr'].is_live():
+                st.subheader("📈 Recent Trade History")
+                trades = components['portfolio_mgr'].get_trade_history(limit=10)
+                
+                if trades:
+                    trade_df = pd.DataFrame(trades)
+                    st.dataframe(trade_df, use_container_width=True)
+                else:
+                    st.info("No recent trades found")
+            
         else:
             st.warning("⚠️ No portfolio data available.")
             
     except Exception as e:
         st.error(f"Portfolio fetch error: {e}")
         st.code(traceback.format_exc())
+        
+        # Show debug info
+        with st.expander("🔧 Debug Information"):
+            st.write("Portfolio Manager Status:")
+            st.write(f"- Live connection: {components['portfolio_mgr'].is_live()}")
+            st.write(f"- Connection status: {components['portfolio_mgr'].get_connection_status()}")
 
 # -------------------------
 # Manual Trading Tab
