@@ -825,6 +825,39 @@ class PortfolioManager:
             logger.error(f"Error calculating time since update: {e}")
             return "Unknown"
     
+    def get_portfolio(self) -> Tuple[Dict[str, Any], float]:
+        """
+        Get portfolio in the format expected by the dashboard
+        
+        Returns:
+            Tuple of (portfolio_dict, gbp_exchange_rate)
+        """
+        try:
+            # Use the existing get_real_portfolio method
+            return self.get_real_portfolio()
+        except Exception as e:
+            logger.error(f"Error getting portfolio: {e}")
+            # Return empty portfolio with default GBP rate
+            return {}, 1.30
+    
+    def get_portfolio_simple(self) -> Dict[str, Any]:
+        """Get simplified portfolio for quick access"""
+        try:
+            portfolio, gbp_rate = self.get_real_portfolio()
+            return portfolio
+        except Exception as e:
+            logger.error(f"Error getting simple portfolio: {e}")
+            return {}
+    
+    def refresh_portfolio(self) -> bool:
+        """Force refresh portfolio data"""
+        try:
+            self.update_portfolio(force_update=True)
+            return True
+        except Exception as e:
+            logger.error(f"Error refreshing portfolio: {e}")
+            return False
+    
     def _get_demo_portfolio(self) -> Dict[str, Any]:
         """Get demo portfolio data when client unavailable"""
         return {
