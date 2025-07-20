@@ -1684,44 +1684,6 @@ with tabs[4]:
             if len(trading_pairs) > 20:
                 st.caption(f"... and {len(trading_pairs) - 20} more pairs")
 
-# -------------------------
-# Settings Tab
-# -------------------------
-with tabs[4]:
-    st.header("🛠 Trading Settings")
-    
-    settings_col1, settings_col2 = st.columns(2)
-    
-    with settings_col1:
-        st.subheader("Risk Management")
-        st.session_state["sl_mult"] = st.slider(
-            "Stop Loss Multiplier (ATR)", 0.5, 5.0, st.session_state["sl_mult"], 0.1, key="settings_sl_mult"
-        )
-        st.session_state["tp_mult"] = st.slider(
-            "Take Profit Multiplier (ATR)", 1.0, 10.0, st.session_state["tp_mult"], 0.5, key="settings_tp_mult"
-        )
-        
-        risk_pct = st.slider("Risk per Trade (%)", 0.1, 5.0, 2.0, 0.1, key="settings_risk_pct")
-        max_positions = st.slider("Max Positions", 1, 10, 5, key="settings_max_positions")
-    
-    with settings_col2:
-        st.subheader("Strategy Settings")
-        min_confidence = st.slider("Min Signal Confidence", 0.5, 1.0, 0.65, 0.01, key="settings_min_confidence")
-        scan_interval = st.slider("Scan Interval (seconds)", 60, 600, 300, 30, key="settings_scan_interval")
-        
-        # Auto-trading toggle
-        auto_trade = st.checkbox("Enable Auto-Trading", value=False, key="settings_auto_trade")
-        if auto_trade:
-            st.warning("⚠️ Auto-trading enabled. Monitor closely!")
-    
-    if st.button("💾 Save Settings", key="save_settings"):
-        st.session_state.update({
-            "risk_pct": risk_pct,
-            "max_positions": max_positions,
-            "min_confidence": min_confidence,
-            "scan_interval": scan_interval
-        })
-        st.success("✅ Settings saved!")
         # -------------------------
 # System Health Tab
 # -------------------------
