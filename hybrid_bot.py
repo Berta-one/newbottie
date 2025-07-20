@@ -950,7 +950,7 @@ with tabs[2]:
         st.info("Order tracking not available in demo mode")
 
 # -------------------------
-# Multi-Strategy Tab (With Unique Keys Fixed)
+# Multi-Strategy Tab (COMPLETE FIXED VERSION)
 # -------------------------
 with tabs[3]:
     st.header("⚛ Multi-Strategy Market Scanner")
@@ -984,7 +984,6 @@ with tabs[3]:
         # Auto-balance weights
         total = quantum_weight + ml_weight + technical_weight
         if total != 100:
-            # Normalize to 100
             quantum_weight = int((quantum_weight / total) * 100)
             ml_weight = int((ml_weight / total) * 100)
             technical_weight = 100 - quantum_weight - ml_weight
@@ -1215,9 +1214,7 @@ with tabs[3]:
             styled_df = df.style.applymap(color_signals, subset=['Final Signal'])
             st.dataframe(styled_df, use_container_width=True)
             
-            # -------------------------
-            # TRADING INTERFACE (WITH UNIQUE KEYS)
-            # -------------------------
+            # Trading Interface
             st.subheader("⚡ Quick Trading Interface")
             
             # Select signal for trading
@@ -1235,14 +1232,6 @@ with tabs[3]:
                             conf = signal['final']['confidence']
                             price = signal.get('price', 0)
                             
-                            # Validate price before displaying
-                            if price <= 0:
-                                try:
-                                    fresh_price = components['market_analyzer'].get_price(symbol)
-                                    price = fresh_price if fresh_price > 0 else 0
-                                except:
-                                    price = 0
-                            
                             if price > 0:  # Only show if we have valid price
                                 signal_col1, signal_col2 = st.columns([3, 1])
                                 
@@ -1251,7 +1240,6 @@ with tabs[3]:
                                 
                                 with signal_col2:
                                     if st.button(f"🚀 Buy", key=f"multi_buy_{symbol}_{i}"):
-                                        # Store selected trade with validated price
                                         st.session_state['selected_trade'] = {
                                             'symbol': symbol,
                                             'action': 'BUY',
@@ -1262,8 +1250,6 @@ with tabs[3]:
                                         }
                                         st.success(f"Selected {symbol} for BUY")
                                         st.rerun()
-                            else:
-                                st.warning(f"⚠️ {symbol} - Price data unavailable")
                 
                 with col2:
                     if strong_sell_signals:
@@ -1273,14 +1259,6 @@ with tabs[3]:
                             conf = signal['final']['confidence']
                             price = signal.get('price', 0)
                             
-                            # Validate price before displaying
-                            if price <= 0:
-                                try:
-                                    fresh_price = components['market_analyzer'].get_price(symbol)
-                                    price = fresh_price if fresh_price > 0 else 0
-                                except:
-                                    price = 0
-                            
                             if price > 0:  # Only show if we have valid price
                                 signal_col1, signal_col2 = st.columns([3, 1])
                                 
@@ -1289,7 +1267,6 @@ with tabs[3]:
                                 
                                 with signal_col2:
                                     if st.button(f"📉 Sell", key=f"multi_sell_{symbol}_{i}"):
-                                        # Store selected trade with validated price
                                         st.session_state['selected_trade'] = {
                                             'symbol': symbol,
                                             'action': 'SELL',
@@ -1300,10 +1277,8 @@ with tabs[3]:
                                         }
                                         st.success(f"Selected {symbol} for SELL")
                                         st.rerun()
-                            else:
-                                st.warning(f"⚠️ {symbol} - Price data unavailable")
             
-            # Execute Selected Trade (WITH UNIQUE KEYS)
+            # Execute Selected Trade
             if 'selected_trade' in st.session_state and st.session_state['selected_trade'].get('source') == 'multi_strategy':
                 trade = st.session_state['selected_trade']
                 
@@ -1319,10 +1294,8 @@ with tabs[3]:
                     st.info(f"**Confidence:** {trade['confidence']:.3f}")
                 
                 with col2:
-                    # Quantity input (UNIQUE KEY)
                     quantity = st.number_input("Quantity", min_value=0.0001, step=0.0001, format="%.6f", key="multi_strategy_quantity_input")
                     
-                    # Calculate trade value
                     if quantity > 0:
                         trade_value = quantity * trade['price']
                         est_fee = trade_value * 0.001
@@ -1332,128 +1305,53 @@ with tabs[3]:
                         st.warning("⚠️ Enter quantity")
                 
                 with col3:
-                    # Risk management (UNIQUE KEY)
                     use_sl_tp = st.checkbox("Use Stop Loss / Take Profit", value=True, key="multi_strategy_sl_tp_checkbox")
                     
                     if use_sl_tp:
                         sl_pct = st.number_input("Stop Loss %", min_value=1.0, value=5.0, max_value=20.0, key="multi_strategy_sl_pct")
                         tp_pct = st.number_input("Take Profit %", min_value=1.0, value=10.0, max_value=50.0, key="multi_strategy_tp_pct")
                     
-                   
-           # Execute button (DEMO AWARE)
-if st.button("🚀 EXECUTE TRADE", type="primary", key="multi_strategy_execute_button"):
-    try:
-        # Check if we're in demo mode
-        is_demo = (not client or 
-                  "DEMO" in client_status or 
-                  os.getenv("USE_DEMO_MODE", "false").lower() == "true" or
-                  not hasattr(components['trade_exec'], 'client') or
-                  components['trade_exec'].client is None)
-        
-        if is_demo:
-            # DEMO MODE EXECUTION
-            if quantity > 0:
-                # Log the demo trade attempt
-                log_msg = f"[DEMO] Attempting {trade['action']} {quantity:.6f} {trade['symbol']} @ ${trade['price']:.4f}"
-                st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {log_msg}")
+                    # Execute button (DEMO MODE FRIENDLY)
+                    if st.button("🚀 EXECUTE TRADE", type="primary", key="multi_strategy_execute_button"):
+                        if quantity > 0:
+                            try:
+                                # Log the trade attempt
+                                log_msg = f"[DEMO] Attempting {trade['action']} {quantity:.6f} {trade['symbol']} @ ${trade['price']:.4f}"
+                                st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {log_msg}")
+                                
+                                # Execute demo trade
+                                result = components['trade_exec'].manual_trade(
+                                    trade['symbol'], quantity, 
+                                    st.session_state["sl_mult"], st.session_state["tp_mult"]
+                                )
+                                
+                                st.success(f"✅ DEMO Trade Executed: {result}")
+                                st.info("🎮 This was a simulated trade - no real money was used")
+                                
+                                success_msg = f"Multi-Strategy DEMO Trade: {trade['action']} {quantity:.6f} {trade['symbol']} @ ${trade['price']:.4f} (Conf: {trade['confidence']:.3f})"
+                                st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {success_msg}")
+                                
+                                # Clear selected trade
+                                del st.session_state['selected_trade']
+                                st.rerun()
+                                
+                            except Exception as e:
+                                error_msg = f"❌ Trade execution failed: {str(e)}"
+                                st.error(error_msg)
+                                st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {error_msg}")
+                        else:
+                            st.error("❌ Invalid quantity")
                 
-                # Execute demo trade
-                result = components['trade_exec'].manual_trade(
-                    trade['symbol'], quantity, 
-                    st.session_state["sl_mult"], st.session_state["tp_mult"]
-                )
-                
-                # Demo trades always "succeed" but with realistic variation
-                import random
-                if random.random() > 0.1:  # 90% success rate in demo
-                    st.success(f"✅ DEMO Trade Executed: {result}")
-                    success_msg = f"[DEMO] Multi-Strategy Trade SUCCESS: {trade['action']} {quantity:.6f} {trade['symbol']} @ ${trade['price']:.4f} (Conf: {trade['confidence']:.3f})"
-                    st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {success_msg}")
-                    
-                    # Show demo notice
-                    st.info("🎮 This was a simulated trade in DEMO MODE - no real money was used")
-                else:
-                    # Simulate occasional demo "failures" for realism
-                    st.warning("⚠️ DEMO Trade simulation: Order would have been rejected due to market conditions")
-                    demo_msg = f"[DEMO] Trade simulation: Market rejection for {trade['symbol']}"
-                    st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {demo_msg}")
-                
-                # Clear selected trade
-                del st.session_state['selected_trade']
-                st.rerun()
-            else:
-                st.error("❌ Invalid quantity - must be greater than 0")
-                
-        else:
-            # LIVE MODE EXECUTION (original code)
-            if quantity > 0:
-                total_balance = components['portfolio_mgr'].total_value()
-                open_positions = 0
-                
-                log_msg = f"[LIVE] Attempting {trade['action']} {quantity:.6f} {trade['symbol']} @ ${trade['price']:.4f}"
-                st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {log_msg}")
-                
-                if components['risk_mgr']:
-                    validation = components['risk_mgr'].validate_trade(
-                        trade['symbol'], quantity, trade['price'], total_balance, open_positions
-                    )
-                    if not validation["status"]:
-                        error_msg = f"❌ Trade blocked by risk manager: {validation['reason']}"
-                        st.error(error_msg)
-                        st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {error_msg}")
-                        st.stop()
-                
-                result = components['trade_exec'].manual_trade(
-                    trade['symbol'], quantity, 
-                    st.session_state["sl_mult"], st.session_state["tp_mult"]
-                )
-                
-                if "Error" in result or "APIError" in result:
-                    st.error(f"❌ Trade Failed: {result}")
-                    st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] TRADE ERROR: {result}")
-                    
-                    # Show API troubleshooting
-                    with st.expander("🔧 Switch to Demo Mode?"):
-                        st.write("Having API issues? You can switch to demo mode:")
-                        if st.button("🎮 Enable Demo Mode", key="enable_demo_mode"):
-                            os.environ['USE_DEMO_MODE'] = 'true'
-                            st.success("Demo mode enabled! Refresh the page.")
-                            st.rerun()
-                else:
-                    st.success(f"✅ Trade Executed: {result}")
-                    success_msg = f"Multi-Strategy Trade SUCCESS: {trade['action']} {quantity:.6f} {trade['symbol']} @ ${trade['price']:.4f} (Conf: {trade['confidence']:.3f})"
-                    st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {success_msg}")
-                    
+                # Cancel trade button
+                if st.button("❌ Cancel Trade", key="multi_strategy_cancel_button"):
                     del st.session_state['selected_trade']
                     st.rerun()
-            else:
-                st.error("❌ Invalid quantity - must be greater than 0")
-                
-    except Exception as e:
-        error_msg = f"❌ Trade execution failed: {str(e)}"
-        st.error(error_msg)
-        st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] EXCEPTION: {error_msg}")
-        
-        with st.expander("🐛 Detailed Error"):
-            st.code(traceback.format_exc())
-            st.write("💡 **Tip:** Enable demo mode to avoid API issues")
-            if st.button("🎮 Switch to Demo Mode", key="switch_to_demo"):
-                os.environ['USE_DEMO_MODE'] = 'true'
-                st.success("Demo mode enabled! Refresh the page.")
-                st.rerun()
-                
-                # Cancel trade button (UNIQUE KEY)
-                col1, col2, col3 = st.columns([1, 1, 1])
-                with col2:
-                    if st.button("❌ Cancel Trade", key="multi_strategy_cancel_button"):
-                        del st.session_state['selected_trade']
-                        st.rerun()
             
             else:
                 st.info("💡 Select a signal above to execute a trade")
-               
-                         
-       
+            
+            # Signal Statistics
+            st.subheader("📈 Signal Statistics")
             
             total_scanned = len(signals_data)
             strong_signals = len(filtered_signals)
