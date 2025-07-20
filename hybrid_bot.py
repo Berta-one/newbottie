@@ -839,7 +839,7 @@ with tabs[2]:
         st.info("Order tracking not available in demo mode")
 
 # -------------------------
-# Multi-Strategy Tab
+# Multi-Strategy Tab (Complete with Trading Interface)
 # -------------------------
 with tabs[3]:
     st.header("⚛ Multi-Strategy Market Scanner")
@@ -1102,6 +1102,187 @@ with tabs[3]:
             # Apply styling
             styled_df = df.style.applymap(color_signals, subset=['Final Signal'])
             st.dataframe(styled_df, use_container_width=True)
+            
+            # -------------------------
+            # TRADING INTERFACE (RESTORED)
+            # -------------------------
+            st.subheader("⚡ Quick Trading Interface")
+            
+            # Select signal for trading
+            strong_buy_signals = [s for s in filtered_signals if s['final']['decision'] == 'BUY']
+            strong_sell_signals = [s for s in filtered_signals if s['final']['decision'] == 'SELL']
+            
+            if strong_buy_signals or strong_sell_signals:
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    if strong_buy_signals:
+                        st.write("**🟢 Strong BUY Signals:**")
+                        for i, signal in enumerate(strong_buy_signals[:5]):  # Top 5
+                            symbol = signal['symbol']
+                            conf = signal['final']['confidence']
+                            price = signal.get('price', 0)
+                            
+                            # Validate price before displaying
+                            if price <= 0:
+                                try:
+                                    fresh_price = components['market_analyzer'].get_price(symbol)
+                                    price = fresh_price if fresh_price > 0 else 0
+                                except:
+                                    price = 0
+                            
+                            if price > 0:  # Only show if we have valid price
+                                signal_col1, signal_col2 = st.columns([3, 1])
+                                
+                                with signal_col1:
+                                    st.write(f"**{symbol}** - ${price:.4f} (Conf: {conf:.3f})")
+                                
+                                with signal_col2:
+                                    if st.button(f"🚀 Buy", key=f"multi_buy_{symbol}_{i}"):
+                                        # Store selected trade with validated price
+                                        st.session_state['selected_trade'] = {
+                                            'symbol': symbol,
+                                            'action': 'BUY',
+                                            'price': price,
+                                            'confidence': conf,
+                                            'timestamp': datetime.now()
+                                        }
+                                        st.success(f"Selected {symbol} for BUY")
+                                        st.rerun()
+                            else:
+                                st.warning(f"⚠️ {symbol} - Price data unavailable")
+                
+                with col2:
+                    if strong_sell_signals:
+                        st.write("**🔴 Strong SELL Signals:**")
+                        for i, signal in enumerate(strong_sell_signals[:5]):  # Top 5
+                            symbol = signal['symbol']
+                            conf = signal['final']['confidence']
+                            price = signal.get('price', 0)
+                            
+                            # Validate price before displaying
+                            if price <= 0:
+                                try:
+                                    fresh_price = components['market_analyzer'].get_price(symbol)
+                                    price = fresh_price if fresh_price > 0 else 0
+                                except:
+                                    price = 0
+                            
+                            if price > 0:  # Only show if we have valid price
+                                signal_col1, signal_col2 = st.columns([3, 1])
+                                
+                                with signal_col1:
+                                    st.write(f"**{symbol}** - ${price:.4f} (Conf: {conf:.3f})")
+                                
+                                with signal_col2:
+                                    if st.button(f"📉 Sell", key=f"multi_sell_{symbol}_{i}"):
+                                        # Store selected trade with validated price
+                                        st.session_state['selected_trade'] = {
+                                            'symbol': symbol,
+                                            'action': 'SELL',
+                                            'price': price,
+                                            'confidence': conf,
+                                            'timestamp': datetime.now()
+                                        }
+                                        st.success(f"Selected {symbol} for SELL")
+                                        st.rerun()
+                            else:
+                                st.warning(f"⚠️ {symbol} - Price data unavailable")
+            
+            # Execute Selected Trade
+            if 'selected_trade' in st.session_state:
+                trade = st.session_state['selected_trade']
+                
+                st.divider()
+                st.subheader(f"🎯 Execute Trade: {trade['action']} {trade['symbol']}")
+                
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.info(f"**Symbol:** {trade['symbol']}")
+                    st.info(f"**Action:** {trade['action']}")
+                    st.info(f"**Price:** ${trade['price']:.4f}")
+                    st.info(f"**Confidence:** {trade['confidence']:.3f}")
+                
+                with col2:
+                    # Quantity input
+                    quantity = st.number_input("Quantity", min_value=0.0001, step=0.0001, format="%.6f", key="multi_strategy_qty")
+                    
+                    # Calculate trade value
+                    if quantity > 0:
+                        trade_value = quantity * trade['price']
+                        est_fee = trade_value * 0.001
+                        st.info(f"Trade Value: ${trade_value:.2f}")
+                        st.caption(f"Est. Fee: ${est_fee:.4f}")
+                    else:
+                        st.warning("⚠️ Enter quantity")
+                
+                with col3:
+                    # Risk management
+                    use_sl_tp = st.checkbox("Use Stop Loss / Take Profit", value=True)
+                    
+                    if use_sl_tp:
+                        sl_pct = st.number_input("Stop Loss %", min_value=1.0, value=5.0, max_value=20.0)
+                        tp_pct = st.number_input("Take Profit %", min_value=1.0, value=10.0, max_value=50.0)
+                    
+                    # Execute button
+                    if st.button("🚀 EXECUTE TRADE", type="primary"):
+                        try:
+                            # Validate trade
+                            if quantity > 0:
+                                total_balance = components['portfolio_mgr'].total_value()
+                                open_positions = 0  # Fallback
+                                
+                                if components['risk_mgr']:
+                                    validation = components['risk_mgr'].validate_trade(
+                                        trade['symbol'], quantity, trade['price'], total_balance, open_positions
+                                    )
+                                    if validation["status"]:
+                                        result = components['trade_exec'].manual_trade(
+                                            trade['symbol'], quantity, 
+                                            st.session_state["sl_mult"], st.session_state["tp_mult"]
+                                        )
+                                        st.success(f"✅ Trade Executed: {result}")
+                                        
+                                        # Log the trade
+                                        log_msg = f"Multi-Strategy Trade: {trade['action']} {quantity:.6f} {trade['symbol']} @ ${trade['price']:.4f} (Conf: {trade['confidence']:.3f})"
+                                        st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {log_msg}")
+                                        
+                                        # Clear selected trade
+                                        del st.session_state['selected_trade']
+                                        st.rerun()
+                                    else:
+                                        st.error(f"❌ Trade blocked: {validation['reason']}")
+                                else:
+                                    # Execute without risk validation (fallback)
+                                    result = components['trade_exec'].manual_trade(
+                                        trade['symbol'], quantity, 
+                                        st.session_state["sl_mult"], st.session_state["tp_mult"]
+                                    )
+                                    st.success(f"✅ Trade Executed: {result}")
+                                    
+                                    # Log the trade
+                                    log_msg = f"Multi-Strategy Trade: {trade['action']} {quantity:.6f} {trade['symbol']} @ ${trade['price']:.4f} (Conf: {trade['confidence']:.3f})"
+                                    st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {log_msg}")
+                                    
+                                    # Clear selected trade
+                                    del st.session_state['selected_trade']
+                                    st.rerun()
+                            else:
+                                st.error("❌ Invalid quantity")
+                                
+                        except Exception as e:
+                            st.error(f"❌ Trade execution failed: {e}")
+                
+                # Cancel trade button
+                col1, col2, col3 = st.columns([1, 1, 1])
+                with col2:
+                    if st.button("❌ Cancel Trade", key="cancel_multi_trade"):
+                        del st.session_state['selected_trade']
+                        st.rerun()
+            
+            else:
+                st.info("💡 Select a signal above to execute a trade")
             
             # Signal Statistics
             st.subheader("📈 Signal Statistics")
