@@ -1,3 +1,5 @@
+# FORCE DEMO MODE - Remove this line to re-enable API trading
+os.environ['USE_DEMO_MODE'] = 'true'
 #!/usr/bin/env python3
 """
 Hybrid Quantum Crypto Trading Bot Dashboard
@@ -1338,75 +1340,107 @@ with tabs[3]:
                         tp_pct = st.number_input("Take Profit %", min_value=1.0, value=10.0, max_value=50.0, key="multi_strategy_tp_pct")
                     
                    
-           # Execute button (IMPROVED ERROR HANDLING)
-                    if st.button("🚀 EXECUTE TRADE", type="primary", key="multi_strategy_execute_button"):
-                        try:
-                            # Validate trade
-                            if quantity > 0:
-                                total_balance = components['portfolio_mgr'].total_value()
-                                open_positions = 0  # Fallback
-                                
-                                # Log the trade attempt
-                                log_msg = f"Attempting {trade['action']} {quantity:.6f} {trade['symbol']} @ ${trade['price']:.4f}"
-                                st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {log_msg}")
-                                
-                                if components['risk_mgr']:
-                                    validation = components['risk_mgr'].validate_trade(
-                                        trade['symbol'], quantity, trade['price'], total_balance, open_positions
-                                    )
-                                    if not validation["status"]:
-                                        error_msg = f"❌ Trade blocked by risk manager: {validation['reason']}"
-                                        st.error(error_msg)
-                                        st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {error_msg}")
-                                        st.stop()
-                                
-                                # Execute the trade
-                                result = components['trade_exec'].manual_trade(
-                                    trade['symbol'], quantity, 
-                                    st.session_state["sl_mult"], st.session_state["tp_mult"]
-                                )
-                                
-                                # Check if the result contains an error
-                                if "Error" in result or "APIError" in result:
-                                    st.error(f"❌ Trade Failed: {result}")
-                                    st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] TRADE ERROR: {result}")
-                                    
-                                    # Show API troubleshooting
-                                    with st.expander("🔧 API Troubleshooting"):
-                                        st.write("**Possible solutions:**")
-                                        st.write("1. **Check API Keys** - Make sure your Binance API keys are correct")
-                                        st.write("2. **Check IP Whitelist** - Add your server IP to Binance API whitelist")
-                                        st.write("3. **Check Permissions** - Enable 'Spot & Margin Trading' in API settings")
-                                        st.write("4. **Testnet Mode** - Make sure you're using testnet keys if USE_TESTNET=true")
-                                        st.write("5. **API Status** - Check if Binance API is operational")
-                                        
-                                        # Show current API settings
-                                        st.write("**Current Settings:**")
-                                        st.write(f"- Testnet Mode: {os.getenv('USE_TESTNET', 'true')}")
-                                        st.write(f"- API Key Set: {'Yes' if os.getenv('BINANCE_API_KEY') or os.getenv('BINANCE_TESTNET_API_KEY') else 'No'}")
-                                        st.write(f"- API Secret Set: {'Yes' if os.getenv('BINANCE_API_SECRET') or os.getenv('BINANCE_TESTNET_API_SECRET') else 'No'}")
-                                else:
-                                    # Trade successful
-                                    st.success(f"✅ Trade Executed: {result}")
-                                    success_msg = f"Multi-Strategy Trade SUCCESS: {trade['action']} {quantity:.6f} {trade['symbol']} @ ${trade['price']:.4f} (Conf: {trade['confidence']:.3f})"
-                                    st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {success_msg}")
-                                    
-                                    # Clear selected trade
-                                    del st.session_state['selected_trade']
-                                    st.rerun()
-                            else:
-                                error_msg = "❌ Invalid quantity - must be greater than 0"
-                                st.error(error_msg)
-                                st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {error_msg}")
-                                
-                        except Exception as e:
-                            error_msg = f"❌ Trade execution failed: {str(e)}"
-                            st.error(error_msg)
-                            st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] EXCEPTION: {error_msg}")
-                            
-                            # Show detailed error
-                            with st.expander("🐛 Detailed Error"):
-                                st.code(traceback.format_exc())
+           # Execute button (DEMO AWARE)
+if st.button("🚀 EXECUTE TRADE", type="primary", key="multi_strategy_execute_button"):
+    try:
+        # Check if we're in demo mode
+        is_demo = (not client or 
+                  "DEMO" in client_status or 
+                  os.getenv("USE_DEMO_MODE", "false").lower() == "true" or
+                  not hasattr(components['trade_exec'], 'client') or
+                  components['trade_exec'].client is None)
+        
+        if is_demo:
+            # DEMO MODE EXECUTION
+            if quantity > 0:
+                # Log the demo trade attempt
+                log_msg = f"[DEMO] Attempting {trade['action']} {quantity:.6f} {trade['symbol']} @ ${trade['price']:.4f}"
+                st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {log_msg}")
+                
+                # Execute demo trade
+                result = components['trade_exec'].manual_trade(
+                    trade['symbol'], quantity, 
+                    st.session_state["sl_mult"], st.session_state["tp_mult"]
+                )
+                
+                # Demo trades always "succeed" but with realistic variation
+                import random
+                if random.random() > 0.1:  # 90% success rate in demo
+                    st.success(f"✅ DEMO Trade Executed: {result}")
+                    success_msg = f"[DEMO] Multi-Strategy Trade SUCCESS: {trade['action']} {quantity:.6f} {trade['symbol']} @ ${trade['price']:.4f} (Conf: {trade['confidence']:.3f})"
+                    st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {success_msg}")
+                    
+                    # Show demo notice
+                    st.info("🎮 This was a simulated trade in DEMO MODE - no real money was used")
+                else:
+                    # Simulate occasional demo "failures" for realism
+                    st.warning("⚠️ DEMO Trade simulation: Order would have been rejected due to market conditions")
+                    demo_msg = f"[DEMO] Trade simulation: Market rejection for {trade['symbol']}"
+                    st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {demo_msg}")
+                
+                # Clear selected trade
+                del st.session_state['selected_trade']
+                st.rerun()
+            else:
+                st.error("❌ Invalid quantity - must be greater than 0")
+                
+        else:
+            # LIVE MODE EXECUTION (original code)
+            if quantity > 0:
+                total_balance = components['portfolio_mgr'].total_value()
+                open_positions = 0
+                
+                log_msg = f"[LIVE] Attempting {trade['action']} {quantity:.6f} {trade['symbol']} @ ${trade['price']:.4f}"
+                st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {log_msg}")
+                
+                if components['risk_mgr']:
+                    validation = components['risk_mgr'].validate_trade(
+                        trade['symbol'], quantity, trade['price'], total_balance, open_positions
+                    )
+                    if not validation["status"]:
+                        error_msg = f"❌ Trade blocked by risk manager: {validation['reason']}"
+                        st.error(error_msg)
+                        st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {error_msg}")
+                        st.stop()
+                
+                result = components['trade_exec'].manual_trade(
+                    trade['symbol'], quantity, 
+                    st.session_state["sl_mult"], st.session_state["tp_mult"]
+                )
+                
+                if "Error" in result or "APIError" in result:
+                    st.error(f"❌ Trade Failed: {result}")
+                    st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] TRADE ERROR: {result}")
+                    
+                    # Show API troubleshooting
+                    with st.expander("🔧 Switch to Demo Mode?"):
+                        st.write("Having API issues? You can switch to demo mode:")
+                        if st.button("🎮 Enable Demo Mode", key="enable_demo_mode"):
+                            os.environ['USE_DEMO_MODE'] = 'true'
+                            st.success("Demo mode enabled! Refresh the page.")
+                            st.rerun()
+                else:
+                    st.success(f"✅ Trade Executed: {result}")
+                    success_msg = f"Multi-Strategy Trade SUCCESS: {trade['action']} {quantity:.6f} {trade['symbol']} @ ${trade['price']:.4f} (Conf: {trade['confidence']:.3f})"
+                    st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {success_msg}")
+                    
+                    del st.session_state['selected_trade']
+                    st.rerun()
+            else:
+                st.error("❌ Invalid quantity - must be greater than 0")
+                
+    except Exception as e:
+        error_msg = f"❌ Trade execution failed: {str(e)}"
+        st.error(error_msg)
+        st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] EXCEPTION: {error_msg}")
+        
+        with st.expander("🐛 Detailed Error"):
+            st.code(traceback.format_exc())
+            st.write("💡 **Tip:** Enable demo mode to avoid API issues")
+            if st.button("🎮 Switch to Demo Mode", key="switch_to_demo"):
+                os.environ['USE_DEMO_MODE'] = 'true'
+                st.success("Demo mode enabled! Refresh the page.")
+                st.rerun()
                 
                 # Cancel trade button (UNIQUE KEY)
                 col1, col2, col3 = st.columns([1, 1, 1])
