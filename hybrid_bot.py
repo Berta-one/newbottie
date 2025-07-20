@@ -1490,7 +1490,7 @@ with tabs[6]:
         st.text("[12:36:00] Bot initialized successfully")
 
 # -------------------------
-# Analytics Tab
+# Analytics Tab (FIXED - Complete Section)
 # -------------------------
 with tabs[7]:
     st.header("📈 Advanced Analytics")
@@ -1531,23 +1531,97 @@ with tabs[7]:
             else:
                 st.metric("Sharpe Ratio", "N/A")
         
-        # Trading Activity
+        # Trading Activity (FIXED)
         st.subheader("📈 Trading Activity Analysis")
         
         # Create sample trading data
-        trade_data = {
-            'Hour': list(range(24)),
-            'Trades': np.random.poisson(2, 24)  # Random number of trades per hour
-        }
+        hours = list(range(24))
+        trades_per_hour = np.random.poisson(2, 24)  # Random number of trades per hour
         
-        fig_trades = px.bar(x=trade_data['Hour'], y=trade_data['Trades'], 
-                           title="Trading Activity by Hour")
-        fig_trades.update_xaxis(title="Hour of Day")
-        fig_trades.update_yaxis(title="Number of Trades")
+        # Create bar chart using plotly.graph_objects (FIXED)
+        fig_trades = go.Figure()
+        fig_trades.add_trace(go.Bar(
+            x=hours,
+            y=trades_per_hour,
+            name='Trades',
+            marker_color='rgba(102, 126, 234, 0.8)'
+        ))
+        
+        fig_trades.update_layout(
+            title="Trading Activity by Hour",
+            xaxis_title="Hour of Day",
+            yaxis_title="Number of Trades",
+            showlegend=False
+        )
+        
         st.plotly_chart(fig_trades, use_container_width=True)
         
+        # Recent Trades Analysis
+        st.subheader("📊 Recent Trading Summary")
+        
+        # Analyze logs for trading patterns
+        logs = st.session_state.get("logs", [])
+        trade_logs = [log for log in logs if "Trade" in log and ("BUY" in log or "SELL" in log)]
+        
+        if trade_logs:
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.write("**Recent Trade Activity:**")
+                for log in trade_logs[-10:]:  # Last 10 trades
+                    if "SUCCESS" in log:
+                        st.success(log)
+                    elif "ERROR" in log or "FAIL" in log:
+                        st.error(log)
+                    else:
+                        st.info(log)
+            
+            with col2:
+                # Trade statistics
+                total_trades = len(trade_logs)
+                successful_trades = len([log for log in trade_logs if "SUCCESS" in log])
+                failed_trades = len([log for log in trade_logs if "ERROR" in log or "FAIL" in log])
+                
+                st.metric("Total Trades", total_trades)
+                st.metric("Successful", successful_trades)
+                st.metric("Failed", failed_trades)
+                
+                if total_trades > 0:
+                    success_rate = (successful_trades / total_trades) * 100
+                    st.metric("Success Rate", f"{success_rate:.1f}%")
+        else:
+            st.info("📝 No trading activity recorded yet. Execute some trades to see analytics.")
+        
+        # Strategy Performance Breakdown
+        st.subheader("⚛️ Strategy Performance")
+        
+        # Count trades by source
+        manual_trades = len([log for log in trade_logs if "Manual" in log])
+        multi_strategy_trades = len([log for log in trade_logs if "Multi-Strategy" in log])
+        auto_trades = len([log for log in trade_logs if "Auto" in log])
+        
+        if manual_trades + multi_strategy_trades + auto_trades > 0:
+            strategy_data = {
+                'Strategy': ['Manual Trading', 'Multi-Strategy', 'Auto Trading'],
+                'Trades': [manual_trades, multi_strategy_trades, auto_trades]
+            }
+            
+            fig_strategy = px.pie(
+                values=strategy_data['Trades'],
+                names=strategy_data['Strategy'],
+                title="Trades by Strategy"
+            )
+            st.plotly_chart(fig_strategy, use_container_width=True)
+        else:
+            st.info("📊 Execute trades to see strategy breakdown")
+            
     except Exception as e:
         st.error(f"Analytics error: {e}")
+        
+        # Show detailed error for debugging
+        with st.expander("🐛 Debug Information"):
+            st.code(traceback.format_exc())
+        
         st.info("📊 Analytics will show real data once more trading activity is recorded")
 
 # -------------------------
