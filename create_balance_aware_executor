@@ -1,0 +1,293 @@
+#!/usr/bin/env python3
+"""
+Balance-Aware Trade Executor - Fixes -2010 Insufficient Balance Errors
+======================================================================
+This version automatically checks balance and adjusts trade sizes
+"""
+
+import os
+from datetime import datetime
+from typing import Dict, Any, Optional
+
+try:
+    from binance.client import Client
+    from binance.exceptions import BinanceAPIException
+    BINANCE_AVAILABLE = True
+except ImportError:
+    BINANCE_AVAILABLE = False
+    Client = None
+    BinanceAPIException = Exception
+
+class BalanceAwareTradeExecutor:
+    """
+    Smart Trade Executor that automatically manages balance and position sizing
+    """
+    
+    def __init__(self, client=None, risk_manager=None, log_callback=None):
+        self.client = client
+        self.risk_manager = risk_manager
+        self.active_orders = {}
+        self.log = log_callback if log_callback else print
+        
+        # Trading configuration
+        self.min_trade_usd = float(os.getenv('MIN_TRADE_USD', '10.0'))
+        self.max_trade_usd = float(os.getenv('MAX_TRADE_USD', '50.0'))
+        self.risk_percentage = float(os.getenv('RISK_PERCENTAGE', '0.05'))  # 5%
+        
+        # Configure API endpoint
+        if self.client:
+            self._configure_client_endpoint()
+    
+    def _configure_client_endpoint(self):
+        """Configure correct API endpoint"""
+        try:
+            use_testnet = os.getenv('USE_TESTNET', 'false').lower() == 'true'
+            
+            if use_testnet:
+                self.client.API_URL = 'https://testnet.binance.vision/api'
+                self.log("🧪 TradeExecutor: Using TESTNET")
+            else:
+                self.client.API_URL = 'https://api.binance.com/api'
+                self.log("🚀 TradeExecutor: Using LIVE")
+                
+            # Test connection
+            self.client.get_server_time()
+            self.log("✅ API connection verified")
+            
+        except Exception as e:
+            self.log(f"❌ API configuration failed: {e}")
+    
+    def get_available_balance(self, asset='USDT') -> float:
+        """Get available balance for specified asset"""
+        try:
+            account = self.client.get_account()
+            for balance in account['balances']:
+                if balance['asset'] == asset:
+                    free_balance = float(balance['free'])
+                    self.log(f"💰 Available {asset}: ${free_balance:.2f}")
+                    return free_balance
+            return 0.0
+        except Exception as e:
+            self.log(f"❌ Balance check failed: {e}")
+            return 0.0
+    
+    def calculate_safe_trade_amount(self, symbol: str, requested_amount_usd: Optional[float] = None) -> Dict[str, Any]:
+        """
+        Calculate safe trade amount based on available balance
+        """
+        try:
+            # Get available USDT balance
+            available_usdt = self.get_available_balance('USDT')
+            
+            if available_usdt < self.min_trade_usd:
+                return {
+                    'success': False,
+                    'reason': f'Insufficient balance: ${available_usdt:.2f} < ${self.min_trade_usd:.2f} minimum',
+                    'available': available_usdt
+                }
+            
+            # Determine trade amount
+            if requested_amount_usd:
+                # User specified amount
+                trade_amount = min(requested_amount_usd, available_usdt * 0.95)  # 95% max
+            else:
+                # Auto-calculate based on risk percentage
+                trade_amount = min(
+                    available_usdt * self.risk_percentage,
+                    self.max_trade_usd,
+                    available_usdt * 0.95
+                )
+            
+            # Ensure minimum trade amount
+            trade_amount = max(trade_amount, self.min_trade_usd)
+            
+            # Final check
+            if trade_amount > available_usdt:
+                trade_amount = available_usdt * 0.95
+            
+            self.log(f"💡 Safe trade amount: ${trade_amount:.2f} (Available: ${available_usdt:.2f})")
+            
+            return {
+                'success': True,
+                'trade_amount_usd': trade_amount,
+                'available_balance': available_usdt,
+                'risk_percentage': (trade_amount / available_usdt) * 100
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'reason': f'Calculation failed: {e}',
+                'available': 0
+            }
+    
+    def manual_trade(self, symbol: str, qty: float = None, sl_mult: float = 1.5, tp_mult: float = 3.0, trade_amount_usd: float = None) -> str:
+        """
+        Execute manual trade with automatic balance management
+        """
+        if not self.client:
+            return "❌ No API client available"
+        
+        try:
+            # Reconfigure endpoint
+            self._configure_client_endpoint()
+            
+            # Calculate safe trade amount
+            if trade_amount_usd:
+                calc_result = self.calculate_safe_trade_amount(symbol, trade_amount_usd)
+            else:
+                calc_result = self.calculate_safe_trade_amount(symbol)
+            
+            if not calc_result['success']:
+                return f"❌ Trade rejected: {calc_result['reason']}"
+            
+            trade_usd = calc_result['trade_amount_usd']
+            
+            # Get current price
+            ticker = self.client.get_symbol_ticker(symbol=symbol)
+            price = float(ticker["price"])
+            
+            self.log(f"🎯 Executing: ${trade_usd:.2f} of {symbol} @ ${price:,.4f}")
+            
+            # Execute using USD amount (more reliable than quantity)
+            order = self.client.order_market_buy(
+                symbol=symbol,
+                quoteOrderQty=trade_usd  # Buy specific USD amount
+            )
+            
+            # Get actual quantity from order
+            executed_qty = 0
+            for fill in order.get('fills', []):
+                executed_qty += float(fill['qty'])
+            
+            self.log(f"✅ Trade executed: {executed_qty:.8f} {symbol} for ${trade_usd:.2f}")
+            
+            # Try to set stop-loss and take-profit
+            if executed_qty > 0:
+                try:
+                    stop_price = round(price * 0.95, 2)  # 5% stop loss
+                    tp_price = round(price * 1.10, 2)    # 10% take profit
+                    
+                    oco = self.client.create_oco_order(
+                        symbol=symbol,
+                        side="SELL",
+                        quantity=executed_qty,
+                        price=str(tp_price),
+                        stopPrice=str(stop_price),
+                        stopLimitPrice=str(stop_price * 0.999),
+                        stopLimitTimeInForce="GTC"
+                    )
+                    self.active_orders[symbol] = oco
+                    self.log(f"✅ OCO set: SL=${stop_price}, TP=${tp_price}")
+                except Exception as oco_error:
+                    self.log(f"⚠️ OCO failed (trade still successful): {oco_error}")
+            
+            return f"✅ SUCCESS: Bought {executed_qty:.8f} {symbol} for ${trade_usd:.2f} @ ${price:,.4f}"
+            
+        except BinanceAPIException as api_error:
+            self.log(f"❌ Binance API Error: {api_error}")
+            
+            if api_error.code == -2010:
+                # Still insufficient balance - try smaller amount
+                try:
+                    fallback_amount = self.min_trade_usd
+                    self.log(f"🔄 Retrying with minimum amount: ${fallback_amount}")
+                    
+                    order = self.client.order_market_buy(
+                        symbol=symbol,
+                        quoteOrderQty=fallback_amount
+                    )
+                    return f"✅ Fallback trade: ${fallback_amount} of {symbol}"
+                except:
+                    return f"❌ Insufficient balance even for ${fallback_amount} minimum trade"
+            else:
+                return f"❌ API Error [{api_error.code}]: {api_error.message}"
+                
+        except Exception as e:
+            return f"❌ Trade failed: {e}"
+    
+    def auto_execute(self, signal: Dict[str, Any], total_balance: float = None, open_positions: int = 0, sl_mult: float = 1.5, tp_mult: float = 3.0) -> str:
+        """Auto-execute with balance awareness"""
+        if not signal or signal.get("decision") != "BUY":
+            return "⏭️ Skipped: Non-BUY signal"
+        
+        symbol = signal["symbol"]
+        
+        # Use automatic position sizing
+        return self.manual_trade(symbol, sl_mult=sl_mult, tp_mult=tp_mult)
+    
+    def get_account_summary(self) -> Dict[str, Any]:
+        """Get detailed account summary"""
+        try:
+            account = self.client.get_account()
+            
+            # Calculate total values
+            total_usdt = 0
+            assets_with_balance = []
+            
+            for balance in account['balances']:
+                free = float(balance['free'])
+                locked = float(balance['locked'])
+                total = free + locked
+                
+                if total > 0:
+                    assets_with_balance.append({
+                        'asset': balance['asset'],
+                        'free': free,
+                        'locked': locked,
+                        'total': total
+                    })
+                    
+                    if balance['asset'] == 'USDT':
+                        total_usdt = total
+            
+            return {
+                'total_usdt': total_usdt,
+                'tradeable_usdt': max(0, total_usdt - self.min_trade_usd),
+                'assets_count': len(assets_with_balance),
+                'assets': assets_with_balance,
+                'can_trade': total_usdt >= self.min_trade_usd
+            }
+            
+        except Exception as e:
+            return {'error': str(e)}
+    
+    def get_connection_status(self) -> str:
+        """Get detailed connection status"""
+        if not self.client:
+            return "❌ No client configured"
+        
+        try:
+            use_testnet = os.getenv('USE_TESTNET', 'false').lower() == 'true'
+            mode = "🧪 TESTNET" if use_testnet else "🚀 LIVE"
+            
+            # Test connection and get balance
+            server_time = self.client.get_server_time()
+            usdt_balance = self.get_available_balance('USDT')
+            
+            status = f"✅ Connected to Binance {mode} | Balance: ${usdt_balance:.2f}"
+            
+            if usdt_balance < self.min_trade_usd:
+                status += f" ⚠️ Below ${self.min_trade_usd} minimum"
+            
+            return status
+            
+        except Exception as e:
+            return f"❌ Connection failed: {e}"
+
+
+# Create factory function
+def create_balance_aware_executor(client=None, risk_manager=None, log_callback=None):
+    """Create balance-aware trade executor"""
+    if BINANCE_AVAILABLE and client:
+        return BalanceAwareTradeExecutor(client, risk_manager, log_callback)
+    else:
+        # Fallback executor
+        class FallbackExecutor:
+            def manual_trade(self, *args, **kwargs):
+                return "📝 Demo: Would execute trade (API not available)"
+            def get_connection_status(self):
+                return "📝 Demo mode"
+            def get_account_summary(self):
+                return {'error': 'Demo mode'}
+        return FallbackExecutor()
