@@ -1,3 +1,5 @@
+# **PART 1: Complete hybrid_bot.py File (Lines 1-200)**
+
 #!/usr/bin/env python3
 """
 Hybrid Quantum Crypto Trading Bot Dashboard
@@ -74,6 +76,7 @@ for module_path, class_name in module_imports:
         print(f"⚠️ {class_name} not available: {e}")
 
 print(f"📦 Loaded {sum(1 for v in modules.values() if v is not None)}/{len(modules)} modules")
+
 # -------------------------
 # Enhanced Fallback Classes
 # -------------------------
@@ -155,21 +158,58 @@ class FallbackQuantumAnalyzer:
             'distribution': {'BUY': 0.4, 'SELL': 0.3, 'HOLD': 0.3}
         }
 
+# ✅ CRITICAL FIX #5: Enhanced FallbackTradeExecutor with proper interface
 class FallbackTradeExecutor:
     def __init__(self, client=None, risk_mgr=None, log_callback=None):
         self.active_orders = {}
         self.log_callback = log_callback or (lambda msg: print(msg))
         self.client = client
+        self.mock_balance = 1000.0
     
-    def manual_trade(self, symbol, qty, sl_mult, tp_mult, atr_value=None):
-        price = FallbackMarketAnalyzer().get_price(symbol)
-        trade_msg = f"[Manual] BUY {symbol} @ {price} Qty={qty}"
-        self.log_callback(trade_msg)
-        return f"✅ Trade executed: {symbol} quantity {qty}"
+    def manual_trade(self, symbol, qty=None, sl_mult=1.5, tp_mult=3.0, trade_amount_usd=None):
+        try:
+            mock_prices = {
+                'BTCUSDT': 117000.0, 'ETHUSDT': 4000.0, 'BNBUSDT': 600.0,
+                'ADAUSDT': 0.45, 'SOLUSDT': 200.0
+            }
+            
+            price = mock_prices.get(symbol, 100.0)
+            
+            if trade_amount_usd:
+                amount = min(trade_amount_usd, self.mock_balance * 0.1)
+                qty = amount / price
+            else:
+                amount = min(50.0, self.mock_balance * 0.05)
+                qty = amount / price
+            
+            self.log_callback(f"📝 DEMO: Would buy {qty:.8f} {symbol} for ${amount:.2f}")
+            self.mock_balance -= amount
+            
+            return f"📝 Demo trade: {qty:.8f} {symbol} for ${amount:.2f}"
+            
+        except Exception as e:
+            return f"📝 Demo trade failed: {e}"
     
-    def auto_execute(self, signal, total_balance, open_positions, sl_mult, tp_mult):
-        return "✅ Auto-trade executed (demo)"
-
+    def auto_execute(self, signal, total_balance=None, open_positions=0, sl_mult=1.5, tp_mult=3.0):
+        symbol = signal.get("symbol", "BTCUSDT")
+        return self.manual_trade(symbol, trade_amount_usd=25.0)
+    
+    def get_active_orders(self):
+        return {}
+    
+    def cancel_order(self, symbol):
+        return f"📝 Demo: Would cancel {symbol}"
+    
+    def get_connection_status(self):
+        return f"📝 Demo mode - Balance: ${self.mock_balance:.2f}"
+    
+    def get_account_summary(self):
+        return {
+            'total_usdt': self.mock_balance,
+            'tradeable_usdt': self.mock_balance * 0.9,
+            'can_trade': True,
+            'demo_mode': True
+        }
 # -------------------------
 # Auto-Scanner Class
 # -------------------------
@@ -223,7 +263,9 @@ class AutoScanner:
         return self.last_scan_results
     
     def is_running(self):
-        return self.running# -------------------------
+        return self.running
+
+# -------------------------
 # Setup Components
 # -------------------------
 def setup_binance_client():
@@ -239,7 +281,8 @@ def setup_binance_client():
     
     try:
         client = modules['Client'](api_key, api_secret)
-        use_testnet = os.getenv("USE_TESTNET", "true").lower() == "true"
+        # ✅ CRITICAL FIX #4: Fix USE_TESTNET Default
+        use_testnet = os.getenv("USE_TESTNET", "false").lower() == "true"
         
         if use_testnet:
             client.API_URL = 'https://testnet.binance.vision/api'
@@ -250,10 +293,6 @@ def setup_binance_client():
         
     except Exception as e:
         return None, f"❌ Connection failed: {str(e)}"
-
-# -------------------------
-# Complete Component Initialization - FIXED INDENTATION
-# -------------------------
 
 def initialize_components():
     """Initialize components safely"""
@@ -275,7 +314,7 @@ def initialize_components():
     else:
         components['risk_mgr'] = None
     
-    # Portfolio Manager
+    # ✅ CRITICAL FIX #6: Portfolio Manager with Fallback
     if modules.get('PortfolioManager'):
         try:
             api_key = os.getenv("BINANCE_API_KEY")
@@ -283,78 +322,23 @@ def initialize_components():
             components['portfolio_mgr'] = modules['PortfolioManager'](api_key, api_secret)
             print("✅ Portfolio Manager initialized")
         except:
-            components['portfolio_mgr'] = None
+            print("⚠️ Portfolio Manager failed, using fallback")
+            components['portfolio_mgr'] = FallbackPortfolioManager()
     else:
-        components['portfolio_mgr'] = None
+        components['portfolio_mgr'] = FallbackPortfolioManager()
     
-    # Market Analyzer
+    # ✅ CRITICAL FIX #7: Market Analyzer with Fallback
     if modules.get('MarketAnalyzer') and client:
         try:
             components['market_analyzer'] = modules['MarketAnalyzer'](client)
             print("✅ Market Analyzer initialized")
         except:
-            components['market_analyzer'] = None
+            print("⚠️ Market Analyzer failed, using fallback")
+            components['market_analyzer'] = FallbackMarketAnalyzer(client)
     else:
-        components['market_analyzer'] = None
+        components['market_analyzer'] = FallbackMarketAnalyzer(client)
     
-    # Enhanced Fallback Trade Executor Class
-    class FallbackTradeExecutor:
-        """Enhanced fallback executor with balance simulation"""
-        
-        def __init__(self, client=None, risk_mgr=None, log_callback=None):
-            self.log = log_callback if log_callback else print
-            self.active_orders = {}
-            self.mock_balance = 1000.0
-        
-        def manual_trade(self, symbol, qty=None, sl_mult=1.5, tp_mult=3.0, trade_amount_usd=None):
-            try:
-                mock_prices = {
-                    'BTCUSDT': 117000.0,
-                    'ETHUSDT': 4000.0,
-                    'BNBUSDT': 600.0,
-                    'ADAUSDT': 0.45,
-                    'SOLUSDT': 200.0
-                }
-                
-                price = mock_prices.get(symbol, 100.0)
-                
-                if trade_amount_usd:
-                    amount = min(trade_amount_usd, self.mock_balance * 0.1)
-                    qty = amount / price
-                else:
-                    amount = min(50.0, self.mock_balance * 0.05)
-                    qty = amount / price
-                
-                self.log(f"📝 DEMO: Would buy {qty:.8f} {symbol} for ${amount:.2f}")
-                self.mock_balance -= amount
-                
-                return f"📝 Demo trade: {qty:.8f} {symbol} for ${amount:.2f}"
-                
-            except Exception as e:
-                return f"📝 Demo trade failed: {e}"
-        
-        def auto_execute(self, signal, total_balance=None, open_positions=0, sl_mult=1.5, tp_mult=3.0):
-            symbol = signal.get("symbol", "BTCUSDT")
-            return self.manual_trade(symbol, trade_amount_usd=25.0)
-        
-        def get_active_orders(self):
-            return {}
-        
-        def cancel_order(self, symbol):
-            return f"📝 Demo: Would cancel {symbol}"
-        
-        def get_connection_status(self):
-            return f"📝 Demo mode - Balance: ${self.mock_balance:.2f}"
-        
-        def get_account_summary(self):
-            return {
-                'total_usdt': self.mock_balance,
-                'tradeable_usdt': self.mock_balance * 0.9,
-                'can_trade': True,
-                'demo_mode': True
-            }
-    
-    # Trade Executor
+    # ✅ CRITICAL FIX #3: Trade Executor Priority - Balance-Aware First
     print("🔧 Initializing Trade Executor...")
     try:
         # Try balance-aware executor first
@@ -430,20 +414,11 @@ def initialize_components():
     
     return components, client, client_status
 
-# Fallback Quantum Analyzer
-class FallbackQuantumAnalyzer:
-    def generate_quantum_signal(self, market_data):
-        return {
-            "decision": "HOLD",
-            "confidence": 0.5,
-            "quantum_confidence": 0.5,
-            "entanglement": 0.3,
-            "superposition": 0.4
-        }
+# ✅ CRITICAL FIX #1: ADD COMPONENT INITIALIZATION
+print("🚀 Initializing all components...")
+components, client, client_status = initialize_components()
 
-# -------------------------
-# Session State Initialization
-# -------------------------
+# ✅ CRITICAL FIX #2: MOVE SESSION STATE INITIALIZATION AFTER COMPONENTS
 if "sl_mult" not in st.session_state:
     st.session_state["sl_mult"] = 1.5
 if "tp_mult" not in st.session_state:
@@ -512,8 +487,7 @@ def display_scanner_results():
             symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT']
             signals = components['market_analyzer'].analyze_market_signals(symbols)
             st.json(signals)
-    
-    # Display recent signals
+  # Display recent signals
     results = auto_scanner.get_latest_results()
     if results and results.get('strong_signals'):
         st.subheader("📊 Latest Strong Signals")
@@ -533,8 +507,8 @@ def display_scanner_results():
             st.dataframe(df, use_container_width=True)
     else:
         st.info("🔍 No strong signals detected. Scanner will update automatically.")
-        
-        # -------------------------
+
+# -------------------------
 # Company Branding Sidebar
 # -------------------------
 with st.sidebar:
@@ -580,7 +554,7 @@ with st.sidebar:
     else:
         st.error("🔴 API Disconnected")
     
-    mode = "🧪 TESTNET" if os.getenv("USE_TESTNET", "true").lower() == "true" else "🚀 LIVE"
+    mode = "🧪 TESTNET" if os.getenv("USE_TESTNET", "false").lower() == "true" else "🚀 LIVE"
     if "TESTNET" in mode:
         st.info(f"Mode: {mode}")
     else:
@@ -707,6 +681,7 @@ tabs = st.tabs([
     "📊 Portfolio", "✋ Manual Trading", "🤖 Auto-Trader",
     "⚛ Multi-Strategy", "🛠 Settings", "🩺 Health", "📜 Logs", "📈 Analytics"
 ])
+
 # -------------------------
 # Enhanced Portfolio Tab
 # -------------------------
@@ -736,7 +711,7 @@ with tabs[0]:
             with col1:
                 st.metric("Total Value (USD)", f"${total_usd:,.2f}")
             with col2:
-                mode = "🧪 TESTNET" if os.getenv("USE_TESTNET", "true").lower() == "true" else "🚀 LIVE"
+                mode = "🧪 TESTNET" if os.getenv("USE_TESTNET", "false").lower() == "true" else "🚀 LIVE"
                 st.metric("Trading Mode", mode)
             with col3:
                 assets_count = len([k for k, v in portfolio.items() if v['balance'] > 0])
@@ -816,7 +791,6 @@ with tabs[0]:
     except Exception as e:
         st.error(f"Portfolio fetch error: {e}")
         st.code(traceback.format_exc())
-
 # -------------------------
 # Manual Trading Tab
 # -------------------------
@@ -930,7 +904,8 @@ with tabs[2]:
             st.info("No active orders")
     else:
         st.info("Order tracking not available in demo mode")
-        # -------------------------
+
+# -------------------------
 # Multi-Strategy Tab
 # -------------------------
 with tabs[3]:
@@ -1066,8 +1041,7 @@ with tabs[3]:
     
     with scan_col3:
         show_only_signals = st.checkbox("Show Only Strong Signals", value=True, key="multi_show_only_signals")
-    
-    # Scanning process
+        # Scanning process
     if st.session_state.get('manual_scan_requested', False):
         progress_bar = st.progress(0)
         status_text = st.empty()
@@ -1360,6 +1334,7 @@ with tabs[3]:
             
             if len(trading_pairs) > 20:
                 st.caption(f"... and {len(trading_pairs) - 20} more pairs")
+
 # -------------------------
 # Settings Tab
 # -------------------------
@@ -1398,287 +1373,335 @@ with tabs[4]:
             "scan_interval": scan_interval
         })
         st.success("✅ Settings saved!")
-
-# -------------------------
-# System Health Tab
-# -------------------------
-with tabs[5]:
-    st.header("🩺 System Health")
-    
-    health = get_system_health()
-    
-    health_col1, health_col2, health_col3 = st.columns(3)
-    with health_col1:
-        cpu_pct = float(health["CPU"].replace('%', ''))
-        st.metric("CPU Usage", health["CPU"], delta="High" if cpu_pct > 80 else "Normal")
-    with health_col2:
-        mem_pct = float(health["Memory"].replace('%', ''))
-        st.metric("Memory Usage", health["Memory"], delta="High" if mem_pct > 80 else "Normal")
-    with health_col3:
-        st.metric("Active Threads", health["Threads"])
-    
-    # API Connection Test
-    st.subheader("🔗 API Connection Test")
-    if client:
-        try:
-            server_time = client.get_server_time()
-            st.success(f"✅ Binance API connected. Server time: {datetime.fromtimestamp(server_time['serverTime']/1000)}")
-        except Exception as e:
-            st.error(f"❌ API connection failed: {e}")
-    else:
-        st.error("❌ No API client available")
-    
-    # Module Status
-    st.subheader("📦 Module Status")
-    module_status = []
-    for name, module in modules.items():
-        status = "✅ Available" if module else "❌ Missing"
-        module_status.append({"Module": name, "Status": status})
-    
-    module_df = pd.DataFrame(module_status)
-    st.dataframe(module_df, use_container_width=True)
-
-# -------------------------
-# Logs Tab
-# -------------------------
-with tabs[6]:
-    st.header("📜 Activity Logs")
-    
-    logs_col1, logs_col2, logs_col3 = st.columns([2, 1, 1])
-    with logs_col1:
-        log_filter = st.selectbox("Filter logs", ["All", "Manual", "Multi-Strategy", "ERROR", "SUCCESS", "WARNING"], key="log_filter")
-    with logs_col2:
-        if st.button("🗑️ Clear Logs", key="clear_logs"):
-            st.session_state["logs"] = []
-            st.success("Logs cleared")
-    with logs_col3:
-        if st.button("📥 Export Logs", key="export_logs"):
-            logs = st.session_state.get("logs", [])
-            if logs:
-                log_text = "\n".join(logs)
-                st.download_button(
-                    label="💾 Download",
-                    data=log_text,
-                    file_name=f"trading_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-                    mime="text/plain",
-                    key="download_logs"
-                )
-    
-    # Display logs
-    logs = st.session_state.get("logs", [])
-    if logs:
-        # Show recent logs (last 100)
-        recent_logs = logs[-100:]
+        # Scanning process
+    if st.session_state.get('manual_scan_requested', False):
+        progress_bar = st.progress(0)
+        status_text = st.empty()
         
-        # Filter logs
-        if log_filter != "All":
-            recent_logs = [log for log in recent_logs if log_filter in log]
+        signals_data = []
         
-        # Count different types of logs
-        total_logs = len(recent_logs)
-        error_count = len([log for log in recent_logs if "ERROR" in log])
-        success_count = len([log for log in recent_logs if "SUCCESS" in log])
-        
-        # Show log statistics
-        log_stats_col1, log_stats_col2, log_stats_col3 = st.columns(3)
-        with log_stats_col1:
-            st.metric("Total Logs", total_logs)
-        with log_stats_col2:
-            st.metric("Errors", error_count, delta="High" if error_count > 5 else "Normal")
-        with log_stats_col3:
-            st.metric("Successes", success_count)
-        
-        st.divider()
-        
-        # Display logs in reverse order (newest first)
-        for log in reversed(recent_logs):
-            if "ERROR" in log or "FAIL" in log:
-                st.error(log)
-            elif "WARNING" in log:
-                st.warning(log)
-            elif "SUCCESS" in log:
-                st.success(log)
-            elif "Multi-Strategy" in log:
-                st.info(log)
-            elif "Manual" in log:
-                st.info(log)
-            else:
-                st.text(log)
-    else:
-        st.info("📝 No logs available. Activity will appear here as the bot operates.")
-
-# -------------------------
-# Analytics Tab
-# -------------------------
-with tabs[7]:
-    st.header("📈 Advanced Analytics")
-    
-    # Performance Overview
-    st.subheader("📊 Portfolio Performance")
-    
-    try:
-        # Create sample performance data
-        dates = pd.date_range(start='2024-01-01', end=datetime.now(), freq='D')
-        returns = np.random.normal(0.001, 0.02, len(dates))
-        cumulative_returns = np.cumprod(1 + returns) - 1
-        portfolio_values = 10000 * (1 + cumulative_returns)
-        
-        performance_df = pd.DataFrame({
-            'Date': dates,
-            'Portfolio_Value': portfolio_values
-        })
-        
-        fig = px.line(performance_df, x='Date', y='Portfolio_Value', 
-                     title="Portfolio Performance Over Time")
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Performance Metrics
-        perf_col1, perf_col2, perf_col3, perf_col4 = st.columns(4)
-        with perf_col1:
-            st.metric("Total Return", f"{cumulative_returns[-1]*100:.2f}%")
-        with perf_col2:
-            st.metric("Total Trades", len(st.session_state.get("logs", [])))
-        with perf_col3:
-            volatility = np.std(returns) * np.sqrt(252) * 100
-            st.metric("Volatility", f"{volatility:.2f}%")
-        with perf_col4:
-            if volatility != 0:
-                sharpe = (np.mean(returns) * 252) / (np.std(returns) * np.sqrt(252))
-                st.metric("Sharpe Ratio", f"{sharpe:.2f}")
-            else:
-                st.metric("Sharpe Ratio", "N/A")
-        
-        # Trading Activity
-        st.subheader("📈 Trading Activity Analysis")
-        
-        # Create sample trading data
-        hours = list(range(24))
-        trades_per_hour = np.random.poisson(2, 24)
-        
-        activity_df = pd.DataFrame({
-            'Hour': hours,
-            'Trades': trades_per_hour
-        })
-        
-        fig_trades = px.bar(activity_df, x='Hour', y='Trades', 
-                           title="Trading Activity by Hour")
-        st.plotly_chart(fig_trades, use_container_width=True)
-        
-        # Recent Trades Analysis
-        st.subheader("📊 Recent Trading Summary")
-        
-        logs = st.session_state.get("logs", [])
-        trade_logs = [log for log in logs if "Trade" in log and ("BUY" in log or "SELL" in log)]
-        
-        if trade_logs:
-            trade_analysis_col1, trade_analysis_col2 = st.columns(2)
-            
-            with trade_analysis_col1:
-                st.write("**Recent Trade Activity:**")
-                for log in trade_logs[-10:]:
-                    if "SUCCESS" in log:
-                        st.success(log)
-                    elif "ERROR" in log or "FAIL" in log:
-                        st.error(log)
-                    else:
-                        st.info(log)
-            
-            with trade_analysis_col2:
-                total_trades = len(trade_logs)
-                successful_trades = len([log for log in trade_logs if "SUCCESS" in log])
-                failed_trades = len([log for log in trade_logs if "ERROR" in log or "FAIL" in log])
+        for i, symbol in enumerate(trading_pairs):
+            try:
+                progress = (i + 1) / len(trading_pairs)
+                progress_bar.progress(progress)
+                status_text.text(f"Analyzing {symbol}... ({i+1}/{len(trading_pairs)})")
                 
-                st.metric("Total Trades", total_trades)
-                st.metric("Successful", successful_trades)
-                st.metric("Failed", failed_trades)
+                # Generate signals using current components
+                rsi = components['market_analyzer'].get_latest_rsi(symbol)
+                momentum = components['market_analyzer'].get_latest_momentum(symbol)
+                volatility = components['market_analyzer'].get_volatility(symbol)
+                price = components['market_analyzer'].get_price(symbol)
                 
-                if total_trades > 0:
-                    success_rate = (successful_trades / total_trades) * 100
-                    st.metric("Success Rate", f"{success_rate:.1f}%")
+                # Enhanced signal logic
+                quantum_decision = "HOLD"
+                quantum_conf = 0.5
+                
+                if rsi < 30 and momentum > 3:
+                    quantum_decision = "BUY"
+                    quantum_conf = 0.75
+                elif rsi > 70 and momentum < -3:
+                    quantum_decision = "SELL" 
+                    quantum_conf = 0.75
+                elif abs(momentum) > 5:
+                    quantum_decision = "BUY" if momentum > 0 else "SELL"
+                    quantum_conf = 0.65
+                
+                # ML simulation (more conservative)
+                ml_decision = quantum_decision
+                ml_conf = quantum_conf * 0.9
+                
+                # Technical analysis
+                tech_decision = quantum_decision
+                tech_conf = min(quantum_conf * 1.1, 1.0)
+                
+                # Final ensemble decision
+                weights = {
+                    "quantum": quantum_weight,
+                    "ml": ml_weight,
+                    "technical": technical_weight
+                }
+                
+                final_conf = (quantum_conf * weights['quantum'] + 
+                            ml_conf * weights['ml'] + 
+                            tech_conf * weights['technical']) / 100
+                
+                final_decision = quantum_decision if final_conf > min_conf else "HOLD"
+                
+                signal = {
+                    "symbol": symbol,
+                    "quantum": {"decision": quantum_decision, "confidence": quantum_conf},
+                    "ml": {"decision": ml_decision, "confidence": ml_conf},
+                    "technical": {"decision": tech_decision, "confidence": tech_conf},
+                    "final": {"decision": final_decision, "confidence": final_conf},
+                    "price": price,
+                    "rsi": rsi,
+                    "momentum": momentum,
+                    "volatility": volatility
+                }
+                
+                signals_data.append(signal)
+                
+            except Exception as e:
+                st.error(f"Error analyzing {symbol}: {e}")
+                continue
+        
+        # Clear progress indicators
+        progress_bar.empty()
+        status_text.empty()
+        
+        # Store results in session state
+        st.session_state['latest_signals'] = signals_data
+        st.session_state['manual_scan_requested'] = False
+        st.session_state['last_scan_time'] = datetime.now()
+    
+    # Display Results
+    signals_data = st.session_state.get('latest_signals', [])
+    
+    if signals_data:
+        # Filter signals if requested
+        if show_only_signals:
+            filtered_signals = [
+                s for s in signals_data 
+                if s['final']['decision'] != 'HOLD' and s['final']['confidence'] > min_conf
+            ]
         else:
-            st.info("📝 No trading activity recorded yet. Execute some trades to see analytics.")
+            filtered_signals = signals_data
+        
+        if filtered_signals:
+            st.subheader(f"📊 Analysis Results ({len(filtered_signals)} pairs)")
             
-    except Exception as e:
-        st.error(f"Analytics error: {e}")
-        st.info("📊 Analytics will show real data once more trading activity is recorded")
-
-# -------------------------
-# Status Bar
-# -------------------------
-st.divider()
-
-status_col1, status_col2, status_col3, status_col4 = st.columns(4)
-
-with status_col1:
-    if client:
-        st.success("🟢 API Connected")
-    else:
-        st.error("🔴 API Disconnected")
-
-with status_col2:
-    scanner = st.session_state.get("auto_scanner")
-    if scanner and scanner.is_running():
-        st.success("🟢 Scanner Active")
-    else:
-        st.warning("🟡 Scanner Inactive")
-
-with status_col3:
-    auto_trade = os.getenv("AUTO_TRADE_ENABLED", "false").lower() == "true"
-    if auto_trade:
-        st.success("🟢 Auto-Trade ON")
-    else:
-        st.info("🔵 Auto-Trade OFF")
-
-with status_col4:
-    mode = "🧪 TESTNET" if os.getenv("USE_TESTNET", "true").lower() == "true" else "🚀 LIVE"
-    if "TESTNET" in mode:
-        st.info(mode)
-    else:
-        st.warning(mode)
-
-# -------------------------
-# Enhanced Footer
-# -------------------------
-st.markdown("---")
-st.markdown(
-    """
-    <div style='text-align: center; padding: 20px; background: #f8f9fa; border-radius: 10px; margin-top: 20px;'>
-        <div style='margin-bottom: 15px;'>
-            <img src='https://static.wixstatic.com/media/80aa29_3bdfcbab4dd34671915e3b66b0b596e4~mv2.jpeg/v1/fill/w_146,h_104,al_c,q_80,usm_0.66_1.00_0.01,enc_avif,quality_auto/LRC_1719585575250.jpeg' 
-                 width='80' style='border-radius: 8px; opacity: 0.8;'/>
-        </div>
-        <h4 style='color: #333; margin: 10px 0;'>🧠 Hybrid Quantum Crypto Trading Bot v2.0</h4>
-        <p style='color: #666; margin: 10px 0;'>
-            ⚛️ Quantum Analytics | 🤖 AI Trading | 📊 Advanced Analytics
-        </p>
-        <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                    padding: 15px; border-radius: 10px; margin: 15px 0; color: white;'>
-            <h4 style='color: white; margin: 0;'>Rondanini Publishing Ltd.</h4>
-            <p style='color: #f0f0f0; margin: 5px 0; font-size: 14px;'>
-                Advanced Quantum-Enhanced Trading Solutions
-            </p>
-            <p style='color: #e0e0e0; margin: 5px 0; font-size: 12px;'>
-                © 2025 All Rights Reserved
-            </p>
-        </div>
-        <p style='color: #888; font-size: 12px; margin-top: 15px;'>
-            ⚠️ <strong>Risk Disclaimer:</strong> Trading involves substantial risk of loss. 
-            Past performance does not guarantee future results. Trade responsibly.
-        </p>
-    </div>
-    """, 
-    unsafe_allow_html=True
-)
-
-# -------------------------
-# Background Tasks
-# -------------------------
-if os.getenv("AUTO_START_BOT", "false").lower() == "true":
-    scanner = st.session_state.get("auto_scanner")
-    if scanner and not scanner.is_running():
-        scanner.start_scanning()
-        st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Auto-scanner started")
-
-print("✅ Hybrid Quantum Trading Bot loaded successfully!")
-
+            # Create signals dataframe
+            signals_df = []
+            for s in filtered_signals:
+                signals_df.append({
+                    "Symbol": s["symbol"],
+                    "Price": f"${s.get('price', 0):.4f}",
+                    "Final Signal": s['final']['decision'],
+                    "Confidence": f"{s['final']['confidence']:.3f}",
+                    "Quantum": f"{s['quantum']['decision']} ({s['quantum']['confidence']:.2f})",
+                    "ML": f"{s['ml']['decision']} ({s['ml']['confidence']:.2f})",
+                    "Technical": f"{s['technical']['decision']} ({s['technical']['confidence']:.2f})",
+                    "RSI": f"{s.get('rsi', 50):.1f}",
+                    "Momentum": f"{s.get('momentum', 0):.2f}%",
+                    "Volatility": f"{s.get('volatility', 0):.3f}"
+                })
+            
+            df = pd.DataFrame(signals_df)
+            
+            # Color coding for signals
+            def color_signals(val):
+                if 'BUY' in val:
+                    return 'background-color: #90EE90'  # Light green
+                elif 'SELL' in val:
+                    return 'background-color: #FFB6C1'  # Light red
+                else:
+                    return 'background-color: #F0F0F0'  # Light gray
+            
+            # Apply styling
+            styled_df = df.style.applymap(color_signals, subset=['Final Signal'])
+            st.dataframe(styled_df, use_container_width=True)
+            
+            # Trading Interface
+            st.subheader("⚡ Quick Trading Interface")
+            
+            # Select signal for trading
+            strong_buy_signals = [s for s in filtered_signals if s['final']['decision'] == 'BUY']
+            strong_sell_signals = [s for s in filtered_signals if s['final']['decision'] == 'SELL']
+            
+            if strong_buy_signals or strong_sell_signals:
+                trade_col1, trade_col2 = st.columns(2)
                 
+                with trade_col1:
+                    if strong_buy_signals:
+                        st.write("**🟢 Strong BUY Signals:**")
+                        for i, signal in enumerate(strong_buy_signals[:5]):  # Top 5
+                            symbol = signal['symbol']
+                            conf = signal['final']['confidence']
+                            price = signal.get('price', 0)
+                            
+                            if price > 0:
+                                signal_col1, signal_col2 = st.columns([3, 1])
+                                
+                                with signal_col1:
+                                    st.write(f"**{symbol}** - ${price:.4f} (Conf: {conf:.3f})")
+                                
+                                with signal_col2:
+                                    if st.button(f"🚀 Buy", key=f"multi_buy_{symbol}_{i}"):
+                                        st.session_state['selected_trade'] = {
+                                            'symbol': symbol,
+                                            'action': 'BUY',
+                                            'price': price,
+                                            'confidence': conf,
+                                            'timestamp': datetime.now(),
+                                            'source': 'multi_strategy'
+                                        }
+                                        st.success(f"Selected {symbol} for BUY")
+                                        st.rerun()
+                
+                with trade_col2:
+                    if strong_sell_signals:
+                        st.write("**🔴 Strong SELL Signals:**")
+                        for i, signal in enumerate(strong_sell_signals[:5]):  # Top 5
+                            symbol = signal['symbol']
+                            conf = signal['final']['confidence']
+                            price = signal.get('price', 0)
+                            
+                            if price > 0:
+                                signal_col1, signal_col2 = st.columns([3, 1])
+                                
+                                with signal_col1:
+                                    st.write(f"**{symbol}** - ${price:.4f} (Conf: {conf:.3f})")
+                                
+                                with signal_col2:
+                                    if st.button(f"📉 Sell", key=f"multi_sell_{symbol}_{i}"):
+                                        st.session_state['selected_trade'] = {
+                                            'symbol': symbol,
+                                            'action': 'SELL',
+                                            'price': price,
+                                            'confidence': conf,
+                                            'timestamp': datetime.now(),
+                                            'source': 'multi_strategy'
+                                        }
+                                        st.success(f"Selected {symbol} for SELL")
+                                        st.rerun()
+            
+            # Execute Selected Trade
+            if 'selected_trade' in st.session_state and st.session_state['selected_trade'].get('source') == 'multi_strategy':
+                trade = st.session_state['selected_trade']
+                
+                st.divider()
+                st.subheader(f"🎯 Execute Trade: {trade['action']} {trade['symbol']}")
+                
+                exec_col1, exec_col2, exec_col3 = st.columns(3)
+                
+                with exec_col1:
+                    st.info(f"**Symbol:** {trade['symbol']}")
+                    st.info(f"**Action:** {trade['action']}")
+                    st.info(f"**Price:** ${trade['price']:.4f}")
+                    st.info(f"**Confidence:** {trade['confidence']:.3f}")
+                
+                with exec_col2:
+                    quantity = st.number_input("Quantity", min_value=0.0001, step=0.0001, format="%.6f", key="multi_strategy_quantity")
+                    
+                    if quantity > 0:
+                        trade_value = quantity * trade['price']
+                        est_fee = trade_value * 0.001
+                        st.info(f"Trade Value: ${trade_value:.2f}")
+                        st.caption(f"Est. Fee: ${est_fee:.4f}")
+                    else:
+                        st.warning("⚠️ Enter quantity")
+                
+                with exec_col3:
+                    use_sl_tp = st.checkbox("Use Stop Loss / Take Profit", value=True, key="multi_strategy_sl_tp")
+                    
+                    if use_sl_tp:
+                        sl_pct = st.number_input("Stop Loss %", min_value=1.0, value=5.0, max_value=20.0, key="multi_strategy_sl")
+                        tp_pct = st.number_input("Take Profit %", min_value=1.0, value=10.0, max_value=50.0, key="multi_strategy_tp")
+                    
+                    # Execute button
+                    if st.button("🚀 EXECUTE TRADE", type="primary", key="multi_strategy_execute"):
+                        if quantity > 0:
+                            try:
+                                result = components['trade_exec'].manual_trade(
+                                    trade['symbol'], quantity, 
+                                    st.session_state["sl_mult"], st.session_state["tp_mult"]
+                                )
+                                st.success(f"✅ Trade Executed: {result}")
+                                
+                                success_msg = f"Multi-Strategy Trade: {trade['action']} {quantity:.6f} {trade['symbol']} @ ${trade['price']:.4f} (Conf: {trade['confidence']:.3f})"
+                                st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {success_msg}")
+                                
+                                # Clear selected trade
+                                del st.session_state['selected_trade']
+                                st.rerun()
+                                
+                            except Exception as e:
+                                st.error(f"❌ Trade execution failed: {e}")
+                        else:
+                            st.error("❌ Invalid quantity")
+                
+                # Cancel trade button
+                if st.button("❌ Cancel Trade", key="multi_strategy_cancel"):
+                    del st.session_state['selected_trade']
+                    st.rerun()
+            
+            else:
+                st.info("💡 Select a signal above to execute a trade")
+            
+            # Signal Statistics
+            st.subheader("📈 Signal Statistics")
+            
+            total_scanned = len(signals_data)
+            strong_signals = len(filtered_signals)
+            buy_signals = len([s for s in filtered_signals if s['final']['decision'] == 'BUY'])
+            sell_signals = len([s for s in filtered_signals if s['final']['decision'] == 'SELL'])
+            
+            stats_col1, stats_col2, stats_col3, stats_col4 = st.columns(4)
+            with stats_col1:
+                st.metric("Total Scanned", total_scanned)
+            with stats_col2:
+                st.metric("Strong Signals", strong_signals)
+            with stats_col3:
+                st.metric("BUY Signals", buy_signals)
+            with stats_col4:
+                st.metric("SELL Signals", sell_signals)
+        
+        else:
+            st.warning("⚠️ No strong signals found with current confidence threshold")
+            st.info("💡 Try lowering the minimum confidence or scanning more pairs")
+        
+        # Last scan info
+        if 'last_scan_time' in st.session_state:
+            st.caption(f"Last scan: {st.session_state['last_scan_time'].strftime('%H:%M:%S')}")
+    
+    else:
+        st.info("🔍 Click 'Scan All Pairs' to analyze trading opportunities")
+        
+        # Show pairs to be scanned
+        st.subheader("📋 Pairs to be scanned:")
+        if trading_pairs:
+            pairs_cols = st.columns(4)
+            for i, pair in enumerate(trading_pairs[:20]):
+                pairs_cols[i % 4].write(f"• {pair}")
+            
+            if len(trading_pairs) > 20:
+                st.caption(f"... and {len(trading_pairs) - 20} more pairs")
+
+# -------------------------
+# Settings Tab
+# -------------------------
+with tabs[4]:
+    st.header("🛠 Trading Settings")
+    
+    settings_col1, settings_col2 = st.columns(2)
+    
+    with settings_col1:
+        st.subheader("Risk Management")
+        st.session_state["sl_mult"] = st.slider(
+            "Stop Loss Multiplier (ATR)", 0.5, 5.0, st.session_state["sl_mult"], 0.1, key="settings_sl_mult"
+        )
+        st.session_state["tp_mult"] = st.slider(
+            "Take Profit Multiplier (ATR)", 1.0, 10.0, st.session_state["tp_mult"], 0.5, key="settings_tp_mult"
+        )
+        
+        risk_pct = st.slider("Risk per Trade (%)", 0.1, 5.0, 2.0, 0.1, key="settings_risk_pct")
+        max_positions = st.slider("Max Positions", 1, 10, 5, key="settings_max_positions")
+    
+    with settings_col2:
+        st.subheader("Strategy Settings")
+        min_confidence = st.slider("Min Signal Confidence", 0.5, 1.0, 0.65, 0.01, key="settings_min_confidence")
+        scan_interval = st.slider("Scan Interval (seconds)", 60, 600, 300, 30, key="settings_scan_interval")
+        
+        # Auto-trading toggle
+        auto_trade = st.checkbox("Enable Auto-Trading", value=False, key="settings_auto_trade")
+        if auto_trade:
+            st.warning("⚠️ Auto-trading enabled. Monitor closely!")
+    
+    if st.button("💾 Save Settings", key="save_settings"):
+        st.session_state.update({
+            "risk_pct": risk_pct,
+            "max_positions": max_positions,
+            "min_confidence": min_confidence,
+            "scan_interval": scan_interval
+        })
+        st.success("✅ Settings saved!")
