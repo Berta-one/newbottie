@@ -39,7 +39,19 @@ if "logs" not in st.session_state:
     st.session_state["logs"] = []
 if "auto_scanner" not in st.session_state:
     st.session_state["auto_scanner"] = None
+# ✅ Helper function for system health
+import psutil
+import threading
 
+def get_system_health():
+    try:
+        return {
+            "CPU": f"{psutil.cpu_percent()}%",
+            "Memory": f"{psutil.virtual_memory().percent}%",
+            "Threads": threading.active_count()
+        }
+    except Exception as e:
+        return {"CPU": "N/A", "Memory": "N/A", "Threads": "N/A"}
 # Authentication
 try:
     from auth import require_authentication
