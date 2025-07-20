@@ -133,50 +133,63 @@ client = setup_binance_client()
 def initialize_components():
     components = {}
 
-    try:
-        components['risk_mgr'] = modules['RiskManager'](max_risk_percent=0.02, max_positions=5)
-    except Exception as e:
-        st.error(f"Risk Manager init failed: {e}")
-        st.stop()
-    
-    try:
+    # Setup Binance Client
+    client, client_status = setup_binance_client()
+
+    # ✅ Initialize Risk Manager
+    if modules.get('RiskManager'):
+        try:
+            components['risk_mgr'] = modules['RiskManager'](
+                profile_name=os.getenv("RISK_PROFILE", "BALANCED")
+            )
+            print("✅ Risk Manager initialized")
+        except Exception as e:
+            raise RuntimeError(f"Risk Manager initialization failed: {e}")
+    else:
+        raise ImportError("RiskManager module is missing. Cannot continue.")
+
+    # ✅ Initialize Portfolio Manager
+    if modules.get('PortfolioManager') and client:
         components['portfolio_mgr'] = modules['PortfolioManager'](
             api_key=os.getenv("BINANCE_API_KEY"),
             api_secret=os.getenv("BINANCE_API_SECRET")
         )
-    except Exception as e:
-        st.error(f"Portfolio Manager init failed: {e}")
-        st.stop()
-    
-    try:
-        components['market_analyzer'] = modules['MarketAnalyzer'](client)
-    except Exception as e:
-        st.error(f"Market Analyzer init failed: {e}")
-        st.stop()
-    
-    try:
-        components['trade_exec'] = modules['TradeExecutor'](
-            client, components['risk_mgr'],
-            log_callback=lambda msg: st.session_state.setdefault("logs", []).append(
-                f"[{datetime.now().strftime('%H:%M:%S')}] {msg}"
-            )
-        )
-    except Exception as e:
-        st.error(f"Trade Executor init failed: {e}")
-        st.stop()
-    
-    # Quantum components
-    try:
-        components['quantum_trader'] = modules['QuantumTrader'](client)
-        components['quantum_analyzer'] = modules['QuantumAnalyzer']()
-    except Exception as e:
-        st.warning(f"Quantum components failed: {e}")
-        components['quantum_trader'] = None
-        components['quantum_analyzer'] = None
-    
-    return components
+        print("✅ Portfolio Manager initialized")
+    else:
+        raise ImportError("PortfolioManager module missing or Binance client not available")
 
-components = initialize_components()
+    # ✅ Initialize Market Analyzer
+    if modules.get('MarketAnalyzer') and client:
+        components['market_analyzer'] = modules['MarketAnalyzer'](client)
+        print("✅ Market Analyzer initialized")
+    else:
+        raise ImportError("MarketAnalyzer module missing or Binance client not available")
+
+    # ✅ Initialize Trade Executor
+    if modules.get('TradeExecutor') and client:
+        components['trade_exec'] = modules['TradeExecutor'](
+            client,
+            components['risk_mgr'],
+            log_callback=lambda msg: st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
+        )
+        print("✅ Trade Executor initialized")
+    else:
+        raise ImportError("TradeExecutor module missing or Binance client not available")
+
+    # ✅ Quantum Components (optional)
+    if modules.get('QuantumTrader') and client:
+        components['quantum_trader'] = modules['QuantumTrader'](client)
+        print("✅ Quantum Trader initialized")
+    else:
+        components['quantum_trader'] = None
+
+    if modules.get('QuantumAnalyzer'):
+        components['quantum_analyzer'] = modules['QuantumAnalyzer']()
+        print("✅ Quantum Analyzer initialized")
+    else:
+        components['quantum_analyzer'] = None
+
+    return components, client, client_status
 
 # -------------------------
 # Session State Initialization
