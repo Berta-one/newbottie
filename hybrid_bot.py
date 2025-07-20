@@ -613,20 +613,226 @@ with tabs[3]:
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        # Strategy weights
-        subcol1, subcol2, subcol3 = st.columns(3)
-        with subcol1:
-            quantum_weight = st.slider("Quantum Weight", 0, 100, 30)
-        with subcol2:
-            ml_weight = st.slider("ML Weight", 0, 100, 30)
-        with subcol3:
-            technical_weight = st.slider("Technical Weight", 0, 100, 40)
-        
-        weights = {"quantum": quantum_weight, "ml": ml_weight, "technical": technical_weight}
+        # Replace the strategy weights section with this interactive version:
     
+    # Strategy weights with auto-balancing
+    st.write("**Strategy Weights (Auto-balanced to 100%)**")
+    
+    # Initialize weights in session state if not exists
+    if 'weight_quantum' not in st.session_state:
+        st.session_state['weight_quantum'] = 30
+    if 'weight_ml' not in st.session_state:
+        st.session_state['weight_ml'] = 30
+    if 'weight_technical' not in st.session_state:
+        st.session_state['weight_technical'] = 40
+    if 'last_changed_weight' not in st.session_state:
+        st.session_state['last_changed_weight'] = None
+    
+    # Create three columns for sliders
+    subcol1, subcol2, subcol3 = st.columns(3)
+    
+    with subcol1:
+        new_quantum = st.slider(
+            "Quantum Weight", 
+            0, 100, 
+            st.session_state['weight_quantum'],
+            key="quantum_slider"
+        )
+    
+    with subcol2:
+        new_ml = st.slider(
+            "ML Weight", 
+            0, 100, 
+            st.session_state['weight_ml'],
+            key="ml_slider"
+        )
+    
+    with subcol3:
+        new_technical = st.slider(
+            "Technical Weight", 
+            0, 100, 
+            st.session_state['weight_technical'],
+            key="technical_slider"
+        )
+    
+    # Auto-balance logic
+    def auto_balance_weights(changed_weight, new_value):
+        """Auto-balance weights to sum to 100%"""
+        old_quantum = st.session_state['weight_quantum']
+        old_ml = st.session_state['weight_ml'] 
+        old_technical = st.session_state['weight_technical']
+        
+        if changed_weight == 'quantum':
+            # Quantum changed
+            remaining = 100 - new_value
+            if remaining >= 0:
+                # Distribute remaining between ML and Technical proportionally
+                old_total = old_ml + old_technical
+                if old_total > 0:
+                    ratio_ml = old_ml / old_total
+                    ratio_technical = old_technical / old_total
+                    new_ml_calc = int(remaining * ratio_ml)
+                    new_technical_calc = remaining - new_ml_calc
+                else:
+                    new_ml_calc = remaining // 2
+                    new_technical_calc = remaining - new_ml_calc
+                
+                return new_value, new_ml_calc, new_technical_calc
+            else:
+                return old_quantum, old_ml, old_technical
+                
+        elif changed_weight == 'ml':
+            # ML changed
+            remaining = 100 - new_value
+            if remaining >= 0:
+                old_total = old_quantum + old_technical
+                if old_total > 0:
+                    ratio_quantum = old_quantum / old_total
+                    ratio_technical = old_technical / old_total
+                    new_quantum_calc = int(remaining * ratio_quantum)
+                    new_technical_calc = remaining - new_quantum_calc
+                else:
+                    new_quantum_calc = remaining // 2
+                    new_technical_calc = remaining - new_quantum_calc
+                
+                return new_quantum_calc, new_value, new_technical_calc
+            else:
+                return old_quantum, old_ml, old_technical
+                
+        elif changed_weight == 'technical':
+            # Technical changed
+            remaining = 100 - new_value
+            if remaining >= 0:
+                old_total = old_quantum + old_ml
+                if old_total > 0:
+                    ratio_quantum = old_quantum / old_total
+                    ratio_ml = old_ml / old_total
+                    new_quantum_calc = int(remaining * ratio_quantum)
+                    new_ml_calc = remaining - new_quantum_calc
+                else:
+                    new_quantum_calc = remaining // 2
+                    new_ml_calc = remaining - new_quantum_calc
+                
+                return new_quantum_calc, new_ml_calc, new_value
+            else:
+                return old_quantum, old_ml, old_technical
+        
+        return old_quantum, old_ml, old_technical
+    
+    # Check which weight changed and auto-balance
+    weights_changed = False
+    
+    if new_quantum != st.session_state['weight_quantum']:
+        # Quantum changed
+        balanced_quantum, balanced_ml, balanced_technical = auto_balance_weights('quantum', new_quantum)
+        weights_changed = True
+        st.session_state['last_changed_weight'] = 'quantum'
+        
+    elif new_ml != st.session_state['weight_ml']:
+        # ML changed
+        balanced_quantum, balanced_ml, balanced_technical = auto_balance_weights('ml', new_ml)
+        weights_changed = True
+        st.session_state['last_changed_weight'] = 'ml'
+        
+    elif new_technical != st.session_state['weight_technical']:
+        # Technical changed
+        balanced_quantum, balanced_ml, balanced_technical = auto_balance_weights('technical', new_technical)
+        weights_changed = True
+        st.session_state['last_changed_weight'] = 'technical'
+        
+    else:
+        # No change, use current values
+        balanced_quantum = st.session_state['weight_quantum']
+        balanced_ml = st.session_state['weight_ml']
+        balanced_technical = st.session_state['weight_technical']
+    
+    # Update session state
+    st.session_state['weight_quantum'] = balanced_quantum
+    st.session_state['weight_ml'] = balanced_ml
+    st.session_state['weight_technical'] = balanced_technical
+    
+    # If weights were auto-balanced, refresh to update sliders
+    if weights_changed:
+        st.rerun()
+    
+    # Display current weights with visual indicator
+    total_weight = balanced_quantum + balanced_ml + balanced_technical
+    
+    # Visual weight display
+    col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
+    
+    with col1:
+        st.metric("Quantum", f"{balanced_quantum}%")
     with col2:
-        min_conf = st.slider("Min Confidence", 0.5, 1.0, 0.65, 0.01)
-        max_pairs = st.slider("Max Pairs to Scan", 5, 50, 20)
+        st.metric("ML", f"{balanced_ml}%")
+    with col3:
+        st.metric("Technical", f"{balanced_technical}%")
+    with col4:
+        # Total should always be 100%, but show it anyway
+        if total_weight == 100:
+            st.metric("Total", f"{total_weight}%", delta="✅")
+        else:
+            st.metric("Total", f"{total_weight}%", delta="⚠️")
+    
+    # Progress bar visualization
+    st.write("**Weight Distribution:**")
+    progress_col1, progress_col2, progress_col3 = st.columns(3)
+    
+    with progress_col1:
+        st.write(f"Quantum: {balanced_quantum}%")
+        st.progress(balanced_quantum / 100)
+    
+    with progress_col2:
+        st.write(f"ML: {balanced_ml}%")
+        st.progress(balanced_ml / 100)
+    
+    with progress_col3:
+        st.write(f"Technical: {balanced_technical}%")
+        st.progress(balanced_technical / 100)
+    
+    # Quick preset buttons
+    st.write("**Quick Presets:**")
+    preset_col1, preset_col2, preset_col3, preset_col4 = st.columns(4)
+    
+    with preset_col1:
+        if st.button("⚛️ Quantum Focus", help="Quantum: 60%, ML: 20%, Technical: 20%"):
+            st.session_state['weight_quantum'] = 60
+            st.session_state['weight_ml'] = 20
+            st.session_state['weight_technical'] = 20
+            st.rerun()
+    
+    with preset_col2:
+        if st.button("🤖 ML Focus", help="Quantum: 20%, ML: 60%, Technical: 20%"):
+            st.session_state['weight_quantum'] = 20
+            st.session_state['weight_ml'] = 60
+            st.session_state['weight_technical'] = 20
+            st.rerun()
+    
+    with preset_col3:
+        if st.button("📊 Technical Focus", help="Quantum: 20%, ML: 20%, Technical: 60%"):
+            st.session_state['weight_quantum'] = 20
+            st.session_state['weight_ml'] = 20
+            st.session_state['weight_technical'] = 60
+            st.rerun()
+    
+    with preset_col4:
+        if st.button("⚖️ Balanced", help="Quantum: 33%, ML: 33%, Technical: 34%"):
+            st.session_state['weight_quantum'] = 33
+            st.session_state['weight_ml'] = 33
+            st.session_state['weight_technical'] = 34
+            st.rerun()
+    
+    # Final weights dictionary for use in analysis
+    weights = {
+        "quantum": balanced_quantum, 
+        "ml": balanced_ml, 
+        "technical": balanced_technical
+    }
+    
+    # Display which weight was last changed (for user feedback)
+    if st.session_state.get('last_changed_weight'):
+        last_changed = st.session_state['last_changed_weight'].title()
+        st.caption(f"💡 Last changed: {last_changed} weight - others auto-adjusted")
         
         # Scan mode selection
         scan_mode = st.selectbox("Scan Mode", [
