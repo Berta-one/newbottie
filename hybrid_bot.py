@@ -295,9 +295,41 @@ def setup_binance_client():
         return None, f"❌ Connection failed: {str(e)}"
 
 def initialize_components():
-    """Initialize components safely"""
     components = {}
+    client, client_status = setup_binance_client()
+    force_live = force_live_components()
     
+    # If FORCE_LIVE_MODE=true, don't use fallback components
+    if force_live:
+        print("🚀 FORCE LIVE MODE: Using only live components")
+    
+    # Portfolio Manager
+    if modules.get('PortfolioManager') and client:
+        try:
+            components['portfolio_mgr'] = modules['PortfolioManager'](
+                os.getenv("BINANCE_API_KEY"), 
+                os.getenv("BINANCE_API_SECRET")
+            )
+            print("✅ LIVE Portfolio Manager initialized")
+        except Exception as e:
+            if force_live:
+                raise Exception(f"LIVE mode required but Portfolio Manager failed: {e}")
+            else:
+                components['portfolio_mgr'] = FallbackPortfolioManager()
+    else:
+        if force_live:
+            raise Exception("LIVE mode required but no Portfolio Manager available")
+        components['portfolio_mgr'] = FallbackPortfolioManager()
+    
+    # Continue for other components...
+    components = {}
+def force_live_components():
+    """Force live components when API is available"""
+    force_live = os.getenv("FORCE_LIVE_MODE", "false").lower() == "true"
+    has_api_keys = os.getenv("BINANCE_API_KEY") and os.getenv("BINANCE_API_SECRET")
+    use_testnet = os.getenv("USE_TESTNET", "false").lower() == "true"
+    
+    return force_live and has_api_keys and not use_testnet    
     # Binance client
     client, client_status = setup_binance_client()
     
