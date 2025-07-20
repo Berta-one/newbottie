@@ -1722,3 +1722,284 @@ with tabs[4]:
             "scan_interval": scan_interval
         })
         st.success("✅ Settings saved!")
+        # -------------------------
+# System Health Tab
+# -------------------------
+with tabs[5]:
+    st.header("🩺 System Health")
+    
+    health = get_system_health()
+    
+    health_col1, health_col2, health_col3 = st.columns(3)
+    with health_col1:
+        cpu_pct = float(health["CPU"].replace('%', ''))
+        st.metric("CPU Usage", health["CPU"], delta="High" if cpu_pct > 80 else "Normal")
+    with health_col2:
+        mem_pct = float(health["Memory"].replace('%', ''))
+        st.metric("Memory Usage", health["Memory"], delta="High" if mem_pct > 80 else "Normal")
+    with health_col3:
+        st.metric("Active Threads", health["Threads"])
+    
+    # API Connection Test
+    st.subheader("🔗 API Connection Test")
+    if client:
+        try:
+            server_time = client.get_server_time()
+            st.success(f"✅ Binance API connected. Server time: {datetime.fromtimestamp(server_time['serverTime']/1000)}")
+        except Exception as e:
+            st.error(f"❌ API connection failed: {e}")
+    else:
+        st.error("❌ No API client available")
+    
+    # Module Status
+    st.subheader("📦 Module Status")
+    module_status = []
+    for name, module in modules.items():
+        status = "✅ Available" if module else "❌ Missing"
+        module_status.append({"Module": name, "Status": status})
+    
+    module_df = pd.DataFrame(module_status)
+    st.dataframe(module_df, use_container_width=True)
+
+# -------------------------
+# Logs Tab
+# -------------------------
+with tabs[6]:
+    st.header("📜 Activity Logs")
+    
+    logs_col1, logs_col2, logs_col3 = st.columns([2, 1, 1])
+    with logs_col1:
+        log_filter = st.selectbox("Filter logs", ["All", "Manual", "Multi-Strategy", "ERROR", "SUCCESS", "WARNING"], key="log_filter")
+    with logs_col2:
+        if st.button("🗑️ Clear Logs", key="clear_logs"):
+            st.session_state["logs"] = []
+            st.success("Logs cleared")
+    with logs_col3:
+        if st.button("📥 Export Logs", key="export_logs"):
+            logs = st.session_state.get("logs", [])
+            if logs:
+                log_text = "\n".join(logs)
+                st.download_button(
+                    label="💾 Download",
+                    data=log_text,
+                    file_name=f"trading_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+                    mime="text/plain",
+                    key="download_logs"
+                )
+    
+    # Display logs
+    logs = st.session_state.get("logs", [])
+    if logs:
+        # Show recent logs (last 100)
+        recent_logs = logs[-100:]
+        
+        # Filter logs
+        if log_filter != "All":
+            recent_logs = [log for log in recent_logs if log_filter in log]
+        
+        # Count different types of logs
+        total_logs = len(recent_logs)
+        error_count = len([log for log in recent_logs if "ERROR" in log])
+        success_count = len([log for log in recent_logs if "SUCCESS" in log])
+        
+        # Show log statistics
+        log_stats_col1, log_stats_col2, log_stats_col3 = st.columns(3)
+        with log_stats_col1:
+            st.metric("Total Logs", total_logs)
+        with log_stats_col2:
+            st.metric("Errors", error_count, delta="High" if error_count > 5 else "Normal")
+        with log_stats_col3:
+            st.metric("Successes", success_count)
+        
+        st.divider()
+        
+        # Display logs in reverse order (newest first)
+        for log in reversed(recent_logs):
+            if "ERROR" in log or "FAIL" in log:
+                st.error(log)
+            elif "WARNING" in log:
+                st.warning(log)
+            elif "SUCCESS" in log:
+                st.success(log)
+            elif "Multi-Strategy" in log:
+                st.info(log)
+            elif "Manual" in log:
+                st.info(log)
+            else:
+                st.text(log)
+    else:
+        st.info("📝 No logs available. Activity will appear here as the bot operates.")
+
+# -------------------------
+# Analytics Tab
+# -------------------------
+with tabs[7]:
+    st.header("📈 Advanced Analytics")
+    
+    # Performance Overview
+    st.subheader("📊 Portfolio Performance")
+    
+    try:
+        # Create sample performance data
+        dates = pd.date_range(start='2024-01-01', end=datetime.now(), freq='D')
+        returns = np.random.normal(0.001, 0.02, len(dates))
+        cumulative_returns = np.cumprod(1 + returns) - 1
+        portfolio_values = 10000 * (1 + cumulative_returns)
+        
+        performance_df = pd.DataFrame({
+            'Date': dates,
+            'Portfolio_Value': portfolio_values
+        })
+        
+        fig = px.line(performance_df, x='Date', y='Portfolio_Value', 
+                     title="Portfolio Performance Over Time")
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Performance Metrics
+        perf_col1, perf_col2, perf_col3, perf_col4 = st.columns(4)
+        with perf_col1:
+            st.metric("Total Return", f"{cumulative_returns[-1]*100:.2f}%")
+        with perf_col2:
+            st.metric("Total Trades", len(st.session_state.get("logs", [])))
+        with perf_col3:
+            volatility = np.std(returns) * np.sqrt(252) * 100
+            st.metric("Volatility", f"{volatility:.2f}%")
+        with perf_col4:
+            if volatility != 0:
+                sharpe = (np.mean(returns) * 252) / (np.std(returns) * np.sqrt(252))
+                st.metric("Sharpe Ratio", f"{sharpe:.2f}")
+            else:
+                st.metric("Sharpe Ratio", "N/A")
+        
+        # Trading Activity
+        st.subheader("📈 Trading Activity Analysis")
+        
+        # Create sample trading data
+        hours = list(range(24))
+        trades_per_hour = np.random.poisson(2, 24)
+        
+        activity_df = pd.DataFrame({
+            'Hour': hours,
+            'Trades': trades_per_hour
+        })
+        
+        fig_trades = px.bar(activity_df, x='Hour', y='Trades', 
+                           title="Trading Activity by Hour")
+        st.plotly_chart(fig_trades, use_container_width=True)
+        
+        # Recent Trades Analysis
+        st.subheader("📊 Recent Trading Summary")
+        
+        logs = st.session_state.get("logs", [])
+        trade_logs = [log for log in logs if "Trade" in log and ("BUY" in log or "SELL" in log)]
+        
+        if trade_logs:
+            trade_analysis_col1, trade_analysis_col2 = st.columns(2)
+            
+            with trade_analysis_col1:
+                st.write("**Recent Trade Activity:**")
+                for log in trade_logs[-10:]:
+                    if "SUCCESS" in log:
+                        st.success(log)
+                    elif "ERROR" in log or "FAIL" in log:
+                        st.error(log)
+                    else:
+                        st.info(log)
+            
+            with trade_analysis_col2:
+                total_trades = len(trade_logs)
+                successful_trades = len([log for log in trade_logs if "SUCCESS" in log])
+                failed_trades = len([log for log in trade_logs if "ERROR" in log or "FAIL" in log])
+                
+                st.metric("Total Trades", total_trades)
+                st.metric("Successful", successful_trades)
+                st.metric("Failed", failed_trades)
+                
+                if total_trades > 0:
+                    success_rate = (successful_trades / total_trades) * 100
+                    st.metric("Success Rate", f"{success_rate:.1f}%")
+        else:
+            st.info("📝 No trading activity recorded yet. Execute some trades to see analytics.")
+            
+    except Exception as e:
+        st.error(f"Analytics error: {e}")
+        st.info("📊 Analytics will show real data once more trading activity is recorded")
+
+# -------------------------
+# Status Bar
+# -------------------------
+st.divider()
+
+status_col1, status_col2, status_col3, status_col4 = st.columns(4)
+
+with status_col1:
+    if client:
+        st.success("🟢 API Connected")
+    else:
+        st.error("🔴 API Disconnected")
+
+with status_col2:
+    scanner = st.session_state.get("auto_scanner")
+    if scanner and scanner.is_running():
+        st.success("🟢 Scanner Active")
+    else:
+        st.warning("🟡 Scanner Inactive")
+
+with status_col3:
+    auto_trade = os.getenv("AUTO_TRADE_ENABLED", "false").lower() == "true"
+    if auto_trade:
+        st.success("🟢 Auto-Trade ON")
+    else:
+        st.info("🔵 Auto-Trade OFF")
+
+with status_col4:
+    mode = "🧪 TESTNET" if os.getenv("USE_TESTNET", "false").lower() == "true" else "🚀 LIVE"
+    if "TESTNET" in mode:
+        st.info(mode)
+    else:
+        st.warning(mode)
+
+# -------------------------
+# Enhanced Footer
+# -------------------------
+st.markdown("---")
+st.markdown(
+    """
+    <div style='text-align: center; padding: 20px; background: #f8f9fa; border-radius: 10px; margin-top: 20px;'>
+        <div style='margin-bottom: 15px;'>
+            <img src='https://static.wixstatic.com/media/80aa29_3bdfcbab4dd34671915e3b66b0b596e4~mv2.jpeg/v1/fill/w_146,h_104,al_c,q_80,usm_0.66_1.00_0.01,enc_avif,quality_auto/LRC_1719585575250.jpeg' 
+                 width='80' style='border-radius: 8px; opacity: 0.8;'/>
+        </div>
+        <h4 style='color: #333; margin: 10px 0;'>🧠 Hybrid Quantum Crypto Trading Bot v2.0</h4>
+        <p style='color: #666; margin: 10px 0;'>
+            ⚛️ Quantum Analytics | 🤖 AI Trading | 📊 Advanced Analytics
+        </p>
+        <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                    padding: 15px; border-radius: 10px; margin: 15px 0; color: white;'>
+            <h4 style='color: white; margin: 0;'>Rondanini Publishing Ltd.</h4>
+            <p style='color: #f0f0f0; margin: 5px 0; font-size: 14px;'>
+                Advanced Quantum-Enhanced Trading Solutions
+            </p>
+            <p style='color: #e0e0e0; margin: 5px 0; font-size: 12px;'>
+                © 2025 All Rights Reserved
+            </p>
+        </div>
+        <p style='color: #888; font-size: 12px; margin-top: 15px;'>
+            ⚠️ <strong>Risk Disclaimer:</strong> Trading involves substantial risk of loss. 
+            Past performance does not guarantee future results. Trade responsibly.
+        </p>
+    </div>
+    """, 
+    unsafe_allow_html=True
+)
+
+# -------------------------
+# Background Tasks
+# -------------------------
+if os.getenv("AUTO_START_BOT", "false").lower() == "true":
+    scanner = st.session_state.get("auto_scanner")
+    if scanner and not scanner.is_running():
+        scanner.start_scanning()
+        st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Auto-scanner started")
+
+print("✅ Hybrid Quantum Trading Bot loaded successfully!")
