@@ -220,5 +220,65 @@ def render_portfolio_overview():
     with col3:
         st.metric("Daily P&L", "$150.25", "1.2%")
 
+class TradingDashboard:
+    """Main TradingDashboard class for compatibility with hybrid_bot.py"""
+    
+    def __init__(self):
+        self.trade_data = None
+    
+    def load_trade_data(self):
+        """Load trade data"""
+        self.trade_data = load_trade_data()
+        return self.trade_data
+    
+    def render_performance_overview(self):
+        """Render performance overview"""
+        render_analytics_dashboard()
+    
+    def render_analytics_dashboard(self):
+        """Render main analytics dashboard"""
+        render_analytics_dashboard()
+    
+    def render_portfolio_overview(self):
+        """Render portfolio overview"""
+        render_portfolio_overview()
+    
+    def render_trade_analysis(self):
+        """Render trade analysis"""
+        render_analytics_dashboard()
+    
+    def render_recent_trades(self):
+        """Render recent trades section"""
+        st.subheader("📋 Recent Trades")
+        df = load_trade_data()
+        df = calculate_pnl_if_missing(df)
+        
+        if len(df) > 0:
+            recent_trades = df.tail(10)
+            st.dataframe(recent_trades, use_container_width=True)
+        else:
+            st.info("📝 No recent trades available")
+    
+    def calculate_metrics(self, df):
+        """Calculate trading metrics"""
+        if df.empty:
+            return {}
+        
+        metrics = {
+            'total_trades': len(df),
+            'total_pnl': safe_get_column_sum(df, 'pnl', 0.0),
+            'win_rate': 0.0,
+            'avg_trade': safe_get_column_mean(df, 'pnl', 0.0)
+        }
+        
+        if 'pnl' in df.columns and len(df) > 0:
+            wins = len(df[df['pnl'] > 0])
+            metrics['win_rate'] = (wins / len(df)) * 100 if len(df) > 0 else 0
+        
+        return metrics
+
+# Create global instance for backward compatibility
+analytics_dashboard = TradingDashboard()
+
 if __name__ == "__main__":
     render_analytics_dashboard()
