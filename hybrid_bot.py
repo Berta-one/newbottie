@@ -251,6 +251,10 @@ def setup_binance_client():
     except Exception as e:
         return None, f"❌ Connection failed: {str(e)}"
 
+# -------------------------
+# Complete Component Initialization - FIXED INDENTATION
+# -------------------------
+
 def initialize_components():
     """Initialize components safely"""
     components = {}
@@ -258,154 +262,145 @@ def initialize_components():
     # Binance client
     client, client_status = setup_binance_client()
     
-    # Portfolio Manager
-    if modules.get('PortfolioManager') and client:
-        try:
-            api_key = os.getenv("BINANCE_API_KEY") or os.getenv("BINANCE_TESTNET_API_KEY")
-            api_secret = os.getenv("BINANCE_API_SECRET") or os.getenv("BINANCE_TESTNET_API_SECRET")
-            use_testnet = os.getenv("USE_TESTNET", "true").lower() == "true"
-            components['portfolio_mgr'] = modules['PortfolioManager'](api_key, api_secret, use_testnet)
-            print("✅ Live Portfolio Manager initialized")
-        except Exception as e:
-            print(f"⚠️ Portfolio Manager failed, using fallback: {e}")
-            components['portfolio_mgr'] = FallbackPortfolioManager()
-    else:
-        components['portfolio_mgr'] = FallbackPortfolioManager()
-    
-    # Market Analyzer
-    if modules.get('MarketAnalyzer'):
-        try:
-            components['market_analyzer'] = modules['MarketAnalyzer'](client)
-            print("✅ Live Market Analyzer initialized")
-        except Exception as e:
-            print(f"⚠️ Market Analyzer failed, using fallback: {e}")
-            components['market_analyzer'] = FallbackMarketAnalyzer(client)
-    else:
-        components['market_analyzer'] = FallbackMarketAnalyzer(client)
-    
     # Risk Manager
     if modules.get('RiskManager'):
         try:
-            components['risk_mgr'] = modules['RiskManager'](max_risk_percent=0.02, max_positions=5)
+            components['risk_mgr'] = modules['RiskManager'](
+                max_risk_percent=0.02, 
+                max_positions=5
+            )
             print("✅ Risk Manager initialized")
-        except Exception as e:
-            print(f"⚠️ Risk Manager failed: {e}")
+        except:
             components['risk_mgr'] = None
     else:
         components['risk_mgr'] = None
     
-   # -------------------------
-# Trade Executor Section - CLEAN VERSION
-# -------------------------
-
-# Enhanced Fallback Trade Executor Class
-class FallbackTradeExecutor:
-    """Enhanced fallback executor with balance simulation"""
-    
-    def __init__(self, client=None, risk_mgr=None, log_callback=None):
-        self.log = log_callback if log_callback else print
-        self.active_orders = {}
-        self.mock_balance = 1000.0
-    
-    def manual_trade(self, symbol, qty=None, sl_mult=1.5, tp_mult=3.0, trade_amount_usd=None):
+    # Portfolio Manager
+    if modules.get('PortfolioManager'):
         try:
-            mock_prices = {
-                'BTCUSDT': 117000.0,
-                'ETHUSDT': 4000.0,
-                'BNBUSDT': 600.0,
-                'ADAUSDT': 0.45,
-                'SOLUSDT': 200.0
+            api_key = os.getenv("BINANCE_API_KEY")
+            api_secret = os.getenv("BINANCE_API_SECRET")
+            components['portfolio_mgr'] = modules['PortfolioManager'](api_key, api_secret)
+            print("✅ Portfolio Manager initialized")
+        except:
+            components['portfolio_mgr'] = None
+    else:
+        components['portfolio_mgr'] = None
+    
+    # Market Analyzer
+    if modules.get('MarketAnalyzer') and client:
+        try:
+            components['market_analyzer'] = modules['MarketAnalyzer'](client)
+            print("✅ Market Analyzer initialized")
+        except:
+            components['market_analyzer'] = None
+    else:
+        components['market_analyzer'] = None
+    
+    # Enhanced Fallback Trade Executor Class
+    class FallbackTradeExecutor:
+        """Enhanced fallback executor with balance simulation"""
+        
+        def __init__(self, client=None, risk_mgr=None, log_callback=None):
+            self.log = log_callback if log_callback else print
+            self.active_orders = {}
+            self.mock_balance = 1000.0
+        
+        def manual_trade(self, symbol, qty=None, sl_mult=1.5, tp_mult=3.0, trade_amount_usd=None):
+            try:
+                mock_prices = {
+                    'BTCUSDT': 117000.0,
+                    'ETHUSDT': 4000.0,
+                    'BNBUSDT': 600.0,
+                    'ADAUSDT': 0.45,
+                    'SOLUSDT': 200.0
+                }
+                
+                price = mock_prices.get(symbol, 100.0)
+                
+                if trade_amount_usd:
+                    amount = min(trade_amount_usd, self.mock_balance * 0.1)
+                    qty = amount / price
+                else:
+                    amount = min(50.0, self.mock_balance * 0.05)
+                    qty = amount / price
+                
+                self.log(f"📝 DEMO: Would buy {qty:.8f} {symbol} for ${amount:.2f}")
+                self.mock_balance -= amount
+                
+                return f"📝 Demo trade: {qty:.8f} {symbol} for ${amount:.2f}"
+                
+            except Exception as e:
+                return f"📝 Demo trade failed: {e}"
+        
+        def auto_execute(self, signal, total_balance=None, open_positions=0, sl_mult=1.5, tp_mult=3.0):
+            symbol = signal.get("symbol", "BTCUSDT")
+            return self.manual_trade(symbol, trade_amount_usd=25.0)
+        
+        def get_active_orders(self):
+            return {}
+        
+        def cancel_order(self, symbol):
+            return f"📝 Demo: Would cancel {symbol}"
+        
+        def get_connection_status(self):
+            return f"📝 Demo mode - Balance: ${self.mock_balance:.2f}"
+        
+        def get_account_summary(self):
+            return {
+                'total_usdt': self.mock_balance,
+                'tradeable_usdt': self.mock_balance * 0.9,
+                'can_trade': True,
+                'demo_mode': True
             }
-            
-            price = mock_prices.get(symbol, 100.0)
-            
-            if trade_amount_usd:
-                amount = min(trade_amount_usd, self.mock_balance * 0.1)
-                qty = amount / price
-            else:
-                amount = min(50.0, self.mock_balance * 0.05)
-                qty = amount / price
-            
-            self.log(f"📝 DEMO: Would buy {qty:.8f} {symbol} for ${amount:.2f}")
-            self.mock_balance -= amount
-            
-            return f"📝 Demo trade: {qty:.8f} {symbol} for ${amount:.2f}"
-            
-        except Exception as e:
-            return f"📝 Demo trade failed: {e}"
     
-    def auto_execute(self, signal, total_balance=None, open_positions=0, sl_mult=1.5, tp_mult=3.0):
-        symbol = signal.get("symbol", "BTCUSDT")
-        return self.manual_trade(symbol, trade_amount_usd=25.0)
-    
-    def get_active_orders(self):
-        return {}
-    
-    def cancel_order(self, symbol):
-        return f"📝 Demo: Would cancel {symbol}"
-    
-    def get_connection_status(self):
-        return f"📝 Demo mode - Balance: ${self.mock_balance:.2f}"
-    
-    def get_account_summary(self):
-        return {
-            'total_usdt': self.mock_balance,
-            'tradeable_usdt': self.mock_balance * 0.9,
-            'can_trade': True,
-            'demo_mode': True
-        }
-
-# Initialize Trade Executor - SAFE VERSION
-print("🔧 Initializing Trade Executor...")
-
-try:
-    # Try balance-aware executor first
-    from balance_aware_trade_executor import create_balance_aware_executor
-    components['trade_exec'] = create_balance_aware_executor(
-        client, 
-        components.get('risk_mgr'),
-        log_callback=lambda msg: st.session_state.setdefault("logs", []).append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
-    )
-    print("✅ Balance-Aware Trade Executor initialized")
-    
-except ImportError:
-    print("⚠️ Balance-aware executor not found, trying standard executor...")
-    # Try standard trade executor
-    if modules.get('TradeExecutor'):
-        try:
-            components['trade_exec'] = modules['TradeExecutor'](
-                client, 
-                components.get('risk_mgr'),
-                log_callback=lambda msg: st.session_state.setdefault("logs", []).append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
-            )
-            print("✅ Standard Trade Executor initialized")
-        except Exception as e:
-            print(f"⚠️ Standard executor failed: {e}")
+    # Trade Executor
+    print("🔧 Initializing Trade Executor...")
+    try:
+        # Try balance-aware executor first
+        from balance_aware_trade_executor import create_balance_aware_executor
+        components['trade_exec'] = create_balance_aware_executor(
+            client, 
+            components.get('risk_mgr'),
+            log_callback=lambda msg: st.session_state.setdefault("logs", []).append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
+        )
+        print("✅ Balance-Aware Trade Executor initialized")
+        
+    except ImportError:
+        print("⚠️ Balance-aware executor not found, trying standard executor...")
+        if modules.get('TradeExecutor'):
+            try:
+                components['trade_exec'] = modules['TradeExecutor'](
+                    client, 
+                    components.get('risk_mgr'),
+                    log_callback=lambda msg: st.session_state.setdefault("logs", []).append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
+                )
+                print("✅ Standard Trade Executor initialized")
+            except Exception as e:
+                print(f"⚠️ Standard executor failed: {e}")
+                components['trade_exec'] = FallbackTradeExecutor(
+                    client, 
+                    components.get('risk_mgr'),
+                    log_callback=lambda msg: st.session_state.setdefault("logs", []).append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
+                )
+                print("✅ Using Fallback Trade Executor")
+        else:
+            print("⚠️ No TradeExecutor module found, using fallback...")
             components['trade_exec'] = FallbackTradeExecutor(
                 client, 
                 components.get('risk_mgr'),
                 log_callback=lambda msg: st.session_state.setdefault("logs", []).append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
             )
             print("✅ Using Fallback Trade Executor")
-    else:
-        print("⚠️ No TradeExecutor module found, using fallback...")
+            
+    except Exception as e:
+        print(f"⚠️ All executors failed: {e}")
         components['trade_exec'] = FallbackTradeExecutor(
             client, 
             components.get('risk_mgr'),
             log_callback=lambda msg: st.session_state.setdefault("logs", []).append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
         )
-        print("✅ Using Fallback Trade Executor")
-        
-except Exception as e:
-    print(f"⚠️ All executors failed: {e}")
-    components['trade_exec'] = FallbackTradeExecutor(
-        client, 
-        components.get('risk_mgr'),
-        log_callback=lambda msg: st.session_state.setdefault("logs", []).append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
-    )
-    print("✅ Using Fallback Trade Executor (emergency)")
-
-print(f"🎯 Trade Executor ready: {type(components['trade_exec']).__name__}")
+        print("✅ Using Fallback Trade Executor (emergency)")
     
     # Quantum Components
     if modules.get('QuantumTrader') and client:
@@ -431,11 +426,20 @@ print(f"🎯 Trade Executor ready: {type(components['trade_exec']).__name__}")
     components['analytics_dashboard'] = None
     components['ensemble_engine'] = None
     
+    print(f"🎯 Initialized {len([k for k, v in components.items() if v is not None])}/{len(components)} components")
+    
     return components, client, client_status
 
-# Initialize everything
-print("🔧 Initializing components...")
-components, client, client_status = initialize_components()
+# Fallback Quantum Analyzer
+class FallbackQuantumAnalyzer:
+    def generate_quantum_signal(self, market_data):
+        return {
+            "decision": "HOLD",
+            "confidence": 0.5,
+            "quantum_confidence": 0.5,
+            "entanglement": 0.3,
+            "superposition": 0.4
+        }
 
 # -------------------------
 # Session State Initialization
