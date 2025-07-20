@@ -51,8 +51,11 @@ for name, module in modules.items():
 # ✅ Streamlit Config
 st.set_page_config(page_title="Hybrid Quantum Trading Bot", layout="wide")
 
+# ✅ Streamlit Config
+st.set_page_config(page_title="Hybrid Quantum Trading Bot", layout="wide")
+
 # -------------------------
-# Conditional Imports with Error Handling
+# Conditional Imports with Error Handling (Define first)
 # -------------------------
 def safe_import_modules():
     """Safely import modules with fallbacks"""
@@ -151,6 +154,16 @@ def safe_import_modules():
     print(f"📦 Module import summary: {sum(1 for v in modules.values() if v is not None)}/{len(modules)} modules loaded")
     return modules
 
+# Import modules with debug info
+print("🔄 Starting module imports...")
+modules = safe_import_modules()
+
+# Debug: Print what was actually imported
+print("📦 Available modules:")
+for name, module in modules.items():
+    status = "✅ Available" if module else "❌ Missing"
+    print(f"  - {name}: {status}")
+
 # -------------------------
 # Environment & API Setup
 # -------------------------
@@ -189,21 +202,40 @@ def setup_binance_client():
 # Initialize client
 client, client_status = setup_binance_client()
 # -------------------------
-# Fallback Classes
+# Enhanced Fallback Classes
 # -------------------------
-class FallbackManager:
+class FallbackPortfolioManager:
     def __init__(self):
         self.dummy_portfolio = {
-            'USDT': {'balance': 1000.0, 'price': 1.0, 'value': 1000.0, 'change': 0.0},
-            'BTC': {'balance': 0.01, 'price': 45000.0, 'value': 450.0, 'change': 2.5},
-            'ETH': {'balance': 0.1, 'price': 3000.0, 'value': 300.0, 'change': 1.8}
+            'USDT': {'balance': 1000.0, 'free': 1000.0, 'locked': 0.0, 'price': 1.0, 'value': 1000.0, 'change': 0.0},
+            'BTC': {'balance': 0.01, 'free': 0.01, 'locked': 0.0, 'price': 45000.0, 'value': 450.0, 'change': 2.5},
+            'ETH': {'balance': 0.1, 'free': 0.1, 'locked': 0.0, 'price': 3000.0, 'value': 300.0, 'change': 1.8}
         }
+        self._live = False
+        self._last_update = None
     
     def get_portfolio(self):
         return self.dummy_portfolio
     
     def total_value(self):
         return sum(asset['value'] for asset in self.dummy_portfolio.values())
+    
+    def last_updated(self):
+        return datetime.now().strftime("%H:%M:%S")
+    
+    def refresh_portfolio(self):
+        """Mock refresh - just return current portfolio"""
+        return self.get_portfolio()
+    
+    def is_live(self):
+        return False
+    
+    def get_connection_status(self):
+        return "❌ Using mock data - Portfolio Manager not available"
+    
+    def get_trade_history(self, symbol=None, limit=10):
+        """Mock trade history"""
+        return []
 
 class FallbackMarketAnalyzer:
     def __init__(self, client=None):
@@ -255,7 +287,6 @@ class FallbackTradeExecutor:
     
     def auto_execute(self, signal, total_balance, open_positions, sl_mult, tp_mult):
         return "Demo auto-trade executed"
-
 # -------------------------
 # Initialize Core Objects with Better Error Handling
 # -------------------------
@@ -559,7 +590,176 @@ def display_scanner_results():
             st.dataframe(df, use_container_width=True)
     else:
         st.info("🔍 No strong signals detected. Scanner will update automatically.")
-        # -------------------------
+
+# -------------------------
+# Company Branding Sidebar
+# -------------------------
+with st.sidebar:
+    # Company Logo and Information
+    st.markdown(
+        """
+        <div style='text-align: center; margin-bottom: 20px;'>
+            <img src='https://static.wixstatic.com/media/80aa29_3bdfcbab4dd34671915e3b66b0b596e4~mv2.jpeg/v1/fill/w_146,h_104,al_c,q_80,usm_0.66_1.00_0.01,enc_avif,quality_auto/LRC_1719585575250.jpeg' 
+                 width='120' style='border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'/>
+        </div>
+        """, 
+        unsafe_allow_html=True
+    )
+    
+    st.markdown(
+        """
+        <div style='text-align: center; padding: 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                    border-radius: 10px; margin-bottom: 20px; color: white;'>
+            <h3 style='color: white; margin: 0;'>🧠 Quantum Trading Bot</h3>
+            <p style='color: #f0f0f0; margin: 5px 0; font-size: 14px;'>Advanced AI Trading Platform</p>
+        </div>
+        """, 
+        unsafe_allow_html=True
+    )
+    
+    # Company Information
+    st.markdown(
+        """
+        <div style='background: #f8f9fa; padding: 15px; border-radius: 10px; border-left: 4px solid #667eea;'>
+            <h4 style='margin-top: 0; color: #333;'>📊 Rondanini Publishing Ltd.</h4>
+            <p style='margin: 5px 0; font-size: 12px; color: #666;'>© 2025 All Rights Reserved</p>
+            <p style='margin: 5px 0; font-size: 11px; color: #888;'>Quantum-Enhanced Trading Solutions</p>
+        </div>
+        """, 
+        unsafe_allow_html=True
+    )
+    
+    st.markdown("---")
+    
+    # Quick Stats Sidebar
+    st.subheader("📈 Quick Stats")
+    
+    # Connection Status
+    try:
+        if client:
+            st.success("🟢 API Connected")
+        else:
+            st.error("🔴 API Disconnected")
+        
+        # Trading Mode
+        mode = "🧪 TESTNET" if os.getenv("USE_TESTNET", "true").lower() == "true" else "🚀 LIVE"
+        if "TESTNET" in mode:
+            st.info(f"Mode: {mode}")
+        else:
+            st.warning(f"Mode: {mode}")
+        
+        # Portfolio Value (if available)
+        try:
+            total_value = components['portfolio_mgr'].total_value()
+            st.metric("Portfolio Value", f"${total_value:,.2f}")
+        except:
+            st.metric("Portfolio Value", "Loading...")
+        
+        # Active Scanner
+        scanner = st.session_state.get("auto_scanner")
+        if scanner and scanner.is_running():
+            st.success("🟢 Scanner Active")
+            results = scanner.get_latest_results()
+            if results:
+                st.metric("Signals Found", results.get('signals_found', 0))
+        else:
+            st.warning("🟡 Scanner Inactive")
+    
+    except Exception as e:
+        st.error("❌ Stats Error")
+    
+    st.markdown("---")
+    
+    # Quick Actions
+    st.subheader("⚡ Quick Actions")
+    
+    # Quick Portfolio Refresh
+    if st.button("🔄 Refresh Portfolio", help="Update portfolio data"):
+        try:
+            with st.spinner("Refreshing..."):
+                components['portfolio_mgr'].refresh_portfolio()
+            st.success("✅ Refreshed!")
+            st.rerun()
+        except Exception as e:
+            st.error(f"❌ Error: {e}")
+    
+    # Quick Scanner Toggle
+    scanner = st.session_state.get("auto_scanner")
+    if scanner:
+        if scanner.is_running():
+            if st.button("🛑 Stop Scanner", help="Stop the market scanner"):
+                scanner.stop_scanning()
+                st.success("Scanner stopped")
+                st.rerun()
+        else:
+            if st.button("▶️ Start Scanner", help="Start the market scanner"):
+                scanner.start_scanning()
+                st.success("Scanner started")
+                st.rerun()
+    
+    st.markdown("---")
+    
+    # System Info
+    st.subheader("🔧 System Info")
+    try:
+        health = get_system_health()
+        st.metric("CPU", health["CPU"])
+        st.metric("Memory", health["Memory"])
+        st.metric("Threads", health["Threads"])
+    except:
+        st.error("System info unavailable")
+    
+    st.markdown("---")
+    
+    # Footer in Sidebar
+    st.markdown(
+        """
+        <div style='text-align: center; padding: 10px; font-size: 10px; color: #888;'>
+            <p>⚠️ Trading involves risk<br>
+            Use at your own discretion</p>
+            <p style='margin-top: 10px;'>
+                <strong>Rondanini Publishing Ltd.</strong><br>
+                Advanced Trading Solutions<br>
+                Est. 2025
+            </p>
+        </div>
+        """, 
+        unsafe_allow_html=True
+    )
+
+# -------------------------
+# Enhanced Main Header with Branding
+# -------------------------
+st.markdown(
+    """
+    <div style='text-align: center; padding: 20px 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                border-radius: 15px; margin-bottom: 20px; color: white;'>
+        <h1 style='color: white; margin: 0; font-size: 2.5em;'>
+            🧠 Hybrid Quantum Crypto Trading Bot
+        </h1>
+        <p style='color: #f0f0f0; margin: 10px 0; font-size: 1.2em;'>
+            Advanced Crypto Trading with Technical, ML & Quantum Strategies
+        </p>
+        <div style='margin-top: 15px;'>
+            <span style='background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 20px; margin: 0 5px;'>
+                ⚛️ Quantum Analytics
+            </span>
+            <span style='background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 20px; margin: 0 5px;'>
+                🤖 AI Trading
+            </span>
+            <span style='background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 20px; margin: 0 5px;'>
+                📊 Advanced Analytics
+            </span>
+        </div>
+        <p style='margin-top: 15px; font-size: 0.9em; color: #e0e0e0;'>
+            Powered by <strong>Rondanini Publishing Ltd.</strong> • © 2025
+        </p>
+    </div>
+    """, 
+    unsafe_allow_html=True
+)
+
+# -------------------------
 # Main UI Layout
 # -------------------------
 st.title("🧠 Hybrid Quantum Crypto Trading Bot")
@@ -1592,15 +1792,34 @@ if st.checkbox("🔄 Auto-refresh (30s)", value=False):
     st.rerun()
 
 # -------------------------
-# Footer
+# Enhanced Footer with Branding
 # -------------------------
 st.markdown("---")
 st.markdown(
     """
-    <div style='text-align: center; color: gray;'>
-    🧠 Hybrid Quantum Crypto Trading Bot v2.0 | 
-    ⚛️ Quantum Analytics | 🤖 AI Trading | 📊 Advanced Analytics<br>
-    <small>⚠️ Trading involves risk. Past performance does not guarantee future results.</small>
+    <div style='text-align: center; padding: 20px; background: #f8f9fa; border-radius: 10px; margin-top: 20px;'>
+        <div style='margin-bottom: 15px;'>
+            <img src='https://static.wixstatic.com/media/80aa29_3bdfcbab4dd34671915e3b66b0b596e4~mv2.jpeg/v1/fill/w_146,h_104,al_c,q_80,usm_0.66_1.00_0.01,enc_avif,quality_auto/LRC_1719585575250.jpeg' 
+                 width='80' style='border-radius: 8px; opacity: 0.8;'/>
+        </div>
+        <h4 style='color: #333; margin: 10px 0;'>🧠 Hybrid Quantum Crypto Trading Bot v2.0</h4>
+        <p style='color: #666; margin: 10px 0;'>
+            ⚛️ Quantum Analytics | 🤖 AI Trading | 📊 Advanced Analytics
+        </p>
+        <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                    padding: 15px; border-radius: 10px; margin: 15px 0; color: white;'>
+            <h4 style='color: white; margin: 0;'>Rondanini Publishing Ltd.</h4>
+            <p style='color: #f0f0f0; margin: 5px 0; font-size: 14px;'>
+                Advanced Quantum-Enhanced Trading Solutions
+            </p>
+            <p style='color: #e0e0e0; margin: 5px 0; font-size: 12px;'>
+                © 2025 All Rights Reserved
+            </p>
+        </div>
+        <p style='color: #888; font-size: 12px; margin-top: 15px;'>
+            ⚠️ <strong>Risk Disclaimer:</strong> Trading involves substantial risk of loss. 
+            Past performance does not guarantee future results. Trade responsibly.
+        </p>
     </div>
     """, 
     unsafe_allow_html=True
