@@ -21,7 +21,17 @@ import time
 import threading
 from datetime import datetime, timedelta
 import traceback
-
+from auth import require_authentication
+from notifications import (
+    get_notification_system, 
+    notify_system, 
+    notify_error, 
+    notify_trade,
+    notify_trade_close,
+    notify_signal,
+    send_test_notification,
+    get_notification_status
+)
 # Fix Railway port issue
 if 'streamlit' in sys.argv[0] or 'RAILWAY_ENVIRONMENT' in os.environ:
     os.environ.pop('STREAMLIT_SERVER_PORT', None)
@@ -40,7 +50,13 @@ import numpy as np
 
 # ✅ Streamlit Config
 st.set_page_config(page_title="Hybrid Quantum Trading Bot", layout="wide")
+# 🔐 Require authentication
+auth = require_authentication()
 
+# Notify system on dashboard access (only once per session)
+if 'system_notified' not in st.session_state:
+    notify_system("started", f"Dashboard accessed by {auth.admin_username}")
+    st.session_state.system_notified = True 
 # -------------------------
 # Enhanced Module Import System
 # -------------------------
@@ -1100,6 +1116,31 @@ with tabs[1]:
                 st.warning("⚠️ Please enter a valid quantity")
     else:
         st.error("❌ Market analyzer not available. Manual trading disabled.")
+def execute_manual_trade_with_notifications(symbol, quantity, side, price):
+    try:
+        result = components['trade_exec'].manual_trade(symbol, quantity, st.session_state["sl_mult"], st.session_state["tp_mult"])
+        if "✅" in result or "Demo" in result:
+            trade_data = {
+                'symbol': symbol,
+                'side': side,
+                'quantity': quantity,
+                'price': price,
+                'value': quantity * price,
+                'timestamp': datetime.now().isoformat(),
+                'execution_type': 'manual'
+            }
+            notify_trade(trade_data)
+            st.success("✅ Trade executed and notification sent!")
+        return result
+    except Exception as e:
+        notify_error("Manual Trade Execution", str(e), {'symbol': symbol, 'quantity': quantity, 'side': side})
+        return f"❌ Trade failed: {e}"
+
+# Replace existing trade button logic:
+if st.button("🚀 Execute Trade", type="primary", key="manual_execute"):
+    if qty > 0:
+        result = execute_manual_trade_with_notifications(symbol, qty, "BUY", current_price)
+        st.write(result)
 
 # -------------------------
 # Auto-Trader Tab
@@ -1402,6 +1443,16 @@ with tabs[3]:
             
             # REPLACE THIS ENTIRE SECTION IN hybrid_bot.py
 # FIND: "# Trading Interface" section and replace everything until "# Signal Statistics"
+if final_decision in ["BUY", "SELL"] and final_conf >= 0.8:
+    notify_signal({
+        'symbol': symbol,
+        'signal': final_decision,
+        'confidence': final_conf,
+        'price': price,
+        'rsi': rsi,
+        'momentum': momentum,
+        'volatility': volatility
+    })
 
 # ==========================================
 # FIXED TRADING INTERFACE WITH UNIQUE KEYS
@@ -1914,6 +1965,45 @@ with tabs[4]:
             
             if len(trading_pairs) > 20:
                 st.caption(f"... and {len(trading_pairs) - 20} more pairs")
+
+# Email Notification System Section
+st.subheader("📧 Email Notification System")
+
+notification_status = get_notification_status()
+col1, col2 = st.columns(2)
+
+with col1:
+    st.metric("Email System", "✅ Enabled" if notification_status['enabled'] else "❌ Disabled")
+    st.metric("Configuration", "✅ Ready" if notification_status['configured'] else "⚠️ Incomplete")
+
+with col2:
+    st.metric("Emails Sent (Hour)", notification_status['emails_sent_hour'])
+    st.metric("Queue Size", notification_status['queue_size'])
+
+if st.button("📧 Send Test Email", use_container_width=True):
+    with st.spinner("Sending test email..."):
+        try:
+            success = send_test_notification()
+            if success:
+                st.success("✅ Test email sent successfully! Check your inbox.")
+            else:
+                st.error("❌ Failed to send test email. Check configuration.")
+        except Exception as e:
+            st.error(f"❌ Email test failed: {e}")
+            notify_error("Email Test", str(e))
+
+if notification_status['enabled']:
+    preferences = notification_status['types']
+    col1, col2 = st.columns(2)
+    with col1:
+        st.write(f"🤖 Trade Alerts: {'✅' if preferences['trades'] else '❌'}")
+        st.write(f"🎯 Signal Alerts: {'✅' if preferences['signals'] else '❌'}")
+    with col2:
+        st.write(f"🟢 System Alerts: {'✅' if preferences['system'] else '❌'}")
+        st.write(f"❌ Error Alerts: {'✅' if preferences['errors'] else '❌'}")
+    st.info(f"📧 Recipients: {', '.join(notification_status['to_emails'])}")
+else:
+    st.warning("⚠️ Email notifications disabled. Set EMAIL_ENABLED=true in environment.")
 
         # -------------------------
 # System Health Tab
