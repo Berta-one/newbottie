@@ -1,4 +1,3 @@
-# Core Trading Dependencies
 python-binance==1.0.19
 python-dotenv==1.0.0
 streamlit>=1.32.0
@@ -6,23 +5,10 @@ pandas>=2.0.3
 numpy>=1.24.3
 requests>=2.31.0
 pytz>=2023.3
-
-# Dashboard & Visualization
 plotly>=5.15.0
-
-# Async & WebSocket Support
 aiohttp>=3.8.5
 websockets>=11.0.2
 websocket-client>=1.6.0
-
-# Utility & Logging
 colorlog>=6.7.0
 tqdm>=4.66.0
-
-# Additional Trading Bot Dependencies
-asyncio-mqtt>=0.13.0
-ccxt>=4.0.0
-
-# Optional ML Dependencies (comment out if causing Railway issues)
-# scikit-learn>=1.3.0
-# joblib>=1.3.0
+psutil>=5.9.0
