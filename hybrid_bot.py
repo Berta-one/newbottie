@@ -1228,65 +1228,75 @@ with tabs[3]:
                         sl_pct = st.number_input("Stop Loss %", min_value=1.0, value=5.0, max_value=20.0, key="multi_strategy_sl_pct")
                         tp_pct = st.number_input("Take Profit %", min_value=1.0, value=10.0, max_value=50.0, key="multi_strategy_tp_pct")
                     
-                    # Execute button (UNIQUE KEY)
-                    if st.button("🚀 EXECUTE TRADE", type="primary", key="multi_strategy_execute_button"):
-                        try:
-                            # Validate trade
-                            if quantity > 0:
-                                total_balance = components['portfolio_mgr'].total_value()
-                                open_positions = 0  # Fallback
-                                
-                                if components['risk_mgr']:
-                                    validation = components['risk_mgr'].validate_trade(
-                                        trade['symbol'], quantity, trade['price'], total_balance, open_positions
-                                    )
-                                    if validation["status"]:
-                                        result = components['trade_exec'].manual_trade(
-                                            trade['symbol'], quantity, 
-                                            st.session_state["sl_mult"], st.session_state["tp_mult"]
-                                        )
-                                        st.success(f"✅ Trade Executed: {result}")
-                                        
-                                        # Log the trade
-                                        log_msg = f"Multi-Strategy Trade: {trade['action']} {quantity:.6f} {trade['symbol']} @ ${trade['price']:.4f} (Conf: {trade['confidence']:.3f})"
-                                        st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {log_msg}")
-                                        
-                                        # Clear selected trade
-                                        del st.session_state['selected_trade']
-                                        st.rerun()
-                                    else:
-                                        st.error(f"❌ Trade blocked: {validation['reason']}")
-                                else:
-                                    # Execute without risk validation (fallback)
-                                    result = components['trade_exec'].manual_trade(
-                                        trade['symbol'], quantity, 
-                                        st.session_state["sl_mult"], st.session_state["tp_mult"]
-                                    )
-                                    st.success(f"✅ Trade Executed: {result}")
-                                    
-                                    # Log the trade
-                                    log_msg = f"Multi-Strategy Trade: {trade['action']} {quantity:.6f} {trade['symbol']} @ ${trade['price']:.4f} (Conf: {trade['confidence']:.3f})"
-                                    st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {log_msg}")
-                                    
-                                    # Clear selected trade
-                                    del st.session_state['selected_trade']
-                                    st.rerun()
-                            else:
-                                st.error("❌ Invalid quantity")
-                                
-                        except Exception as e:
-                            st.error(f"❌ Trade execution failed: {e}")
+                   # Execute button (IMPROVED ERROR HANDLING)
+if st.button("🚀 EXECUTE TRADE", type="primary", key="multi_strategy_execute_button"):
+    try:
+        # Validate trade
+        if quantity > 0:
+            total_balance = components['portfolio_mgr'].total_value()
+            open_positions = 0  # Fallback
+            
+            # Log the trade attempt
+            log_msg = f"Attempting {trade['action']} {quantity:.6f} {trade['symbol']} @ ${trade['price']:.4f}"
+            st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {log_msg}")
+            
+            if components['risk_mgr']:
+                validation = components['risk_mgr'].validate_trade(
+                    trade['symbol'], quantity, trade['price'], total_balance, open_positions
+                )
+                if not validation["status"]:
+                    error_msg = f"❌ Trade blocked by risk manager: {validation['reason']}"
+                    st.error(error_msg)
+                    st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {error_msg}")
+                    st.stop()
+            
+            # Execute the trade
+            result = components['trade_exec'].manual_trade(
+                trade['symbol'], quantity, 
+                st.session_state["sl_mult"], st.session_state["tp_mult"]
+            )
+            
+            # Check if the result contains an error
+            if "Error" in result or "APIError" in result:
+                st.error(f"❌ Trade Failed: {result}")
+                st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] TRADE ERROR: {result}")
                 
-                # Cancel trade button (UNIQUE KEY)
-                col1, col2, col3 = st.columns([1, 1, 1])
-                with col2:
-                    if st.button("❌ Cancel Trade", key="multi_strategy_cancel_button"):
-                        del st.session_state['selected_trade']
-                        st.rerun()
-            
+                # Show API troubleshooting
+                with st.expander("🔧 API Troubleshooting"):
+                    st.write("**Possible solutions:**")
+                    st.write("1. **Check API Keys** - Make sure your Binance API keys are correct")
+                    st.write("2. **Check IP Whitelist** - Add your server IP to Binance API whitelist")
+                    st.write("3. **Check Permissions** - Enable 'Spot & Margin Trading' in API settings")
+                    st.write("4. **Testnet Mode** - Make sure you're using testnet keys if USE_TESTNET=true")
+                    st.write("5. **API Status** - Check if Binance API is operational")
+                    
+                    # Show current API settings
+                    st.write("**Current Settings:**")
+                    st.write(f"- Testnet Mode: {os.getenv('USE_TESTNET', 'true')}")
+                    st.write(f"- API Key Set: {'Yes' if os.getenv('BINANCE_API_KEY') or os.getenv('BINANCE_TESTNET_API_KEY') else 'No'}")
+                    st.write(f"- API Secret Set: {'Yes' if os.getenv('BINANCE_API_SECRET') or os.getenv('BINANCE_TESTNET_API_SECRET') else 'No'}")
             else:
-                st.info("💡 Select a signal above to execute a trade")
+                # Trade successful
+                st.success(f"✅ Trade Executed: {result}")
+                success_msg = f"Multi-Strategy Trade SUCCESS: {trade['action']} {quantity:.6f} {trade['symbol']} @ ${trade['price']:.4f} (Conf: {trade['confidence']:.3f})"
+                st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {success_msg}")
+                
+                # Clear selected trade
+                del st.session_state['selected_trade']
+                st.rerun()
+        else:
+            error_msg = "❌ Invalid quantity - must be greater than 0"
+            st.error(error_msg)
+            st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {error_msg}")
             
+    except Exception as e:
+        error_msg = f"❌ Trade execution failed: {str(e)}"
+        st.error(error_msg)
+        st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] EXCEPTION: {error_msg}")
+        
+        # Show detailed error
+        with st.expander("🐛 Detailed Error"):
+            st.code(traceback.format_exc())
             # Signal Statistics
             st.subheader("📈 Signal Statistics")
             
@@ -1405,20 +1415,31 @@ with tabs[5]:
     st.dataframe(df, use_container_width=True)
 
 # -------------------------
-# Logs Tab
+# Enhanced Logs Tab (PERSISTENT ERRORS)
 # -------------------------
 with tabs[6]:
     st.header("📜 Activity Logs")
     
-    col1, col2 = st.columns([3, 1])
+    col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
-        log_filter = st.selectbox("Filter logs", ["All", "Manual", "Auto", "ERROR", "WARNING"])
+        log_filter = st.selectbox("Filter logs", ["All", "Manual", "Multi-Strategy", "ERROR", "SUCCESS", "WARNING"], key="log_filter_select")
     with col2:
-        if st.button("🗑️ Clear Logs"):
+        if st.button("🗑️ Clear Logs", key="clear_logs_button"):
             st.session_state["logs"] = []
             st.success("Logs cleared")
+    with col3:
+        if st.button("📥 Export Logs", key="export_logs_button"):
+            logs = st.session_state.get("logs", [])
+            if logs:
+                log_text = "\n".join(logs)
+                st.download_button(
+                    label="💾 Download",
+                    data=log_text,
+                    file_name=f"trading_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+                    mime="text/plain"
+                )
     
-    # Display logs
+    # Display logs with better formatting
     logs = st.session_state.get("logs", [])
     if logs:
         # Show recent logs (last 100)
@@ -1428,18 +1449,45 @@ with tabs[6]:
         if log_filter != "All":
             recent_logs = [log for log in recent_logs if log_filter in log]
         
-        # Display logs in reverse order (newest first)
+        # Count different types of logs
+        total_logs = len(recent_logs)
+        error_count = len([log for log in recent_logs if "ERROR" in log])
+        success_count = len([log for log in recent_logs if "SUCCESS" in log])
+        
+        # Show log statistics
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Logs", total_logs)
+        with col2:
+            st.metric("Errors", error_count, delta="High" if error_count > 5 else "Normal")
+        with col3:
+            st.metric("Successes", success_count)
+        
+        st.divider()
+        
+        # Display logs in reverse order (newest first) with better formatting
         for log in reversed(recent_logs):
-            if "ERROR" in log:
+            if "ERROR" in log or "FAIL" in log:
                 st.error(log)
             elif "WARNING" in log:
                 st.warning(log)
+            elif "SUCCESS" in log:
+                st.success(log)
+            elif "Multi-Strategy" in log:
+                st.info(log)
             elif "Manual" in log:
                 st.info(log)
             else:
                 st.text(log)
     else:
         st.info("📝 No logs available. Activity will appear here as the bot operates.")
+        
+        # Show sample logs for demonstration
+        st.write("**Log types you'll see:**")
+        st.success("[12:34:56] Trade SUCCESS: BUY 0.001 BTCUSDT @ $117000")
+        st.error("[12:35:15] TRADE ERROR: APIError - Invalid permissions")
+        st.info("[12:35:30] Multi-Strategy Trade: BUY 0.0005 ETHUSDT")
+        st.text("[12:36:00] Bot initialized successfully")
 
 # -------------------------
 # Analytics Tab
