@@ -76,22 +76,48 @@ class PortfolioManager:
     def __init__(self, api_key: str = None, api_secret: str = None, binance_client: Optional[Client] = None):
         """Initialize portfolio manager for LIVE trading"""
         
+        self.api_available = False
+        self.api_error = None
+        
         # Initialize Binance client for LIVE trading
-        if binance_client:
-            self.client = binance_client
-        elif api_key and api_secret:
-            self.client = Client(api_key, api_secret)
-            # LIVE API URL (not testnet)
-            self.client.API_URL = 'https://api.binance.com/api'
-        else:
-            # Try from environment
-            api_key = os.getenv('BINANCE_API_KEY')
-            api_secret = os.getenv('BINANCE_API_SECRET')
-            if api_key and api_secret:
+        try:
+            if binance_client:
+                self.client = binance_client
+            elif api_key and api_secret:
                 self.client = Client(api_key, api_secret)
+                # LIVE API URL (not testnet)
                 self.client.API_URL = 'https://api.binance.com/api'
             else:
-                self.client = None
+                # Try from environment
+                api_key = os.getenv('BINANCE_API_KEY')
+                api_secret = os.getenv('BINANCE_API_SECRET')
+                if api_key and api_secret:
+                    self.client = Client(api_key, api_secret)
+                    self.client.API_URL = 'https://api.binance.com/api'
+                else:
+                    self.client = None
+            
+            # Test API connection immediately
+            if self.client:
+                try:
+                    test_response = self.client.get_account()
+                    self.api_available = True
+                    logger.info("✅ Binance API connection successful")
+                except Exception as e:
+                    self.api_available = False
+                    self.api_error = str(e)
+                    logger.error(f"❌ Binance API connection failed: {e}")
+                    self.client = None
+            else:
+                self.api_available = False
+                self.api_error = "No API credentials provided"
+                logger.warning("⚠️ No Binance API credentials - using demo mode")
+                
+        except Exception as e:
+            self.api_available = False
+            self.api_error = str(e)
+            logger.error(f"❌ Failed to initialize Binance client: {e}")
+            self.client = None
         
         self.base_currency = "USDT"
         
@@ -116,7 +142,114 @@ class PortfolioManager:
         self._load_portfolio_state()
         self._load_historical_snapshots()
         
-        logger.info("PortfolioManager initialized for LIVE TRADING")
+        if self.api_available:
+            logger.info("PortfolioManager initialized for LIVE TRADING")
+        else:
+            logger.info("PortfolioManager initialized in DEMO MODE")
+    
+    def is_live(self) -> bool:
+        """Check if portfolio manager is using live data"""
+        return self.api_available and self.client is not None
+    
+    def get_portfolio(self) -> Dict[str, Any]:
+        """
+        Get portfolio in the EXACT format expected by hybrid_bot.py dashboard
+        
+        Looking at hybrid_bot.py line 962-964, it expects:
+        - data['price'] for "Price (USD)"
+        - data['value'] for total USD sum  
+        - data['change'] for "24h Change"
+        - data['balance'] for "Balance"
+        - data.get('free', data['balance']) for "Free"  
+        - data.get('locked', 0) for "Locked"
+        
+        Returns:
+            Portfolio dictionary with exact keys expected by dashboard
+        """
+        # If API is not available, return demo data immediately
+        if not self.api_available or not self.client:
+            logger.info("API not available - returning demo portfolio")
+            return self._get_demo_portfolio_dict()
+        
+        try:
+            logger.info("Getting live portfolio for dashboard...")
+            
+            # Get the real portfolio data
+            portfolio_raw, gbp_rate = self.get_real_portfolio()
+            
+            if not portfolio_raw:
+                logger.warning("Empty portfolio from API - returning demo data")
+                return self._get_demo_portfolio_dict()
+            
+            # Convert to EXACT format expected by hybrid_bot.py dashboard
+            portfolio_formatted = {}
+            
+            for asset, data in portfolio_raw.items():
+                # Extract values with defaults
+                balance = data.get('balance', 0.0)
+                free = data.get('free', balance)  # Default free = balance if not specified
+                locked = data.get('locked', 0.0)
+                price_usd = data.get('price_usd', 0.0)
+                usd_value = data.get('usd_value', 0.0)
+                change_24h = data.get('change_24h', 0.0)
+                
+                # Create entry with EXACT keys expected by dashboard
+                portfolio_formatted[asset] = {
+                    'balance': balance,           # Used in: data['balance']
+                    'free': free,                 # Used in: data.get('free', data['balance'])  
+                    'locked': locked,             # Used in: data.get('locked', 0)
+                    'price': price_usd,           # Used in: data['price'] 
+                    'value': usd_value,           # Used in: data['value'] for sum calculation
+                    'change': change_24h,         # Used in: data['change']
+                    # Additional fields for compatibility
+                    'symbol': data.get('symbol', f"{asset}USDT"),
+                    'price_usd': price_usd,
+                    'usd_value': usd_value,
+                    'gbp_value': data.get('gbp_value', 0.0),
+                    'change_24h': change_24h
+                }
+            
+            logger.info(f"Successfully formatted live portfolio with {len(portfolio_formatted)} assets")
+            return portfolio_formatted
+            
+        except Exception as e:
+            logger.error(f"Error getting live portfolio: {e}")
+            # Mark API as unavailable and return demo data
+            self.api_available = False
+            self.api_error = str(e)
+            return self._get_demo_portfolio_dict()
+    
+    def get_connection_status(self) -> str:
+        """Get Binance API connection status"""
+        if not self.api_available:
+            if self.api_error:
+                if "API-key format invalid" in self.api_error:
+                    return "🔴 Demo - Invalid API Key Format"
+                elif "Invalid API" in self.api_error:
+                    return "🔴 Demo - Invalid API Credentials"
+                elif "Timestamp" in self.api_error:
+                    return "🔴 Demo - Timestamp Error"
+                else:
+                    return f"🔴 Demo - {self.api_error[:50]}..."
+            else:
+                return "🔴 Demo - No API Credentials"
+        
+        try:
+            # Test connection
+            if self.client:
+                account_info = self.client.get_account()
+                if account_info:
+                    if 'testnet' in self.client.API_URL.lower():
+                        return "🧪 Connected to Binance Testnet"
+                    else:
+                        return "🟢 Connected to Binance Live Trading"
+            
+            return "🔴 Demo - Connection Test Failed"
+                
+        except Exception as e:
+            self.api_available = False
+            self.api_error = str(e)
+            return f"🔴 Demo - Connection Error"
     
     def get_real_portfolio(self) -> Tuple[Dict[str, Any], float]:
         """
