@@ -656,7 +656,7 @@ with tabs[0]:
     with col1:
         st.info(components['portfolio_mgr'].get_connection_status())
     with col2:
-        if st.button("🔄 Refresh Portfolio", key="
+        if st.button("🔄 Refresh Portfolio", key="portfolio_refresh"):
 # -------------------------
 # Multi-Strategy Tab
 # -------------------------
