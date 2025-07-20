@@ -81,18 +81,29 @@ print(f"📦 Loaded {sum(1 for v in modules.values() if v is not None)}/{len(mod
 class FallbackPortfolioManager:
     def __init__(self):
         self.portfolio = {
-            'USDT': {'balance': 10000.0, 'free': 10000.0, 'locked': 0.0, 'price': 1.0, 'value': 10000.0, 'change': 0.0},
-            'BTC': {'balance': 0.02, 'free': 0.02, 'locked': 0.0, 'price': 117000.0, 'value': 2340.0, 'change': 2.5},
-            'ETH': {'balance': 0.5, 'free': 0.5, 'locked': 0.0, 'price': 4000.0, 'value': 2000.0, 'change': 1.8}
+            'USDT': {'balance': 50000.0, 'free': 45000.0, 'locked': 5000.0, 'price': 1.0, 'value': 50000.0, 'change': 0.0},
+            'BTC': {'balance': 0.42, 'free': 0.40, 'locked': 0.02, 'price': 117000.0, 'value': 49140.0, 'change': 2.5},
+            'ETH': {'balance': 12.5, 'free': 12.0, 'locked': 0.5, 'price': 4000.0, 'value': 50000.0, 'change': 1.8},
+            'BNB': {'balance': 83.3, 'free': 80.0, 'locked': 3.3, 'price': 600.0, 'value': 49980.0, 'change': -0.5}
         }
         self._live = False
         self._last_update = None
     
     def get_portfolio(self):
+        # Add some realistic fluctuation to demo portfolio
+        import random
+        for asset in self.portfolio:
+            if asset != 'USDT':
+                # Simulate small price movements
+                change = random.uniform(-0.03, 0.03)  # ±3%
+                self.portfolio[asset]['price'] *= (1 + change)
+                self.portfolio[asset]['value'] = self.portfolio[asset]['balance'] * self.portfolio[asset]['price']
+                self.portfolio[asset]['change'] = change * 100
+        
         return self.portfolio
     
     def total_value(self):
-        return sum(asset['value'] for asset in self.portfolio.values())
+        return sum(asset['value'] for asset in self.get_portfolio().values())
     
     def last_updated(self):
         return datetime.now().strftime("%H:%M:%S")
@@ -104,14 +115,29 @@ class FallbackPortfolioManager:
         return False
     
     def get_connection_status(self):
-        return "❌ Using demo data - Portfolio Manager not available"
+        return "🎮 DEMO MODE - Simulated portfolio with $200K starting balance"
     
     def get_trade_history(self, symbol=None, limit=10):
-        return [
-            {"symbol": "BTCUSDT", "side": "BUY", "quantity": 0.0001, "price": 117858.4, "value": 11.79, "commission": 0.01, "time": "11:33:06"},
-            {"symbol": "BTCUSDT", "side": "BUY", "quantity": 0.0001, "price": 117861.97, "value": 11.79, "commission": 0.01, "time": "11:31:58"},
-            {"symbol": "BTCUSDT", "side": "BUY", "quantity": 0.0001, "price": 117850.01, "value": 11.79, "commission": 0.01, "time": "11:31:58"}
-        ]
+        # Generate more realistic demo trade history
+        demo_trades = []
+        for i in range(limit):
+            symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'XRPUSDT']
+            symbol = random.choice(symbols)
+            side = random.choice(['BUY', 'SELL'])
+            quantity = random.uniform(0.001, 0.1)
+            price = FallbackMarketAnalyzer().get_price(symbol) * random.uniform(0.95, 1.05)
+            
+            demo_trades.append({
+                "symbol": symbol,
+                "side": side,
+                "quantity": quantity,
+                "price": price,
+                "value": quantity * price,
+                "commission": quantity * price * 0.001,
+                "time": f"{random.randint(10, 23)}:{random.randint(10, 59)}:{random.randint(10, 59)}"
+            })
+        
+        return demo_trades
 
 class FallbackMarketAnalyzer:
     def __init__(self, client=None):
@@ -562,7 +588,25 @@ with st.sidebar:
         st.metric("Portfolio Value", f"${total_value:,.2f}")
     except:
         st.metric("Portfolio Value", "Loading...")
+    # Demo Mode Indicator
+if not client or "DEMO" in client_status:
+    st.markdown(
+        """
+        <div style='background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%); 
+                    padding: 10px; border-radius: 10px; margin: 10px 0; color: white; text-align: center;'>
+            <h4 style='color: white; margin: 0;'>🎮 DEMO MODE</h4>
+            <p style='color: #f0f0f0; margin: 5px 0; font-size: 12px;'>All trades are simulated</p>
+        </div>
+        """, 
+        unsafe_allow_html=True
+    )
     
+    # Demo Stats
+    if hasattr(components['trade_exec'], 'get_demo_stats'):
+        demo_stats = components['trade_exec'].get_demo_stats()
+        st.metric("Demo Trades", demo_stats['total_trades'])
+        st.metric("Demo P&L", f"${demo_stats['total_pnl']:+.2f}")
+        st.metric("Win Rate", f"{demo_stats['win_rate']:.1f}%")
     # Active Scanner
     scanner = st.session_state.get("auto_scanner")
     if scanner and scanner.is_running():
