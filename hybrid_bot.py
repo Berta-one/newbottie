@@ -603,102 +603,403 @@ with tabs[2]:
         st.info("Order tracking not available")
 
 # -------------------------
-# Multi-Strategy Tab
+# Enhanced Multi-Strategy Tab (Replace the existing Multi-Strategy section)
 # -------------------------
 with tabs[3]:
-    st.header("⚛ Multi-Strategy Analysis")
-    st.caption("Quantum + ML + Technical Signal Ensemble")
+    st.header("⚛ Multi-Strategy Market Scanner")
+    st.caption("Quantum + ML + Technical Analysis for ALL Trading Pairs")
     
-    # Strategy weights
-    col1, col2, col3 = st.columns(3)
+    # Configuration Section
+    col1, col2 = st.columns([2, 1])
+    
     with col1:
-        quantum_weight = st.slider("Quantum Weight", 0, 100, 30)
-    with col2:
-        ml_weight = st.slider("ML Weight", 0, 100, 30)
-    with col3:
-        technical_weight = st.slider("Technical Weight", 0, 100, 40)
-    
-    weights = {"quantum": quantum_weight, "ml": ml_weight, "technical": technical_weight}
-    min_conf = st.slider("Minimum Confidence", 0.5, 1.0, 0.65, 0.01)
-    
-    # Analyze signals for portfolio pairs
-    try:
-        portfolio = components['portfolio_mgr'].get_portfolio()
-        portfolio_pairs = [f"{asset}USDT" for asset in portfolio.keys() if asset != "USDT"]
+        # Strategy weights
+        subcol1, subcol2, subcol3 = st.columns(3)
+        with subcol1:
+            quantum_weight = st.slider("Quantum Weight", 0, 100, 30)
+        with subcol2:
+            ml_weight = st.slider("ML Weight", 0, 100, 30)
+        with subcol3:
+            technical_weight = st.slider("Technical Weight", 0, 100, 40)
         
-        if not portfolio_pairs:
-            portfolio_pairs = ["BTCUSDT", "ETHUSDT", "BNBUSDT"]
+        weights = {"quantum": quantum_weight, "ml": ml_weight, "technical": technical_weight}
+    
+    with col2:
+        min_conf = st.slider("Min Confidence", 0.5, 1.0, 0.65, 0.01)
+        max_pairs = st.slider("Max Pairs to Scan", 5, 50, 20)
+        
+        # Scan mode selection
+        scan_mode = st.selectbox("Scan Mode", [
+            "Top Volume Pairs",
+            "Portfolio + Major Pairs", 
+            "All USDT Pairs",
+            "Custom Selection"
+        ])
+    
+    # Pair Selection Logic
+    if scan_mode == "Top Volume Pairs":
+        # Get high volume pairs
+        all_pairs = components['market_analyzer'].get_trading_pairs()
+        trading_pairs = all_pairs[:max_pairs]  # Top N by volume
+        
+    elif scan_mode == "Portfolio + Major Pairs":
+        # Existing positions + major pairs
+        try:
+            portfolio = components['portfolio_mgr'].get_portfolio()
+            portfolio_pairs = [f"{asset}USDT" for asset in portfolio.keys() if asset not in ["USDT", "BUSD"]]
+        except:
+            portfolio_pairs = []
+        
+        major_pairs = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'XRPUSDT', 'ADAUSDT', 'SOLUSDT', 'DOTUSDT', 'LINKUSDT']
+        trading_pairs = list(set(portfolio_pairs + major_pairs))[:max_pairs]
+        
+    elif scan_mode == "All USDT Pairs":
+        # All available USDT pairs
+        all_pairs = components['market_analyzer'].get_trading_pairs()
+        trading_pairs = [pair for pair in all_pairs if pair.endswith('USDT')][:max_pairs]
+        
+    else:  # Custom Selection
+        # Let user select custom pairs
+        all_pairs = components['market_analyzer'].get_trading_pairs()
+        trading_pairs = st.multiselect(
+            "Select Trading Pairs", 
+            all_pairs, 
+            default=['BTCUSDT', 'ETHUSDT', 'BNBUSDT']
+        )
+    
+    # Scan Controls
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("🔍 Scan All Pairs", type="primary"):
+            st.session_state['manual_scan_requested'] = True
+    
+    with col2:
+        if st.button("🔄 Refresh Signals"):
+            st.session_state['refresh_signals'] = True
+    
+    with col3:
+        show_only_signals = st.checkbox("Show Only Strong Signals", value=True)
+    
+    # Progress bar for scanning
+    if st.session_state.get('manual_scan_requested', False):
+        progress_bar = st.progress(0)
+        status_text = st.empty()
         
         signals_data = []
         
-        for symbol in portfolio_pairs[:5]:  # Limit to 5 pairs
+        for i, symbol in enumerate(trading_pairs):
             try:
+                # Update progress
+                progress = (i + 1) / len(trading_pairs)
+                progress_bar.progress(progress)
+                status_text.text(f"Analyzing {symbol}... ({i+1}/{len(trading_pairs)})")
+                
                 if components['ensemble_engine']:
                     signal = components['ensemble_engine'].get_signals(symbol, weights, min_conf)
-                    signals_data.append(signal)
                 else:
-                    # Fallback signal generation
+                    # Enhanced fallback signal generation
                     rsi = components['market_analyzer'].get_latest_rsi(symbol)
                     momentum = components['market_analyzer'].get_latest_momentum(symbol)
+                    volatility = components['market_analyzer'].get_volatility(symbol)
+                    price = components['market_analyzer'].get_price(symbol)
                     
-                    # Simple signal logic
-                    if rsi < 30 and momentum > 2:
-                        decision = "BUY"
-                        confidence = 0.7
-                    elif rsi > 70 and momentum < -2:
-                        decision = "SELL"
-                        confidence = 0.7
-                    else:
-                        decision = "HOLD"
-                        confidence = 0.5
+                    # Advanced signal logic
+                    quantum_decision = "HOLD"
+                    quantum_conf = 0.5
                     
-                    signals_data.append({
+                    if rsi < 30 and momentum > 3:
+                        quantum_decision = "BUY"
+                        quantum_conf = 0.75
+                    elif rsi > 70 and momentum < -3:
+                        quantum_decision = "SELL" 
+                        quantum_conf = 0.75
+                    elif abs(momentum) > 5:
+                        quantum_decision = "BUY" if momentum > 0 else "SELL"
+                        quantum_conf = 0.65
+                    
+                    # ML simulation (more conservative)
+                    ml_decision = quantum_decision
+                    ml_conf = quantum_conf * 0.9
+                    
+                    # Technical analysis
+                    tech_decision = quantum_decision
+                    tech_conf = quantum_conf * 1.1
+                    
+                    # Final ensemble decision
+                    final_conf = (quantum_conf * weights['quantum'] + 
+                                ml_conf * weights['ml'] + 
+                                tech_conf * weights['technical']) / 100
+                    
+                    final_decision = quantum_decision if final_conf > min_conf else "HOLD"
+                    
+                    signal = {
                         "symbol": symbol,
-                        "quantum": {"decision": decision, "confidence": confidence},
-                        "ml": {"decision": decision, "confidence": confidence * 0.9},
-                        "technical": {"decision": decision, "confidence": confidence * 1.1},
-                        "final": {"decision": decision, "confidence": confidence}
-                    })
-                    
+                        "quantum": {"decision": quantum_decision, "confidence": quantum_conf},
+                        "ml": {"decision": ml_decision, "confidence": ml_conf},
+                        "technical": {"decision": tech_decision, "confidence": tech_conf},
+                        "final": {"decision": final_decision, "confidence": final_conf},
+                        "price": price,
+                        "rsi": rsi,
+                        "momentum": momentum,
+                        "volatility": volatility
+                    }
+                
+                signals_data.append(signal)
+                
             except Exception as e:
-                st.error(f"Signal error for {symbol}: {e}")
+                st.error(f"Error analyzing {symbol}: {e}")
                 continue
         
-        if signals_data:
-            # Create signals dataframe
-            df = pd.DataFrame([
-                {
+        # Clear progress indicators
+        progress_bar.empty()
+        status_text.empty()
+        
+        # Store results in session state
+        st.session_state['latest_signals'] = signals_data
+        st.session_state['manual_scan_requested'] = False
+        st.session_state['last_scan_time'] = datetime.now()
+    
+    # Display Results
+    signals_data = st.session_state.get('latest_signals', [])
+    
+    if signals_data:
+        # Filter signals if requested
+        if show_only_signals:
+            filtered_signals = [
+                s for s in signals_data 
+                if s['final']['decision'] != 'HOLD' and s['final']['confidence'] > min_conf
+            ]
+        else:
+            filtered_signals = signals_data
+        
+        if filtered_signals:
+            st.subheader(f"📊 Analysis Results ({len(filtered_signals)} pairs)")
+            
+            # Create comprehensive signals dataframe
+            signals_df = []
+            for s in filtered_signals:
+                signals_df.append({
                     "Symbol": s["symbol"],
+                    "Price": f"${s.get('price', 0):.4f}",
+                    "Final Signal": s['final']['decision'],
+                    "Confidence": f"{s['final']['confidence']:.3f}",
                     "Quantum": f"{s['quantum']['decision']} ({s['quantum']['confidence']:.2f})",
                     "ML": f"{s['ml']['decision']} ({s['ml']['confidence']:.2f})",
                     "Technical": f"{s['technical']['decision']} ({s['technical']['confidence']:.2f})",
-                    "Final": f"{s['final']['decision']} ({s['final']['confidence']:.2f})"
-                }
-                for s in signals_data
-            ])
+                    "RSI": f"{s.get('rsi', 50):.1f}",
+                    "Momentum": f"{s.get('momentum', 0):.2f}%",
+                    "Volatility": f"{s.get('volatility', 0):.3f}"
+                })
             
-            st.subheader("📊 Multi-Strategy Signals")
-            st.dataframe(df, use_container_width=True)
+            df = pd.DataFrame(signals_df)
             
-            # Signal summary
-            final_signals = [s['final']['decision'] for s in signals_data]
-            buy_count = final_signals.count('BUY')
-            sell_count = final_signals.count('SELL')
-            hold_count = final_signals.count('HOLD')
+            # Color coding for signals
+            def color_signals(val):
+                if 'BUY' in val:
+                    return 'background-color: #90EE90'  # Light green
+                elif 'SELL' in val:
+                    return 'background-color: #FFB6C1'  # Light red
+                else:
+                    return 'background-color: #F0F0F0'  # Light gray
             
-            col1, col2, col3 = st.columns(3)
+            # Apply styling
+            styled_df = df.style.applymap(color_signals, subset=['Final Signal'])
+            st.dataframe(styled_df, use_container_width=True)
+            
+            # Trading Interface
+            st.subheader("⚡ Quick Trading Interface")
+            
+            # Select signal for trading
+            strong_buy_signals = [s for s in filtered_signals if s['final']['decision'] == 'BUY']
+            strong_sell_signals = [s for s in filtered_signals if s['final']['decision'] == 'SELL']
+            
+            if strong_buy_signals or strong_sell_signals:
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    if strong_buy_signals:
+                        st.write("**🟢 Strong BUY Signals:**")
+                        for signal in strong_buy_signals[:5]:  # Top 5
+                            symbol = signal['symbol']
+                            conf = signal['final']['confidence']
+                            price = signal.get('price', 0)
+                            
+                            signal_col1, signal_col2 = st.columns([3, 1])
+                            
+                            with signal_col1:
+                                st.write(f"**{symbol}** - ${price:.4f} (Conf: {conf:.3f})")
+                            
+                            with signal_col2:
+                                if st.button(f"🚀 Buy", key=f"buy_{symbol}"):
+                                    # Store selected trade in session state
+                                    st.session_state['selected_trade'] = {
+                                        'symbol': symbol,
+                                        'action': 'BUY',
+                                        'price': price,
+                                        'confidence': conf
+                                    }
+                                    st.success(f"Selected {symbol} for BUY")
+                
+                with col2:
+                    if strong_sell_signals:
+                        st.write("**🔴 Strong SELL Signals:**")
+                        for signal in strong_sell_signals[:5]:  # Top 5
+                            symbol = signal['symbol']
+                            conf = signal['final']['confidence']
+                            price = signal.get('price', 0)
+                            
+                            signal_col1, signal_col2 = st.columns([3, 1])
+                            
+                            with signal_col1:
+                                st.write(f"**{symbol}** - ${price:.4f} (Conf: {conf:.3f})")
+                            
+                            with signal_col2:
+                                if st.button(f"📉 Sell", key=f"sell_{symbol}"):
+                                    st.session_state['selected_trade'] = {
+                                        'symbol': symbol,
+                                        'action': 'SELL',
+                                        'price': price,
+                                        'confidence': conf
+                                    }
+                                    st.success(f"Selected {symbol} for SELL")
+            
+            # Execute Selected Trade
+            if 'selected_trade' in st.session_state:
+                trade = st.session_state['selected_trade']
+                
+                st.divider()
+                st.subheader(f"🎯 Execute Trade: {trade['action']} {trade['symbol']}")
+                
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.info(f"**Symbol:** {trade['symbol']}")
+                    st.info(f"**Action:** {trade['action']}")
+                    st.info(f"**Price:** ${trade['price']:.4f}")
+                    st.info(f"**Confidence:** {trade['confidence']:.3f}")
+                
+                with col2:
+                    # Position sizing options
+                    sizing_method = st.radio("Position Sizing", [
+                        "Fixed USD Amount",
+                        "Risk Percentage", 
+                        "Fixed Quantity"
+                    ])
+                    
+                    if sizing_method == "Fixed USD Amount":
+                        usd_amount = st.number_input("USD Amount", min_value=10.0, value=100.0, step=10.0)
+                        quantity = usd_amount / trade['price']
+                    elif sizing_method == "Risk Percentage":
+                        risk_pct = st.number_input("Risk %", min_value=0.1, value=2.0, max_value=10.0, step=0.1)
+                        portfolio_value = components['portfolio_mgr'].total_value()
+                        risk_amount = portfolio_value * (risk_pct / 100)
+                        quantity = risk_amount / trade['price']
+                    else:
+                        quantity = st.number_input("Quantity", min_value=0.0001, value=0.01, step=0.0001, format="%.6f")
+                    
+                    st.info(f"**Quantity:** {quantity:.6f}")
+                    st.info(f"**Value:** ${quantity * trade['price']:.2f}")
+                
+                with col3:
+                    # Risk management
+                    use_sl_tp = st.checkbox("Use Stop Loss / Take Profit", value=True)
+                    
+                    if use_sl_tp:
+                        sl_pct = st.number_input("Stop Loss %", min_value=1.0, value=5.0, max_value=20.0)
+                        tp_pct = st.number_input("Take Profit %", min_value=1.0, value=10.0, max_value=50.0)
+                    
+                    # Execute button
+                    if st.button("🚀 EXECUTE TRADE", type="primary"):
+                        try:
+                            # Validate trade
+                            if quantity > 0:
+                                total_balance = components['portfolio_mgr'].total_value()
+                                open_positions = 0  # Fallback
+                                
+                                if components['risk_mgr']:
+                                    validation = components['risk_mgr'].validate_trade(
+                                        trade['symbol'], quantity, trade['price'], total_balance, open_positions
+                                    )
+                                    if validation["status"]:
+                                        result = components['trade_exec'].manual_trade(
+                                            trade['symbol'], quantity, 
+                                            st.session_state["sl_mult"], st.session_state["tp_mult"]
+                                        )
+                                        st.success(f"✅ Trade Executed: {result}")
+                                        
+                                        # Log the trade
+                                        log_msg = f"Multi-Strategy Trade: {trade['action']} {quantity:.6f} {trade['symbol']} @ ${trade['price']:.4f} (Conf: {trade['confidence']:.3f})"
+                                        st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {log_msg}")
+                                        
+                                        # Clear selected trade
+                                        del st.session_state['selected_trade']
+                                        st.rerun()
+                                    else:
+                                        st.error(f"❌ Trade blocked: {validation['reason']}")
+                                else:
+                                    # Execute without risk validation (fallback)
+                                    result = components['trade_exec'].manual_trade(
+                                        trade['symbol'], quantity, 
+                                        st.session_state["sl_mult"], st.session_state["tp_mult"]
+                                    )
+                                    st.success(f"✅ Trade Executed: {result}")
+                            else:
+                                st.error("❌ Invalid quantity")
+                                
+                        except Exception as e:
+                            st.error(f"❌ Trade execution failed: {e}")
+                
+                # Cancel trade
+                if st.button("❌ Cancel Trade"):
+                    del st.session_state['selected_trade']
+                    st.rerun()
+            
+            # Signal Statistics
+            st.subheader("📈 Signal Statistics")
+            
+            total_scanned = len(signals_data)
+            strong_signals = len(filtered_signals)
+            buy_signals = len([s for s in filtered_signals if s['final']['decision'] == 'BUY'])
+            sell_signals = len([s for s in filtered_signals if s['final']['decision'] == 'SELL'])
+            
+            col1, col2, col3, col4 = st.columns(4)
             with col1:
-                st.metric("BUY Signals", buy_count)
+                st.metric("Total Scanned", total_scanned)
             with col2:
-                st.metric("SELL Signals", sell_count)
+                st.metric("Strong Signals", strong_signals)
             with col3:
-                st.metric("HOLD Signals", hold_count)
+                st.metric("BUY Signals", buy_signals)
+            with col4:
+                st.metric("SELL Signals", sell_signals)
+        
         else:
-            st.warning("⚠️ No signals generated. Check your portfolio or try manual refresh.")
+            st.warning("⚠️ No strong signals found with current confidence threshold")
+            st.info("💡 Try lowering the minimum confidence or scanning more pairs")
+        
+        # Last scan info
+        if 'last_scan_time' in st.session_state:
+            st.caption(f"Last scan: {st.session_state['last_scan_time'].strftime('%H:%M:%S')}")
+    
+    else:
+        # Initial state - no scan performed yet
+        st.info("🔍 Click 'Scan All Pairs' to analyze trading opportunities across multiple cryptocurrencies")
+        
+        # Show sample pairs that will be scanned
+        st.subheader("📋 Pairs to be scanned:")
+        if trading_pairs:
+            # Display in columns
+            pairs_per_col = 5
+            cols = st.columns(min(len(trading_pairs) // pairs_per_col + 1, 4))
             
-    except Exception as e:
-        st.error(f"Multi-strategy analysis error: {e}")
-        st.code(traceback.format_exc())
+            for i, pair in enumerate(trading_pairs[:20]):  # Show first 20
+                col_idx = i % len(cols)
+                cols[col_idx].write(f"• {pair}")
+            
+            if len(trading_pairs) > 20:
+                st.caption(f"... and {len(trading_pairs) - 20} more pairs")
+        else:
+            st.warning("⚠️ No trading pairs selected")
 
 # -------------------------
 # Settings Tab
