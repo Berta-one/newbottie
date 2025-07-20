@@ -1642,7 +1642,7 @@ with tabs[7]:
         st.info("📊 Analytics will show real data once more trading activity is recorded")
 
 # -------------------------
-# Status Bar
+# Status Bar (SINGLE VERSION)
 # -------------------------
 st.divider()
 
@@ -1670,15 +1670,80 @@ with col3:
 
 with col4:
     mode = "🧪 TESTNET" if os.getenv("USE_TESTNET", "true").lower() == "true" else "🚀 LIVE"
-    if "TESTNET" in mode:
+    demo_mode = os.getenv("USE_DEMO_MODE", "false").lower() == "true"
+    if demo_mode:
+        st.warning("🎮 DEMO MODE")
+    elif "TESTNET" in mode:
         st.info(mode)
     else:
         st.warning(mode)
 
-# Auto-refresh option
-if st.checkbox("🔄 Auto-refresh (30s)", value=False):
+# Auto-refresh option (SINGLE VERSION WITH UNIQUE KEY)
+if st.checkbox("🔄 Auto-refresh (30s)", value=False, key="main_auto_refresh"):
     time.sleep(30)
     st.rerun()
+
+# -------------------------
+# Enhanced Footer (SINGLE VERSION)
+# -------------------------
+st.markdown("---")
+st.markdown(
+    """
+    <div style='text-align: center; padding: 20px; background: #f8f9fa; border-radius: 10px; margin-top: 20px;'>
+        <div style='margin-bottom: 15px;'>
+            <img src='https://static.wixstatic.com/media/80aa29_3bdfcbab4dd34671915e3b66b0b596e4~mv2.jpeg/v1/fill/w_146,h_104,al_c,q_80,usm_0.66_1.00_0.01,enc_avif,quality_auto/LRC_1719585575250.jpeg' 
+                 width='80' style='border-radius: 8px; opacity: 0.8;'/>
+        </div>
+        <h4 style='color: #333; margin: 10px 0;'>🧠 Hybrid Quantum Crypto Trading Bot v2.0</h4>
+        <p style='color: #666; margin: 10px 0;'>
+            ⚛️ Quantum Analytics | 🤖 AI Trading | 📊 Advanced Analytics
+        </p>
+        <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                    padding: 15px; border-radius: 10px; margin: 15px 0; color: white;'>
+            <h4 style='color: white; margin: 0;'>Rondanini Publishing Ltd.</h4>
+            <p style='color: #f0f0f0; margin: 5px 0; font-size: 14px;'>
+                Advanced Quantum-Enhanced Trading Solutions
+            </p>
+            <p style='color: #e0e0e0; margin: 5px 0; font-size: 12px;'>
+                © 2025 All Rights Reserved
+            </p>
+        </div>
+        <p style='color: #888; font-size: 12px; margin-top: 15px;'>
+            ⚠️ <strong>Risk Disclaimer:</strong> Trading involves substantial risk of loss. 
+            Past performance does not guarantee future results. Trade responsibly.
+        </p>
+    </div>
+    """, 
+    unsafe_allow_html=True
+)
+
+# -------------------------
+# Background Tasks (SINGLE VERSION)
+# -------------------------
+if os.getenv("AUTO_START_BOT", "false").lower() == "true":
+    scanner = st.session_state.get("auto_scanner")
+    if scanner and not scanner.is_running():
+        scanner.start_scanning()
+        st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Auto-scanner started")
+
+# -------------------------
+# Demo Mode Status (NEW)
+# -------------------------
+demo_mode = os.getenv("USE_DEMO_MODE", "false").lower() == "true"
+if demo_mode:
+    st.markdown(
+        """
+        <div style='position: fixed; top: 10px; right: 10px; z-index: 999; 
+                    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%); 
+                    color: white; padding: 10px 20px; border-radius: 25px; 
+                    font-weight: bold; box-shadow: 0 4px 8px rgba(0,0,0,0.2);'>
+            🎮 DEMO MODE ACTIVE
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+print("✅ Hybrid Quantum Trading Bot loaded successfully!")
 
 # -------------------------
 # Enhanced Footer
