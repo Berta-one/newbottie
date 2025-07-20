@@ -20,10 +20,15 @@ import threading
 from datetime import datetime, timedelta
 import traceback
 
-# FORCE LIVE DATA BUT DEMO TRADING
-os.environ['USE_LIVE_DATA'] = 'true'
-os.environ['DEMO_TRADING_ONLY'] = 'true'
+# EMERGENCY LOOP STOPPER
+if 'loop_count' not in st.session_state:
+    st.session_state['loop_count'] = 0
 
+st.session_state['loop_count'] += 1
+
+if st.session_state['loop_count'] > 3:
+    st.error("🛑 Loop detected! Stopping auto-refresh.")
+    st.stop()
 # Fix Railway port issue
 if 'streamlit' in sys.argv[0] or 'RAILWAY_ENVIRONMENT' in os.environ:
     os.environ.pop('STREAMLIT_SERVER_PORT', None)
@@ -259,7 +264,7 @@ class AutoScanner:
 # Setup Components
 # -------------------------
 def setup_binance_client():
-    """Setup Binance client for LIVE data with demo trading"""
+    """Setup Binance client"""
     if not modules.get('Client'):
         return None, "❌ Binance client not available"
     
@@ -267,22 +272,22 @@ def setup_binance_client():
     api_secret = os.getenv("BINANCE_API_SECRET") or os.getenv("BINANCE_TESTNET_API_SECRET")
     
     if not api_key or not api_secret:
-        return None, "⚠️ API keys not configured"
+        return None, "⚠️ API keys not configured - using demo mode"
     
     try:
         client = modules['Client'](api_key, api_secret)
+        use_testnet = os.getenv("USE_TESTNET", "true").lower() == "true"
         
-        # Always use LIVE API for data (not testnet)
-        use_testnet = False  # Force live data
+        if use_testnet:
+            client.API_URL = 'https://testnet.binance.vision/api'
         
-        # Test connection (read-only)
         client.get_server_time()
-        
-        return client, f"✅ Connected to Binance 🚀 LIVE DATA (Demo Trading)"
+        mode = "🧪 TESTNET" if use_testnet else "🚀 LIVE"
+        return client, f"✅ Connected to Binance {mode}"
         
     except Exception as e:
         return None, f"❌ Connection failed: {str(e)}"
-
+        
 def initialize_components():
     """Initialize components with LIVE data but demo trading"""
     components = {}
