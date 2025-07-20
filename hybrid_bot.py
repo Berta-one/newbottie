@@ -1228,77 +1228,89 @@ with tabs[3]:
                         sl_pct = st.number_input("Stop Loss %", min_value=1.0, value=5.0, max_value=20.0, key="multi_strategy_sl_pct")
                         tp_pct = st.number_input("Take Profit %", min_value=1.0, value=10.0, max_value=50.0, key="multi_strategy_tp_pct")
                     
-                   # Execute button (IMPROVED ERROR HANDLING)
-if st.button("🚀 EXECUTE TRADE", type="primary", key="multi_strategy_execute_button"):
-    try:
-        # Validate trade
-        if quantity > 0:
-            total_balance = components['portfolio_mgr'].total_value()
-            open_positions = 0  # Fallback
-            
-            # Log the trade attempt
-            log_msg = f"Attempting {trade['action']} {quantity:.6f} {trade['symbol']} @ ${trade['price']:.4f}"
-            st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {log_msg}")
-            
-            if components['risk_mgr']:
-                validation = components['risk_mgr'].validate_trade(
-                    trade['symbol'], quantity, trade['price'], total_balance, open_positions
-                )
-                if not validation["status"]:
-                    error_msg = f"❌ Trade blocked by risk manager: {validation['reason']}"
-                    st.error(error_msg)
-                    st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {error_msg}")
-                    st.stop()
-            
-            # Execute the trade
-            result = components['trade_exec'].manual_trade(
-                trade['symbol'], quantity, 
-                st.session_state["sl_mult"], st.session_state["tp_mult"]
-            )
-            
-            # Check if the result contains an error
-            if "Error" in result or "APIError" in result:
-                st.error(f"❌ Trade Failed: {result}")
-                st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] TRADE ERROR: {result}")
+                   
+           # Execute button (IMPROVED ERROR HANDLING)
+                    if st.button("🚀 EXECUTE TRADE", type="primary", key="multi_strategy_execute_button"):
+                        try:
+                            # Validate trade
+                            if quantity > 0:
+                                total_balance = components['portfolio_mgr'].total_value()
+                                open_positions = 0  # Fallback
+                                
+                                # Log the trade attempt
+                                log_msg = f"Attempting {trade['action']} {quantity:.6f} {trade['symbol']} @ ${trade['price']:.4f}"
+                                st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {log_msg}")
+                                
+                                if components['risk_mgr']:
+                                    validation = components['risk_mgr'].validate_trade(
+                                        trade['symbol'], quantity, trade['price'], total_balance, open_positions
+                                    )
+                                    if not validation["status"]:
+                                        error_msg = f"❌ Trade blocked by risk manager: {validation['reason']}"
+                                        st.error(error_msg)
+                                        st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {error_msg}")
+                                        st.stop()
+                                
+                                # Execute the trade
+                                result = components['trade_exec'].manual_trade(
+                                    trade['symbol'], quantity, 
+                                    st.session_state["sl_mult"], st.session_state["tp_mult"]
+                                )
+                                
+                                # Check if the result contains an error
+                                if "Error" in result or "APIError" in result:
+                                    st.error(f"❌ Trade Failed: {result}")
+                                    st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] TRADE ERROR: {result}")
+                                    
+                                    # Show API troubleshooting
+                                    with st.expander("🔧 API Troubleshooting"):
+                                        st.write("**Possible solutions:**")
+                                        st.write("1. **Check API Keys** - Make sure your Binance API keys are correct")
+                                        st.write("2. **Check IP Whitelist** - Add your server IP to Binance API whitelist")
+                                        st.write("3. **Check Permissions** - Enable 'Spot & Margin Trading' in API settings")
+                                        st.write("4. **Testnet Mode** - Make sure you're using testnet keys if USE_TESTNET=true")
+                                        st.write("5. **API Status** - Check if Binance API is operational")
+                                        
+                                        # Show current API settings
+                                        st.write("**Current Settings:**")
+                                        st.write(f"- Testnet Mode: {os.getenv('USE_TESTNET', 'true')}")
+                                        st.write(f"- API Key Set: {'Yes' if os.getenv('BINANCE_API_KEY') or os.getenv('BINANCE_TESTNET_API_KEY') else 'No'}")
+                                        st.write(f"- API Secret Set: {'Yes' if os.getenv('BINANCE_API_SECRET') or os.getenv('BINANCE_TESTNET_API_SECRET') else 'No'}")
+                                else:
+                                    # Trade successful
+                                    st.success(f"✅ Trade Executed: {result}")
+                                    success_msg = f"Multi-Strategy Trade SUCCESS: {trade['action']} {quantity:.6f} {trade['symbol']} @ ${trade['price']:.4f} (Conf: {trade['confidence']:.3f})"
+                                    st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {success_msg}")
+                                    
+                                    # Clear selected trade
+                                    del st.session_state['selected_trade']
+                                    st.rerun()
+                            else:
+                                error_msg = "❌ Invalid quantity - must be greater than 0"
+                                st.error(error_msg)
+                                st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {error_msg}")
+                                
+                        except Exception as e:
+                            error_msg = f"❌ Trade execution failed: {str(e)}"
+                            st.error(error_msg)
+                            st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] EXCEPTION: {error_msg}")
+                            
+                            # Show detailed error
+                            with st.expander("🐛 Detailed Error"):
+                                st.code(traceback.format_exc())
                 
-                # Show API troubleshooting
-                with st.expander("🔧 API Troubleshooting"):
-                    st.write("**Possible solutions:**")
-                    st.write("1. **Check API Keys** - Make sure your Binance API keys are correct")
-                    st.write("2. **Check IP Whitelist** - Add your server IP to Binance API whitelist")
-                    st.write("3. **Check Permissions** - Enable 'Spot & Margin Trading' in API settings")
-                    st.write("4. **Testnet Mode** - Make sure you're using testnet keys if USE_TESTNET=true")
-                    st.write("5. **API Status** - Check if Binance API is operational")
-                    
-                    # Show current API settings
-                    st.write("**Current Settings:**")
-                    st.write(f"- Testnet Mode: {os.getenv('USE_TESTNET', 'true')}")
-                    st.write(f"- API Key Set: {'Yes' if os.getenv('BINANCE_API_KEY') or os.getenv('BINANCE_TESTNET_API_KEY') else 'No'}")
-                    st.write(f"- API Secret Set: {'Yes' if os.getenv('BINANCE_API_SECRET') or os.getenv('BINANCE_TESTNET_API_SECRET') else 'No'}")
+                # Cancel trade button (UNIQUE KEY)
+                col1, col2, col3 = st.columns([1, 1, 1])
+                with col2:
+                    if st.button("❌ Cancel Trade", key="multi_strategy_cancel_button"):
+                        del st.session_state['selected_trade']
+                        st.rerun()
+            
             else:
-                # Trade successful
-                st.success(f"✅ Trade Executed: {result}")
-                success_msg = f"Multi-Strategy Trade SUCCESS: {trade['action']} {quantity:.6f} {trade['symbol']} @ ${trade['price']:.4f} (Conf: {trade['confidence']:.3f})"
-                st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {success_msg}")
-                
-                # Clear selected trade
-                del st.session_state['selected_trade']
-                st.rerun()
-        else:
-            error_msg = "❌ Invalid quantity - must be greater than 0"
-            st.error(error_msg)
-            st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {error_msg}")
-            
-    except Exception as e:
-        error_msg = f"❌ Trade execution failed: {str(e)}"
-        st.error(error_msg)
-        st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] EXCEPTION: {error_msg}")
-        
-        # Show detailed error
-        with st.expander("🐛 Detailed Error"):
-            st.code(traceback.format_exc())
-            # Signal Statistics
-            st.subheader("📈 Signal Statistics")
+                st.info("💡 Select a signal above to execute a trade")
+               
+                         
+       
             
             total_scanned = len(signals_data)
             strong_signals = len(filtered_signals)
