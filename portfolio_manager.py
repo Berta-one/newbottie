@@ -689,6 +689,103 @@ class PortfolioManager:
         except Exception as e:
             logger.error(f"Error loading snapshots: {e}")
     
+    def get_connection_status(self) -> str:
+        """Get Binance API connection status"""
+        try:
+            if not self.client:
+                return "❌ Not Connected - Missing API credentials"
+            
+            # Test connection with a simple API call
+            account_info = self.client.get_account()
+            if account_info:
+                # Check if we're on live or testnet
+                if 'testnet' in self.client.API_URL.lower():
+                    return "🧪 Connected to Binance Testnet"
+                else:
+                    return "🚀 Connected to Binance Live Trading"
+            else:
+                return "❌ Connection Failed"
+                
+        except BinanceAPIException as e:
+            if e.code == -2015:
+                return "❌ Invalid API Key or Secret"
+            elif e.code == -1021:
+                return "❌ Timestamp Error - Check system clock"
+            else:
+                return f"❌ API Error: {e.message}"
+        except Exception as e:
+            return f"❌ Connection Error: {str(e)}"
+    
+    def get_api_permissions(self) -> Dict[str, bool]:
+        """Check API key permissions"""
+        try:
+            if not self.client:
+                return {"spot": False, "futures": False, "margin": False}
+            
+            account_info = self.client.get_account()
+            permissions = account_info.get('permissions', [])
+            
+            return {
+                "spot": "SPOT" in permissions,
+                "futures": "FUTURES" in permissions,
+                "margin": "MARGIN" in permissions,
+                "can_trade": account_info.get('canTrade', False),
+                "can_withdraw": account_info.get('canWithdraw', False),
+                "can_deposit": account_info.get('canDeposit', False)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error checking API permissions: {e}")
+            return {"error": str(e)}
+    
+    def test_connection(self) -> Dict[str, Any]:
+        """Comprehensive connection test"""
+        try:
+            if not self.client:
+                return {
+                    "connected": False,
+                    "error": "No Binance client initialized",
+                    "status": "❌ Not Connected"
+                }
+            
+            # Test server time
+            server_time = self.client.get_server_time()
+            
+            # Test account access
+            account_info = self.client.get_account()
+            
+            # Get permissions
+            permissions = self.get_api_permissions()
+            
+            # Determine trading mode
+            is_testnet = 'testnet' in self.client.API_URL.lower()
+            
+            return {
+                "connected": True,
+                "server_time": server_time,
+                "account_type": account_info.get('accountType', 'UNKNOWN'),
+                "can_trade": account_info.get('canTrade', False),
+                "permissions": permissions,
+                "is_testnet": is_testnet,
+                "mode": "Testnet" if is_testnet else "Live Trading",
+                "status": "🧪 Testnet Connected" if is_testnet else "🚀 Live Trading Connected",
+                "api_url": self.client.API_URL
+            }
+            
+        except BinanceAPIException as e:
+            return {
+                "connected": False,
+                "error": f"Binance API Error: {e.message}",
+                "error_code": e.code,
+                "status": f"❌ API Error ({e.code})"
+            }
+        except Exception as e:
+            return {
+                "connected": False,
+                "error": str(e),
+                "status": "❌ Connection Failed"
+            }
+    
     def _get_demo_portfolio(self) -> Dict[str, Any]:
         """Get demo portfolio data when client unavailable"""
         return {
