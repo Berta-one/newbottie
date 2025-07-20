@@ -20,6 +20,10 @@ import threading
 from datetime import datetime, timedelta
 import traceback
 
+# FORCE LIVE DATA BUT DEMO TRADING
+os.environ['USE_LIVE_DATA'] = 'true'
+os.environ['DEMO_TRADING_ONLY'] = 'true'
+
 # Fix Railway port issue
 if 'streamlit' in sys.argv[0] or 'RAILWAY_ENVIRONMENT' in os.environ:
     os.environ.pop('STREAMLIT_SERVER_PORT', None)
@@ -155,20 +159,48 @@ class FallbackQuantumAnalyzer:
             'distribution': {'BUY': 0.4, 'SELL': 0.3, 'HOLD': 0.3}
         }
 
-class FallbackTradeExecutor:
+class DemoTradeExecutor:
     def __init__(self, client=None, risk_mgr=None, log_callback=None):
         self.active_orders = {}
         self.log_callback = log_callback or (lambda msg: print(msg))
         self.client = client
+        self.trade_count = 0
     
     def manual_trade(self, symbol, qty, sl_mult, tp_mult, atr_value=None):
-        price = FallbackMarketAnalyzer().get_price(symbol)
-        trade_msg = f"[Manual] BUY {symbol} @ {price} Qty={qty}"
+        self.trade_count += 1
+        
+        # Get REAL current price from live data
+        try:
+            if self.client:
+                ticker = self.client.get_symbol_ticker(symbol=symbol)
+                real_price = float(ticker['price'])
+            else:
+                real_price = 100000.0  # Fallback
+        except:
+            real_price = 100000.0  # Fallback
+        
+        # Simulate successful trade execution
+        trade_value = qty * real_price
+        fee = trade_value * 0.001  # 0.1% fee
+        
+        trade_msg = f"[DEMO] ✅ BUY {symbol} @ ${real_price:,.4f} | Qty: {qty:.6f} | Value: ${trade_value:.2f} | DEMO TRADE - NO REAL EXECUTION"
         self.log_callback(trade_msg)
-        return f"✅ Trade executed: {symbol} quantity {qty}"
+        
+        # Add to demo active orders
+        order_id = f"DEMO_{self.trade_count}_{int(time.time())}"
+        self.active_orders[order_id] = {
+            'symbol': symbol,
+            'side': 'BUY',
+            'quantity': qty,
+            'price': real_price,
+            'status': 'DEMO_FILLED',
+            'time': datetime.now().strftime('%H:%M:%S')
+        }
+        
+        return f"✅ DEMO Trade: {symbol} | Qty: {qty:.6f} | Price: ${real_price:,.4f} | Value: ${trade_value:.2f} (NO REAL MONEY USED)"
     
     def auto_execute(self, signal, total_balance, open_positions, sl_mult, tp_mult):
-        return "✅ Auto-trade executed (demo)"
+        return self.manual_trade(signal.get('symbol', 'BTCUSDT'), 0.001, sl_mult, tp_mult)
 
 # -------------------------
 # Auto-Scanner Class
@@ -227,7 +259,7 @@ class AutoScanner:
 # Setup Components
 # -------------------------
 def setup_binance_client():
-    """Setup Binance client"""
+    """Setup Binance client for LIVE data with demo trading"""
     if not modules.get('Client'):
         return None, "❌ Binance client not available"
     
@@ -235,52 +267,54 @@ def setup_binance_client():
     api_secret = os.getenv("BINANCE_API_SECRET") or os.getenv("BINANCE_TESTNET_API_SECRET")
     
     if not api_key or not api_secret:
-        return None, "⚠️ API keys not configured - using demo mode"
+        return None, "⚠️ API keys not configured"
     
     try:
         client = modules['Client'](api_key, api_secret)
-        use_testnet = os.getenv("USE_TESTNET", "true").lower() == "true"
         
-        if use_testnet:
-            client.API_URL = 'https://testnet.binance.vision/api'
+        # Always use LIVE API for data (not testnet)
+        use_testnet = False  # Force live data
         
+        # Test connection (read-only)
         client.get_server_time()
-        mode = "🧪 TESTNET" if use_testnet else "🚀 LIVE"
-        return client, f"✅ Connected to Binance {mode}"
+        
+        return client, f"✅ Connected to Binance 🚀 LIVE DATA (Demo Trading)"
         
     except Exception as e:
         return None, f"❌ Connection failed: {str(e)}"
 
 def initialize_components():
-    """Initialize components safely"""
+    """Initialize components with LIVE data but demo trading"""
     components = {}
     
     # Binance client
     client, client_status = setup_binance_client()
     
-    # Portfolio Manager
-    if modules.get('PortfolioManager') and client:
-        try:
+    # Portfolio Manager - ALWAYS try live first
+    try:
+        if modules.get('PortfolioManager') and client:
             api_key = os.getenv("BINANCE_API_KEY") or os.getenv("BINANCE_TESTNET_API_KEY")
             api_secret = os.getenv("BINANCE_API_SECRET") or os.getenv("BINANCE_TESTNET_API_SECRET")
-            use_testnet = os.getenv("USE_TESTNET", "true").lower() == "true"
+            use_testnet = False  # Force live data
             components['portfolio_mgr'] = modules['PortfolioManager'](api_key, api_secret, use_testnet)
-            print("✅ Live Portfolio Manager initialized")
-        except Exception as e:
-            print(f"⚠️ Portfolio Manager failed, using fallback: {e}")
+            print("✅ LIVE Portfolio Manager initialized")
+        else:
             components['portfolio_mgr'] = FallbackPortfolioManager()
-    else:
+            print("⚠️ Using Fallback Portfolio Manager")
+    except Exception as e:
+        print(f"⚠️ Portfolio Manager failed: {e}")
         components['portfolio_mgr'] = FallbackPortfolioManager()
     
-    # Market Analyzer
-    if modules.get('MarketAnalyzer'):
-        try:
+    # Market Analyzer - ALWAYS try live first
+    try:
+        if modules.get('MarketAnalyzer') and client:
             components['market_analyzer'] = modules['MarketAnalyzer'](client)
-            print("✅ Live Market Analyzer initialized")
-        except Exception as e:
-            print(f"⚠️ Market Analyzer failed, using fallback: {e}")
+            print("✅ LIVE Market Analyzer initialized")
+        else:
             components['market_analyzer'] = FallbackMarketAnalyzer(client)
-    else:
+            print("⚠️ Using Fallback Market Analyzer")
+    except Exception as e:
+        print(f"⚠️ Market Analyzer failed: {e}")
         components['market_analyzer'] = FallbackMarketAnalyzer(client)
     
     # Risk Manager
@@ -294,24 +328,21 @@ def initialize_components():
     else:
         components['risk_mgr'] = None
     
-    # Trade Executor
-    if modules.get('TradeExecutor'):
-        try:
-            components['trade_exec'] = modules['TradeExecutor'](
-                client, components.get('risk_mgr'),
-                log_callback=lambda msg: st.session_state.setdefault("logs", []).append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
-            )
-            print("✅ Live Trade Executor initialized")
-        except Exception as e:
-            print(f"⚠️ Trade Executor failed, using fallback: {e}")
-            components['trade_exec'] = FallbackTradeExecutor(
-                client, components.get('risk_mgr'),
-                log_callback=lambda msg: st.session_state.setdefault("logs", []).append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
-            )
-    else:
-        components['trade_exec'] = FallbackTradeExecutor(
-            client, components.get('risk_mgr'),
-            log_callback=lambda msg: st.session_state.setdefault("logs", []).append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
+    # DEMO Trade Executor (never real trades)
+    components['trade_exec'] = DemoTradeExecutor(
+        client, components.get('risk_mgr'),
+        log_callback=lambda msg: st.session_state.setdefault("logs", []).append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
+    )
+    print("✅ DEMO Trade Executor initialized - NO REAL TRADES")
+    
+    # Other components
+    components['quantum_trader'] = None
+    components['quantum_analyzer'] = FallbackQuantumAnalyzer()
+    components['position_monitor'] = None
+    components['analytics_dashboard'] = None
+    components['ensemble_engine'] = None
+    
+    return components, client, client_status
         )
     
     # Quantum Components
@@ -461,7 +492,17 @@ with st.sidebar:
         """, 
         unsafe_allow_html=True
     )
-    
+   # Add this in your sidebar section:
+st.markdown(
+    """
+    <div style='background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%); 
+                padding: 10px; border-radius: 10px; margin: 10px 0; color: white; text-align: center;'>
+        <h4 style='color: white; margin: 0;'>🎮 DEMO TRADING MODE</h4>
+        <p style='color: #f0f0f0; margin: 5px 0; font-size: 12px;'>Live Data | Demo Trades Only</p>
+    </div>
+    """, 
+    unsafe_allow_html=True
+) 
     st.markdown(
         """
         <div style='background: #f8f9fa; padding: 15px; border-radius: 10px; border-left: 4px solid #667eea;'>
