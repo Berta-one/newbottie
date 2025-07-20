@@ -1086,26 +1086,80 @@ with tabs[3]:
                     st.info(f"**Confidence:** {trade['confidence']:.3f}")
                 
                 with col2:
-                    # Position sizing options
-                    sizing_method = st.radio("Position Sizing", [
-                        "Fixed USD Amount",
-                        "Risk Percentage", 
-                        "Fixed Quantity"
-                    ])
+                    if strong_buy_signals:
+                            st.write("**🟢 Strong BUY Signals:**")
+                            for signal in strong_buy_signals[:5]:  # Top 5
+                                symbol = signal['symbol']
+                                conf = signal['final']['confidence']
+                                price = signal.get('price', 0)
+                                
+                                # Validate price before displaying
+                                if price <= 0:
+                                    # Try to get fresh price
+                                    try:
+                                        fresh_price = components['market_analyzer'].get_price(symbol)
+                                        price = fresh_price if fresh_price > 0 else 0
+                                    except:
+                                        price = 0
+                                
+                                if price > 0:  # Only show if we have valid price
+                                    signal_col1, signal_col2 = st.columns([3, 1])
+                                    
+                                    with signal_col1:
+                                        st.write(f"**{symbol}** - ${price:.4f} (Conf: {conf:.3f})")
+                                    
+                                    with signal_col2:
+                                        if st.button(f"🚀 Buy", key=f"buy_{symbol}"):
+                                            # Store selected trade with validated price
+                                            st.session_state['selected_trade'] = {
+                                                'symbol': symbol,
+                                                'action': 'BUY',
+                                                'price': price,
+                                                'confidence': conf,
+                                                'timestamp': datetime.now()
+                                            }
+                                            st.success(f"Selected {symbol} for BUY")
+                                            st.rerun()
+                                else:
+                                    st.warning(f"⚠️ {symbol} - Price data unavailable")
                     
-                    if sizing_method == "Fixed USD Amount":
-                        usd_amount = st.number_input("USD Amount", min_value=10.0, value=100.0, step=10.0)
-                        quantity = usd_amount / trade['price']
-                    elif sizing_method == "Risk Percentage":
-                        risk_pct = st.number_input("Risk %", min_value=0.1, value=2.0, max_value=10.0, step=0.1)
-                        portfolio_value = components['portfolio_mgr'].total_value()
-                        risk_amount = portfolio_value * (risk_pct / 100)
-                        quantity = risk_amount / trade['price']
-                    else:
-                        quantity = st.number_input("Quantity", min_value=0.0001, value=0.01, step=0.0001, format="%.6f")
-                    
-                    st.info(f"**Quantity:** {quantity:.6f}")
-                    st.info(f"**Value:** ${quantity * trade['price']:.2f}")
+                    with col2:
+                        if strong_sell_signals:
+                            st.write("**🔴 Strong SELL Signals:**")
+                            for signal in strong_sell_signals[:5]:  # Top 5
+                                symbol = signal['symbol']
+                                conf = signal['final']['confidence']
+                                price = signal.get('price', 0)
+                                
+                                # Validate price before displaying
+                                if price <= 0:
+                                    # Try to get fresh price
+                                    try:
+                                        fresh_price = components['market_analyzer'].get_price(symbol)
+                                        price = fresh_price if fresh_price > 0 else 0
+                                    except:
+                                        price = 0
+                                
+                                if price > 0:  # Only show if we have valid price
+                                    signal_col1, signal_col2 = st.columns([3, 1])
+                                    
+                                    with signal_col1:
+                                        st.write(f"**{symbol}** - ${price:.4f} (Conf: {conf:.3f})")
+                                    
+                                    with signal_col2:
+                                        if st.button(f"📉 Sell", key=f"sell_{symbol}"):
+                                            # Store selected trade with validated price
+                                            st.session_state['selected_trade'] = {
+                                                'symbol': symbol,
+                                                'action': 'SELL',
+                                                'price': price,
+                                                'confidence': conf,
+                                                'timestamp': datetime.now()
+                                            }
+                                            st.success(f"Selected {symbol} for SELL")
+                                            st.rerun()
+                                else:
+                                    st.warning(f"⚠️ {symbol} - Price data unavailable")
                 
                 with col3:
                     # Risk management
