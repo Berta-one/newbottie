@@ -1490,7 +1490,7 @@ with tabs[6]:
         st.text("[12:36:00] Bot initialized successfully")
 
 # -------------------------
-# Analytics Tab (FIXED - Complete Section)
+# Analytics Tab (COMPLETE FIXED VERSION)
 # -------------------------
 with tabs[7]:
     st.header("📈 Advanced Analytics")
@@ -1531,29 +1531,21 @@ with tabs[7]:
             else:
                 st.metric("Sharpe Ratio", "N/A")
         
-        # Trading Activity (FIXED)
+        # Trading Activity
         st.subheader("📈 Trading Activity Analysis")
         
         # Create sample trading data
         hours = list(range(24))
-        trades_per_hour = np.random.poisson(2, 24)  # Random number of trades per hour
+        trades_per_hour = np.random.poisson(2, 24)
         
-        # Create bar chart using plotly.graph_objects (FIXED)
-        fig_trades = go.Figure()
-        fig_trades.add_trace(go.Bar(
-            x=hours,
-            y=trades_per_hour,
-            name='Trades',
-            marker_color='rgba(102, 126, 234, 0.8)'
-        ))
+        # Create bar chart using plotly express (SIMPLE VERSION)
+        activity_df = pd.DataFrame({
+            'Hour': hours,
+            'Trades': trades_per_hour
+        })
         
-        fig_trades.update_layout(
-            title="Trading Activity by Hour",
-            xaxis_title="Hour of Day",
-            yaxis_title="Number of Trades",
-            showlegend=False
-        )
-        
+        fig_trades = px.bar(activity_df, x='Hour', y='Trades', 
+                           title="Trading Activity by Hour")
         st.plotly_chart(fig_trades, use_container_width=True)
         
         # Recent Trades Analysis
@@ -1591,38 +1583,94 @@ with tabs[7]:
                     st.metric("Success Rate", f"{success_rate:.1f}%")
         else:
             st.info("📝 No trading activity recorded yet. Execute some trades to see analytics.")
-        
-        # Strategy Performance Breakdown
-        st.subheader("⚛️ Strategy Performance")
-        
-        # Count trades by source
-        manual_trades = len([log for log in trade_logs if "Manual" in log])
-        multi_strategy_trades = len([log for log in trade_logs if "Multi-Strategy" in log])
-        auto_trades = len([log for log in trade_logs if "Auto" in log])
-        
-        if manual_trades + multi_strategy_trades + auto_trades > 0:
-            strategy_data = {
-                'Strategy': ['Manual Trading', 'Multi-Strategy', 'Auto Trading'],
-                'Trades': [manual_trades, multi_strategy_trades, auto_trades]
-            }
-            
-            fig_strategy = px.pie(
-                values=strategy_data['Trades'],
-                names=strategy_data['Strategy'],
-                title="Trades by Strategy"
-            )
-            st.plotly_chart(fig_strategy, use_container_width=True)
-        else:
-            st.info("📊 Execute trades to see strategy breakdown")
             
     except Exception as e:
         st.error(f"Analytics error: {e}")
-        
-        # Show detailed error for debugging
-        with st.expander("🐛 Debug Information"):
-            st.code(traceback.format_exc())
-        
         st.info("📊 Analytics will show real data once more trading activity is recorded")
+
+# -------------------------
+# Status Bar
+# -------------------------
+st.divider()
+
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+    if client:
+        st.success("🟢 API Connected")
+    else:
+        st.error("🔴 API Disconnected")
+
+with col2:
+    scanner = st.session_state.get("auto_scanner")
+    if scanner and scanner.is_running():
+        st.success("🟢 Scanner Active")
+    else:
+        st.warning("🟡 Scanner Inactive")
+
+with col3:
+    auto_trade = os.getenv("AUTO_TRADE_ENABLED", "false").lower() == "true"
+    if auto_trade:
+        st.success("🟢 Auto-Trade ON")
+    else:
+        st.info("🔵 Auto-Trade OFF")
+
+with col4:
+    mode = "🧪 TESTNET" if os.getenv("USE_TESTNET", "true").lower() == "true" else "🚀 LIVE"
+    if "TESTNET" in mode:
+        st.info(mode)
+    else:
+        st.warning(mode)
+
+# Auto-refresh option
+if st.checkbox("🔄 Auto-refresh (30s)", value=False):
+    time.sleep(30)
+    st.rerun()
+
+# -------------------------
+# Enhanced Footer
+# -------------------------
+st.markdown("---")
+st.markdown(
+    """
+    <div style='text-align: center; padding: 20px; background: #f8f9fa; border-radius: 10px; margin-top: 20px;'>
+        <div style='margin-bottom: 15px;'>
+            <img src='https://static.wixstatic.com/media/80aa29_3bdfcbab4dd34671915e3b66b0b596e4~mv2.jpeg/v1/fill/w_146,h_104,al_c,q_80,usm_0.66_1.00_0.01,enc_avif,quality_auto/LRC_1719585575250.jpeg' 
+                 width='80' style='border-radius: 8px; opacity: 0.8;'/>
+        </div>
+        <h4 style='color: #333; margin: 10px 0;'>🧠 Hybrid Quantum Crypto Trading Bot v2.0</h4>
+        <p style='color: #666; margin: 10px 0;'>
+            ⚛️ Quantum Analytics | 🤖 AI Trading | 📊 Advanced Analytics
+        </p>
+        <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                    padding: 15px; border-radius: 10px; margin: 15px 0; color: white;'>
+            <h4 style='color: white; margin: 0;'>Rondanini Publishing Ltd.</h4>
+            <p style='color: #f0f0f0; margin: 5px 0; font-size: 14px;'>
+                Advanced Quantum-Enhanced Trading Solutions
+            </p>
+            <p style='color: #e0e0e0; margin: 5px 0; font-size: 12px;'>
+                © 2025 All Rights Reserved
+            </p>
+        </div>
+        <p style='color: #888; font-size: 12px; margin-top: 15px;'>
+            ⚠️ <strong>Risk Disclaimer:</strong> Trading involves substantial risk of loss. 
+            Past performance does not guarantee future results. Trade responsibly.
+        </p>
+    </div>
+    """, 
+    unsafe_allow_html=True
+)
+
+# -------------------------
+# Background Tasks
+# -------------------------
+if os.getenv("AUTO_START_BOT", "false").lower() == "true":
+    scanner = st.session_state.get("auto_scanner")
+    if scanner and not scanner.is_running():
+        scanner.start_scanning()
+        st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Auto-scanner started")
+
+print("✅ Complete Hybrid Quantum Trading Bot loaded successfully!")
 
 # -------------------------
 # Status Bar
