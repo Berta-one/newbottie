@@ -839,7 +839,7 @@ with tabs[2]:
         st.info("Order tracking not available in demo mode")
 
 # -------------------------
-# Multi-Strategy Tab (Complete with Trading Interface)
+# Multi-Strategy Tab (With Unique Keys Fixed)
 # -------------------------
 with tabs[3]:
     st.header("⚛ Multi-Strategy Market Scanner")
@@ -864,11 +864,11 @@ with tabs[3]:
         subcol1, subcol2, subcol3 = st.columns(3)
         
         with subcol1:
-            quantum_weight = st.slider("Quantum Weight", 0, 100, st.session_state['weight_quantum'])
+            quantum_weight = st.slider("Quantum Weight", 0, 100, st.session_state['weight_quantum'], key="multi_quantum_weight")
         with subcol2:
-            ml_weight = st.slider("ML Weight", 0, 100, st.session_state['weight_ml'])
+            ml_weight = st.slider("ML Weight", 0, 100, st.session_state['weight_ml'], key="multi_ml_weight")
         with subcol3:
-            technical_weight = st.slider("Technical Weight", 0, 100, st.session_state['weight_technical'])
+            technical_weight = st.slider("Technical Weight", 0, 100, st.session_state['weight_technical'], key="multi_technical_weight")
         
         # Auto-balance weights
         total = quantum_weight + ml_weight + technical_weight
@@ -899,28 +899,28 @@ with tabs[3]:
         preset_col1, preset_col2, preset_col3, preset_col4 = st.columns(4)
         
         with preset_col1:
-            if st.button("⚛️ Quantum Focus"):
+            if st.button("⚛️ Quantum Focus", key="preset_quantum"):
                 st.session_state['weight_quantum'] = 60
                 st.session_state['weight_ml'] = 20
                 st.session_state['weight_technical'] = 20
                 st.rerun()
         
         with preset_col2:
-            if st.button("🤖 ML Focus"):
+            if st.button("🤖 ML Focus", key="preset_ml"):
                 st.session_state['weight_quantum'] = 20
                 st.session_state['weight_ml'] = 60
                 st.session_state['weight_technical'] = 20
                 st.rerun()
         
         with preset_col3:
-            if st.button("📊 Technical Focus"):
+            if st.button("📊 Technical Focus", key="preset_technical"):
                 st.session_state['weight_quantum'] = 20
                 st.session_state['weight_ml'] = 20
                 st.session_state['weight_technical'] = 60
                 st.rerun()
         
         with preset_col4:
-            if st.button("⚖️ Balanced"):
+            if st.button("⚖️ Balanced", key="preset_balanced"):
                 st.session_state['weight_quantum'] = 33
                 st.session_state['weight_ml'] = 33
                 st.session_state['weight_technical'] = 34
@@ -928,8 +928,8 @@ with tabs[3]:
     
     with col2:
         # Configuration parameters
-        min_conf = st.slider("Min Confidence", 0.5, 1.0, 0.65, 0.01)
-        max_pairs = st.slider("Max Pairs to Scan", 5, 50, 20, 5)
+        min_conf = st.slider("Min Confidence", 0.5, 1.0, 0.65, 0.01, key="multi_min_conf")
+        max_pairs = st.slider("Max Pairs to Scan", 5, 50, 20, 5, key="multi_max_pairs")
         
         # Scan mode selection
         scan_mode = st.selectbox("Scan Mode", [
@@ -937,7 +937,7 @@ with tabs[3]:
             "Portfolio + Major Pairs", 
             "All USDT Pairs",
             "Custom Selection"
-        ])
+        ], key="multi_scan_mode")
     
     # Pair Selection Logic
     all_pairs = components['market_analyzer'].get_trading_pairs()
@@ -958,22 +958,23 @@ with tabs[3]:
         trading_pairs = st.multiselect(
             "Select Trading Pairs", 
             all_pairs, 
-            default=['BTCUSDT', 'ETHUSDT', 'BNBUSDT']
+            default=['BTCUSDT', 'ETHUSDT', 'BNBUSDT'],
+            key="multi_custom_pairs"
         )
     
     # Scan Controls
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        if st.button("🔍 Scan All Pairs", type="primary"):
+        if st.button("🔍 Scan All Pairs", type="primary", key="multi_scan_button"):
             st.session_state['manual_scan_requested'] = True
     
     with col2:
-        if st.button("🔄 Refresh Signals"):
+        if st.button("🔄 Refresh Signals", key="multi_refresh_button"):
             st.session_state['refresh_signals'] = True
     
     with col3:
-        show_only_signals = st.checkbox("Show Only Strong Signals", value=True)
+        show_only_signals = st.checkbox("Show Only Strong Signals", value=True, key="multi_show_only_signals")
     
     # Scanning process
     if st.session_state.get('manual_scan_requested', False):
@@ -1104,7 +1105,7 @@ with tabs[3]:
             st.dataframe(styled_df, use_container_width=True)
             
             # -------------------------
-            # TRADING INTERFACE (RESTORED)
+            # TRADING INTERFACE (WITH UNIQUE KEYS)
             # -------------------------
             st.subheader("⚡ Quick Trading Interface")
             
@@ -1145,7 +1146,8 @@ with tabs[3]:
                                             'action': 'BUY',
                                             'price': price,
                                             'confidence': conf,
-                                            'timestamp': datetime.now()
+                                            'timestamp': datetime.now(),
+                                            'source': 'multi_strategy'
                                         }
                                         st.success(f"Selected {symbol} for BUY")
                                         st.rerun()
@@ -1182,15 +1184,16 @@ with tabs[3]:
                                             'action': 'SELL',
                                             'price': price,
                                             'confidence': conf,
-                                            'timestamp': datetime.now()
+                                            'timestamp': datetime.now(),
+                                            'source': 'multi_strategy'
                                         }
                                         st.success(f"Selected {symbol} for SELL")
                                         st.rerun()
                             else:
                                 st.warning(f"⚠️ {symbol} - Price data unavailable")
             
-            # Execute Selected Trade
-            if 'selected_trade' in st.session_state:
+            # Execute Selected Trade (WITH UNIQUE KEYS)
+            if 'selected_trade' in st.session_state and st.session_state['selected_trade'].get('source') == 'multi_strategy':
                 trade = st.session_state['selected_trade']
                 
                 st.divider()
@@ -1205,8 +1208,8 @@ with tabs[3]:
                     st.info(f"**Confidence:** {trade['confidence']:.3f}")
                 
                 with col2:
-                    # Quantity input
-                    quantity = st.number_input("Quantity", min_value=0.0001, step=0.0001, format="%.6f", key="multi_strategy_qty")
+                    # Quantity input (UNIQUE KEY)
+                    quantity = st.number_input("Quantity", min_value=0.0001, step=0.0001, format="%.6f", key="multi_strategy_quantity_input")
                     
                     # Calculate trade value
                     if quantity > 0:
@@ -1218,15 +1221,15 @@ with tabs[3]:
                         st.warning("⚠️ Enter quantity")
                 
                 with col3:
-                    # Risk management
-                    use_sl_tp = st.checkbox("Use Stop Loss / Take Profit", value=True)
+                    # Risk management (UNIQUE KEY)
+                    use_sl_tp = st.checkbox("Use Stop Loss / Take Profit", value=True, key="multi_strategy_sl_tp_checkbox")
                     
                     if use_sl_tp:
-                        sl_pct = st.number_input("Stop Loss %", min_value=1.0, value=5.0, max_value=20.0)
-                        tp_pct = st.number_input("Take Profit %", min_value=1.0, value=10.0, max_value=50.0)
+                        sl_pct = st.number_input("Stop Loss %", min_value=1.0, value=5.0, max_value=20.0, key="multi_strategy_sl_pct")
+                        tp_pct = st.number_input("Take Profit %", min_value=1.0, value=10.0, max_value=50.0, key="multi_strategy_tp_pct")
                     
-                    # Execute button
-                    if st.button("🚀 EXECUTE TRADE", type="primary"):
+                    # Execute button (UNIQUE KEY)
+                    if st.button("🚀 EXECUTE TRADE", type="primary", key="multi_strategy_execute_button"):
                         try:
                             # Validate trade
                             if quantity > 0:
@@ -1274,10 +1277,10 @@ with tabs[3]:
                         except Exception as e:
                             st.error(f"❌ Trade execution failed: {e}")
                 
-                # Cancel trade button
+                # Cancel trade button (UNIQUE KEY)
                 col1, col2, col3 = st.columns([1, 1, 1])
                 with col2:
-                    if st.button("❌ Cancel Trade", key="cancel_multi_trade"):
+                    if st.button("❌ Cancel Trade", key="multi_strategy_cancel_button"):
                         del st.session_state['selected_trade']
                         st.rerun()
             
