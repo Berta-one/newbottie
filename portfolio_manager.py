@@ -786,6 +786,45 @@ class PortfolioManager:
                 "status": "❌ Connection Failed"
             }
     
+    def last_updated(self) -> str:
+        """Get formatted last update time"""
+        try:
+            if hasattr(self, 'last_update') and self.last_update:
+                # Format the datetime for display
+                return self.last_update.strftime("%Y-%m-%d %H:%M:%S")
+            else:
+                return "Never"
+        except Exception as e:
+            logger.error(f"Error formatting last update time: {e}")
+            return "Unknown"
+    
+    def get_last_update_time(self) -> datetime:
+        """Get last update time as datetime object"""
+        return self.last_update if hasattr(self, 'last_update') else datetime.now()
+    
+    def time_since_last_update(self) -> str:
+        """Get human-readable time since last update"""
+        try:
+            if not hasattr(self, 'last_update') or not self.last_update:
+                return "Never updated"
+            
+            time_diff = datetime.now() - self.last_update
+            
+            if time_diff.days > 0:
+                return f"{time_diff.days} days ago"
+            elif time_diff.seconds > 3600:
+                hours = time_diff.seconds // 3600
+                return f"{hours} hours ago"
+            elif time_diff.seconds > 60:
+                minutes = time_diff.seconds // 60
+                return f"{minutes} minutes ago"
+            else:
+                return f"{time_diff.seconds} seconds ago"
+                
+        except Exception as e:
+            logger.error(f"Error calculating time since update: {e}")
+            return "Unknown"
+    
     def _get_demo_portfolio(self) -> Dict[str, Any]:
         """Get demo portfolio data when client unavailable"""
         return {
