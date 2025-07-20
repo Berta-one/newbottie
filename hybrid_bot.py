@@ -51,11 +51,8 @@ for name, module in modules.items():
 # ✅ Streamlit Config
 st.set_page_config(page_title="Hybrid Quantum Trading Bot", layout="wide")
 
-# ✅ Streamlit Config
-st.set_page_config(page_title="Hybrid Quantum Trading Bot", layout="wide")
-
 # -------------------------
-# Conditional Imports with Error Handling (Define first)
+# Conditional Imports with Error Handling (Define FIRST)
 # -------------------------
 def safe_import_modules():
     """Safely import modules with fallbacks"""
@@ -68,7 +65,8 @@ def safe_import_modules():
     except ImportError as e:
         modules['PortfolioManager'] = None
         print(f"⚠️ PortfolioManager not available: {e}")
-        st.warning("⚠️ PortfolioManager not available")
+        if 'st' in globals():  # Only show warning if streamlit is available
+            st.warning("⚠️ PortfolioManager not available")
     
     try:
         from trade_executor import TradeExecutor
@@ -77,7 +75,8 @@ def safe_import_modules():
     except ImportError as e:
         modules['TradeExecutor'] = None
         print(f"⚠️ TradeExecutor not available: {e}")
-        st.warning("⚠️ TradeExecutor not available")
+        if 'st' in globals():
+            st.warning("⚠️ TradeExecutor not available")
     
     try:
         from risk_manager import RiskManager
@@ -86,7 +85,8 @@ def safe_import_modules():
     except ImportError as e:
         modules['RiskManager'] = None
         print(f"⚠️ RiskManager not available: {e}")
-        st.warning("⚠️ RiskManager not available")
+        if 'st' in globals():
+            st.warning("⚠️ RiskManager not available")
     
     try:
         from position_monitor import PositionMonitor
@@ -95,7 +95,8 @@ def safe_import_modules():
     except ImportError as e:
         modules['PositionMonitor'] = None
         print(f"⚠️ PositionMonitor not available: {e}")
-        st.warning("⚠️ PositionMonitor not available")
+        if 'st' in globals():
+            st.warning("⚠️ PositionMonitor not available")
     
     try:
         from market_analyzer import MarketAnalyzer
@@ -104,7 +105,8 @@ def safe_import_modules():
     except ImportError as e:
         modules['MarketAnalyzer'] = None
         print(f"❌ MarketAnalyzer not available: {e}")
-        st.error("❌ MarketAnalyzer not available - Manual Trading disabled")
+        if 'st' in globals():
+            st.error("❌ MarketAnalyzer not available - Manual Trading disabled")
     
     try:
         from quantum_trading_integration import QuantumTrader
@@ -113,7 +115,8 @@ def safe_import_modules():
     except ImportError as e:
         modules['QuantumTrader'] = None
         print(f"⚠️ QuantumTrader not available: {e}")
-        st.warning("⚠️ QuantumTrader not available - Using fallback")
+        if 'st' in globals():
+            st.warning("⚠️ QuantumTrader not available - Using fallback")
     
     try:
         from quantum_engine import QuantumAnalyzer
@@ -122,7 +125,8 @@ def safe_import_modules():
     except ImportError as e:
         modules['QuantumAnalyzer'] = None
         print(f"⚠️ QuantumAnalyzer not available: {e}")
-        st.warning("⚠️ QuantumAnalyzer not available - Using fallback")
+        if 'st' in globals():
+            st.warning("⚠️ QuantumAnalyzer not available - Using fallback")
     
     try:
         from dashboard import TradingDashboard
@@ -131,7 +135,8 @@ def safe_import_modules():
     except ImportError as e:
         modules['TradingDashboard'] = None
         print(f"⚠️ TradingDashboard not available: {e}")
-        st.warning("⚠️ TradingDashboard not available")
+        if 'st' in globals():
+            st.warning("⚠️ TradingDashboard not available")
     
     try:
         from ensemble_signal_engine import EnsembleSignalEngine
@@ -140,7 +145,8 @@ def safe_import_modules():
     except ImportError as e:
         modules['EnsembleSignalEngine'] = None
         print(f"⚠️ EnsembleSignalEngine not available: {e}")
-        st.warning("⚠️ EnsembleSignalEngine not available")
+        if 'st' in globals():
+            st.warning("⚠️ EnsembleSignalEngine not available")
     
     try:
         from binance.client import Client
@@ -149,10 +155,41 @@ def safe_import_modules():
     except ImportError as e:
         modules['Client'] = None
         print(f"❌ Binance client not available: {e}")
-        st.error("❌ Binance client not available")
+        if 'st' in globals():
+            st.error("❌ Binance client not available")
     
     print(f"📦 Module import summary: {sum(1 for v in modules.values() if v is not None)}/{len(modules)} modules loaded")
     return modules
+
+# -------------------------
+# DEBUG: Check what files exist
+# -------------------------
+import os
+current_dir = os.getcwd()
+try:
+    py_files = [f for f in os.listdir('.') if f.endswith('.py')]
+    print(f"📁 Current directory: {current_dir}")
+    print(f"🐍 Python files found: {py_files}")
+    
+    # Check specifically for our modules
+    key_modules = ['trade_executor.py', 'portfolio_manager.py', 'market_analyzer.py', 'risk_manager.py', 'position_monitor.py']
+    for module in key_modules:
+        if module in py_files:
+            print(f"✅ {module} exists")
+        else:
+            print(f"❌ {module} missing")
+except Exception as e:
+    print(f"❌ Could not list directory: {e}")
+
+# Import modules with debug info (NOW CALL IT)
+print("🔄 Starting module imports...")
+modules = safe_import_modules()
+
+# Debug: Print what was actually imported
+print("📦 Available modules:")
+for name, module in modules.items():
+    status = "✅ Available" if module else "❌ Missing"
+    print(f"  - {name}: {status}")
 
 # Import modules with debug info
 print("🔄 Starting module imports...")
