@@ -961,7 +961,7 @@ with tabs[0]:
                     "Locked": f"{data.get('locked', 0):.8f}".rstrip('0').rstrip('.'),
                     "Price (USD)": f"${data['price']:.4f}",
                     "Value (USD)": f"${data['value']:.2f}",
-                    "24h Change": f"{data['change']:.2f}%"
+                    "24h Change": f"{data.get('change_24h', 0):.2f}%"
                 })
             
             df = pd.DataFrame(portfolio_data)
