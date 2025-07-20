@@ -825,19 +825,50 @@ class PortfolioManager:
             logger.error(f"Error calculating time since update: {e}")
             return "Unknown"
     
-    def get_portfolio(self) -> Tuple[Dict[str, Any], float]:
+    def get_portfolio(self) -> Dict[str, Any]:
         """
         Get portfolio in the format expected by the dashboard
+        
+        Returns:
+            Portfolio dictionary with 'value' keys for compatibility
+        """
+        try:
+            # Get the real portfolio data
+            portfolio_raw, gbp_rate = self.get_real_portfolio()
+            
+            # Convert to format expected by dashboard (with 'value' key)
+            portfolio_formatted = {}
+            
+            for asset, data in portfolio_raw.items():
+                portfolio_formatted[asset] = {
+                    'symbol': data.get('symbol', f"{asset}USDT"),
+                    'balance': data.get('balance', 0),
+                    'free': data.get('free', 0),
+                    'locked': data.get('locked', 0),
+                    'price_usd': data.get('price_usd', 0),
+                    'usd_value': data.get('usd_value', 0),
+                    'gbp_value': data.get('gbp_value', 0),
+                    'change_24h': data.get('change_24h', 0),
+                    'value': data.get('usd_value', 0)  # Add 'value' key for dashboard compatibility
+                }
+            
+            return portfolio_formatted
+            
+        except Exception as e:
+            logger.error(f"Error getting formatted portfolio: {e}")
+            return {}
+    
+    def get_portfolio_with_gbp(self) -> Tuple[Dict[str, Any], float]:
+        """
+        Get portfolio with GBP rate as separate method
         
         Returns:
             Tuple of (portfolio_dict, gbp_exchange_rate)
         """
         try:
-            # Use the existing get_real_portfolio method
             return self.get_real_portfolio()
         except Exception as e:
-            logger.error(f"Error getting portfolio: {e}")
-            # Return empty portfolio with default GBP rate
+            logger.error(f"Error getting portfolio with GBP: {e}")
             return {}, 1.30
     
     def get_portfolio_simple(self) -> Dict[str, Any]:
