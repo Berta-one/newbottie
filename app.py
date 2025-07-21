@@ -2,6 +2,22 @@
 """
 Pure Flask Crypto Trading Bot - No Streamlit Dependencies
 """
+import subprocess
+import psutil
+import os
+
+BOT_SCRIPT = "bot_service.py"
+
+# ✅ Check if the bot is running
+def is_bot_running():
+    for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+        if BOT_SCRIPT in " ".join(proc.info['cmdline']):
+            return True
+    return False
+
+# ✅ Auto-start the bot if not running
+if not is_bot_running():
+    subprocess.Popen(["python", BOT_SCRIPT])
 
 import os
 import json
