@@ -1,4 +1,4 @@
-# **PART 1: Complete hybrid_bot.py File (Lines 1-200mmmm)**
+# **PART 1: Complete hybrid_bot.py File (Lines 1-200)**
 
 #!/usr/bin/env python3
 """
