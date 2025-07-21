@@ -1464,17 +1464,12 @@ with tabs[3]:
             styled_df = df.style.applymap(color_signals, subset=['Final Signal'])
             st.dataframe(styled_df, use_container_width=True)
             
-            # ==========================================
-            # FIXED TRADING INTERFACE WITH UNIQUE KEYS
-            # ==========================================
-            
             # Trading Interface
             st.subheader("⚡ Quick Trading Interface")
             
             # Helper function for unique keys
             def create_unique_button_key(action, symbol, index, timestamp_ms):
                 """Generate unique button key"""
-                import hashlib
                 unique_string = f"{action}_{symbol}_{index}_{timestamp_ms}"
                 hash_suffix = hashlib.md5(unique_string.encode()).hexdigest()[:8]
                 return f"{action}_{symbol}_{index}_{hash_suffix}"
