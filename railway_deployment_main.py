@@ -1,16 +1,10 @@
-# railway_deployment_main.py - Main Railway entry point
+#!/usr/bin/env python3
 """
 Railway Deployment Main Entry Point
 ==================================
 
 This file serves as the main entry point for Railway deployment while
 preserving all your existing bot logic in hybrid_bot.py, main.py, etc.
-
-It combines:
-- Your existing hybrid_bot.py (Streamlit dashboard)
-- Always-on background functionality
-- Health endpoints for Railway
-- Keep-alive systems
 
 Usage: Railway will start this file, which then runs your existing system.
 """
@@ -22,369 +16,195 @@ import threading
 import subprocess
 import signal
 import json
-import requests
+import logging
 from datetime import datetime
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from pathlib import Path
 
-# Add current directory to path so we can import your existing modules
-current_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, current_dir)
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
-class RailwayHealthHandler(BaseHTTPRequestHandler):
-    """HTTP handler for Railway health checks and keep-alive"""
-    
-    def do_GET(self):
-        try:
-            if self.path in ['/health', '/ping', '/status']:
-                self.send_response(200)
-                self.send_header('Content-type', 'application/json')
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.end_headers()
-                
-                # Get bot status
-                status = self.get_bot_status()
-                self.wfile.write(json.dumps(status).encode())
-                
-            elif self.path == '/':
-                # Redirect to main app
-                self.send_response(302)
-                self.send_header('Location', f'http://localhost:{os.getenv("PORT", 8501)}')
-                self.end_headers()
-                
-            else:
-                self.send_response(404)
-                self.send_header('Content-type', 'text/plain')
-                self.end_headers()
-                self.wfile.write(b'Not Found')
-                
-        except Exception as e:
-            self.send_response(500)
-            self.send_header('Content-type', 'text/plain')
-            self.end_headers()
-            self.wfile.write(f'Server Error: {str(e)}'.encode())
-    
-    def get_bot_status(self):
-        """Get current bot status"""
-        try:
-            # Try to read bot status from your existing logs
-            if os.path.exists('logs/bot_status.json'):
-                with open('logs/bot_status.json', 'r') as f:
-                    status = json.load(f)
-            else:
-                status = {}
-            
-            # Add Railway-specific status
-            status.update({
-                'railway_status': 'alive',
-                'timestamp': datetime.now().isoformat(),
-                'uptime_seconds': (datetime.now() - start_time).total_seconds() if 'start_time' in globals() else 0,
-                'version': '2.0.0',
-                'platform': 'Railway',
-                'main_process': 'hybrid_bot.py',
-                'health_endpoint': 'active'
-            })
-            
-            return status
-            
-        except Exception as e:
-            return {
-                'railway_status': 'error',
-                'error': str(e),
-                'timestamp': datetime.now().isoformat(),
-                'platform': 'Railway'
-            }
-    
-    def log_message(self, format, *args):
-        # Suppress HTTP access logs
-        pass
-
-class RailwayKeepAliveSystem:
-    """Keep-alive system for Railway deployment"""
+class RailwayBot:
+    """Main Railway deployment handler"""
     
     def __init__(self):
-        self.running = False
-        self.heartbeat_count = 0
+        self.process = None
         self.start_time = datetime.now()
+        self.running = False
         
-    def start_keepalive(self):
-        """Start all keep-alive mechanisms"""
-        if not self.running:
-            self.running = True
+    def setup_environment(self):
+        """Setup environment and directories"""
+        try:
+            # Create necessary directories
+            for dir_name in ['logs', 'models', 'data']:
+                Path(dir_name).mkdir(exist_ok=True)
+                logger.info(f"✅ Created directory: {dir_name}")
             
-            # Start heartbeat thread
-            heartbeat_thread = threading.Thread(target=self.heartbeat_loop, daemon=True)
-            heartbeat_thread.start()
+            # Set environment variables
+            os.environ['PYTHONPATH'] = '/app'
+            os.environ['TZ'] = 'UTC'
             
-            # Start activity thread
-            activity_thread = threading.Thread(target=self.activity_loop, daemon=True)
-            activity_thread.start()
+            # Get Railway port
+            port = os.environ.get('PORT', '8501')
+            logger.info(f"🚀 Railway port: {port}")
             
-            print("💓 Railway keep-alive system started")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Setup failed: {e}")
+            return False
     
-    def heartbeat_loop(self):
-        """Continuous heartbeat logging"""
-        while self.running:
+    def start_streamlit(self):
+        """Start Streamlit application"""
+        try:
+            port = os.environ.get('PORT', '8501')
+            
+            # Streamlit command for Railway
+            cmd = [
+                'streamlit', 'run', 'hybrid_bot.py',
+                '--server.port', str(port),
+                '--server.address', '0.0.0.0',
+                '--server.headless', 'true',
+                '--server.enableCORS', 'false',
+                '--server.enableXsrfProtection', 'false',
+                '--server.enableWebsocketCompression', 'true'
+            ]
+            
+            logger.info(f"🎯 Starting Streamlit: {' '.join(cmd)}")
+            
+            # Start process
+            self.process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                universal_newlines=True,
+                bufsize=1
+            )
+            
+            # Log output
+            def log_output():
+                if self.process:
+                    for line in iter(self.process.stdout.readline, ''):
+                        if line:
+                            logger.info(f"STREAMLIT: {line.rstrip()}")
+            
+            # Start logging thread
+            log_thread = threading.Thread(target=log_output, daemon=True)
+            log_thread.start()
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to start Streamlit: {e}")
+            return False
+    
+    def signal_handler(self, signum, frame):
+        """Handle shutdown signals"""
+        logger.info(f"🛑 Received signal {signum}, shutting down...")
+        self.shutdown()
+        sys.exit(0)
+    
+    def shutdown(self):
+        """Graceful shutdown"""
+        self.running = False
+        if self.process:
+            logger.info("🔄 Terminating Streamlit process...")
+            self.process.terminate()
             try:
-                self.heartbeat_count += 1
+                self.process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                logger.warning("⚠️ Force killing process...")
+                self.process.kill()
+    
+    def health_check(self):
+        """Check application health"""
+        try:
+            if self.process and self.process.poll() is None:
                 uptime = (datetime.now() - self.start_time).total_seconds()
-                
-                print(f"💓 Railway Heartbeat #{self.heartbeat_count} - Uptime: {uptime:.0f}s")
-                
-                # Save heartbeat to your existing logs structure
-                os.makedirs('logs', exist_ok=True)
-                heartbeat_data = {
-                    'timestamp': datetime.now().isoformat(),
-                    'heartbeat_count': self.heartbeat_count,
+                return {
+                    'status': 'healthy',
                     'uptime_seconds': uptime,
-                    'status': 'alive',
+                    'process_id': self.process.pid if self.process else None,
+                    'timestamp': datetime.now().isoformat(),
                     'platform': 'Railway'
                 }
-                
-                with open('logs/railway_heartbeat.json', 'w') as f:
-                    json.dump(heartbeat_data, f)
-                
-                time.sleep(300)  # Every 5 minutes
-                
-            except Exception as e:
-                print(f"Heartbeat error: {e}")
-                time.sleep(60)
+            else:
+                return {
+                    'status': 'unhealthy',
+                    'error': 'Process not running',
+                    'timestamp': datetime.now().isoformat()
+                }
+        except Exception as e:
+            return {
+                'status': 'error',
+                'error': str(e),
+                'timestamp': datetime.now().isoformat()
+            }
     
-    def activity_loop(self):
-        """Generate activity to prevent Railway sleep"""
-        while self.running:
-            try:
-                # Write activity file
-                activity_file = f'logs/railway_activity_{datetime.now().strftime("%Y%m%d")}.log'
-                with open(activity_file, 'a') as f:
-                    f.write(f"{datetime.now().isoformat()}: Railway bot active\n")
-                
-                # CPU activity to prevent sleep
-                dummy = sum(i * i for i in range(1000))
-                
-                time.sleep(180)  # Every 3 minutes
-                
-            except Exception as e:
-                print(f"Activity error: {e}")
-                time.sleep(120)
-    
-    def stop_keepalive(self):
-        """Stop keep-alive system"""
-        self.running = False
-        print("🛑 Railway keep-alive system stopped")
-
-class RailwayBotManager:
-    """Main bot manager for Railway deployment"""
-    
-    def __init__(self):
-        self.bot_process = None
-        self.health_server = None
-        self.keepalive_system = RailwayKeepAliveSystem()
-        self.running = False
+    def run(self):
+        """Main run method"""
+        self.running = True
         
         # Setup signal handlers
         signal.signal(signal.SIGTERM, self.signal_handler)
         signal.signal(signal.SIGINT, self.signal_handler)
-    
-    def signal_handler(self, signum, frame):
-        """Handle shutdown signals gracefully"""
-        print(f"\n🛑 Received shutdown signal ({signum})")
-        self.graceful_shutdown()
-        sys.exit(0)
-    
-    def start_health_server(self):
-        """Start HTTP health server for Railway"""
-        try:
-            port = int(os.getenv('PORT', 8501))
-            
-            def run_health_server():
-                # Start health server on a different port to avoid conflict with Streamlit
-                health_port = port + 1000  # Use a different port for health checks
-                try:
-                    server = HTTPServer(('0.0.0.0', health_port), RailwayHealthHandler)
-                    self.health_server = server
-                    print(f"💓 Railway health server started on port {health_port}")
-                    server.serve_forever()
-                except Exception as e:
-                    print(f"Health server error: {e}")
-            
-            health_thread = threading.Thread(target=run_health_server, daemon=True)
-            health_thread.start()
-            
-            return True
-            
-        except Exception as e:
-            print(f"Failed to start health server: {e}")
-            return False
-    
-    def start_main_bot(self):
-        """Start your existing hybrid_bot.py"""
-        try:
-            # Get Railway port
-            port = os.getenv('PORT', '8501')
-            
-            # Start your existing hybrid_bot.py with Streamlit
-            cmd = [
-                sys.executable, '-m', 'streamlit', 'run',
-                'hybrid_bot.py',
-                '--server.port', port,
-                '--server.address', '0.0.0.0',
-                '--server.headless', 'true',
-                '--server.enableCORS', 'false',
-                '--server.enableXsrfProtection', 'false'
-            ]
-            
-            print(f"🚀 Starting main bot: {' '.join(cmd)}")
-            
-            self.bot_process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                universal_newlines=True
-            )
-            
-            print(f"✅ Main bot started with PID: {self.bot_process.pid}")
-            return True
-            
-        except Exception as e:
-            print(f"❌ Failed to start main bot: {e}")
-            return False
-    
-    def monitor_main_bot(self):
-        """Monitor your main bot process"""
-        restart_count = 0
-        max_restarts = 10
         
-        while self.running:
-            try:
-                if self.bot_process:
-                    # Check if process is still running
-                    poll_result = self.bot_process.poll()
-                    
-                    if poll_result is not None:
-                        # Process has terminated
-                        print(f"⚠️ Main bot process terminated with code: {poll_result}")
-                        
-                        if restart_count < max_restarts:
-                            restart_count += 1
-                            print(f"🔄 Restarting main bot (attempt {restart_count}/{max_restarts})")
-                            
-                            time.sleep(10)  # Wait before restart
-                            
-                            if self.start_main_bot():
-                                print("✅ Main bot restarted successfully")
-                            else:
-                                print("❌ Failed to restart main bot")
-                        else:
-                            print("❌ Maximum restart attempts reached. Stopping.")
-                            break
+        logger.info("🚀 Starting Railway Crypto Trading Bot...")
+        
+        # Setup environment
+        if not self.setup_environment():
+            sys.exit(1)
+        
+        # Start Streamlit
+        if not self.start_streamlit():
+            sys.exit(1)
+        
+        logger.info("✅ Bot started successfully on Railway!")
+        
+        # Keep alive and monitor
+        try:
+            while self.running:
+                if self.process and self.process.poll() is not None:
+                    logger.error("❌ Streamlit process died, restarting...")
+                    if not self.start_streamlit():
+                        logger.error("❌ Failed to restart, exiting...")
+                        break
                 
                 time.sleep(30)  # Check every 30 seconds
                 
-            except Exception as e:
-                print(f"Monitor error: {e}")
-                time.sleep(60)
-    
-    def run_forever(self):
-        """Main run loop for Railway"""
-        global start_time
-        start_time = datetime.now()
-        
-        try:
-            self.running = True
-            
-            print("🚀 Railway Bot Manager Starting...")
-            print(f"Environment: {os.getenv('RAILWAY_ENVIRONMENT', 'unknown')}")
-            print(f"Port: {os.getenv('PORT', '8501')}")
-            
-            # Ensure logs directory exists
-            os.makedirs('logs', exist_ok=True)
-            
-            # Start keep-alive system
-            self.keepalive_system.start_keepalive()
-            
-            # Start health server (optional - Streamlit will handle main traffic)
-            # self.start_health_server()
-            
-            # Start your main bot
-            if not self.start_main_bot():
-                print("❌ Failed to start main bot. Exiting.")
-                return
-            
-            # Monitor the main bot
-            monitor_thread = threading.Thread(target=self.monitor_main_bot, daemon=True)
-            monitor_thread.start()
-            
-            print("✅ All systems started successfully")
-            
-            # Main loop - keep the process alive
-            while self.running:
-                try:
-                    time.sleep(60)
-                    
-                    # Log periodic status
-                    uptime = (datetime.now() - start_time).total_seconds()
-                    if uptime % 3600 < 60:  # Every hour
-                        print(f"📊 Railway status: Running for {uptime/3600:.1f} hours")
-                    
-                except KeyboardInterrupt:
-                    print("Keyboard interrupt received")
-                    break
-                except Exception as e:
-                    print(f"Main loop error: {e}")
-                    time.sleep(60)
-        
+        except KeyboardInterrupt:
+            logger.info("🛑 Keyboard interrupt received")
         except Exception as e:
-            print(f"Fatal error in run_forever: {e}")
-        
+            logger.error(f"❌ Unexpected error: {e}")
         finally:
-            self.graceful_shutdown()
-    
-    def graceful_shutdown(self):
-        """Gracefully shutdown all systems"""
-        print("🛑 Initiating graceful shutdown...")
-        self.running = False
-        
-        # Stop keep-alive system
-        self.keepalive_system.stop_keepalive()
-        
-        # Stop main bot process
-        if self.bot_process:
-            try:
-                print("Terminating main bot process...")
-                self.bot_process.terminate()
-                self.bot_process.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                print("Force killing main bot process...")
-                self.bot_process.kill()
-            except Exception as e:
-                print(f"Error stopping main bot: {e}")
-        
-        # Stop health server
-        if self.health_server:
-            try:
-                self.health_server.shutdown()
-            except:
-                pass
-        
-        uptime = (datetime.now() - start_time).total_seconds() if 'start_time' in globals() else 0
-        print(f"✅ Railway bot stopped after {uptime:.0f} seconds")
+            self.shutdown()
 
 def main():
-    """Main entry point for Railway"""
-    print("🎯 Railway Crypto Trading Bot Deployment Manager")
-    print("=" * 60)
-    
-    # Validate environment
-    required_env = ['BINANCE_API_KEY', 'BINANCE_API_SECRET']
-    missing_env = [var for var in required_env if not os.getenv(var)]
-    
-    if missing_env:
-        print(f"⚠️ Warning: Missing environment variables: {missing_env}")
-        print("Set these in Railway environment variables for full functionality.")
-    
-    # Start the bot manager
-    bot_manager = RailwayBotManager()
-    bot_manager.run_forever()
+    """Entry point for Railway"""
+    try:
+        # Log startup
+        logger.info("=" * 50)
+        logger.info("🚀 RAILWAY CRYPTO BOT STARTING")
+        logger.info("=" * 50)
+        
+        # Check for required files
+        required_files = ['hybrid_bot.py', 'requirements.txt']
+        missing_files = [f for f in required_files if not os.path.exists(f)]
+        
+        if missing_files:
+            logger.error(f"❌ Missing required files: {missing_files}")
+            sys.exit(1)
+        
+        # Start the bot
+        bot = RailwayBot()
+        bot.run()
+        
+    except Exception as e:
+        logger.error(f"❌ Fatal error: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
