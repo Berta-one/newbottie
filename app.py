@@ -1,28 +1,24 @@
 #!/usr/bin/env python3
 """
-Flask Dashboard for Bottie
-Features:
-- Real-time logs using Flask-SocketIO + Redis
-- Bot control (Start/Stop)
-- Portfolio & Trade interface
+Flask Dashboard for Bottie (Railway Ready)
 Author: Rondanini Publishing Ltd
 """
-
 import os
 import subprocess
-from datetime import datetime, timedelta
-from flask import Flask, render_template_string, request, jsonify, redirect, url_for, flash
+from datetime import datetime
+from flask import Flask, render_template_string, redirect, url_for, flash, jsonify
 from flask_socketio import SocketIO
-from dotenv import load_dotenv
 import psutil
 
-load_dotenv()
+# ✅ Load Env Variables
+REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379')
+PORT = int(os.getenv('PORT', 5000))
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
-# ✅ SocketIO for real-time updates (Redis as message queue)
-socketio = SocketIO(app, cors_allowed_origins="*", message_queue='redis://')
+# ✅ SocketIO with Redis backend
+socketio = SocketIO(app, cors_allowed_origins="*", message_queue=REDIS_URL)
 
 BOT_SCRIPT = "bot_service.py"
 
@@ -33,14 +29,14 @@ def is_bot_running():
             return True
     return False
 
-# ✅ Bot control routes
+# ✅ Bot Control Routes
 @app.route('/bot/start')
 def start_bot():
     if not is_bot_running():
         subprocess.Popen(["python", BOT_SCRIPT])
         flash("✅ Bot started!", "success")
     else:
-        flash("Bot is already running.", "info")
+        flash("Bot already running.", "info")
     return redirect(url_for('dashboard'))
 
 @app.route('/bot/stop')
@@ -52,28 +48,26 @@ def stop_bot():
         flash("Bot is not running.", "info")
     return redirect(url_for('dashboard'))
 
-# ✅ WebSocket namespace
+# ✅ SocketIO Event
 @socketio.on('connect', namespace='/logs')
 def logs_connect():
-    print("Client connected to logs namespace")
+    print("✅ Client connected to logs namespace")
 
-# ✅ Dashboard Template
+# ✅ HTML Template
 BASE_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🤖 Bottie Dashboard</title>
+    <title>Bottie Dashboard</title>
     <style>
-        body { font-family: Arial, sans-serif; background: #111; color: #fff; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; background: #111; color: #fff; }
         .navbar { background: #222; padding: 10px; display: flex; justify-content: space-between; }
         .navbar a { color: #fff; margin: 0 10px; text-decoration: none; }
-        .container { padding: 20px; }
-        .btn { padding: 10px 15px; border-radius: 5px; text-decoration: none; font-weight: bold; }
+        .btn { padding: 8px 12px; border-radius: 4px; }
         .btn-start { background: #28a745; color: #fff; }
         .btn-stop { background: #dc3545; color: #fff; }
-        #logs { background:#000; color:#0f0; height:300px; overflow:auto; padding:10px; font-family:monospace; }
+        #logs { background:#000;color:#0f0;height:300px;overflow:auto;padding:10px;font-family:monospace; }
     </style>
 </head>
 <body>
@@ -85,7 +79,7 @@ BASE_TEMPLATE = """
             <a href="/bot/stop" class="btn btn-stop">Stop Bot</a>
         </div>
     </div>
-    <div class="container">
+    <div class="container" style="padding:20px;">
         {% block content %}{% endblock %}
         <h3>📜 Live Logs</h3>
         <div id="logs"><p>Waiting for logs...</p></div>
@@ -122,5 +116,5 @@ def health():
     return jsonify({"status": "healthy", "timestamp": datetime.now().isoformat()})
 
 if __name__ == '__main__':
-    print("🚀 Starting Flask-SocketIO server...")
-    socketio.run(app, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
+    print("🚀 Starting Flask-SocketIO on Railway...")
+    socketio.run(app, host='0.0.0.0', port=PORT)
