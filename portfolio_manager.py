@@ -1112,3 +1112,122 @@ if __name__ == "__main__":
     summary = manager.update_portfolio(force_update=True)
     print("Portfolio Summary:")
     print(json.dumps(summary, indent=2))
+"""
+Portfolio Manager Fix: Add missing get_trade_history method
+
+Add this method to your PortfolioManager class in portfolio_manager.py
+"""
+
+def get_trade_history(self, limit: int = 100, days: int = 30) -> List[Dict[str, Any]]:
+    """
+    Get trade history from the saved trades file
+    
+    Args:
+        limit: Maximum number of trades to return
+        days: Number of days to look back
+        
+    Returns:
+        List of trade dictionaries
+    """
+    try:
+        trades = []
+        
+        if os.path.exists(self.trades_file):
+            with open(self.trades_file, 'r') as f:
+                all_trades = json.load(f)
+            
+            # Filter by date if specified
+            if days > 0:
+                cutoff_date = datetime.now() - timedelta(days=days)
+                filtered_trades = []
+                
+                for trade in all_trades:
+                    try:
+                        trade_date = datetime.fromisoformat(trade.get('timestamp', '').replace('Z', '+00:00'))
+                        if trade_date >= cutoff_date:
+                            filtered_trades.append(trade)
+                    except (ValueError, TypeError):
+                        # Include trades with invalid timestamps
+                        filtered_trades.append(trade)
+                
+                trades = filtered_trades
+            else:
+                trades = all_trades
+            
+            # Apply limit
+            trades = trades[-limit:] if len(trades) > limit else trades
+            
+            # Sort by timestamp (most recent first)
+            trades.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+            
+        return trades
+        
+    except Exception as e:
+        logger.error(f"Error getting trade history: {e}")
+        return []
+
+def get_performance_summary(self, days: int = 30) -> Dict[str, Any]:
+    """
+    Get performance summary based on trade history
+    
+    Args:
+        days: Number of days to analyze
+        
+    Returns:
+        Dictionary with performance metrics
+    """
+    try:
+        trades = self.get_trade_history(days=days)
+        
+        if not trades:
+            return {
+                "total_trades": 0,
+                "win_rate": 0.0,
+                "total_pnl": 0.0,
+                "avg_pnl_per_trade": 0.0,
+                "best_trade": 0.0,
+                "worst_trade": 0.0,
+                "total_fees": 0.0,
+                "period_days": days
+            }
+        
+        # Calculate metrics
+        total_trades = len(trades)
+        profitable_trades = sum(1 for trade in trades if trade.get('pnl', 0) > 0)
+        win_rate = (profitable_trades / total_trades * 100) if total_trades > 0 else 0
+        
+        pnl_values = [trade.get('pnl', 0) for trade in trades]
+        total_pnl = sum(pnl_values)
+        avg_pnl = total_pnl / total_trades if total_trades > 0 else 0
+        
+        best_trade = max(pnl_values) if pnl_values else 0
+        worst_trade = min(pnl_values) if pnl_values else 0
+        
+        total_fees = sum(trade.get('fee', 0) for trade in trades)
+        
+        return {
+            "total_trades": total_trades,
+            "win_rate": win_rate,
+            "total_pnl": total_pnl,
+            "avg_pnl_per_trade": avg_pnl,
+            "best_trade": best_trade,
+            "worst_trade": worst_trade,
+            "total_fees": total_fees,
+            "period_days": days,
+            "profitable_trades": profitable_trades,
+            "losing_trades": total_trades - profitable_trades
+        }
+        
+    except Exception as e:
+        logger.error(f"Error calculating performance summary: {e}")
+        return {
+            "total_trades": 0,
+            "win_rate": 0.0,
+            "total_pnl": 0.0,
+            "avg_pnl_per_trade": 0.0,
+            "best_trade": 0.0,
+            "worst_trade": 0.0,
+            "total_fees": 0.0,
+            "period_days": days,
+            "error": str(e)
+        }
