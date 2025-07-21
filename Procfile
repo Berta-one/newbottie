@@ -1,1 +1,0 @@
-web: python quick_fix.py && streamlit run hybrid_bot.py --server.port=$PORT --server.address=0.0.0.0
