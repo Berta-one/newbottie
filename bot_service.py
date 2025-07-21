@@ -7,7 +7,6 @@ import logging
 import os
 import time
 from hybrid_bot import AutoScanner, AutoTrader
-from config import API_KEY, API_SECRET  # Remove hardcoded values
 from datetime import datetime
 
 # ✅ Environment Variables
