@@ -12,13 +12,6 @@ Streamlit App for:
 - Logs
 - Advanced Analytics
 """
- Fix Railway deployment issues
-if 'RAILWAY_ENVIRONMENT' in os.environ:
-    print("🚂 Railway environment detected")
-    os.environ['STREAMLIT_SERVER_PORT'] = os.environ.get('PORT', '8080')
-    os.environ['STREAMLIT_SERVER_ADDRESS'] = '0.0.0.0'
-    os.environ['STREAMLIT_SERVER_HEADLESS'] = 'true'
-    os.environ['STREAMLIT_BROWSER_GATHER_USAGE_STATS'] = 'false'
 import os
 import sys
 import time
