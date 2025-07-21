@@ -1201,11 +1201,13 @@ with tabs[3]:
             "Min Confidence", 0.5, 1.0, float(st.session_state['multi_min_conf']),
             0.01, key="multi_min_conf"
         )
-        st.session_state['multi_max_pairs'] = st.slider(
+        # Fixed session state conflict
+        max_pairs_slider = st.slider(
             "Max Pairs to Scan", 5, 50, int(st.session_state['multi_max_pairs']),
             5, key="multi_max_pairs"
         )
-        st.session_state['multi_scan_mode'] = st.selectbox(
+        # Fixed session state conflict
+        scan_mode_select = st.selectbox(
             "Scan Mode",
             ["Top Volume Pairs", "Portfolio + Major Pairs", "All USDT Pairs", "Custom Selection"],
             key="multi_scan_mode",
@@ -2394,5 +2396,6 @@ if os.getenv("AUTO_START_BOT", "false").lower() == "true":
         st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Auto-scanner started")
 
 print("âœ… Hybrid Quantum Trading Bot loaded successfully!")
+
 
 
