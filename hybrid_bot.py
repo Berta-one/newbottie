@@ -1851,377 +1851,532 @@ with tabs[3]:
             if len(trading_pairs) > 20:
                 st.caption(f"... and {len(trading_pairs) - 20} more pairs")
 
+# ========================================
+# COMPLETE SETTINGS TAB WITH NOTIFICATIONS
+# ========================================
+# Replace your entire Settings Tab section with this code:
+
 # -------------------------
 # Settings Tab
 # -------------------------
 with tabs[4]:
-    st.header("🛠 Trading Settings")
+    st.header("🛠 Trading Settings & Configuration")
     
+    # Create main layout
     settings_col1, settings_col2 = st.columns(2)
     
+    # ================================
+    # LEFT COLUMN - Risk Management
+    # ================================
     with settings_col1:
-        st.subheader("Risk Management")
+        st.subheader("⚠️ Risk Management")
+        
+        # Initialize session state defaults if not exists
+        if "sl_mult" not in st.session_state:
+            st.session_state["sl_mult"] = 2.0
+        if "tp_mult" not in st.session_state:
+            st.session_state["tp_mult"] = 3.0
+        if "risk_pct" not in st.session_state:
+            st.session_state["risk_pct"] = 2.0
+        if "max_positions" not in st.session_state:
+            st.session_state["max_positions"] = 5
+        
+        # Stop Loss Multiplier
         st.session_state["sl_mult"] = st.slider(
-            "Stop Loss Multiplier (ATR)", 0.5, 5.0, st.session_state["sl_mult"], 0.1, key="settings_sl_mult"
-        )
-        st.session_state["tp_mult"] = st.slider(
-            "Take Profit Multiplier (ATR)", 1.0, 10.0, st.session_state["tp_mult"], 0.5, key="settings_tp_mult"
+            "🛑 Stop Loss Multiplier (ATR)", 
+            min_value=0.5, 
+            max_value=5.0, 
+            value=st.session_state["sl_mult"], 
+            step=0.1,
+            help="Multiplier for ATR-based stop loss calculation",
+            key="settings_tab_sl_mult"
         )
         
-        risk_pct = st.slider("Risk per Trade (%)", 0.1, 5.0, 2.0, 0.1, key="settings_risk_pct")
-        max_positions = st.slider("Max Positions", 1, 10, 5, key="settings_max_positions")
+        # Take Profit Multiplier
+        st.session_state["tp_mult"] = st.slider(
+            "🎯 Take Profit Multiplier (ATR)", 
+            min_value=1.0, 
+            max_value=10.0, 
+            value=st.session_state["tp_mult"], 
+            step=0.5,
+            help="Multiplier for ATR-based take profit calculation",
+            key="settings_tab_tp_mult"
+        )
+        
+        # Risk per Trade
+        st.session_state["risk_pct"] = st.slider(
+            "💰 Risk per Trade (%)", 
+            min_value=0.1, 
+            max_value=5.0, 
+            value=st.session_state["risk_pct"], 
+            step=0.1,
+            help="Percentage of account balance to risk per trade",
+            key="settings_tab_risk_pct"
+        )
+        
+        # Max Positions
+        st.session_state["max_positions"] = st.slider(
+            "📊 Maximum Positions", 
+            min_value=1, 
+            max_value=10, 
+            value=st.session_state["max_positions"],
+            help="Maximum number of simultaneous open positions",
+            key="settings_tab_max_positions"
+        )
+        
+        # Risk Level Indicator
+        risk_level = "🔴 HIGH" if st.session_state["risk_pct"] > 3.0 else "🟡 MEDIUM" if st.session_state["risk_pct"] > 1.5 else "🟢 LOW"
+        st.info(f"**Current Risk Level:** {risk_level}")
     
+    # ================================
+    # RIGHT COLUMN - Strategy Settings
+    # ================================
     with settings_col2:
-        st.subheader("Strategy Settings")
-        min_confidence = st.slider("Min Signal Confidence", 0.5, 1.0, 0.65, 0.01, key="settings_min_confidence")
-        scan_interval = st.slider("Scan Interval (seconds)", 60, 600, 300, 30, key="settings_scan_interval")
+        st.subheader("⚙️ Strategy Settings")
+        
+        # Initialize strategy defaults
+        if "min_confidence" not in st.session_state:
+            st.session_state["min_confidence"] = 0.65
+        if "scan_interval" not in st.session_state:
+            st.session_state["scan_interval"] = 300
+        if "auto_trade_enabled" not in st.session_state:
+            st.session_state["auto_trade_enabled"] = False
+        
+        # Minimum Confidence
+        st.session_state["min_confidence"] = st.slider(
+            "🎯 Minimum Signal Confidence", 
+            min_value=0.5, 
+            max_value=1.0, 
+            value=st.session_state["min_confidence"], 
+            step=0.01,
+            help="Minimum confidence threshold for trade signals",
+            key="settings_tab_min_confidence"
+        )
+        
+        # Scan Interval
+        st.session_state["scan_interval"] = st.slider(
+            "⏱️ Scan Interval (seconds)", 
+            min_value=60, 
+            max_value=600, 
+            value=st.session_state["scan_interval"], 
+            step=30,
+            help="Time between market scans for new opportunities",
+            key="settings_tab_scan_interval"
+        )
+        
+        # Strategy Selection
+        strategy_options = ["Breakout", "Momentum", "Mean Reversion", "Scalping", "Swing Trading"]
+        selected_strategy = st.selectbox(
+            "📈 Trading Strategy",
+            strategy_options,
+            index=0,
+            help="Primary trading strategy to use",
+            key="settings_tab_strategy"
+        )
         
         # Auto-trading toggle
-        auto_trade = st.checkbox("Enable Auto-Trading", value=False, key="settings_auto_trade")
-        if auto_trade:
-            st.warning("⚠️ Auto-trading enabled. Monitor closely!")
-    
-    if st.button("💾 Save Settings", key="save_settings"):
-        st.session_state.update({
-            "risk_pct": risk_pct,
-            "max_positions": max_positions,
-            "min_confidence": min_confidence,
-            "scan_interval": scan_interval
-        })
-        st.success("✅ Settings saved!")
-        # Scanning process
-    if st.session_state.get('manual_scan_requested', False):
-        progress_bar = st.progress(0)
-        status_text = st.empty()
+        st.session_state["auto_trade_enabled"] = st.checkbox(
+            "🤖 Enable Auto-Trading", 
+            value=st.session_state["auto_trade_enabled"],
+            help="Allow bot to execute trades automatically",
+            key="settings_tab_auto_trade"
+        )
         
-        signals_data = []
-        
-        for i, symbol in enumerate(trading_pairs):
-            try:
-                progress = (i + 1) / len(trading_pairs)
-                progress_bar.progress(progress)
-                status_text.text(f"Analyzing {symbol}... ({i+1}/{len(trading_pairs)})")
-                
-                # Generate signals using current components
-                rsi = components['market_analyzer'].get_latest_rsi(symbol)
-                momentum = components['market_analyzer'].get_latest_momentum(symbol)
-                volatility = components['market_analyzer'].get_volatility(symbol)
-                price = components['market_analyzer'].get_price(symbol)
-                
-                # Enhanced signal logic
-                quantum_decision = "HOLD"
-                quantum_conf = 0.5
-                
-                if rsi < 30 and momentum > 3:
-                    quantum_decision = "BUY"
-                    quantum_conf = 0.75
-                elif rsi > 70 and momentum < -3:
-                    quantum_decision = "SELL" 
-                    quantum_conf = 0.75
-                elif abs(momentum) > 5:
-                    quantum_decision = "BUY" if momentum > 0 else "SELL"
-                    quantum_conf = 0.65
-                
-                # ML simulation (more conservative)
-                ml_decision = quantum_decision
-                ml_conf = quantum_conf * 0.9
-                
-                # Technical analysis
-                tech_decision = quantum_decision
-                tech_conf = min(quantum_conf * 1.1, 1.0)
-                
-                # Final ensemble decision
-                weights = {
-                    "quantum": quantum_weight,
-                    "ml": ml_weight,
-                    "technical": technical_weight
-                }
-                
-                final_conf = (quantum_conf * weights['quantum'] + 
-                            ml_conf * weights['ml'] + 
-                            tech_conf * weights['technical']) / 100
-                
-                final_decision = quantum_decision if final_conf > min_conf else "HOLD"
-                
-                signal = {
-                    "symbol": symbol,
-                    "quantum": {"decision": quantum_decision, "confidence": quantum_conf},
-                    "ml": {"decision": ml_decision, "confidence": ml_conf},
-                    "technical": {"decision": tech_decision, "confidence": tech_conf},
-                    "final": {"decision": final_decision, "confidence": final_conf},
-                    "price": price,
-                    "rsi": rsi,
-                    "momentum": momentum,
-                    "volatility": volatility
-                }
-                
-                signals_data.append(signal)
-                
-            except Exception as e:
-                st.error(f"Error analyzing {symbol}: {e}")
-                continue
-        
-        # Clear progress indicators
-        progress_bar.empty()
-        status_text.empty()
-        
-        # Store results in session state
-        st.session_state['latest_signals'] = signals_data
-        st.session_state['manual_scan_requested'] = False
-        st.session_state['last_scan_time'] = datetime.now()
-    
-    # Display Results
-    signals_data = st.session_state.get('latest_signals', [])
-    
-    if signals_data:
-        # Filter signals if requested
-        if show_only_signals:
-            filtered_signals = [
-                s for s in signals_data 
-                if s['final']['decision'] != 'HOLD' and s['final']['confidence'] > min_conf
-            ]
+        if st.session_state["auto_trade_enabled"]:
+            st.warning("⚠️ **Auto-trading ENABLED!** Monitor the bot closely.")
         else:
-            filtered_signals = signals_data
+            st.info("ℹ️ Auto-trading disabled. Manual approval required.")
+    
+    # ================================
+    # EMAIL NOTIFICATION SYSTEM
+    # ================================
+    st.markdown("---")
+    st.subheader("📧 Email Notification System")
+    
+    # Get notification status
+    notification_status = get_notification_status()
+    
+    notification_col1, notification_col2 = st.columns(2)
+    
+    with notification_col1:
+        st.metric("Email System", "✅ Enabled" if notification_status['enabled'] else "❌ Disabled")
+        st.metric("Configuration", "✅ Ready" if notification_status['configured'] else "⚠️ Incomplete")
         
-        if filtered_signals:
-            st.subheader(f"📊 Analysis Results ({len(filtered_signals)} pairs)")
+        # Email preferences checkboxes
+        if notification_status['enabled']:
+            st.write("**Notification Types:**")
+            preferences = notification_status['types']
             
-            # Create signals dataframe
-            signals_df = []
-            for s in filtered_signals:
-                signals_df.append({
-                    "Symbol": s["symbol"],
-                    "Price": f"${s.get('price', 0):.4f}",
-                    "Final Signal": s['final']['decision'],
-                    "Confidence": f"{s['final']['confidence']:.3f}",
-                    "Quantum": f"{s['quantum']['decision']} ({s['quantum']['confidence']:.2f})",
-                    "ML": f"{s['ml']['decision']} ({s['ml']['confidence']:.2f})",
-                    "Technical": f"{s['technical']['decision']} ({s['technical']['confidence']:.2f})",
-                    "RSI": f"{s.get('rsi', 50):.1f}",
-                    "Momentum": f"{s.get('momentum', 0):.2f}%",
-                    "Volatility": f"{s.get('volatility', 0):.3f}"
+            trade_alerts = st.checkbox(
+                "🤖 Trade Alerts", 
+                value=preferences['trades'],
+                help="Get notified when trades are executed",
+                key="settings_trade_alerts"
+            )
+            
+            signal_alerts = st.checkbox(
+                "🎯 Signal Alerts", 
+                value=preferences['signals'],
+                help="Get notified about strong trading signals",
+                key="settings_signal_alerts"
+            )
+            
+            system_alerts = st.checkbox(
+                "🟢 System Alerts", 
+                value=preferences['system'],
+                help="Get notified about system events",
+                key="settings_system_alerts"
+            )
+            
+            error_alerts = st.checkbox(
+                "❌ Error Alerts", 
+                value=preferences['errors'],
+                help="Get notified about errors and issues",
+                key="settings_error_alerts"
+            )
+        else:
+            st.warning("⚠️ Email notifications disabled. Set EMAIL_ENABLED=true in environment.")
+    
+    with notification_col2:
+        st.metric("Emails Sent (Hour)", notification_status['emails_sent_hour'])
+        st.metric("Queue Size", notification_status['queue_size'])
+        
+        if notification_status['enabled']:
+            st.info(f"📧 **Recipients:** {', '.join(notification_status['to_emails'])}")
+        
+        # Test email button
+        if st.button("📧 Send Test Email", key="settings_test_email"):
+            with st.spinner("Sending test email..."):
+                try:
+                    success = send_test_notification()
+                    if success:
+                        st.success("✅ Test email sent successfully! Check your inbox.")
+                    else:
+                        st.error("❌ Failed to send test email. Check configuration.")
+                except Exception as e:
+                    st.error(f"❌ Email test failed: {e}")
+                    notify_error("Email Test", str(e))
+    
+    # ================================
+    # ADVANCED CONFIGURATION
+    # ================================
+    st.markdown("---")
+    st.subheader("🔧 Advanced Configuration")
+    
+    advanced_col1, advanced_col2, advanced_col3 = st.columns(3)
+    
+    with advanced_col1:
+        # Trading Mode
+        trading_mode = st.selectbox(
+            "🎮 Trading Mode",
+            ["Demo", "Paper Trading", "Live Trading"],
+            index=0,
+            help="Select trading environment",
+            key="settings_tab_trading_mode"
+        )
+        
+        if trading_mode == "Live Trading":
+            st.error("🚨 **LIVE TRADING MODE** - Real money at risk!")
+        elif trading_mode == "Paper Trading":
+            st.warning("📝 Paper trading mode - Virtual money")
+        else:
+            st.success("🎮 Demo mode - Safe testing environment")
+    
+    with advanced_col2:
+        # Time Zone
+        timezone = st.selectbox(
+            "🌍 Time Zone",
+            ["UTC", "EST", "PST", "GMT", "CET"],
+            index=0,
+            key="settings_tab_timezone"
+        )
+        
+        # Notification frequency
+        notify_frequency = st.selectbox(
+            "🔔 Notification Frequency",
+            ["Immediate", "Every 5 min", "Every 15 min", "Hourly"],
+            index=0,
+            help="How often to send notifications",
+            key="settings_notification_frequency"
+        )
+    
+    with advanced_col3:
+        # Logging Level
+        log_level = st.selectbox(
+            "📝 Logging Level",
+            ["INFO", "DEBUG", "WARNING", "ERROR"],
+            index=0,
+            help="Detail level for system logs",
+            key="settings_tab_log_level"
+        )
+        
+        # API Rate Limiting
+        api_rate_limit = st.checkbox(
+            "⏸️ Respect API Rate Limits",
+            value=True,
+            help="Enable automatic API rate limiting",
+            key="settings_tab_rate_limit"
+        )
+    
+    # ================================
+    # NOTIFICATION PREFERENCES
+    # ================================
+    st.markdown("---")
+    st.subheader("🔔 Detailed Notification Preferences")
+    
+    if notification_status['enabled']:
+        pref_col1, pref_col2 = st.columns(2)
+        
+        with pref_col1:
+            st.write("**Trading Notifications:**")
+            notify_on_buy = st.checkbox("📈 Notify on BUY orders", value=True, key="settings_notify_buy")
+            notify_on_sell = st.checkbox("📉 Notify on SELL orders", value=True, key="settings_notify_sell")
+            notify_on_profit = st.checkbox("💰 Notify on profitable trades", value=True, key="settings_notify_profit")
+            notify_on_loss = st.checkbox("📊 Notify on losing trades", value=True, key="settings_notify_loss")
+        
+        with pref_col2:
+            st.write("**System Notifications:**")
+            notify_on_startup = st.checkbox("🚀 Notify on bot startup", value=True, key="settings_notify_startup")
+            notify_on_shutdown = st.checkbox("🛑 Notify on bot shutdown", value=True, key="settings_notify_shutdown")
+            notify_on_errors = st.checkbox("⚠️ Notify on critical errors", value=True, key="settings_notify_errors")
+            notify_on_signals = st.checkbox("🎯 Notify on strong signals", value=False, key="settings_notify_signals")
+        
+        # Minimum thresholds for notifications
+        st.write("**Notification Thresholds:**")
+        
+        threshold_col1, threshold_col2 = st.columns(2)
+        with threshold_col1:
+            min_trade_value = st.number_input(
+                "Min Trade Value for Notification ($)",
+                min_value=0.0,
+                value=10.0,
+                step=5.0,
+                key="settings_min_trade_notification"
+            )
+        
+        with threshold_col2:
+            min_signal_confidence = st.number_input(
+                "Min Signal Confidence for Notification",
+                min_value=0.5,
+                max_value=1.0,
+                value=0.8,
+                step=0.05,
+                key="settings_min_signal_notification"
+            )
+    
+    # ================================
+    # ACTION BUTTONS
+    # ================================
+    st.markdown("---")
+    button_col1, button_col2, button_col3, button_col4 = st.columns(4)
+    
+    with button_col1:
+        if st.button("💾 **Save All Settings**", type="primary", key="save_all_settings"):
+            # Save all settings to session state
+            settings_data = {
+                "sl_mult": st.session_state["sl_mult"],
+                "tp_mult": st.session_state["tp_mult"],
+                "risk_pct": st.session_state["risk_pct"],
+                "max_positions": st.session_state["max_positions"],
+                "min_confidence": st.session_state["min_confidence"],
+                "scan_interval": st.session_state["scan_interval"],
+                "auto_trade_enabled": st.session_state["auto_trade_enabled"],
+                "strategy": selected_strategy,
+                "trading_mode": trading_mode,
+                "timezone": timezone,
+                "log_level": log_level,
+                "api_rate_limit": api_rate_limit,
+                "last_updated": datetime.now().isoformat()
+            }
+            
+            # Save notification preferences if available
+            if notification_status['enabled']:
+                settings_data.update({
+                    "notify_on_buy": st.session_state.get("settings_notify_buy", True),
+                    "notify_on_sell": st.session_state.get("settings_notify_sell", True),
+                    "notify_on_profit": st.session_state.get("settings_notify_profit", True),
+                    "notify_on_loss": st.session_state.get("settings_notify_loss", True),
+                    "notify_on_startup": st.session_state.get("settings_notify_startup", True),
+                    "notify_on_shutdown": st.session_state.get("settings_notify_shutdown", True),
+                    "notify_on_errors": st.session_state.get("settings_notify_errors", True),
+                    "notify_on_signals": st.session_state.get("settings_notify_signals", False),
+                    "min_trade_notification": st.session_state.get("settings_min_trade_notification", 10.0),
+                    "min_signal_notification": st.session_state.get("settings_min_signal_notification", 0.8)
                 })
             
-            df = pd.DataFrame(signals_df)
+            # Update session state
+            st.session_state.update(settings_data)
             
-            # Color coding for signals
-            def color_signals(val):
-                if 'BUY' in val:
-                    return 'background-color: #90EE90'  # Light green
-                elif 'SELL' in val:
-                    return 'background-color: #FFB6C1'  # Light red
+            # Send system notification about settings update
+            try:
+                notify_system("settings_updated", "Trading bot settings have been updated")
+            except:
+                pass  # Continue if notification fails
+            
+            st.success("✅ **All settings saved successfully!**")
+            time.sleep(1)
+            st.rerun()
+    
+    with button_col2:
+        if st.button("🔄 **Reset to Defaults**", key="reset_settings"):
+            # Reset to default values
+            st.session_state.update({
+                "sl_mult": 2.0,
+                "tp_mult": 3.0,
+                "risk_pct": 2.0,
+                "max_positions": 5,
+                "min_confidence": 0.65,
+                "scan_interval": 300,
+                "auto_trade_enabled": False
+            })
+            st.info("🔄 Settings reset to defaults")
+            time.sleep(1)
+            st.rerun()
+    
+    with button_col3:
+        if st.button("📤 **Export Config**", key="export_settings"):
+            config_data = {
+                "bot_settings": {
+                    "sl_mult": st.session_state.get("sl_mult", 2.0),
+                    "tp_mult": st.session_state.get("tp_mult", 3.0),
+                    "risk_pct": st.session_state.get("risk_pct", 2.0),
+                    "max_positions": st.session_state.get("max_positions", 5),
+                    "min_confidence": st.session_state.get("min_confidence", 0.65),
+                    "scan_interval": st.session_state.get("scan_interval", 300),
+                    "auto_trade_enabled": st.session_state.get("auto_trade_enabled", False)
+                },
+                "notification_settings": {
+                    "enabled": notification_status['enabled'],
+                    "preferences": notification_status.get('types', {}),
+                    "recipients": notification_status.get('to_emails', [])
+                },
+                "export_timestamp": datetime.now().isoformat(),
+                "bot_version": "2.0"
+            }
+            
+            import json
+            config_json = json.dumps(config_data, indent=2)
+            
+            st.download_button(
+                label="💾 Download Config",
+                data=config_json,
+                file_name=f"bot_config_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                mime="application/json",
+                key="download_config"
+            )
+    
+    with button_col4:
+        if st.button("🧪 **Test Configuration**", key="test_settings"):
+            # Test current settings
+            with st.spinner("Testing configuration..."):
+                time.sleep(2)  # Simulate testing
+                
+                # Validation checks
+                validation_results = []
+                
+                if st.session_state.get("risk_pct", 0) > 5.0:
+                    validation_results.append("❌ Risk too high (>5%)")
                 else:
-                    return 'background-color: #F0F0F0'  # Light gray
-            
-            # Apply styling
-            styled_df = df.style.applymap(color_signals, subset=['Final Signal'])
-            st.dataframe(styled_df, use_container_width=True)
-            
-            # Trading Interface
-            st.subheader("⚡ Quick Trading Interface")
-            
-            # Select signal for trading
-            strong_buy_signals = [s for s in filtered_signals if s['final']['decision'] == 'BUY']
-            strong_sell_signals = [s for s in filtered_signals if s['final']['decision'] == 'SELL']
-            
-            if strong_buy_signals or strong_sell_signals:
-                trade_col1, trade_col2 = st.columns(2)
+                    validation_results.append("✅ Risk level acceptable")
                 
-                with trade_col1:
-                    if strong_buy_signals:
-                        st.write("**🟢 Strong BUY Signals:**")
-                        for i, signal in enumerate(strong_buy_signals[:5]):  # Top 5
-                            symbol = signal['symbol']
-                            conf = signal['final']['confidence']
-                            price = signal.get('price', 0)
-                            
-                            if price > 0:
-                                signal_col1, signal_col2 = st.columns([3, 1])
-                                
-                                with signal_col1:
-                                    st.write(f"**{symbol}** - ${price:.4f} (Conf: {conf:.3f})")
-                                
-                                with signal_col2:
-                                    if st.button(f"🚀 Buy", key=f"multi_buy_{symbol}_{i}"):
-                                        st.session_state['selected_trade'] = {
-                                            'symbol': symbol,
-                                            'action': 'BUY',
-                                            'price': price,
-                                            'confidence': conf,
-                                            'timestamp': datetime.now(),
-                                            'source': 'multi_strategy'
-                                        }
-                                        st.success(f"Selected {symbol} for BUY")
-                                        st.rerun()
+                if st.session_state.get("sl_mult", 0) < 1.0:
+                    validation_results.append("❌ Stop loss too tight")
+                else:
+                    validation_results.append("✅ Stop loss appropriate")
                 
-                with trade_col2:
-                    if strong_sell_signals:
-                        st.write("**🔴 Strong SELL Signals:**")
-                        for i, signal in enumerate(strong_sell_signals[:5]):  # Top 5
-                            symbol = signal['symbol']
-                            conf = signal['final']['confidence']
-                            price = signal.get('price', 0)
-                            
-                            if price > 0:
-                                signal_col1, signal_col2 = st.columns([3, 1])
-                                
-                                with signal_col1:
-                                    st.write(f"**{symbol}** - ${price:.4f} (Conf: {conf:.3f})")
-                                
-                                with signal_col2:
-                                    if st.button(f"📉 Sell", key=f"multi_sell_{symbol}_{i}"):
-                                        st.session_state['selected_trade'] = {
-                                            'symbol': symbol,
-                                            'action': 'SELL',
-                                            'price': price,
-                                            'confidence': conf,
-                                            'timestamp': datetime.now(),
-                                            'source': 'multi_strategy'
-                                        }
-                                        st.success(f"Selected {symbol} for SELL")
-                                        st.rerun()
-            
-            # Execute Selected Trade
-            if 'selected_trade' in st.session_state and st.session_state['selected_trade'].get('source') == 'multi_strategy':
-                trade = st.session_state['selected_trade']
+                if st.session_state.get("min_confidence", 0) < 0.5:
+                    validation_results.append("❌ Confidence threshold too low")
+                else:
+                    validation_results.append("✅ Confidence threshold good")
                 
-                st.divider()
-                st.subheader(f"🎯 Execute Trade: {trade['action']} {trade['symbol']}")
+                # Test notification system
+                if notification_status['enabled']:
+                    validation_results.append("✅ Email notifications configured")
+                else:
+                    validation_results.append("⚠️ Email notifications disabled")
                 
-                exec_col1, exec_col2, exec_col3 = st.columns(3)
-                
-                with exec_col1:
-                    st.info(f"**Symbol:** {trade['symbol']}")
-                    st.info(f"**Action:** {trade['action']}")
-                    st.info(f"**Price:** ${trade['price']:.4f}")
-                    st.info(f"**Confidence:** {trade['confidence']:.3f}")
-                
-                with exec_col2:
-                    quantity = st.number_input("Quantity", min_value=0.0001, step=0.0001, format="%.6f", key="multi_strategy_quantity")
-                    
-                    if quantity > 0:
-                        trade_value = quantity * trade['price']
-                        est_fee = trade_value * 0.001
-                        st.info(f"Trade Value: ${trade_value:.2f}")
-                        st.caption(f"Est. Fee: ${est_fee:.4f}")
-                    else:
-                        st.warning("⚠️ Enter quantity")
-                
-                with exec_col3:
-                    use_sl_tp = st.checkbox("Use Stop Loss / Take Profit", value=True, key="multi_strategy_sl_tp")
-                    
-                    if use_sl_tp:
-                        sl_pct = st.number_input("Stop Loss %", min_value=1.0, value=5.0, max_value=20.0, key="multi_strategy_sl")
-                        tp_pct = st.number_input("Take Profit %", min_value=1.0, value=10.0, max_value=50.0, key="multi_strategy_tp")
-                    
-                    # Execute button
-                    if st.button("🚀 EXECUTE TRADE", type="primary", key="multi_strategy_execute"):
-                        if quantity > 0:
-                            try:
-                                result = components['trade_exec'].manual_trade(
-                                    trade['symbol'], quantity, 
-                                    st.session_state["sl_mult"], st.session_state["tp_mult"]
-                                )
-                                st.success(f"✅ Trade Executed: {result}")
-                                
-                                success_msg = f"Multi-Strategy Trade: {trade['action']} {quantity:.6f} {trade['symbol']} @ ${trade['price']:.4f} (Conf: {trade['confidence']:.3f})"
-                                st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {success_msg}")
-                                
-                                # Clear selected trade
-                                del st.session_state['selected_trade']
-                                st.rerun()
-                                
-                            except Exception as e:
-                                st.error(f"❌ Trade execution failed: {e}")
-                        else:
-                            st.error("❌ Invalid quantity")
-                
-                # Cancel trade button
-                if st.button("❌ Cancel Trade", key="multi_strategy_cancel"):
-                    del st.session_state['selected_trade']
-                    st.rerun()
-            
-            else:
-                st.info("💡 Select a signal above to execute a trade")
-            
-            # Signal Statistics
-            st.subheader("📈 Signal Statistics")
-            
-            total_scanned = len(signals_data)
-            strong_signals = len(filtered_signals)
-            buy_signals = len([s for s in filtered_signals if s['final']['decision'] == 'BUY'])
-            sell_signals = len([s for s in filtered_signals if s['final']['decision'] == 'SELL'])
-            
-            stats_col1, stats_col2, stats_col3, stats_col4 = st.columns(4)
-            with stats_col1:
-                st.metric("Total Scanned", total_scanned)
-            with stats_col2:
-                st.metric("Strong Signals", strong_signals)
-            with stats_col3:
-                st.metric("BUY Signals", buy_signals)
-            with stats_col4:
-                st.metric("SELL Signals", sell_signals)
+                # Display results
+                st.info("**Configuration Test Results:**")
+                for result in validation_results:
+                    st.write(result)
+    
+    # ================================
+    # CURRENT SETTINGS SUMMARY
+    # ================================
+    st.markdown("---")
+    st.subheader("📋 Current Settings Summary")
+    
+    summary_col1, summary_col2, summary_col3 = st.columns(3)
+    
+    with summary_col1:
+        st.metric("Stop Loss", f"{st.session_state.get('sl_mult', 2.0):.1f}x ATR")
+        st.metric("Take Profit", f"{st.session_state.get('tp_mult', 3.0):.1f}x ATR")
+        st.metric("Risk per Trade", f"{st.session_state.get('risk_pct', 2.0):.1f}%")
+    
+    with summary_col2:
+        st.metric("Max Positions", f"{st.session_state.get('max_positions', 5)}")
+        st.metric("Min Confidence", f"{st.session_state.get('min_confidence', 0.65):.2f}")
+        st.metric("Scan Interval", f"{st.session_state.get('scan_interval', 300)//60}min")
+    
+    with summary_col3:
+        auto_trade_status = "✅ ENABLED" if st.session_state.get('auto_trade_enabled', False) else "❌ DISABLED"
+        st.metric("Auto Trading", auto_trade_status)
         
+        email_status = "✅ ACTIVE" if notification_status['enabled'] else "❌ INACTIVE"
+        st.metric("Email Alerts", email_status)
+        
+        trading_mode_display = st.session_state.get('trading_mode', 'Demo')
+        st.metric("Trading Mode", trading_mode_display)
+    
+    # Last updated info
+    if "last_updated" in st.session_state:
+        st.caption(f"⏰ Last updated: {st.session_state['last_updated']}")
+    else:
+        st.caption("⏰ Settings not yet saved")
+    
+    # ================================
+    # NOTIFICATION STATUS OVERVIEW
+    # ================================
+    if notification_status['enabled']:
+        st.markdown("---")
+        st.subheader("📧 Email System Status")
+        
+        email_col1, email_col2, email_col3, email_col4 = st.columns(4)
+        
+        with email_col1:
+            st.metric("System Status", "🟢 Active")
+        
+        with email_col2:
+            st.metric("Config Status", "✅ Ready" if notification_status['configured'] else "⚠️ Incomplete")
+        
+        with email_col3:
+            st.metric("Hourly Emails", notification_status['emails_sent_hour'])
+        
+        with email_col4:
+            st.metric("Queue Size", notification_status['queue_size'])
+        
+        # Show current notification preferences in a compact format
+        st.write("**Active Notification Types:**")
+        active_notifications = []
+        preferences = notification_status.get('types', {})
+        
+        if preferences.get('trades', False):
+            active_notifications.append("🤖 Trades")
+        if preferences.get('signals', False):
+            active_notifications.append("🎯 Signals")
+        if preferences.get('system', False):
+            active_notifications.append("🟢 System")
+        if preferences.get('errors', False):
+            active_notifications.append("❌ Errors")
+        
+        if active_notifications:
+            st.info(" | ".join(active_notifications))
         else:
-            st.warning("⚠️ No strong signals found with current confidence threshold")
-            st.info("💡 Try lowering the minimum confidence or scanning more pairs")
-        
-        # Last scan info
-        if 'last_scan_time' in st.session_state:
-            st.caption(f"Last scan: {st.session_state['last_scan_time'].strftime('%H:%M:%S')}")
+            st.warning("No notification types currently active")
     
     else:
-        st.info("🔍 Click 'Scan All Pairs' to analyze trading opportunities")
-        
-        # Show pairs to be scanned
-        st.subheader("📋 Pairs to be scanned:")
-        if trading_pairs:
-            pairs_cols = st.columns(4)
-            for i, pair in enumerate(trading_pairs[:20]):
-                pairs_cols[i % 4].write(f"• {pair}")
-            
-            if len(trading_pairs) > 20:
-                st.caption(f"... and {len(trading_pairs) - 20} more pairs")
-
-# Email Notification System Section
-st.subheader("📧 Email Notification System")
-
-notification_status = get_notification_status()
-col1, col2 = st.columns(2)
-
-with col1:
-    st.metric("Email System", "✅ Enabled" if notification_status['enabled'] else "❌ Disabled")
-    st.metric("Configuration", "✅ Ready" if notification_status['configured'] else "⚠️ Incomplete")
-
-with col2:
-    st.metric("Emails Sent (Hour)", notification_status['emails_sent_hour'])
-    st.metric("Queue Size", notification_status['queue_size'])
-
-if st.button("📧 Send Test Email", use_container_width=True):
-    with st.spinner("Sending test email..."):
-        try:
-            success = send_test_notification()
-            if success:
-                st.success("✅ Test email sent successfully! Check your inbox.")
-            else:
-                st.error("❌ Failed to send test email. Check configuration.")
-        except Exception as e:
-            st.error(f"❌ Email test failed: {e}")
-            notify_error("Email Test", str(e))
-
-if notification_status['enabled']:
-    preferences = notification_status['types']
-    col1, col2 = st.columns(2)
-    with col1:
-        st.write(f"🤖 Trade Alerts: {'✅' if preferences['trades'] else '❌'}")
-        st.write(f"🎯 Signal Alerts: {'✅' if preferences['signals'] else '❌'}")
-    with col2:
-        st.write(f"🟢 System Alerts: {'✅' if preferences['system'] else '❌'}")
-        st.write(f"❌ Error Alerts: {'✅' if preferences['errors'] else '❌'}")
-    st.info(f"📧 Recipients: {', '.join(notification_status['to_emails'])}")
-else:
-    st.warning("⚠️ Email notifications disabled. Set EMAIL_ENABLED=true in environment.")
-
+        st.markdown("---")
+        st.warning("📧 **Email notifications are currently disabled.** Set EMAIL_ENABLED=true in your environment to enable email alerts.")
         # -------------------------
 # System Health Tab
 # -------------------------
