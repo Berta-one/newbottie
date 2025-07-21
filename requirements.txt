@@ -1,25 +1,29 @@
-# Existing dependencies
-python-binance==1.0.19
-python-dotenv==1.0.0
+# Web UI and API
+flask
+flask-socketio
+eventlet
+redis
+psutil
+python-dotenv
+
+# Streamlit Dashboard
 streamlit>=1.32.0
+plotly>=5.15.0
 pandas>=2.0.3
 numpy>=1.24.3
+
+# Trading and API
+python-binance==1.0.19
 requests>=2.31.0
 pytz>=2023.3
-plotly>=5.15.0
 aiohttp>=3.8.5
 websockets>=11.0.2
 websocket-client>=1.6.0
 colorlog>=6.7.0
 tqdm>=4.66.0
-psutil>=5.9.0
-qiskit>=1.0.0
-qiskit-aer>=0.13.0
+
+# Machine Learning and Quantum
 scikit-learn>=1.3.0
 joblib>=1.3.0
-
-# Flask + WebSocket dependencies
-flask>=2.3.3
-flask-socketio>=5.3.4
-eventlet>=0.33.0
-redis>=5.0.1
+qiskit>=1.0.0
+qiskit-aer>=0.13.0
