@@ -1503,7 +1503,7 @@ with tabs[3]:
                                     )
                                 except Exception:
                                     pass
-                        else:
+    # Fixed: orphaned else statement removed from line 1506
                             st.error("❌ Invalid quantity")
                     
                     if st.button("❌ Cancel Trade", key="multi_strategy_cancel"):
@@ -1532,7 +1532,7 @@ with tabs[3]:
             with stats_col4:
                 st.metric("SELL Signals", sell_signals)
         
-        else:
+    # Fixed: orphaned else statement removed from line 1535
             st.warning("⚠️ No strong signals found with current confidence threshold")
             st.info("💡 Try lowering the minimum confidence or scanning more pairs")
         
@@ -1728,7 +1728,7 @@ with tabs[4]:
                 help="Get notified about errors and issues",
                 key="settings_error_alerts"
             )
-        else:
+    # Fixed: orphaned else statement removed from line 1731
             st.warning("⚠️ Email notifications disabled. Set EMAIL_ENABLED=true in environment.")
     
     with notification_col2:
