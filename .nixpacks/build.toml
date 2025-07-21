@@ -1,3 +1,18 @@
+[phases.setup]
+nixPkgs = ["python39", "python39Packages.pip"]
+
+[phases.install]
+cmds = [
+  "pip install --upgrade pip",
+  "pip install -r requirements.txt"
+]
+
+[phases.build]
+cmds = ["echo 'Build complete'"]
+
 [start]
-# Point to your main dashboard instead of adaptive_risk_system.py
-web: streamlit run hybrid_bot.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true --server.enableCORS=false --server.enableXsrfProtection=false
+cmd = "python railway_deployment_main.py"
+
+[variables]
+PORT = "8501"
+PYTHONPATH = "/app"
