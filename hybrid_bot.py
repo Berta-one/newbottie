@@ -1260,7 +1260,8 @@ with tabs[3]:
             # treat refresh as scan
             st.session_state['manual_scan_requested'] = True
     with scan_col3:
-        st.session_state['multi_show_only_signals'] = st.checkbox(
+        # Fixed session state conflict
+        show_signals_checkbox = st.checkbox(
             "Show Only Strong Signals",
             value=st.session_state['multi_show_only_signals'],
             key="multi_show_only_signals"
@@ -1620,7 +1621,7 @@ with tabs[4]:
             st.session_state["max_positions"] = 5
         
         # Stop Loss Multiplier
-        st.session_state["sl_mult"] = st.slider(
+        # Fixed session state conflict`r`n        sl_mult_value = st.slider(
             "ðŸ›‘ Stop Loss Multiplier (ATR)", 
             min_value=0.5, 
             max_value=5.0, 
@@ -1631,7 +1632,7 @@ with tabs[4]:
         )
         
         # Take Profit Multiplier
-        st.session_state["tp_mult"] = st.slider(
+        # Fixed session state conflict`r`n        tp_mult_value = st.slider(
             "ðŸŽ¯ Take Profit Multiplier (ATR)", 
             min_value=1.0, 
             max_value=10.0, 
@@ -1642,7 +1643,7 @@ with tabs[4]:
         )
         
         # Risk per Trade
-        st.session_state["risk_pct"] = st.slider(
+        # Fixed session state conflict`r`n        risk_pct_value = st.slider(
             "ðŸ’° Risk per Trade (%)", 
             min_value=0.1, 
             max_value=5.0, 
@@ -1653,7 +1654,7 @@ with tabs[4]:
         )
         
         # Max Positions
-        st.session_state["max_positions"] = st.slider(
+        # Fixed session state conflict`r`n        max_positions_value = st.slider(
             "ðŸ“Š Maximum Positions", 
             min_value=1, 
             max_value=10, 
@@ -1681,7 +1682,7 @@ with tabs[4]:
             st.session_state["auto_trade_enabled"] = False
         
         # Minimum Confidence
-        st.session_state["min_confidence"] = st.slider(
+        # Fixed session state conflict`r`n        min_confidence_value = st.slider(
             "ðŸŽ¯ Minimum Signal Confidence", 
             min_value=0.5, 
             max_value=1.0, 
@@ -1692,7 +1693,7 @@ with tabs[4]:
         )
         
         # Scan Interval
-        st.session_state["scan_interval"] = st.slider(
+        # Fixed session state conflict`r`n        scan_interval_value = st.slider(
             "â±ï¸ Scan Interval (seconds)", 
             min_value=60, 
             max_value=600, 
@@ -1713,7 +1714,7 @@ with tabs[4]:
         )
         
         # Auto-trading toggle
-        st.session_state["auto_trade_enabled"] = st.checkbox(
+        # Fixed session state conflict`r`n        auto_trade_value = st.checkbox(
             "ðŸ¤– Enable Auto-Trading", 
             value=st.session_state["auto_trade_enabled"],
             help="Allow bot to execute trades automatically",
@@ -2396,6 +2397,9 @@ if os.getenv("AUTO_START_BOT", "false").lower() == "true":
         st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Auto-scanner started")
 
 print("âœ… Hybrid Quantum Trading Bot loaded successfully!")
+
+
+
 
 
 
