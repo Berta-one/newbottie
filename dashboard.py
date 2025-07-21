@@ -1,7 +1,7 @@
 """
 dashboard.py
 ============
-Enhanced Analytics Dashboard with Bot Status and Control (Start/Stop).
+Trading Analytics + Bot Control Panel + Live Logs
 """
 
 import streamlit as st
@@ -12,20 +12,20 @@ import os
 import subprocess
 import psutil
 
+BOT_SCRIPT = "bot_service.py"
+LOG_FILE = "bot_service.log"
+
 # =========================
 # BOT STATUS & CONTROL
 # =========================
-BOT_SCRIPT = "bot_service.py"
-
 def is_bot_running():
-    """Check if the bot service is running"""
     for proc in psutil.process_iter(['cmdline']):
         if BOT_SCRIPT in ' '.join(proc.info['cmdline']):
             return True
     return False
 
 # =========================
-# SAFE DATA HANDLING UTILS
+# DATA UTILITIES
 # =========================
 def safe_get_column_sum(df, column_name, default=0.0):
     if df.empty or column_name not in df.columns:
@@ -75,13 +75,12 @@ def calculate_pnl_if_missing(df):
 def render_analytics_dashboard():
     st.title("📊 Trading Analytics Dashboard")
 
-    # ✅ Bot Status
+    # ✅ Bot Status & Control
     bot_running = is_bot_running()
     status_text = "🟢 Bot is Running" if bot_running else "🔴 Bot is Stopped"
     status_color = "green" if bot_running else "red"
     st.markdown(f"### **Bot Status:** <span style='color:{status_color};'>{status_text}</span>", unsafe_allow_html=True)
 
-    # ✅ Bot Control Buttons
     col1, col2 = st.columns(2)
     with col1:
         if st.button("▶ Start Bot"):
@@ -97,6 +96,22 @@ def render_analytics_dashboard():
                 st.warning("🛑 Bot stopped!")
             else:
                 st.info("Bot is not running")
+
+    st.divider()
+
+    # ✅ Live Logs
+    st.subheader("📜 Live Bot Logs")
+    if os.path.exists(LOG_FILE):
+        try:
+            with open(LOG_FILE, "r") as f:
+                logs = f.readlines()[-30:]  # Last 30 log lines
+                st.text("".join(logs))
+        except:
+            st.info("Unable to read logs.")
+    else:
+        st.info("No log file found yet.")
+
+    st.divider()
 
     # ✅ Load trade data
     df = load_trade_data()
