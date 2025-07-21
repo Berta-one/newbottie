@@ -1,0 +1,28 @@
+version: '3.9'
+
+services:
+  redis:
+    image: redis:latest
+    container_name: bottie-redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+  flask-dashboard:
+    build: ./flask-dashboard  # Folder where app.py lives
+    container_name: bottie-dashboard
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - FLASK_ENV=production
+    depends_on:
+      - redis
+
+  bot-service:
+    build: ./bot-service  # Folder where bot_service.py lives
+    container_name: bottie-bot
+    restart: always
+    depends_on:
+      - redis
