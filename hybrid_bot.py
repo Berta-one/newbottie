@@ -1629,8 +1629,7 @@ with tabs[4]:
             step=0.1,
             help="Multiplier for ATR-based stop loss calculation",
             key="settings_tab_sl_mult"
-        )
-        
+    # Fixed: removed orphaned closing parenthesis\n        
         # Take Profit Multiplier
         # Fixed session state conflict`r`n        tp_mult_value = st.slider(
             "ðŸŽ¯ Take Profit Multiplier (ATR)", 
@@ -2397,6 +2396,7 @@ if os.getenv("AUTO_START_BOT", "false").lower() == "true":
         st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Auto-scanner started")
 
 print("âœ… Hybrid Quantum Trading Bot loaded successfully!")
+
 
 
 
