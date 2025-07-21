@@ -1689,8 +1689,7 @@ with tabs[3]:
             if len(trading_pairs) > 20:
                 st.caption(f"... and {len(trading_pairs) - 20} more pairs")
 
-# -------------------------  # <--- END Multi-Strategy Tab
-
+  
 # ==========================================
 # FIXED TRADING INTERFACE WITH UNIQUE KEYS
 # ==========================================
