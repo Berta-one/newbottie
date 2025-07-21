@@ -9,7 +9,7 @@ services:
       - "6379:6379"
 
   flask-dashboard:
-    build: ./flask-dashboard  # Folder where app.py lives
+    build: ./flask-dashboard
     container_name: bottie-dashboard
     restart: always
     ports:
@@ -17,12 +17,38 @@ services:
     environment:
       - PORT=5000
       - FLASK_ENV=production
+      - BINANCE_API_KEY=${BINANCE_API_KEY}
+      - BINANCE_API_SECRET=${BINANCE_API_SECRET}
+      - USE_TESTNET=true
     depends_on:
       - redis
+    volumes:
+      - shared-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   bot-service:
-    build: ./bot-service  # Folder where bot_service.py lives
+    build: ./bot-service
     container_name: bottie-bot
     restart: always
+    environment:
+      - BINANCE_API_KEY=${BINANCE_API_KEY}
+      - BINANCE_API_SECRET=${BINANCE_API_SECRET}
+      - USE_TESTNET=true
+      - SCAN_INTERVAL=30
+      - TRADING_PAIRS=BTCUSDT,ETHUSDT
     depends_on:
       - redis
+    volumes:
+      - shared-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "bot_service.py"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  shared-logs:
