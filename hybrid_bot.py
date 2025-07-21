@@ -1197,7 +1197,7 @@ with tabs[3]:
     
     with col2:
         # Fixed session state issue
-    multi_min_conf_value = st.slider(
+        multi_min_conf_value = st.slider(
             "Min Confidence", 0.5, 1.0, float(st.session_state['multi_min_conf']),
             0.01, key="multi_min_conf"
         )
@@ -2394,4 +2394,5 @@ if os.getenv("AUTO_START_BOT", "false").lower() == "true":
         st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Auto-scanner started")
 
 print("âœ… Hybrid Quantum Trading Bot loaded successfully!")
+
 
