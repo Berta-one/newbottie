@@ -117,4 +117,4 @@ def health():
 
 if __name__ == '__main__':
     print("🚀 Starting Flask-SocketIO on Railway...")
-    socketio.run(app, host='0.0.0.0', port=PORT)
+    socketio.run(app, host='0.0.0.0', port=int(os.getenv('PORT', 8080)))
