@@ -1062,8 +1062,18 @@ with tabs[3]:
         st.session_state['weight_ml'] = 30
     if 'weight_technical' not in st.session_state:
         st.session_state['weight_technical'] = 40
+    # ✅ Fix: Initialize session state first
     if 'multi_min_conf' not in st.session_state:
-        st.session_state['multi_min_conf'] = 0.65
+    st.session_state['multi_min_conf'] = 0.65
+
+    multi_min_conf = st.slider(
+    "Min Confidence", 
+    min_value=0.0, 
+    max_value=1.0, 
+    value=st.session_state['multi_min_conf'],
+    step=0.05,
+    key='multi_min_conf'
+)
     if 'multi_max_pairs' not in st.session_state:
         st.session_state['multi_max_pairs'] = 20
     if 'multi_scan_mode' not in st.session_state:
@@ -1156,7 +1166,10 @@ with tabs[3]:
                 st.rerun()
     
     with col2:
-        st.session_state['multi_min_conf'] = st.slider(
+        if 'multi_min_conf' not in st.session_state:
+    st.session_state['multi_min_conf'] = 0.65
+
+multi_min_conf = st.slider(
             "Min Confidence", 0.5, 1.0, float(st.session_state['multi_min_conf']),
             0.01, key="multi_min_conf"
         )
@@ -2353,3 +2366,4 @@ if os.getenv("AUTO_START_BOT", "false").lower() == "true":
         st.session_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Auto-scanner started")
 
 print("✅ Hybrid Quantum Trading Bot loaded successfully!")
+
