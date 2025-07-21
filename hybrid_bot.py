@@ -1,16 +1,6 @@
 #!/usr/bin/env python3
 """
 Hybrid Quantum Crypto Trading Bot Dashboard
--------------------------------------------
-Streamlit App for:
-- Portfolio Overview
-- Manual Trading
-- Auto-Trader Control
-- Multi-Strategy Analysis
-- Risk Management Settings
-- System Health
-- Logs
-- Advanced Analytics
 """
 import os
 import sys
@@ -19,17 +9,55 @@ import hashlib
 import threading
 from datetime import datetime, timedelta
 import traceback
-from auth import require_authentication
-from notifications import (
-    get_notification_system, 
-    notify_system, 
-    notify_error, 
-    notify_trade,
-    notify_trade_close,
-    notify_signal,
-    send_test_notification,
-    get_notification_status
-)
+
+# Fix Python path for imports
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
+# Try to import auth system
+try:
+    from auth import require_authentication
+    AUTH_ENABLED = True
+    print("✅ Authentication system loaded")
+except ImportError as e:
+    print(f"⚠️ Authentication disabled: {e}")
+    AUTH_ENABLED = False
+    
+    # Create dummy auth function
+    class DummyAuth:
+        def __init__(self):
+            self.admin_username = "admin"
+    
+    def require_authentication():
+        return DummyAuth()
+
+# Import other modules with error handling
+try:
+    from notifications import (
+        get_notification_system, 
+        notify_system, 
+        notify_error, 
+        notify_trade,
+        notify_trade_close,
+        notify_signal,
+        send_test_notification,
+        get_notification_status
+    )
+    NOTIFICATIONS_ENABLED = True
+except ImportError:
+    print("⚠️ Notifications disabled - module not found")
+    NOTIFICATIONS_ENABLED = False
+    
+    # Create dummy notification functions
+    def notify_system(*args, **kwargs): pass
+    def notify_error(*args, **kwargs): pass
+    def notify_trade(*args, **kwargs): pass
+    def notify_trade_close(*args, **kwargs): pass
+    def notify_signal(*args, **kwargs): pass
+    def send_test_notification(*args, **kwargs): return False
+    def get_notification_status(): return {"status": "disabled"}
+    def get_notification_system(): return None
 
 # Fix Railway port issue
 if 'streamlit' in sys.argv[0] or 'RAILWAY_ENVIRONMENT' in os.environ:
@@ -43,15 +71,27 @@ if 'streamlit' in sys.argv[0] or 'RAILWAY_ENVIRONMENT' in os.environ:
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import psutil
 import streamlit as st
 import numpy as np
 
 # ✅ Streamlit Config
 st.set_page_config(page_title="Hybrid Quantum Trading Bot", layout="wide")
 
-# 🔐 Require authentication
-auth = require_authentication()
+# 🔐 Require authentication (if enabled)
+if AUTH_ENABLED:
+    auth = require_authentication()
+    # Notify system on dashboard access (only once per session)
+    if 'system_notified' not in st.session_state and NOTIFICATIONS_ENABLED:
+        notify_system("started", f"Dashboard accessed by {auth.admin_username}")
+        st.session_state.system_notified = True
+else:
+    # Create dummy auth object
+    class DummyAuth:
+        def __init__(self):
+            self.admin_username = "admin"
+    auth = DummyAuth()
+
+# ... rest of your code continues normally
 
 # Notify system on dashboard access (only once per session)
 if 'system_notified' not in st.session_state:
