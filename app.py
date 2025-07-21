@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """
-Flask Dashboard for Bottie (Railway Ready)
+Bottie Flask Dashboard (Railway Ready)
+Features:
+- Real-time logs via WebSocket (Redis backend)
+- Start/Stop bot controls
 Author: Rondanini Publishing Ltd
 """
 import os
@@ -10,26 +13,22 @@ from flask import Flask, render_template_string, redirect, url_for, flash, jsoni
 from flask_socketio import SocketIO
 import psutil
 
-# ✅ Load Env Variables
-REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379')
-PORT = int(os.getenv('PORT', 5000))
-
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
-# ✅ SocketIO with Redis backend
+# ✅ Use Redis for SocketIO messaging
+REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379')
 socketio = SocketIO(app, cors_allowed_origins="*", message_queue=REDIS_URL)
 
 BOT_SCRIPT = "bot_service.py"
 
-# ✅ Check if bot is running
 def is_bot_running():
+    """Check if bot process is active"""
     for proc in psutil.process_iter(['cmdline']):
         if BOT_SCRIPT in ' '.join(proc.info['cmdline']):
             return True
     return False
 
-# ✅ Bot Control Routes
 @app.route('/bot/start')
 def start_bot():
     if not is_bot_running():
@@ -48,12 +47,10 @@ def stop_bot():
         flash("Bot is not running.", "info")
     return redirect(url_for('dashboard'))
 
-# ✅ SocketIO Event
 @socketio.on('connect', namespace='/logs')
 def logs_connect():
     print("✅ Client connected to logs namespace")
 
-# ✅ HTML Template
 BASE_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
