@@ -1,5 +1,3 @@
-# **PART 1: Complete hybrid_bot.py File (Lines 1-200)**
-
 #!/usr/bin/env python3
 """
 Hybrid Quantum Crypto Trading Bot Dashboard
@@ -33,6 +31,7 @@ from notifications import (
     send_test_notification,
     get_notification_status
 )
+
 # Fix Railway port issue
 if 'streamlit' in sys.argv[0] or 'RAILWAY_ENVIRONMENT' in os.environ:
     os.environ.pop('STREAMLIT_SERVER_PORT', None)
@@ -51,6 +50,7 @@ import numpy as np
 
 # ✅ Streamlit Config
 st.set_page_config(page_title="Hybrid Quantum Trading Bot", layout="wide")
+
 # 🔐 Require authentication
 auth = require_authentication()
 
@@ -58,6 +58,7 @@ auth = require_authentication()
 if 'system_notified' not in st.session_state:
     notify_system("started", f"Dashboard accessed by {auth.admin_username}")
     st.session_state.system_notified = True 
+
 # -------------------------
 # Enhanced Module Import System
 # -------------------------
@@ -175,7 +176,6 @@ class FallbackQuantumAnalyzer:
             'distribution': {'BUY': 0.4, 'SELL': 0.3, 'HOLD': 0.3}
         }
 
-# ✅ CRITICAL FIX #5: Enhanced FallbackTradeExecutor with proper interface
 class FallbackTradeExecutor:
     def __init__(self, client=None, risk_mgr=None, log_callback=None):
         self.active_orders = {}
@@ -227,6 +227,7 @@ class FallbackTradeExecutor:
             'can_trade': True,
             'demo_mode': True
         }
+
 # -------------------------
 # Auto-Scanner Class
 # -------------------------
@@ -298,7 +299,6 @@ def setup_binance_client():
     
     try:
         client = modules['Client'](api_key, api_secret)
-        # ✅ CRITICAL FIX #4: Fix USE_TESTNET Default
         use_testnet = os.getenv("USE_TESTNET", "false").lower() == "true"
         
         if use_testnet:
@@ -536,131 +536,6 @@ def initialize_components():
         print("📝 DEMO MODE: Using fallback components")
     
     return components, client, client_status
-    
-    # Continue for other components...
-    components = {}
-def force_live_components():
-    """Force live components when API is available"""
-    force_live = os.getenv("FORCE_LIVE_MODE", "false").lower() == "true"
-    has_api_keys = os.getenv("BINANCE_API_KEY") and os.getenv("BINANCE_API_SECRET")
-    use_testnet = os.getenv("USE_TESTNET", "false").lower() == "true"
-    
-    return force_live and has_api_keys and not use_testnet    
-    # Binance client
-    client, client_status = setup_binance_client()
-    
-    # Risk Manager
-    if modules.get('RiskManager'):
-        try:
-            components['risk_mgr'] = modules['RiskManager'](
-                max_risk_percent=0.02, 
-                max_positions=5
-            )
-            print("✅ Risk Manager initialized")
-        except:
-            components['risk_mgr'] = None
-    else:
-        components['risk_mgr'] = None
-    
-    # ✅ CRITICAL FIX #6: Portfolio Manager with Fallback
-    if modules.get('PortfolioManager'):
-        try:
-            api_key = os.getenv("BINANCE_API_KEY")
-            api_secret = os.getenv("BINANCE_API_SECRET")
-            components['portfolio_mgr'] = modules['PortfolioManager'](api_key, api_secret)
-            print("✅ Portfolio Manager initialized")
-        except:
-            print("⚠️ Portfolio Manager failed, using fallback")
-            components['portfolio_mgr'] = FallbackPortfolioManager()
-    else:
-        components['portfolio_mgr'] = FallbackPortfolioManager()
-    
-    # ✅ CRITICAL FIX #7: Market Analyzer with Fallback
-    if modules.get('MarketAnalyzer') and client:
-        try:
-            components['market_analyzer'] = modules['MarketAnalyzer'](client)
-            print("✅ Market Analyzer initialized")
-        except:
-            print("⚠️ Market Analyzer failed, using fallback")
-            components['market_analyzer'] = FallbackMarketAnalyzer(client)
-    else:
-        components['market_analyzer'] = FallbackMarketAnalyzer(client)
-    
-    # ✅ CRITICAL FIX #3: Trade Executor Priority - Balance-Aware First
-    print("🔧 Initializing Trade Executor...")
-    try:
-        # Try balance-aware executor first
-        from balance_aware_trade_executor import create_balance_aware_executor
-        components['trade_exec'] = create_balance_aware_executor(
-            client, 
-            components.get('risk_mgr'),
-            log_callback=lambda msg: st.session_state.setdefault("logs", []).append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
-        )
-        print("✅ Balance-Aware Trade Executor initialized")
-        
-    except ImportError:
-        print("⚠️ Balance-aware executor not found, trying standard executor...")
-        if modules.get('TradeExecutor'):
-            try:
-                components['trade_exec'] = modules['TradeExecutor'](
-                    client, 
-                    components.get('risk_mgr'),
-                    log_callback=lambda msg: st.session_state.setdefault("logs", []).append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
-                )
-                print("✅ Standard Trade Executor initialized")
-            except Exception as e:
-                print(f"⚠️ Standard executor failed: {e}")
-                components['trade_exec'] = FallbackTradeExecutor(
-                    client, 
-                    components.get('risk_mgr'),
-                    log_callback=lambda msg: st.session_state.setdefault("logs", []).append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
-                )
-                print("✅ Using Fallback Trade Executor")
-        else:
-            print("⚠️ No TradeExecutor module found, using fallback...")
-            components['trade_exec'] = FallbackTradeExecutor(
-                client, 
-                components.get('risk_mgr'),
-                log_callback=lambda msg: st.session_state.setdefault("logs", []).append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
-            )
-            print("✅ Using Fallback Trade Executor")
-            
-    except Exception as e:
-        print(f"⚠️ All executors failed: {e}")
-        components['trade_exec'] = FallbackTradeExecutor(
-            client, 
-            components.get('risk_mgr'),
-            log_callback=lambda msg: st.session_state.setdefault("logs", []).append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
-        )
-        print("✅ Using Fallback Trade Executor (emergency)")
-    
-    # Quantum Components
-    if modules.get('QuantumTrader') and client:
-        try:
-            components['quantum_trader'] = modules['QuantumTrader'](client)
-            print("✅ Quantum Trader initialized")
-        except:
-            components['quantum_trader'] = None
-    else:
-        components['quantum_trader'] = None
-    
-    if modules.get('QuantumAnalyzer'):
-        try:
-            components['quantum_analyzer'] = modules['QuantumAnalyzer']()
-            print("✅ Quantum Analyzer initialized")
-        except:
-            components['quantum_analyzer'] = FallbackQuantumAnalyzer()
-    else:
-        components['quantum_analyzer'] = FallbackQuantumAnalyzer()
-    
-    # Other components
-    components['position_monitor'] = None
-    components['analytics_dashboard'] = None
-    components['ensemble_engine'] = None
-    
-    print(f"🎯 Initialized {len([k for k, v in components.items() if v is not None])}/{len(components)} components")
-    
-    return components, client, client_status
 
 # ✅ CRITICAL FIX #1: ADD COMPONENT INITIALIZATION
 print("🚀 Initializing all components...")
@@ -735,7 +610,8 @@ def display_scanner_results():
             symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT']
             signals = components['market_analyzer'].analyze_market_signals(symbols)
             st.json(signals)
-  # Display recent signals
+
+    # Display recent signals
     results = auto_scanner.get_latest_results()
     if results and results.get('strong_signals'):
         st.subheader("📊 Latest Strong Signals")
@@ -1039,6 +915,7 @@ with tabs[0]:
     except Exception as e:
         st.error(f"Portfolio fetch error: {e}")
         st.code(traceback.format_exc())
+
 # -------------------------
 # Manual Trading Tab
 # -------------------------
@@ -1089,6 +966,27 @@ with tabs[1]:
                 with col_tp:
                     tp_pct = st.number_input("Take Profit %", min_value=1.0, value=10.0, max_value=50.0, key="manual_tp")
         
+        # Enhanced trade execution with notifications
+        def execute_manual_trade_with_notifications(symbol, quantity, side, price):
+            try:
+                result = components['trade_exec'].manual_trade(symbol, quantity, st.session_state["sl_mult"], st.session_state["tp_mult"])
+                if "✅" in result or "Demo" in result:
+                    trade_data = {
+                        'symbol': symbol,
+                        'side': side,
+                        'quantity': quantity,
+                        'price': price,
+                        'value': quantity * price,
+                        'timestamp': datetime.now().isoformat(),
+                        'execution_type': 'manual'
+                    }
+                    notify_trade(trade_data)
+                    st.success("✅ Trade executed and notification sent!")
+                return result
+            except Exception as e:
+                notify_error("Manual Trade Execution", str(e), {'symbol': symbol, 'quantity': quantity, 'side': side})
+                return f"❌ Trade failed: {e}"
+
         # Trade execution
         if st.button("🚀 Execute Trade", type="primary", key="manual_execute"):
             if qty > 0:
@@ -1099,16 +997,12 @@ with tabs[1]:
                     if components['risk_mgr']:
                         validation = components['risk_mgr'].validate_trade(symbol, qty, current_price, total_balance, open_positions)
                         if validation["status"]:
-                            result = components['trade_exec'].manual_trade(
-                                symbol, qty, st.session_state["sl_mult"], st.session_state["tp_mult"]
-                            )
+                            result = execute_manual_trade_with_notifications(symbol, qty, "BUY", current_price)
                             st.success(f"✅ {result}")
                         else:
                             st.error(f"❌ Trade blocked: {validation['reason']}")
                     else:
-                        result = components['trade_exec'].manual_trade(
-                            symbol, qty, st.session_state["sl_mult"], st.session_state["tp_mult"]
-                        )
+                        result = execute_manual_trade_with_notifications(symbol, qty, "BUY", current_price)
                         st.success(f"✅ {result}")
                         
                 except Exception as e:
@@ -1117,31 +1011,6 @@ with tabs[1]:
                 st.warning("⚠️ Please enter a valid quantity")
     else:
         st.error("❌ Market analyzer not available. Manual trading disabled.")
-def execute_manual_trade_with_notifications(symbol, quantity, side, price):
-    try:
-        result = components['trade_exec'].manual_trade(symbol, quantity, st.session_state["sl_mult"], st.session_state["tp_mult"])
-        if "✅" in result or "Demo" in result:
-            trade_data = {
-                'symbol': symbol,
-                'side': side,
-                'quantity': quantity,
-                'price': price,
-                'value': quantity * price,
-                'timestamp': datetime.now().isoformat(),
-                'execution_type': 'manual'
-            }
-            notify_trade(trade_data)
-            st.success("✅ Trade executed and notification sent!")
-        return result
-    except Exception as e:
-        notify_error("Manual Trade Execution", str(e), {'symbol': symbol, 'quantity': quantity, 'side': side})
-        return f"❌ Trade failed: {e}"
-
-# Replace existing trade button logic:
-if st.button("🚀 Execute Trade", type="primary", key="manual_execute"):
-    if qty > 0:
-        result = execute_manual_trade_with_notifications(symbol, qty, "BUY", current_price)
-        st.write(result)
 
 # -------------------------
 # Auto-Trader Tab
@@ -1177,12 +1046,6 @@ with tabs[2]:
             st.info("No active orders")
     else:
         st.info("Order tracking not available in demo mode")
-
-#!/usr/bin/env python3
-"""
-Fixed Multi-Strategy Tab Section for hybrid_bot.py
-This replaces the problematic section starting around line 1400
-"""
 
 # -------------------------
 # Multi-Strategy Tab  (FIXED)
@@ -1689,16 +1552,9 @@ with tabs[3]:
             if len(trading_pairs) > 20:
                 st.caption(f"... and {len(trading_pairs) - 20} more pairs")
 
-  
-
 # ========================================
 # COMPLETE SETTINGS TAB WITH NOTIFICATIONS
 # ========================================
-# Replace your entire Settings Tab section with this code:
-
-# -------------------------
-# Settings Tab
-# -------------------------
 with tabs[4]:
     st.header("🛠 Trading Settings & Configuration")
     
@@ -1867,7 +1723,6 @@ with tabs[4]:
                 help="Get notified about system events",
                 key="settings_system_alerts"
             )
-            
             error_alerts = st.checkbox(
                 "❌ Error Alerts", 
                 value=preferences['errors'],
@@ -2217,7 +2072,8 @@ with tabs[4]:
     else:
         st.markdown("---")
         st.warning("📧 **Email notifications are currently disabled.** Set EMAIL_ENABLED=true in your environment to enable email alerts.")
-        # -------------------------
+
+# -------------------------
 # System Health Tab
 # -------------------------
 with tabs[5]:
