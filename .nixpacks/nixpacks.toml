@@ -8,11 +8,7 @@ cmds = [
 ]
 
 [phases.build]
-cmds = ["echo 'Build complete'"]
+cmds = ["echo 'Build complete - Bottie ready!'"]
 
 [start]
-cmd = "python railway_deployment_main.py"
-
-[variables]
-PORT = "8501"
-PYTHONPATH = "/app"
+cmd = "echo 'Starting via railway.toml'"
