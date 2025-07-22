@@ -1,5 +1,2 @@
-﻿[build]
-builder = "NIXPACKS"
-
-[deploy]
-startCommand = "streamlit run app_minimal.py --server.address=0.0.0.0 --server.port $PORT --server.headless=true"
+﻿[deploy]
+startCommand = "python app_flask.py"
