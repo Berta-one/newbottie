@@ -11,3 +11,4 @@ ccxt>=4.0.0
 scipy>=1.10.0
 
 
+supervisor>=4.2.5
