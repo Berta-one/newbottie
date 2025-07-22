@@ -1,14 +1,2 @@
-[phases.setup]
-nixPkgs = ["python39", "python39Packages.pip"]
-
-[phases.install]
-cmds = [
-  "pip install --upgrade pip",
-  "pip install -r requirements.txt"
-]
-
-[phases.build]
-cmds = ["echo 'Build complete'"]
-
-[start]
-cmd = "echo 'Using railway.toml start command'"
+﻿[phases.install]
+cmds = ["pip install -r requirements.txt"]
