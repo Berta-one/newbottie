@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """
-Railway Deployment Solution for Bottie
-=====================================
+Railway Deployment Solution for Bottie - Windows Fixed Version
+=============================================================
 
-This script implements a staged deployment strategy that solves Railway issues
-while preserving all your ML and Quantum functionality.
+Fixed encoding issues for Windows PowerShell compatibility.
 """
 
 import os
@@ -30,7 +29,7 @@ pytz>=2023.3
         shutil.copy("requirements.txt", "requirements_full.txt")
         print("📁 Backed up full requirements as requirements_full.txt")
     
-    with open("requirements.txt", "w") as f:
+    with open("requirements.txt", "w", encoding="utf-8") as f:
         f.write(lightweight_deps)
     
     print("✅ Created lightweight requirements.txt for Railway")
@@ -51,7 +50,7 @@ class QuantumAnalyzer:
     
     def __init__(self):
         self.backend_name = "Mathematical Simulator"
-        print("⚛️ Using mathematical quantum simulation (Qiskit unavailable)")
+        print("Quantum using mathematical simulation (Qiskit unavailable)")
     
     def generate_quantum_signal(self, market_data: Dict[str, Any]) -> Dict[str, Any]:
         """Generate quantum-like signals using mathematical models"""
@@ -62,12 +61,10 @@ class QuantumAnalyzer:
         volatility = market_data.get("price_volatility", 0.05)
         
         # Quantum-inspired probability calculation
-        # Based on quantum harmonic oscillator probability distributions
         theta = np.pi * rsi
         phi = np.pi * volatility
         
-        # Simulate quantum superposition using trigonometric functions
-        # that mirror quantum state amplitudes
+        # Simulate quantum superposition
         amplitude_buy = np.cos(theta/2) * np.cos(phi/2)
         amplitude_sell = np.sin(theta/2) * np.cos(phi/2)
         amplitude_hold = np.sin(phi/2)
@@ -77,7 +74,7 @@ class QuantumAnalyzer:
         amplitude_buy *= momentum_factor
         amplitude_sell /= momentum_factor if momentum_factor > 0 else 1
         
-        # Calculate probabilities (square of amplitudes)
+        # Calculate probabilities
         prob_buy = amplitude_buy ** 2
         prob_sell = amplitude_sell ** 2
         prob_hold = amplitude_hold ** 2
@@ -94,9 +91,6 @@ class QuantumAnalyzer:
         decision = max(probs, key=probs.get)
         confidence = max(probs.values())
         
-        # Add quantum-like entanglement score based on correlation
-        entanglement = abs(rsi - 0.5) * volatility
-        
         return {
             "decision": decision,
             "confidence": round(confidence, 4),
@@ -105,7 +99,7 @@ class QuantumAnalyzer:
                 "SELL": round(prob_sell, 4),
                 "HOLD": round(prob_hold, 4)
             },
-            "entanglement_score": round(entanglement, 4),
+            "entanglement_score": round(abs(rsi - 0.5) * volatility, 4),
             "superposition_index": round(1 - confidence, 4),
             "circuit": "Mathematical Quantum Simulation",
             "backend": self.backend_name
@@ -125,7 +119,7 @@ class QuantumAnalyzer:
         return self.generate_quantum_signal(market_data)
 '''
     
-    with open("quantum_engine_fallback.py", "w") as f:
+    with open("quantum_engine_fallback.py", "w", encoding="utf-8") as f:
         f.write(fallback_quantum)
     
     fallback_ml = '''"""
@@ -142,7 +136,7 @@ class MLEnhancedStrategy:
     
     def __init__(self):
         self.trained = False
-        print("🧠 Using statistical ML simulation (scikit-learn unavailable)")
+        print("ML using statistical simulation (scikit-learn unavailable)")
     
     def extract_ml_features(self, klines):
         """Extract features using pandas only"""
@@ -157,15 +151,12 @@ class MLEnhancedStrategy:
         df = df.astype({'open': float, 'high': float, 'low': float, 
                        'close': float, 'volume': float})
         
-        # Calculate technical features
+        # Calculate features
         current_price = df['close'].iloc[-1]
         price_2h_ago = df['close'].iloc[0]
         price_change_2h = ((current_price - price_2h_ago) / price_2h_ago) * 100
         
-        # Volume analysis
         volume_ratio = df['volume'].iloc[-1] / df['volume'].mean()
-        
-        # Volatility
         volatility = df['close'].pct_change().std() * 100
         
         # Simple RSI calculation
@@ -175,7 +166,6 @@ class MLEnhancedStrategy:
         rs = gain / loss
         rsi = 100 - (100 / (1 + rs.iloc[-1]))
         
-        # Moving averages
         sma_5 = df['close'].rolling(5).mean().iloc[-1]
         sma_20 = df['close'].rolling(20).mean().iloc[-1]
         sma_ratio = sma_5 / sma_20 if sma_20 > 0 else 1
@@ -186,7 +176,7 @@ class MLEnhancedStrategy:
             'volatility': volatility,
             'rsi': rsi,
             'sma_5_20_ratio': sma_ratio,
-            'price_momentum': price_change_2h / 10,  # Simplified momentum
+            'price_momentum': price_change_2h / 10,
         }
     
     def get_ml_prediction(self, klines) -> Tuple[str, float]:
@@ -195,7 +185,6 @@ class MLEnhancedStrategy:
         if not features:
             return "HOLD", 0.5
         
-        # Statistical decision tree simulation
         score = 0
         confidence_factors = []
         
@@ -232,10 +221,8 @@ class MLEnhancedStrategy:
         elif features['sma_5_20_ratio'] < 0.98:
             score -= 0.1
         
-        # Calculate confidence
         confidence = np.mean(confidence_factors)
         
-        # Determine signal
         if score > 0.2:
             signal = "BUY_LONG"
         elif score < -0.2:
@@ -249,20 +236,17 @@ class MLEnhancedStrategy:
         """Combine ML prediction with traditional strategy"""
         ml_signal, ml_confidence = self.get_ml_prediction(klines)
         
-        # Weight combination: 40% ML, 60% traditional
         if ml_signal == traditional_signal:
-            # Agreement bonus
             combined_confidence = (ml_confidence * 0.4 + traditional_confidence * 0.6) * 1.1
             final_signal = ml_signal
         else:
-            # Disagreement - be conservative
             combined_confidence = (ml_confidence * 0.4 + traditional_confidence * 0.6) * 0.8
             final_signal = "HOLD" if combined_confidence < 0.6 else traditional_signal
         
         return final_signal, min(1.0, combined_confidence)
 '''
     
-    with open("ml_strategy_fallback.py", "w") as f:
+    with open("ml_strategy_fallback.py", "w", encoding="utf-8") as f:
         f.write(fallback_ml)
     
     print("✅ Created fallback ML and Quantum engines")
@@ -294,19 +278,19 @@ class SmartImportManager:
             import qiskit
             import qiskit_aer
             self.available_modules['qiskit'] = True
-            print("✅ Qiskit available - using real quantum computing")
+            print("Qiskit available - using real quantum computing")
         except ImportError:
             self.available_modules['qiskit'] = False
-            print("⚛️ Qiskit unavailable - using mathematical quantum simulation")
+            print("Qiskit unavailable - using mathematical quantum simulation")
         
         # Check for scikit-learn
         try:
             import sklearn
             self.available_modules['sklearn'] = True
-            print("✅ Scikit-learn available - using real ML")
+            print("Scikit-learn available - using real ML")
         except ImportError:
             self.available_modules['sklearn'] = False
-            print("🧠 Scikit-learn unavailable - using statistical ML simulation")
+            print("Scikit-learn unavailable - using statistical ML simulation")
     
     def get_quantum_engine(self):
         """Get quantum engine - real or fallback"""
@@ -345,7 +329,7 @@ class SmartImportManager:
 smart_imports = SmartImportManager()
 '''
     
-    with open("smart_imports.py", "w") as f:
+    with open("smart_imports.py", "w", encoding="utf-8") as f:
         f.write(import_manager)
     
     print("✅ Created smart import manager")
@@ -357,7 +341,7 @@ def create_railway_optimized_main():
 """
 Railway Optimized Bottie
 ========================
-Optimized entry point for Railway deployment with smart dependency management
+Optimized entry point for Railway deployment
 """
 
 import streamlit as st
@@ -367,7 +351,7 @@ import numpy as np
 from datetime import datetime
 import sys
 
-# Add current directory to path for imports
+# Add current directory to path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # Import smart dependency manager
@@ -376,7 +360,7 @@ try:
     SMART_IMPORTS_AVAILABLE = True
 except ImportError:
     SMART_IMPORTS_AVAILABLE = False
-    print("⚠️ Smart imports unavailable, using basic mode")
+    print("Smart imports unavailable, using basic mode")
 
 # Page configuration
 st.set_page_config(
@@ -431,7 +415,6 @@ def render_configuration_check():
     
     st.subheader("🔧 System Configuration")
     
-    # API Configuration
     api_key = os.getenv("BINANCE_API_KEY", "")
     api_secret = os.getenv("BINANCE_API_SECRET", "")
     
@@ -487,15 +470,13 @@ def test_binance_connection():
         testnet = os.getenv("USE_TESTNET", "true").lower() == "true"
         client = Client(api_key, api_secret, testnet=testnet)
         
-        # Test connection
         server_time = client.get_server_time()
         account = client.get_account()
         
-        st.success(f"✅ Connection successful!")
+        st.success("✅ Connection successful!")
         st.info(f"Server time: {datetime.fromtimestamp(server_time['serverTime']/1000)}")
         st.info(f"Account type: {account.get('accountType', 'Unknown')}")
         
-        # Show balances with funds
         balances = [b for b in account['balances'] if float(b['free']) > 0]
         if balances:
             st.info(f"Assets with balance: {len(balances)}")
@@ -512,7 +493,6 @@ def test_quantum_engine():
             st.warning("Smart imports unavailable, using basic test")
             return
         
-        # Test quantum signal generation
         test_data = {
             "rsi": 65.5,
             "momentum": 0.12,
@@ -527,10 +507,30 @@ def test_quantum_engine():
     except Exception as e:
         st.error(f"❌ Quantum engine test failed: {str(e)}")
 
-def render_next_steps():
-    """Render next steps instructions"""
+def main():
+    """Main application entry point"""
     
-    st.subheader("📋 Next Steps")
+    with st.sidebar:
+        st.image("https://via.placeholder.com/200x100/00ffcc/000000?text=BOTTIE", width=200)
+        st.markdown("### 🚀 Advanced Trading Bot")
+        st.markdown("Railway Deployment")
+        
+        st.markdown("---")
+        caps = load_system_capabilities()
+        st.markdown("**⚡ Performance**")
+        st.metric("Uptime", "100%", "24/7")
+        st.metric("Latency", "< 50ms", "Optimized")
+        
+        st.markdown("**🔧 System**")
+        st.text(f"Quantum: {caps['quantum_mode']}")
+        st.text(f"ML: {caps['ml_mode']}")
+    
+    render_status_dashboard()
+    render_configuration_check()
+    render_quick_test()
+    
+    st.markdown("---")
+    st.markdown("**📋 Next Steps**")
     
     api_configured = bool(os.getenv("BINANCE_API_KEY") and os.getenv("BINANCE_API_SECRET"))
     
@@ -549,48 +549,8 @@ def render_next_steps():
         **✅ Configuration Complete!**
         
         Your Bottie bot is configured and ready! 🎉
-        
-        **Available Features:**
-        - ⚛️ Quantum signal analysis 
-        - 🧠 Machine learning predictions
-        - 📊 Multi-pair scanning
-        - 🛡️ Dynamic risk management
-        - 📈 Real-time dashboard
-        
-        **To activate full trading:**
-        1. Upload your complete bot modules
-        2. Test on small amounts first
-        3. Monitor performance actively
         """)
-
-def main():
-    """Main application entry point"""
     
-    # Sidebar
-    with st.sidebar:
-        st.image("https://via.placeholder.com/200x100/00ffcc/000000?text=BOTTIE", width=200)
-        st.markdown("### 🚀 Advanced Trading Bot")
-        st.markdown("Railway Deployment")
-        
-        st.markdown("---")
-        st.markdown("**🔗 Quick Links**")
-        st.markdown("- [Dashboard](#)")
-        st.markdown("- [Trading](#)")
-        st.markdown("- [Analytics](#)")
-        st.markdown("- [Settings](#)")
-        
-        st.markdown("---")
-        st.markdown("**⚡ Performance**")
-        st.metric("Uptime", "100%", "24/7")
-        st.metric("Latency", "< 50ms", "Optimized")
-    
-    # Main content
-    render_status_dashboard()
-    render_configuration_check()
-    render_quick_test()
-    render_next_steps()
-    
-    # Footer
     st.markdown("---")
     st.markdown("""
     <div style='text-align: center; color: #666;'>
@@ -610,7 +570,7 @@ if __name__ == "__main__":
         shutil.copy("hybrid_bot.py", "hybrid_bot_full.py")
         print("📁 Backed up full hybrid_bot.py as hybrid_bot_full.py")
     
-    with open("hybrid_bot.py", "w") as f:
+    with open("hybrid_bot.py", "w", encoding="utf-8") as f:
         f.write(railway_main)
     
     print("✅ Created Railway-optimized hybrid_bot.py")
@@ -618,7 +578,6 @@ if __name__ == "__main__":
 def fix_railway_config():
     """Fix Railway configuration files"""
     
-    # Clean railway.toml
     railway_config = """[build]
 builder = "NIXPACKS"
 
@@ -628,7 +587,7 @@ restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
 """
     
-    with open("railway.toml", "w") as f:
+    with open("railway.toml", "w", encoding="utf-8") as f:
         f.write(railway_config)
     
     # Clean nixpacks config
@@ -647,11 +606,10 @@ cmds = [
 cmds = ["echo 'Build complete - Bottie ready!'"]
 
 [start]
-# Railway will use the startCommand from railway.toml
 cmd = "echo 'Starting via railway.toml'"
 """
     
-    with open(".nixpacks/nixpacks.toml", "w") as f:
+    with open(".nixpacks/nixpacks.toml", "w", encoding="utf-8") as f:
         f.write(nixpacks_config)
     
     print("✅ Fixed Railway configuration files")
@@ -711,12 +669,6 @@ def main():
 3. Add API keys in Railway environment variables
 4. Test basic functionality first
 5. Gradually add back full dependencies
-
-🔬 WHAT YOU GET:
-- Stage 1: Basic bot with simulated Quantum/ML ✅
-- Stage 2: Add qiskit for real quantum computing 
-- Stage 3: Add scikit-learn for real ML
-- Stage 4: Full Bottie with all features
 
 Your sophisticated bot is preserved - we're just deploying it smartly! 🎉
 """)
