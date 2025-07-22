@@ -1,6 +1,11 @@
-
 #!/bin/bash
-# Start the Streamlit dashboard
-streamlit run hybrid_bot.py
+echo \"Starting container at \07/22/2025 10:31:58\" > /app/railway.log
+echo \"PORT value is: \\" >> /app/railway.log
 
-.venv/lib/python3.12/site-packages/python_binance-1.0.29.dist-info
+# Start the worker bot in the background
+python bot_service.py >> /app/railway.log 2>&1 &
+
+# Start Streamlit dashboard
+streamlit run hybrid_bot.py --server.port=\ --server.address=0.0.0.0 >> /app/railway.log 2>&1
+
+wait
