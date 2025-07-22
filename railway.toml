@@ -1,2 +1,5 @@
-﻿[deploy]
-startCommand = "python start.py"
+﻿[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "streamlit run app_minimal.py --server.address=0.0.0.0 --server.port $PORT --server.headless=true"
