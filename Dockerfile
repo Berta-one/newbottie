@@ -1,8 +1,0 @@
-FROM python:3.12-slim
-WORKDIR /app
-COPY . /app
-WORKDIR /app
-RUN pip install --no-cache-dir -r requirements.txt
-RUN chmod +x start.sh
-EXPOSE 8501
-ENTRYPOINT [\"./start.sh\"]
