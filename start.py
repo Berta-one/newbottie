@@ -1,22 +1,23 @@
-﻿#!/usr/bin/env python3
-import os
+﻿import os
 import subprocess
 import sys
 
-# Get PORT from environment
+# Get PORT from Railway environment
 port = os.environ.get('PORT', '8080')
-print(f"Starting Streamlit on port {port}")
+print(f"Railway PORT detected: {port}")
 
-# Clear problematic environment variables
-if 'STREAMLIT_SERVER_PORT' in os.environ:
-   del os.environ['STREAMLIT_SERVER_PORT']
+# Remove problematic environment variables
+env = os.environ.copy()
+env.pop('STREAMLIT_SERVER_PORT', None)
 
-# Start streamlit with explicit port
+# Start Streamlit with correct port
 cmd = [
    sys.executable, '-m', 'streamlit', 'run', 'app_minimal.py',
    '--server.address', '0.0.0.0',
-   '--server.port', port,
-   '--server.headless', 'true'
+   '--server.port', str(port),
+   '--server.headless', 'true',
+   '--server.enableCORS', 'false'
 ]
 
-subprocess.run(cmd)
+print(f"Executing: {' '.join(cmd)}")
+subprocess.run(cmd, env=env)
