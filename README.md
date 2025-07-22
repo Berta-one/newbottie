@@ -1,25 +1,27 @@
-﻿# Bottie - Multi-Pair Crypto Trading Bot
 
-A sophisticated cryptocurrency trading bot that can scan and trade multiple pairs simultaneously.
+# Bottie Backtesting Engine (Real Integration)
 
 ## Features
+- Tests your **ML + Quantum + Technical ensemble strategy** across multiple weight combinations.
+- Runs on real historical OHLCV from Binance (via CCXT).
+- Outputs ROI, Win Rate, Max Drawdown, and Trade Count.
 
-- Multi-Pair Trading: Scan ALL, SELECTED, or CUSTOM crypto pairs
-- Enhanced Strategy: 5% breakout with volume, time, and volatility filters
-- Smart Risk Management: Dynamic position sizing based on confidence
-- Real-time Dashboard: Streamlit-based monitoring and analytics
-- Comprehensive Logging: CSV and JSON trade tracking
+## Installation
+```bash
+pip install ccxt pandas numpy
+```
 
-## Quick Setup
+## Usage
+```bash
+python backtest_engine_real.py
+```
+Results will be saved in `backtest_output/backtest_results.csv`.
 
-1. Install dependencies: pip install -r requirements.txt
-2. Configure API keys in .env file
-3. Run the bot: python main.py
-
-## Important Notes
-
-- Always test on testnet first
-- Start with small amounts
-- This is for educational purposes - trade at your own risk
-
-Disclaimer: Cryptocurrency trading involves substantial risk.
+### Integration Notes
+- Uncomment and link your ML & Quantum strategy imports:
+  ```python
+  from simplified_ml_strategy import SimplifiedMLStrategy
+  from quantum_trading_integration import QuantumTrader
+  from quantum_engine import QuantumAnalyzer
+  ```
+- Replace placeholders in `simulate_signals()` with actual strategy calls.
