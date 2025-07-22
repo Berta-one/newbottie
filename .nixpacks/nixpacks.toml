@@ -8,7 +8,7 @@ cmds = [
 ]
 
 [phases.build]
-cmds = ["echo 'Build complete - Bottie ready!'"]
+cmds = ["echo 'Build complete'"]
 
 [start]
-cmd = "echo 'Starting via railway.toml'"
+cmd = "echo 'Using railway.toml start command'"
