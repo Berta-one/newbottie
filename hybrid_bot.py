@@ -826,13 +826,13 @@ with col2:
 # Main Tabs
 # -------------------------
 tabs = st.tabs([
-    "📈 Portfolio",       # 0
-    "✋ Manual Trading",   # 1
-    "🤖 Auto-Trader",      # 2
-    "⚛ Multi-Strategy",   # 3
-    "⚙ Settings",         # 4
-    "🔬 Backtesting",     # 5
-    "📜 Logs"             # 6
+    "ðŸ“ˆ Portfolio",       # 0 -> Portfolio Overview
+    "âœ‹ Manual Trading",   # 1 -> Manual Trading
+    "ðŸ¤– Auto-Trader",      # 2 -> Auto-Trader Control
+    "âš› Multi-Strategy",   # 3 -> Multi-Strategy Market Scanner
+    "âš™ Settings",         # 4 -> Trading Settings & Config
+    "ðŸ”¬ Backtesting",     # 5 -> BacktestingIntegration UI
+    "ðŸ“œ Logs"             # 6 -> Logs
 ])
 
 
@@ -1083,6 +1083,11 @@ with tabs[2]:
 with tabs[3]:
     st.header("âš› Multi-Strategy Market Scanner")
     st.caption("Quantum + ML + Technical Analysis for ALL Trading Pairs")
+    # Auto-scan once on first visit so tab isn't empty
+    if st.session_state.get('last_scan_time') is None and 'multi_auto_init_scan_done' not in st.session_state:
+        st.session_state['manual_scan_requested'] = True
+        st.session_state['multi_auto_init_scan_done'] = True
+        st.rerun()
 # --- Show currently applied methodology (if set from Backtesting tab) ---
 _applied = st.session_state.get("last_applied_strategy")
 if _applied:
@@ -2166,129 +2171,68 @@ with tabs[4]:  # Settings tab
     
     # Your other settings code continues here...
 
-# -------------------------
-# System Health Tab
-# -------------------------
-with tabs[6]:
-    st.header("ðŸ©º System Health")
-    
-    health = get_system_health()
-    
-    health_col1, health_col2, health_col3 = st.columns(3)
-    with health_col1:
-        cpu_pct = float(health["CPU"].replace('%', ''))
-        st.metric("CPU Usage", health["CPU"], delta="High" if cpu_pct > 80 else "Normal")
-    with health_col2:
-        mem_pct = float(health["Memory"].replace('%', ''))
-        st.metric("Memory Usage", health["Memory"], delta="High" if mem_pct > 80 else "Normal")
-    with health_col3:
-        st.metric("Active Threads", health["Threads"])
-    
-    # API Connection Test
-    st.subheader("ðŸ”— API Connection Test")
-    if client:
-        try:
-            server_time = client.get_server_time()
-            st.success(f"âœ… Binance API connected. Server time: {datetime.fromtimestamp(server_time['serverTime']/1000)}")
-        except Exception as e:
-            st.error(f"âŒ API connection failed: {e}")
-    else:
-        st.error("âŒ No API client available")
-    
-    # Module Status
-    st.subheader("ðŸ“¦ Module Status")
-    module_status = []
-    for name, module in modules.items():
-        status = "âœ… Available" if module else "âŒ Missing"
-        module_status.append({"Module": name, "Status": status})
-    
-    module_df = pd.DataFrame(module_status)
-    st.dataframe(module_df, use_container_width=True)
 
-# -------------------------
+# --- Removed legacy System Health / duplicate Backtesting / Analytics blocks ---
+
+# =========================================================
+# Backtesting Tab (clean)
+# =========================================================
+with tabs[5]:
+    st.header("🔬 Backtesting")
+    if "BACKTESTING_AVAILABLE" in globals() and BACKTESTING_AVAILABLE:
+        try:
+            if "backtesting_obj" not in st.session_state:
+                from backtesting_integration import BacktestingIntegration
+                st.session_state["backtesting_obj"] = BacktestingIntegration()
+            st.session_state["backtesting_obj"].render_backtesting_tab()
+        except Exception as e:
+            st.error(f"Backtesting error: {e}")
+    else:
+        st.error("Backtesting unavailable - install dependencies.")
+        st.code("pip install ccxt scipy", language="bash")
+
+# =========================================================
 # Logs Tab
-# -------------------------
-# with tabs[REMOVED]:  # Removed invalid tab reference
-    st.header("ðŸ“œ Activity Logs")
-    
-    logs_col1, logs_col2, logs_col3 = st.columns([2, 1, 1])
-    with logs_col1:
-        log_filter = st.selectbox("Filter logs", ["All", "Manual", "Multi-Strategy", "ERROR", "SUCCESS", "WARNING"], key="log_filter")
-    with logs_col2:
-        if st.button("ðŸ—‘ï¸ Clear Logs", key="clear_logs"):
-            st.session_state["logs"] = []
-            st.success("Logs cleared")
-    with logs_col3:
-        if st.button("ðŸ“¥ Export Logs", key="export_logs"):
-            logs = st.session_state.get("logs", [])
-            if logs:
-                log_text = "\n".join(logs)
-                st.download_button(
-                    label="ðŸ’¾ Download",
-                    data=log_text,
-                    file_name=f"trading_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-                    mime="text/plain",
-                    key="download_logs"
-                )
-    
-    # Display logs
+# =========================================================
+with tabs[6]:
+    st.header("📜 System Logs")
     logs = st.session_state.get("logs", [])
     if logs:
-        # Show recent logs (last 100)
-        recent_logs = logs[-100:]
-        
-        # Filter logs
-        if log_filter != "All":
-            recent_logs = [log for log in recent_logs if log_filter in log]
-        
-        # Count different types of logs
-        total_logs = len(recent_logs)
-        error_count = len([log for log in recent_logs if "ERROR" in log])
-        success_count = len([log for log in recent_logs if "SUCCESS" in log])
-        
-        # Show log statistics
-        log_stats_col1, log_stats_col2, log_stats_col3 = st.columns(3)
-        with log_stats_col1:
-            st.metric("Total Logs", total_logs)
-        with log_stats_col2:
-            st.metric("Errors", error_count, delta="High" if error_count > 5 else "Normal")
-        with log_stats_col3:
-            st.metric("Successes", success_count)
-        
-        st.divider()
-        
-        # Display logs in reverse order (newest first)
-        for log in reversed(recent_logs):
-            if "ERROR" in log or "FAIL" in log:
-                st.error(log)
-            elif "WARNING" in log:
-                st.warning(log)
-            elif "SUCCESS" in log:
-                st.success(log)
-            elif "Multi-Strategy" in log:
-                st.info(log)
-            elif "Manual" in log:
-                st.info(log)
-            else:
-                st.text(log)
+        # show newest first
+        for line in reversed(logs[-500:]):
+            st.text(line)
     else:
-        st.info("ðŸ“ No logs available. Activity will appear here as the bot operates.")
+        st.info("No logs yet.")
 
 
-# -------------------------
-# Backtesting Tab
-# -------------------------
+# =========================================================
+# Backtesting Tab (clean)
+# =========================================================
 with tabs[5]:
-    if BACKTESTING_AVAILABLE:
+    st.header("ðŸ”¬ Backtesting")
+    if "BACKTESTING_AVAILABLE" in globals() and BACKTESTING_AVAILABLE:
         try:
-            backtesting = BacktestingIntegration()
-            backtesting.render_backtesting_tab()
+            if "backtesting_obj" not in st.session_state:
+                from backtesting_integration import BacktestingIntegration
+                st.session_state["backtesting_obj"] = BacktestingIntegration()
+            st.session_state["backtesting_obj"].render_backtesting_tab()
         except Exception as e:
-            st.error(f"âŒ Backtesting error: {e}")
+            st.error(f"Backtesting error: {e}")
     else:
-        st.error("ðŸ”¬ Backtesting Unavailable")
-        st.info("Ensure ccxt & scipy are installed *and* BacktestingIntegration is defined.")
+        st.error("Backtesting unavailable - install dependencies.")
+        st.code("pip install ccxt scipy", language="bash")
 
-'# --- Analytics Tab removed (out of range) ---'
+# =========================================================
+# Logs Tab
+# =========================================================
+with tabs[6]:
+    st.header("ðŸ“œ System Logs")
+    logs = st.session_state.get("logs", [])
+    if logs:
+        # show newest first
+        for line in reversed(logs[-500:]):
+            st.text(line)
+    else:
+        st.info("No logs yet.")
 
 
