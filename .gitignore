@@ -57,3 +57,8 @@ ENV/
 
 # Streamlit
 .streamlit/
+
+# Data caches
+data/
+backtest_output/
+
