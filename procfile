@@ -1,3 +1,1 @@
-web: python -m streamlit run hybrid_bot.py --server.port $PORT --server.address 0.0.0.0
-dashboard: python app.py
-worker: python bot_service.py
+web: streamlit run hybrid_bot.py --server.port $PORT --server.address 0.0.0.0
