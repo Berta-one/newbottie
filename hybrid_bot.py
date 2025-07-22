@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Hybrid Quantum Crypto Trading Bot (Final)
 =======================================
@@ -2684,5 +2684,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-#   D e p l o y   t r i g g e r   -   0 7 / 2 2 / 2 0 2 5   1 7 : 2 5 : 4 1  
- 
+#   D e p l o y   t r i g g e r   -   0 7 / 2 2 / 2 0 2 5   1 7 : 2 5 : 4 1 
+ 
+ 
