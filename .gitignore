@@ -1,13 +1,12 @@
-# Environment files
+﻿# Environment files
 .env
 *.env
 .env.local
-.env.production
 
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
+*.class
 *.so
 .Python
 build/
@@ -36,15 +35,9 @@ logs/
 .idea/
 *.swp
 *.swo
-*~
 
 # OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 
 # Virtual environments
@@ -52,13 +45,5 @@ venv/
 env/
 ENV/
 
-# Jupyter
-.ipynb_checkpoints
-
 # Streamlit
 .streamlit/
-
-# Data caches
-data/
-backtest_output/
-
