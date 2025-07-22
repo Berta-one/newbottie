@@ -1,1 +1,9 @@
-﻿flask>=2.3.0
+﻿streamlit>=1.32.0
+python-binance>=1.0.19
+python-dotenv>=1.0.0
+pandas>=2.0.0
+numpy>=1.24.0
+plotly>=5.15.0
+requests>=2.31.0
+pytz>=2023.3
+ta>=0.10.2
