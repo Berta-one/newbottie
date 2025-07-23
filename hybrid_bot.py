@@ -27,7 +27,8 @@ injection that Railway provides and prevents the Streamlit auto‑port error.
 
 Author: Bottie Build (ChatGPT assist)
 """
-
+from portfolio_value_fix import get_unified_portfolio_value, debug_portfolio_calculation
+from quantum_trader import quantum_trader
 from __future__ import annotations
 
 import os
@@ -737,7 +738,7 @@ def render_dashboard():
     except Exception:
         tv = 0.0
     with col1:
-        st.metric("Portfolio Value", f"${tv:,.2f}")
+        st.metric("Portfolio Value", total_usd, total_gbp, asset_count = get_unified_portfolio_value(portfolio)")
     with col2:
         mode = "Testnet" if os.getenv("USE_TESTNET", "false").lower() == "true" else "Live"
         st.metric("Mode", mode)
@@ -785,10 +786,10 @@ def render_portfolio():
 
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            st.metric("Total Value (USD)", f"${total_usd:,.2f}")
+            st.metric("Total Value (USD)", total_usd, total_gbp, asset_count = get_unified_portfolio_value(portfolio))
         with col2:
             st.metric("Trading Mode", "🧪 TESTNET" if os.getenv("USE_TESTNET", "false").lower() == "true" else "🚀 LIVE")
-        with col3:
+
             st.metric("Active Assets", sum(1 for k, v in port.items() if v.get("balance", 0) > 0))
         with col4:
             live_status = "🟢 Live" if getattr(pm, "is_live", lambda: False)() else "🔴 Demo"
