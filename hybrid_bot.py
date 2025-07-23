@@ -986,25 +986,21 @@ def render_multi_strategy():
                 st.session_state['ms_weight_quantum'] = 60
                 st.session_state['ms_weight_ml'] = 20
                 st.session_state['ms_weight_technical'] = 20
-                st.rerun()
         with preset_col2:
             if st.button("🤖 ML Focus", key="ms_preset_ml"):
                 st.session_state['ms_weight_quantum'] = 20
                 st.session_state['ms_weight_ml'] = 60
                 st.session_state['ms_weight_technical'] = 20
-                st.rerun()
         with preset_col3:
             if st.button("📊 Technical Focus", key="ms_preset_technical"):
                 st.session_state['ms_weight_quantum'] = 20
                 st.session_state['ms_weight_ml'] = 20
                 st.session_state['ms_weight_technical'] = 60
-                st.rerun()
         with preset_col4:
             if st.button("⚖️ Balanced", key="ms_preset_balanced"):
                 st.session_state['ms_weight_quantum'] = 33
                 st.session_state['ms_weight_ml'] = 33
                 st.session_state['ms_weight_technical'] = 34
-                st.rerun()
     
     with col2:
         st.session_state['ms_min_conf'] = st.slider(
