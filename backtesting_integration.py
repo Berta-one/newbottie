@@ -34,6 +34,7 @@ class BacktestingIntegration:
             raise RuntimeError(
                 f"Backtesting dependencies missing or broken: {DEPS_ERR}"
             )
+        self.last_exception = None
 
     def _run_engine(self, pairs, timeframe, capital, fee_rate, days=365, refresh_cache=False):
         engine = BacktestEngineReal(
@@ -73,9 +74,174 @@ class BacktestingIntegration:
         )
         return fig
 
+    def _display_results(self, df):
+        """Common result display & weight apply logic."""
+        if df is None or df.empty:
+            st.warning("No results returned.")
+            return
+
+        st.subheader("Results")
+        st.dataframe(df, use_container_width=True)
+
+        if hasattr(self, "data_info"):
+            for p, info in self.data_info.items():
+                st.caption(f"📊 {p}: {info}")
+                if p in self.raw_data:
+                    st.plotly_chart(
+                        self._plot_price_chart(self.raw_data[p], p),
+                        use_container_width=True,
+                    )
+
+        weight_cols = {"Quantum Weight", "ML Weight", "Technical Weight"}
+        if weight_cols.issubset(df.columns):
+            st.subheader("🎯 Apply Strategy")
+            st.caption(
+                "Click to push these weights into the Multi‑Strategy tab sliders."
+            )
+
+            best_row = df.loc[df["ROI (USDT)"].idxmax()]
+            q_best = int(best_row["Quantum Weight"])
+            ml_best = int(best_row["ML Weight"])
+            tech_best = int(best_row["Technical Weight"])
+            tot = q_best + ml_best + tech_best
+            if tot != 100 and tot > 0:
+                scale = 100 / tot
+                q_best = int(round(q_best * scale))
+                ml_best = int(round(ml_best * scale))
+                tech_best = 100 - q_best - ml_best
+
+            if st.button("Auto Apply Best Weights", key="apply_best_weights"):
+                st.session_state["weight_quantum"] = q_best
+                st.session_state["weight_ml"] = ml_best
+                st.session_state["weight_technical"] = tech_best
+                st.session_state["multi_quantum_weight_slider"] = q_best
+                st.session_state["multi_ml_weight_slider"] = ml_best
+                st.session_state["multi_technical_weight_slider"] = tech_best
+                st.session_state["last_applied_strategy"] = {
+                    "source": best_row["Pair"],
+                    "q": q_best,
+                    "ml": ml_best,
+                    "tech": tech_best,
+                    "time": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+                }
+                st.success(
+                    f"✅ Applied best strategy from {best_row['Pair']}!"
+                )
+                st.rerun()
+
+            for i, row in df.iterrows():
+                q = int(row["Quantum Weight"])
+                ml = int(row["ML Weight"])
+                tech = int(row["Technical Weight"])
+
+                tot = q + ml + tech
+                if tot != 100 and tot > 0:
+                    scale = 100 / tot
+                    q = int(round(q * scale))
+                    ml = int(round(ml * scale))
+                    tech = 100 - q - ml
+
+                info_col, btn_col = st.columns([4, 1])
+                with info_col:
+                    st.write(f"**{row['Pair']}** | Q:{q}% ML:{ml}% Tech:{tech}%")
+                with btn_col:
+                    if st.button("Set", key=f"apply_strategy_{i}"):
+                        st.session_state["weight_quantum"] = q
+                        st.session_state["weight_ml"] = ml
+                        st.session_state["weight_technical"] = tech
+                        st.session_state["multi_quantum_weight_slider"] = q
+                        st.session_state["multi_ml_weight_slider"] = ml
+                        st.session_state["multi_technical_weight_slider"] = tech
+                        st.session_state["last_applied_strategy"] = {
+                            "source": row["Pair"],
+                            "q": q,
+                            "ml": ml,
+                            "tech": tech,
+                            "time": datetime.utcnow().isoformat(timespec="seconds")
+                            + "Z",
+                        }
+                        st.success(
+                            f"✅ Applied strategy from {row['Pair']}!"
+                        )
+                        st.rerun()
+
+        agg = df.groupby("Pair").agg(
+            {
+                "ROI (USDT)": "mean",
+                "Win Rate": "mean",
+                "Trades": "sum",
+                "Max Drawdown (%)": "mean",
+            }
+        )
+        st.write("**Averages by Pair**")
+        st.dataframe(agg, use_container_width=True)
+
+        csv_buf = io.StringIO()
+        df.to_csv(csv_buf, index=False)
+        st.download_button(
+            "💾 Download CSV",
+            data=csv_buf.getvalue(),
+            file_name="backtest_results.csv",
+            mime="text/csv",
+        )
+
+    def run_portfolio_backtest(
+        self,
+        timeframe: str,
+        capital: float,
+        fee_rate: float,
+        days: int = 365,
+        refresh_cache: bool = False,
+    ) -> None:
+        """Run backtest on portfolio holdings and display results."""
+        pm = st.session_state.get("_components_cache", {}).get("portfolio_mgr")
+        if pm is None:
+            st.error("Portfolio manager unavailable")
+            return
+
+        try:
+            portfolio = pm.get_portfolio()
+        except Exception as e:  # noqa: BLE001
+            st.error(f"Failed to load portfolio: {e}")
+            return
+
+        pairs = []
+        for asset, data in portfolio.items():
+            sym = data.get("symbol") or f"{asset.upper()}USDT"
+            if not sym.endswith("USDT"):
+                sym = f"{asset.upper()}USDT"
+            if sym.upper() != "USDTUSDT":
+                pairs.append(sym.upper())
+
+        if not pairs:
+            st.warning("No portfolio symbols available for backtest.")
+            return
+
+        with st.spinner(
+            f"Fetching data & running simulations for {len(pairs)} portfolio assets..."
+        ):
+            try:
+                df = self._run_engine(
+                    pairs=pairs,
+                    timeframe=timeframe,
+                    capital=capital,
+                    fee_rate=fee_rate,
+                    days=days,
+                    refresh_cache=refresh_cache,
+                )
+            except Exception as e:  # noqa: BLE001
+                st.error(f"Backtest failed: {e}")
+                st.exception(e)
+                return
+
+        self._display_results(df)
+
     def render_backtesting_tab(self):
         st.header("🔬 Backtesting")
         st.caption("Run historical strategy sweeps across ML / Quantum / Technical weights.")
+
+        # reset any previous exception
+        self.last_exception = None
 
         # --- Inputs ---
         col1, col2, col3, col4 = st.columns(4)
@@ -128,9 +294,12 @@ class BacktestingIntegration:
         pairs = [p.strip().upper() for p in pairs_text.split(",") if p.strip()]
 
         run_bt = st.button("🚀 Run Backtest", type="primary")
+        run_portfolio_bt = st.button("📊 Backtest My Portfolio")
 
         if run_bt:
-            with st.spinner(f"Fetching data & running simulations ({lookback_option} lookback)..."):
+            with st.spinner(
+                f"Fetching data & running simulations ({lookback_option} lookback)..."
+            ):
                 try:
                     df = self._run_engine(
                         pairs=pairs,
@@ -142,85 +311,18 @@ class BacktestingIntegration:
                     )
                 except Exception as e:
                     st.error(f"Backtest failed: {e}")
-                    st.exception(e)
+                    self.last_exception = traceback.format_exc()
                     return
 
-            if df is None or df.empty:
-                st.warning("No results returned.")
-                return
+            self._display_results(df)
 
-            # Display summary metrics
-            st.subheader("Results")
-            st.dataframe(df, use_container_width=True)
-
-            # --- Show data info + charts ---
-            if hasattr(self, "data_info"):
-                for p, info in self.data_info.items():
-                    st.caption(f"📊 {p}: {info}")
-                    if p in self.raw_data:
-                        st.plotly_chart(self._plot_price_chart(self.raw_data[p], p), use_container_width=True)
-
-            # --- APPLY STRATEGY TO MULTI‑STRATEGY TAB ---
-            weight_cols = {"Quantum Weight", "ML Weight", "Technical Weight"}
-            if weight_cols.issubset(df.columns):
-                st.subheader("🎯 Apply Strategy")
-                st.caption("Click to push these weights into the Multi‑Strategy tab sliders.")
-
-                for i, row in df.iterrows():
-                    q = int(row["Quantum Weight"])
-                    ml = int(row["ML Weight"])
-                    tech = int(row["Technical Weight"])
-
-                    # Normalize to 100 if needed
-                    tot = q + ml + tech
-                    if tot != 100 and tot > 0:
-                        scale = 100 / tot
-                        q = int(round(q * scale))
-                        ml = int(round(ml * scale))
-                        tech = 100 - q - ml
-
-                    info_col, btn_col = st.columns([4, 1])
-                    with info_col:
-                        st.write(f"**{row['Pair']}** | Q:{q}% ML:{ml}% Tech:{tech}%")
-                    with btn_col:
-                        if st.button("Set", key=f"apply_strategy_{i}"):
-
-                            st.session_state["weight_quantum"] = q
-                            st.session_state["weight_ml"] = ml
-                            st.session_state["weight_technical"] = tech
-                            st.session_state["multi_quantum_weight_slider"] = q
-                            st.session_state["multi_ml_weight_slider"] = ml
-                            st.session_state["multi_technical_weight_slider"] = tech
-                            st.session_state["last_applied_strategy"] = {
-                                "source": row["Pair"],
-                                "q": q,
-                                "ml": ml,
-                                "tech": tech,
-                                "time": datetime.utcnow().isoformat(timespec="seconds") + "Z",
-                            }
-                            st.success(f"✅ Applied strategy from {row['Pair']}!")
-                            st.rerun()
-
-            # Aggregate performance
-            agg = df.groupby("Pair").agg(
-                {
-                    "ROI (USDT)": "mean",
-                    "Win Rate": "mean",
-                    "Trades": "sum",
-                    "Max Drawdown (%)": "mean",
-                }
-            )
-            st.write("**Averages by Pair**")
-            st.dataframe(agg, use_container_width=True)
-
-            # Download
-            csv_buf = io.StringIO()
-            df.to_csv(csv_buf, index=False)
-            st.download_button(
-                "💾 Download CSV",
-                data=csv_buf.getvalue(),
-                file_name="backtest_results.csv",
-                mime="text/csv",
+        if run_portfolio_bt:
+            self.run_portfolio_backtest(
+                timeframe=timeframe,
+                capital=capital,
+                fee_rate=fee_rate,
+                days=lookback_days,
+                refresh_cache=refresh_cache,
             )
 
         # Diagnostics
@@ -228,4 +330,5 @@ class BacktestingIntegration:
             st.write(f"Dependencies OK: {DEPS_OK}")
             if DEPS_ERR:
                 st.write(f"Error: {DEPS_ERR}")
-            st.code(traceback.format_exc(), language="python")
+            if self.last_exception:
+                st.code(self.last_exception, language="python")

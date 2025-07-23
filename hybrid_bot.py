@@ -164,6 +164,14 @@ IMPORT_TARGETS = [
     ("advanced_ml_strategy", "AdvancedMLStrategy"),
 ]
 
+# Optional Backtesting integration
+try:
+    from backtesting_integration import BacktestingIntegration
+    BACKTESTING_AVAILABLE = True
+except Exception:
+    BacktestingIntegration = None  # type: ignore
+    BACKTESTING_AVAILABLE = False
+
 MODULES: Dict[str, Any] = {}
 QT_IMPORT_ERROR: Optional[str] = None
 QT_STATUS: str = ""
@@ -1733,132 +1741,16 @@ def render_manual_trader():
 # ---- BACKTESTING -------------------------------------------------------------
 
 def render_backtesting():
-    st.header("⏪ Historical Backtesting")
-    st.caption("Test strategies against historical data")
-    
-    # Check if backtesting module is available
-    try:
-        # Try to import backtesting integration
-        backtesting_available = True
-        st.success("✅ Backtesting module available")
-    except Exception:
-        backtesting_available = False
-        st.error("❌ Backtesting module not available")
-        st.info("Install required dependencies: `pip install ccxt scipy`")
-    
-    if not backtesting_available:
-        st.subheader("📊 Sample Backtest Results")
-        # Show sample/demo results
-        sample_data = {
-            'Date': pd.date_range(start='2024-01-01', periods=100, freq='D'),
-            'Portfolio Value': 10000 + np.cumsum(np.random.normal(10, 50, 100)),
-            'Strategy': ['Quantum'] * 50 + ['ML'] * 30 + ['Technical'] * 20
-        }
-        sample_df = pd.DataFrame(sample_data)
-        
-        import plotly.express as px
-        fig = px.line(sample_df, x='Date', y='Portfolio Value', title='Sample Backtest Results')
-        st.plotly_chart(fig, use_container_width=True)
-        
-        st.info("This is sample data. Install backtesting modules for real historical testing.")
-        return
-    
-    # Backtesting parameters
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("📅 Time Period")
-        backtest_period = st.selectbox("Lookback Period", ["7d", "30d", "90d", "180d", "365d"], index=2, key="bt_period")
-        refresh_cache = st.checkbox("Force re-download data", value=False, key="bt_refresh")
-        
-        st.subheader("💰 Capital Settings")
-        initial_capital = st.number_input("Initial Capital (USDT)", min_value=100, max_value=100000, value=10000, step=100, key="bt_capital")
-        fee_rate = st.number_input("Trading Fee Rate", min_value=0.0, max_value=0.01, value=0.001, step=0.0001, format="%.4f", key="bt_fee")
-    
-    with col2:
-        st.subheader("📈 Trading Pairs")
+    st.header("🔬 Backtesting")
+    if BACKTESTING_AVAILABLE and BacktestingIntegration is not None:
         try:
-            all_pairs = COMPONENTS["market_analyzer"].get_trading_pairs()
+            bt = BacktestingIntegration()
+            bt.render_backtesting_tab()
         except Exception as e:
-            all_pairs = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT"]
-            _log_append(f"Failed to get trading pairs: {e}")
-        
-        default_pairs = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT"]
-        # Only use defaults that exist in all_pairs
-        safe_defaults = [pair for pair in default_pairs if pair in all_pairs]
-        
-        selected_pairs = st.multiselect("Select Pairs", all_pairs, default=safe_defaults, key="bt_pairs")
-        
-        st.subheader("⚙️ Strategy Weights")
-        bt_quantum_weight = st.slider("Quantum Weight %", 0, 100, 33, key="bt_quantum_weight")
-        bt_ml_weight = st.slider("ML Weight %", 0, 100, 33, key="bt_ml_weight")
-        bt_technical_weight = st.slider("Technical Weight %", 0, 100, 34, key="bt_technical_weight")
-    
-    # Run backtest button
-    if st.button("🚀 Run Backtest", type="primary", key="run_backtest", disabled=len(selected_pairs)==0):
-        if selected_pairs:
-            with st.spinner(f"Running backtest for {len(selected_pairs)} pairs over {backtest_period}..."):
-                try:
-                    # Simulate backtest results (replace with real backtesting logic)
-                    days = int(backtest_period.rstrip('d'))
-                    dates = pd.date_range(end=datetime.now(), periods=days, freq='D')
-                    
-                    results = []
-                    for pair in selected_pairs:
-                        # Simulate strategy performance
-                        returns = np.random.normal(0.001, 0.02, days)
-                        portfolio_value = initial_capital * np.cumprod(1 + returns)
-                        
-                        final_value = portfolio_value[-1]
-                        total_return = (final_value - initial_capital) / initial_capital * 100
-                        max_dd = np.min(portfolio_value / np.maximum.accumulate(portfolio_value) - 1) * 100
-                        
-                        results.append({
-                            'Pair': pair,
-                            'Initial Capital': initial_capital,
-                            'Final Value': final_value,
-                            'Total Return %': total_return,
-                            'Max Drawdown %': max_dd,
-                            'Quantum Weight': bt_quantum_weight,
-                            'ML Weight': bt_ml_weight,
-                            'Technical Weight': bt_technical_weight
-                        })
-                    
-                    # Display results
-                    st.subheader("📊 Backtest Results")
-                    results_df = pd.DataFrame(results)
-                    st.dataframe(results_df, use_container_width=True)
-                    
-                    # Summary metrics
-                    avg_return = results_df['Total Return %'].mean()
-                    best_pair = results_df.loc[results_df['Total Return %'].idxmax(), 'Pair']
-                    worst_pair = results_df.loc[results_df['Total Return %'].idxmin(), 'Pair']
-                    
-                    metric_col1, metric_col2, metric_col3 = st.columns(3)
-                    with metric_col1:
-                        st.metric("Average Return", f"{avg_return:.2f}%")
-                    with metric_col2:
-                        st.metric("Best Performer", best_pair)
-                    with metric_col3:
-                        st.metric("Worst Performer", worst_pair)
-                    
-                    # Apply to Multi-Strategy weights
-                    st.subheader("🎯 Apply Optimal Weights")
-                    st.info("Apply the best performing strategy weights to Multi-Strategy scanner")
-                    
-                    best_result = results_df.loc[results_df['Total Return %'].idxmax()]
-                    
-                    if st.button("📈 Apply Best Weights to Multi-Strategy", key="apply_bt_weights"):
-                        st.session_state['ms_weight_quantum'] = int(best_result['Quantum Weight'])
-                        st.session_state['ms_weight_ml'] = int(best_result['ML Weight'])
-                        st.session_state['ms_weight_technical'] = int(best_result['Technical Weight'])
-                        st.success(f"✅ Applied weights from {best_result['Pair']}: Q{int(best_result['Quantum Weight'])}% ML{int(best_result['ML Weight'])}% T{int(best_result['Technical Weight'])}%")
-                
-                except Exception as e:
-                    st.error(f"❌ Backtesting failed: {e}")
-                    _log_append(f"Backtest error: {e}")
-        else:
-            st.error("❌ Please select at least one trading pair")
+            st.error(f"Backtesting error: {e}")
+            st.info("Try: pip install ccxt scipy")
+    else:
+        st.error("Backtesting unavailable. Install ccxt & scipy.")
 
 
 # ---- SYSTEM HEALTH -----------------------------------------------------------
