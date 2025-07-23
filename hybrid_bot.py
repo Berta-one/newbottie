@@ -372,7 +372,7 @@ def initialize_components():
     # Risk Manager ------------------------------------------------
     if MODULES.get("RiskManager") is not None:
         try:
-            comps["risk_mgr"] = MODULES["RiskManager"](max_risk_percent=0.02, max_positions=5)
+            comps["risk_mgr"] = MODULES["RiskManager"](os.getenv("RISK_PROFILE", "BALANCED"))
         except Exception as e:  # noqa: BLE001
             print(f"RiskManager init failed: {e}")
             comps["risk_mgr"] = None
