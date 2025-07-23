@@ -1,62 +1,27 @@
 #!/usr/bin/env python3
 """
-Portfolio Value Synchronization Fix
+Portfolio Value Synchronization Fix - CORRECTED VERSION
 Ensures consistent portfolio values across all dashboard tabs
 """
 
 import os
 import sys
 from pathlib import Path
-
-def find_portfolio_value_calculations():
-    """Find all portfolio value calculation methods in the codebase"""
-    
-    portfolio_calculations = {}
-    
-    # Files to check for portfolio calculations
-    files_to_check = [
-        "hybrid_bot.py",
-        "dashboard.py", 
-        "bot_controller.py",
-        "portfolio_manager.py",
-        "portfolio_trading_bot.py"
-    ]
-    
-    for filename in files_to_check:
-        if Path(filename).exists():
-            with open(filename, 'r', encoding='utf-8') as f:
-                content = f.read()
-                
-            # Look for portfolio value calculations
-            calculations = []
-            
-            if "total_usd" in content:
-                calculations.append("total_usd calculation found")
-            if "total_gbp" in content:
-                calculations.append("total_gbp calculation found")
-            if "sum(coin['usd_value']" in content:
-                calculations.append("sum(coin['usd_value']) pattern found")
-            if "portfolio_value" in content:
-                calculations.append("portfolio_value variable found")
-            if "total_value" in content:
-                calculations.append("total_value calculation found")
-                
-            if calculations:
-                portfolio_calculations[filename] = calculations
-    
-    return portfolio_calculations
+from datetime import datetime
 
 def create_unified_portfolio_calculator():
     """Create a unified portfolio value calculator"""
     
-    calculator_code = '''#!/usr/bin/env python3
-"""
+    calculator_code = """#!/usr/bin/env python3
+'''
 Unified Portfolio Value Calculator
 Ensures consistent portfolio calculations across all tabs
-"""
+'''
+
+from datetime import datetime
 
 class UnifiedPortfolioCalculator:
-    """Single source of truth for portfolio value calculations"""
+    '''Single source of truth for portfolio value calculations'''
     
     def __init__(self):
         self._cached_portfolio = {}
@@ -66,7 +31,7 @@ class UnifiedPortfolioCalculator:
         self._gbp_rate = 0.79  # Default fallback
     
     def get_gbp_exchange_rate(self):
-        """Get current GBP exchange rate with caching"""
+        '''Get current GBP exchange rate with caching'''
         try:
             import requests
             response = requests.get("https://api.exchangerate-api.com/v4/latest/USD", timeout=5)
@@ -76,7 +41,7 @@ class UnifiedPortfolioCalculator:
             return self._gbp_rate  # Use cached/fallback rate
     
     def calculate_portfolio_totals(self, portfolio_data):
-        """
+        '''
         Calculate consistent portfolio totals
         
         Args:
@@ -84,7 +49,7 @@ class UnifiedPortfolioCalculator:
             
         Returns:
             tuple: (total_usd, total_gbp, gbp_rate)
-        """
+        '''
         if not portfolio_data:
             return 0.0, 0.0, self._gbp_rate
         
@@ -120,7 +85,7 @@ class UnifiedPortfolioCalculator:
         return total_usd, total_gbp, gbp_rate
     
     def get_portfolio_metrics(self, portfolio_data):
-        """Get comprehensive portfolio metrics"""
+        '''Get comprehensive portfolio metrics'''
         total_usd, total_gbp, gbp_rate = self.calculate_portfolio_totals(portfolio_data)
         
         return {
@@ -134,7 +99,7 @@ class UnifiedPortfolioCalculator:
         }
     
     def _get_largest_holding_percentage(self, portfolio_data, total_usd):
-        """Calculate largest holding percentage"""
+        '''Calculate largest holding percentage'''
         if not portfolio_data or total_usd == 0:
             return 0.0
             
@@ -154,7 +119,7 @@ class UnifiedPortfolioCalculator:
         return (max_value / total_usd * 100) if total_usd > 0 else 0.0
     
     def format_portfolio_for_display(self, portfolio_data):
-        """Format portfolio data for consistent display"""
+        '''Format portfolio data for consistent display'''
         if not portfolio_data:
             return []
         
@@ -186,137 +151,24 @@ portfolio_calculator = UnifiedPortfolioCalculator()
 
 # Convenience functions for easy import
 def get_portfolio_totals(portfolio_data):
-    """Get portfolio totals using unified calculator"""
+    '''Get portfolio totals using unified calculator'''
     return portfolio_calculator.calculate_portfolio_totals(portfolio_data)
 
 def get_portfolio_metrics(portfolio_data):
-    """Get portfolio metrics using unified calculator"""
+    '''Get portfolio metrics using unified calculator'''
     return portfolio_calculator.get_portfolio_metrics(portfolio_data)
 
 def format_portfolio_display(portfolio_data):
-    """Format portfolio for display using unified calculator"""
+    '''Format portfolio for display using unified calculator'''
     return portfolio_calculator.format_portfolio_for_display(portfolio_data)
-'''
-    
-    # Save the calculator
-    with open("unified_portfolio_calculator.py", "w", encoding="utf-8") as f:
-        f.write(calculator_code)
-    
-    print("✅ Created unified_portfolio_calculator.py")
 
-def create_portfolio_sync_patch():
-    """Create patches for existing files to use unified calculator"""
-    
-    # Patch for dashboard functions
-    dashboard_patch = '''
-# PORTFOLIO VALUE SYNC PATCH
-# Add this import at the top of your dashboard files:
-from unified_portfolio_calculator import get_portfolio_totals, get_portfolio_metrics
-
-# Replace portfolio value calculations with:
-def get_consistent_portfolio_values(portfolio_data):
-    """Get consistent portfolio values across all tabs"""
-    total_usd, total_gbp, gbp_rate = get_portfolio_totals(portfolio_data)
-    
-    return {
-        'total_usd': total_usd,
-        'total_gbp': total_gbp, 
-        'gbp_rate': gbp_rate,
-        'formatted_usd': f"${total_usd:,.2f}",
-        'formatted_gbp': f"£{total_gbp:,.2f}"
-    }
-
-# In your dashboard rendering functions, replace:
-# OLD: total_usd = sum(coin['usd_value'] for coin in portfolio.values())
-# NEW: totals = get_consistent_portfolio_values(portfolio)
-#      total_usd = totals['total_usd']
-#      total_gbp = totals['total_gbp']
-'''
-    
-    with open("portfolio_sync_patch.py", "w", encoding="utf-8") as f:
-        f.write(dashboard_patch)
-    
-    print("✅ Created portfolio_sync_patch.py")
-
-def create_quick_fix_script():
-    """Create a quick fix script to apply immediately"""
-    
-    fix_script = '''#!/usr/bin/env python3
-"""
-Quick Portfolio Value Fix
-Applies immediate fixes to sync portfolio values
-"""
-
-import os
-import re
-from pathlib import Path
-
-def fix_hybrid_bot():
-    """Fix hybrid_bot.py portfolio calculations"""
-    
-    if not Path("hybrid_bot.py").exists():
-        print("⚠️ hybrid_bot.py not found")
-        return
-    
-    with open("hybrid_bot.py", "r", encoding="utf-8") as f:
-        content = f.read()
-    
-    # Find and replace inconsistent portfolio calculations
-    fixes_applied = []
-    
-    # Fix 1: Ensure consistent total_usd calculation
-    old_pattern = r'total_usd\s*=\s*sum\(coin\[\'usd_value\'\]\s*for\s*coin\s*in\s*portfolio\.values\(\)\)'
-    new_pattern = '''# Unified portfolio calculation
-    total_usd = 0.0
-    for asset, data in portfolio.items():
-        if isinstance(data, dict) and 'usd_value' in data:
-            total_usd += float(data['usd_value'])'''
-    
-    if re.search(old_pattern, content):
-        content = re.sub(old_pattern, new_pattern, content)
-        fixes_applied.append("Fixed total_usd calculation")
-    
-    # Fix 2: Ensure consistent GBP calculation
-    old_gbp = r'total_gbp\s*=\s*total_usd\s*\*\s*gbp_rate'
-    new_gbp = '''# Consistent GBP calculation
-    gbp_rate = get_gbp_exchange_rate() if 'get_gbp_exchange_rate' in globals() else 0.79
-    total_gbp = total_usd * gbp_rate'''
-    
-    if re.search(old_gbp, content):
-        content = re.sub(old_gbp, new_gbp, content)
-        fixes_applied.append("Fixed total_gbp calculation")
-    
-    # Fix 3: Add import for unified calculator
-    if 'from unified_portfolio_calculator import' not in content:
-        import_line = "from unified_portfolio_calculator import get_portfolio_totals, get_portfolio_metrics\\n"
-        content = import_line + content
-        fixes_applied.append("Added unified calculator import")
-    
-    if fixes_applied:
-        # Backup original
-        with open("hybrid_bot_backup.py", "w", encoding="utf-8") as f:
-            f.write(content)
-        
-        # Write fixed version
-        with open("hybrid_bot.py", "w", encoding="utf-8") as f:
-            f.write(content)
-        
-        print(f"✅ Fixed hybrid_bot.py: {', '.join(fixes_applied)}")
-    else:
-        print("✅ hybrid_bot.py appears to be using consistent calculations")
-
-def add_debug_logging():
-    """Add debug logging to track portfolio values"""
-    
-    debug_code = '''
-# PORTFOLIO DEBUG LOGGING
 def debug_portfolio_values(portfolio_data, location="unknown"):
-    """Debug portfolio value calculations"""
+    '''Debug portfolio value calculations'''
     print(f"\\n=== PORTFOLIO DEBUG [{location}] ===")
     
     if not portfolio_data:
         print("❌ Portfolio data is empty")
-        return
+        return 0.0
     
     total_debug = 0.0
     for asset, data in portfolio_data.items():
@@ -329,113 +181,199 @@ def debug_portfolio_values(portfolio_data, location="unknown"):
     print("=" * 40)
     
     return total_debug
+"""
+    
+    # Save the calculator
+    with open("unified_portfolio_calculator.py", "w", encoding="utf-8") as f:
+        f.write(calculator_code)
+    
+    print("✅ Created unified_portfolio_calculator.py")
 
-# Add this function call in your dashboard rendering:
-# debug_total = debug_portfolio_values(portfolio, "Dashboard Tab")
+def create_quick_fix_patch():
+    """Create a simple patch file to apply to hybrid_bot.py"""
+    
+    patch_code = """#!/usr/bin/env python3
 '''
-    
-    with open("portfolio_debug.py", "w", encoding="utf-8") as f:
-        f.write(debug_code)
-    
-    print("✅ Created portfolio_debug.py for troubleshooting")
+Quick Portfolio Value Fix Patch
+Apply this to fix portfolio value synchronization
+'''
 
-def main():
-    """Main fix function"""
-    print("🔧 Portfolio Value Synchronization Fix")
-    print("=" * 50)
+import os
+import re
+from pathlib import Path
+
+def apply_portfolio_fix():
+    '''Apply portfolio value synchronization fix'''
     
-    print("\\n1. Analyzing current portfolio calculations...")
-    calculations = find_portfolio_value_calculations()
+    print("🔧 Applying Portfolio Value Fix...")
     
-    for filename, calcs in calculations.items():
-        print(f"📄 {filename}:")
-        for calc in calcs:
-            print(f"   - {calc}")
+    # Files to patch
+    files_to_patch = ["hybrid_bot.py", "portfolio_trading_bot.py", "bot_controller.py"]
     
-    print("\\n2. Creating unified portfolio calculator...")
-    create_unified_portfolio_calculator()
+    for filename in files_to_patch:
+        if Path(filename).exists():
+            print(f"📄 Patching {filename}...")
+            
+            try:
+                with open(filename, "r", encoding="utf-8") as f:
+                    content = f.read()
+                
+                # Backup original
+                backup_name = f"{filename}.backup"
+                with open(backup_name, "w", encoding="utf-8") as f:
+                    f.write(content)
+                
+                # Add import if not present
+                if "from unified_portfolio_calculator import" not in content:
+                    import_line = "from unified_portfolio_calculator import get_portfolio_totals, debug_portfolio_values\\n"
+                    content = import_line + content
+                    print(f"  ✅ Added unified calculator import")
+                
+                # Look for portfolio calculation patterns
+                patterns_fixed = []
+                
+                # Pattern 1: sum(coin['usd_value'] for coin in portfolio.values())
+                old_pattern1 = r"total_usd\s*=\s*sum\(coin\['usd_value'\]\s*for\s*coin\s*in\s*portfolio\.values\(\)\)"
+                if re.search(old_pattern1, content):
+                    new_calc = "total_usd, total_gbp, gbp_rate = get_portfolio_totals(portfolio)"
+                    content = re.sub(old_pattern1, new_calc, content)
+                    patterns_fixed.append("sum() calculation")
+                
+                # Pattern 2: Individual total_gbp calculations
+                old_pattern2 = r"total_gbp\s*=\s*total_usd\s*\*\s*gbp_rate"
+                if re.search(old_pattern2, content):
+                    new_calc = "# total_gbp calculated above with get_portfolio_totals()"
+                    content = re.sub(old_pattern2, new_calc, content)
+                    patterns_fixed.append("GBP calculation")
+                
+                # Write patched file
+                with open(filename, "w", encoding="utf-8") as f:
+                    f.write(content)
+                
+                if patterns_fixed:
+                    print(f"  ✅ Fixed: {', '.join(patterns_fixed)}")
+                else:
+                    print(f"  ✅ No patterns to fix found")
+                    
+            except Exception as e:
+                print(f"  ❌ Error patching {filename}: {e}")
+        else:
+            print(f"  ⚠️ {filename} not found")
     
-    print("\\n3. Creating sync patches...")
-    create_portfolio_sync_patch()
-    
-    print("\\n4. Creating debug tools...")
-    add_debug_logging()
-    
-    print("\\n5. Creating quick fix script...")
-    create_quick_fix_script()
-    
-    print("\\n" + "=" * 50)
-    print("🎉 PORTFOLIO SYNC FIX COMPLETED!")
-    print("=" * 50)
-    
-    print("\\n📋 Next Steps:")
-    print("1. Import the unified calculator in your dashboard files:")
-    print("   from unified_portfolio_calculator import get_portfolio_totals")
-    
-    print("\\n2. Replace portfolio calculations with:")
-    print("   total_usd, total_gbp, gbp_rate = get_portfolio_totals(portfolio)")
-    
-    print("\\n3. Use debug logging to verify values:")
-    print("   from portfolio_debug import debug_portfolio_values")
-    print("   debug_portfolio_values(portfolio, 'Dashboard Tab')")
-    
-    print("\\n4. Test both tabs to confirm values match")
-    
-    print("\\n🔍 Root Cause:")
-    print("Different files were calculating portfolio values differently:")
-    print("- Some used sum(coin['usd_value'] for coin in portfolio.values())")
-    print("- Others used different data structures or calculations")
-    print("- GBP rates were fetched at different times")
-    
-    print("\\n✅ Solution:")
-    print("- Unified calculator ensures consistent calculations")
-    print("- Single source of truth for all portfolio values")
-    print("- Cached exchange rates prevent discrepancies")
+    print("\\n🎉 Portfolio fix applied!")
+    print("\\n📋 Next steps:")
+    print("1. Test your dashboard: streamlit run hybrid_bot.py")
+    print("2. Check both Dashboard and Portfolio tabs show same value")
+    print("3. If issues persist, check debug output in console")
 
 if __name__ == "__main__":
-    main()
-'''
+    apply_portfolio_fix()
+"""
     
-    with open("quick_portfolio_fix.py", "w", encoding="utf-8") as f:
-        f.write(fix_script)
+    with open("apply_portfolio_fix.py", "w", encoding="utf-8") as f:
+        f.write(patch_code)
     
-    print("✅ Created quick_portfolio_fix.py")
+    print("✅ Created apply_portfolio_fix.py")
+
+def create_manual_fix_instructions():
+    """Create manual fix instructions"""
+    
+    instructions = """
+# MANUAL PORTFOLIO VALUE FIX INSTRUCTIONS
+
+## Problem:
+Dashboard tab shows portfolio value as zero, while Portfolio tab shows correct value.
+
+## Root Cause:
+Different files calculate portfolio values using different methods and data structures.
+
+## Solution:
+
+### Step 1: Add Unified Calculator Import
+Add this line to the TOP of hybrid_bot.py:
+
+```python
+from unified_portfolio_calculator import get_portfolio_totals, debug_portfolio_values
+```
+
+### Step 2: Replace Portfolio Calculations
+Find lines that look like this:
+```python
+# OLD - Replace this
+total_usd = sum(coin['usd_value'] for coin in portfolio.values())
+total_gbp = bot.get_portfolio_value_gbp(total_usd)
+```
+
+Replace with:
+```python
+# NEW - Use this instead
+total_usd, total_gbp, gbp_rate = get_portfolio_totals(portfolio)
+```
+
+### Step 3: Add Debug Logging (Temporary)
+Add this line after portfolio calculations to debug:
+```python
+debug_total = debug_portfolio_values(portfolio, "Dashboard Tab")
+```
+
+### Step 4: Test
+1. Run: streamlit run hybrid_bot.py
+2. Check Dashboard tab - should now show correct portfolio value
+3. Compare with Portfolio tab - values should match
+4. Remove debug logging once confirmed working
+
+## Quick Test Commands:
+```bash
+# 1. Apply the fix
+python apply_portfolio_fix.py
+
+# 2. Test dashboard
+streamlit run hybrid_bot.py
+
+# 3. Check both tabs show same value
+```
+
+## If Still Zero:
+1. Check console for debug output
+2. Verify portfolio data structure
+3. Ensure Binance API is working
+4. Check if USE_TESTNET vs LIVE mode issue
+"""
+    
+    with open("PORTFOLIO_FIX_INSTRUCTIONS.md", "w", encoding="utf-8") as f:
+        f.write(instructions)
+    
+    print("✅ Created PORTFOLIO_FIX_INSTRUCTIONS.md")
 
 def main():
     """Main function to create all portfolio sync fixes"""
-    print("🔧 Portfolio Value Synchronization Fix")
-    print("=" * 50)
+    print("🔧 Portfolio Value Synchronization Fix - CORRECTED")
+    print("=" * 60)
     
-    print("\n1. Analyzing current portfolio calculations...")
-    calculations = find_portfolio_value_calculations()
-    
-    for filename, calcs in calculations.items():
-        print(f"📄 {filename}:")
-        for calc in calcs:
-            print(f"   - {calc}")
-    
-    print("\n2. Creating unified portfolio calculator...")
+    print("\\n1. Creating unified portfolio calculator...")
     create_unified_portfolio_calculator()
     
-    print("\n3. Creating sync patches...")
-    create_portfolio_sync_patch()
+    print("\\n2. Creating quick fix patch...")
+    create_quick_fix_patch()
     
-    print("\n4. Creating quick fix script...")
-    create_quick_fix_script()
+    print("\\n3. Creating manual instructions...")
+    create_manual_fix_instructions()
     
-    print("\n" + "=" * 50)
+    print("\\n" + "=" * 60)
     print("🎉 PORTFOLIO SYNC FIX COMPLETED!")
-    print("=" * 50)
+    print("=" * 60)
     
-    print("\n📋 Quick Fix Steps:")
-    print("1. Run: python quick_portfolio_fix.py")
-    print("2. Add to your dashboard files:")
-    print("   from unified_portfolio_calculator import get_portfolio_totals")
-    print("3. Replace portfolio calculations:")
-    print("   total_usd, total_gbp, gbp_rate = get_portfolio_totals(portfolio)")
-    print("4. Test both Dashboard and Portfolio tabs")
+    print("\\n🚀 Quick Fix Steps:")
+    print("1. Run: python apply_portfolio_fix.py")
+    print("2. Test: streamlit run hybrid_bot.py")
+    print("3. Check both Dashboard and Portfolio tabs")
     
-    print("\n🎯 This will ensure both tabs show the same portfolio value!")
+    print("\\n📋 Files Created:")
+    print("✅ unified_portfolio_calculator.py - Single source of truth")
+    print("✅ apply_portfolio_fix.py - Automated patcher")
+    print("✅ PORTFOLIO_FIX_INSTRUCTIONS.md - Manual instructions")
+    
+    print("\\n🎯 This will sync portfolio values across all tabs!")
 
 if __name__ == "__main__":
     main()
