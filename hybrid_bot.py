@@ -165,6 +165,8 @@ IMPORT_TARGETS = [
 ]
 
 MODULES: Dict[str, Any] = {}
+QT_IMPORT_ERROR: Optional[str] = None
+QT_STATUS: str = ""
 
 for mod_path, cls_name in IMPORT_TARGETS:
     try:
@@ -173,6 +175,8 @@ for mod_path, cls_name in IMPORT_TARGETS:
     except Exception as e:  # noqa: BLE001
         MODULES[cls_name] = None
         print(f"⚠️ Optional module {cls_name} not available: {e}")
+        if cls_name == "QuantumTrader" and isinstance(e, ImportError):
+            QT_IMPORT_ERROR = str(e)
 
 # Binance Client import separately (often installed via python-binance)
 try:
@@ -335,6 +339,26 @@ class FallbackTradeExecutor:
         }
 
 
+class FallbackQuantumTrader:
+    """Fallback quantum trader when Qiskit/QTrader is unavailable."""
+
+    def __init__(self, client=None):  # noqa: D401,ARG002
+        self.client = client
+        self.analyzer = FallbackQuantumAnalyzer() if 'FallbackQuantumAnalyzer' in globals() else None
+
+    def evaluate_signal(self, market_data):  # noqa: ARG002
+        if self.analyzer:
+            return self.analyzer.generate_quantum_signal(market_data)
+        return {"decision": "HOLD", "confidence": 0.0, "distribution": {}}
+
+    def execute_quantum_trade(self, symbol, market_data, quantity):  # noqa: ARG002
+        signal = self.evaluate_signal(market_data)
+        return {"status": "DISABLED", "reason": "Quantum Trader unavailable", "signal": signal}
+
+    def get_connection_status(self):  # noqa: D401
+        return "❌ Quantum Trader disabled (missing Qiskit)"
+
+
 # ------------------------------------------------------------------
 # Binance Client setup -----------------------------------------------------------
 # ------------------------------------------------------------------
@@ -421,22 +445,29 @@ def initialize_components():
             if FallbackQuantumAnalyzer:
                 comps["quantum_analyzer"] = FallbackQuantumAnalyzer()
             else:
-                comps["quantum_analyzer"] = FallbackQuantumAnalyzer()
+                comps["quantum_analyzer"] = None
     else:
         if FallbackQuantumAnalyzer:
             comps["quantum_analyzer"] = FallbackQuantumAnalyzer()
         else:
-            comps["quantum_analyzer"] = FallbackQuantumAnalyzer()
+            comps["quantum_analyzer"] = None
 
     # Quantum Trader wrapper -------------------------------------
+    global QT_STATUS
     if MODULES.get("QuantumTrader") and client:
         try:
             comps["quantum_trader"] = MODULES["QuantumTrader"](client)
+            QT_STATUS = "✅ Quantum Trader active"
         except Exception as e:  # noqa: BLE001
             print(f"QuantumTrader failed: {e}")
-            comps["quantum_trader"] = None
+            QT_STATUS = f"❌ Quantum Trader error: {e}"
+            comps["quantum_trader"] = FallbackQuantumTrader(client)
     else:
-        comps["quantum_trader"] = None
+        if QT_IMPORT_ERROR:
+            QT_STATUS = f"❌ Quantum Trader disabled - {QT_IMPORT_ERROR}"
+        else:
+            QT_STATUS = "❌ Quantum Trader unavailable"
+        comps["quantum_trader"] = FallbackQuantumTrader(client)
 
     # Ensemble Engine --------------------------------------------
     if MODULES.get("EnsembleSignalEngine") and client and comps["quantum_trader"]:
@@ -476,6 +507,7 @@ if "_components_initialized" not in st.session_state:
     COMPONENTS, BINANCE_CLIENT, CLIENT_STATUS = initialize_components()
     st.session_state["_components_initialized"] = True
     st.session_state["_client_status"] = CLIENT_STATUS
+    st.session_state["_qt_status"] = QT_STATUS
 else:
     # Reuse from session
     COMPONENTS = st.session_state.get("_components_cache")
@@ -483,6 +515,7 @@ else:
         COMPONENTS, BINANCE_CLIENT, CLIENT_STATUS = initialize_components()
     else:
         CLIENT_STATUS = st.session_state.get("_client_status", "")
+        QT_STATUS = st.session_state.get("_qt_status", "")
 
     st.session_state["_components_cache"] = COMPONENTS
 
@@ -490,6 +523,7 @@ else:
 if COMPONENTS is None:
     COMPONENTS, BINANCE_CLIENT, CLIENT_STATUS = initialize_components()
     st.session_state["_components_cache"] = COMPONENTS
+    st.session_state["_qt_status"] = QT_STATUS
 
 # ------------------------------------------------------------------
 # Session defaults for risk
@@ -684,6 +718,9 @@ def compute_realized_pnl(df: pd.DataFrame) -> pd.DataFrame:
 def render_dashboard():
     st.header("🧠 Hybrid Quantum Crypto Trading Bot Dashboard")
     st.info(st.session_state.get("_client_status", ""))
+    qt_msg = st.session_state.get("_qt_status", "")
+    if qt_msg and qt_msg.startswith("❌"):
+        st.warning(qt_msg)
 
     # Quick Stats row
     col1, col2, col3, col4 = st.columns(4)
@@ -887,6 +924,9 @@ for _k, _v in MS_DEFAULTS.items():
 def render_multi_strategy():
     st.header("⚛ Multi-Strategy Market Scanner")
     st.caption("Quantum + ML + Technical Analysis across selected pairs.")
+    qt_msg = st.session_state.get("_qt_status", "")
+    if qt_msg and qt_msg.startswith("❌"):
+        st.warning(qt_msg)
 
     # -------------------------------------------------
     # Configuration Section
@@ -2236,7 +2276,8 @@ def render_logs():
             'name': 'Quantum Trader',
             'description': 'Quantum-enhanced trading strategies',
             'component': COMPONENTS.get('quantum_trader'),
-            'fallback_available': False
+            'fallback_available': True,
+            'disabled_reason': st.session_state.get('_qt_status', '')
         },
         'ensemble_engine': {
             'name': 'Ensemble Signal Engine',
@@ -2337,7 +2378,11 @@ def render_logs():
                     else:
                         st.caption(f"Type: {type(component).__name__}")
                 else:
-                    st.caption("No component loaded")
+                    reason = module_info.get('disabled_reason')
+                    if reason:
+                        st.caption(reason)
+                    else:
+                        st.caption("No component loaded")
             
             with col4:
                 # Control buttons
