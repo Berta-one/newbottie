@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Hybrid Quantum Crypto Trading Bot (Final)
 =======================================
@@ -89,7 +89,7 @@ def require_authentication() -> bool:
     if st.button("Login", key="_auth_btn"):
         if pw == pw_env:
             st.session_state.authenticated = True
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.error("❌ Incorrect password.")
     st.stop()  # Halt until authenticated
@@ -722,7 +722,7 @@ def render_portfolio():
                     pm.refresh_portfolio()
                 except Exception as e:  # noqa: BLE001
                     st.error(f"Error: {e}")
-            st.experimental_rerun()
+            st.rerun()
     with col3:
         st.caption(f"Last updated: {pm.last_updated()}")
 
