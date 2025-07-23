@@ -57,7 +57,7 @@ class TradeExecutor:
         except Exception as e:
             self.log(f"❌ TradeExecutor: API configuration failed - {e}")
     
-    def manual_trade(self, symbol: str, qty: float, sl_mult: float = 1.5, tp_mult: float = 3.0, atr_value: Optional[float] = None) -> str:
+    def manual_trade(self, symbol: str, qty: float, sl_mult: float = 1.5, tp_mult: float = 3.0, atr_value: Optional[float] = None, trade_amount_usd: Optional[float] = None) -> str:
         """
         Execute manual trade with proper error handling
         """
@@ -71,6 +71,10 @@ class TradeExecutor:
             # Get current price
             ticker = self.client.get_symbol_ticker(symbol=symbol)
             price = float(ticker["price"])
+
+            # Allow optional USD-based trade sizing
+            if trade_amount_usd is not None:
+                qty = trade_amount_usd / price
             
             self.log(f"🎯 Executing trade: {symbol} @ ${price:,.4f}, Qty: {qty}")
             
@@ -201,7 +205,9 @@ class FallbackTradeExecutor:
         self.log = log_callback if log_callback else print
         self.active_orders = {}
     
-    def manual_trade(self, symbol: str, qty: float, sl_mult: float = 1.5, tp_mult: float = 3.0, atr_value: Optional[float] = None) -> str:
+    def manual_trade(self, symbol: str, qty: float, sl_mult: float = 1.5, tp_mult: float = 3.0, atr_value: Optional[float] = None, trade_amount_usd: Optional[float] = None) -> str:
+        if trade_amount_usd is not None:
+            qty = trade_amount_usd  # In demo mode qty represents USD value
         self.log(f"📝 DEMO: Would execute BUY {qty} {symbol}")
         return f"📝 Demo trade: BUY {qty} {symbol} (API not available)"
     
