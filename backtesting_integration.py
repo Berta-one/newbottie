@@ -34,6 +34,7 @@ class BacktestingIntegration:
             raise RuntimeError(
                 f"Backtesting dependencies missing or broken: {DEPS_ERR}"
             )
+        self.last_exception = None
 
     def _run_engine(self, pairs, timeframe, capital, fee_rate, days=365, refresh_cache=False):
         engine = BacktestEngineReal(
@@ -76,6 +77,9 @@ class BacktestingIntegration:
     def render_backtesting_tab(self):
         st.header("🔬 Backtesting")
         st.caption("Run historical strategy sweeps across ML / Quantum / Technical weights.")
+
+        # reset any previous exception
+        self.last_exception = None
 
         # --- Inputs ---
         col1, col2, col3, col4 = st.columns(4)
@@ -142,7 +146,7 @@ class BacktestingIntegration:
                     )
                 except Exception as e:
                     st.error(f"Backtest failed: {e}")
-                    st.exception(e)
+                    self.last_exception = traceback.format_exc()
                     return
 
             if df is None or df.empty:
@@ -228,4 +232,5 @@ class BacktestingIntegration:
             st.write(f"Dependencies OK: {DEPS_OK}")
             if DEPS_ERR:
                 st.write(f"Error: {DEPS_ERR}")
-            st.code(traceback.format_exc(), language="python")
+            if self.last_exception:
+                st.code(self.last_exception, language="python")
