@@ -1657,7 +1657,10 @@ def render_manual_trader():
                 )
                 
                 st.success(f"✅ Trade executed successfully!")
-                st.json(result)
+                if isinstance(result, dict):
+                    st.json(result)
+                else:
+                    st.write(result)
                 
                 # Log the execution
                 _log_append(f"Manual trade executed: {side} {calculated_qty:.8f} {symbol} @ ${limit_price:.4f}")
