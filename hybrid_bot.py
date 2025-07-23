@@ -344,7 +344,7 @@ class FallbackQuantumTrader:
 
     def __init__(self, client=None):  # noqa: D401,ARG002
         self.client = client
-        self.analyzer = FallbackQuantumAnalyzer() if 'FallbackQuantumAnalyzer' in globals() else None
+        self.analyzer = FallbackQuantumAnalyzer() if FallbackQuantumAnalyzer else None
 
     def evaluate_signal(self, market_data):  # noqa: ARG002
         if self.analyzer:
