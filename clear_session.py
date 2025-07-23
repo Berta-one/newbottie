@@ -1,4 +1,4 @@
-﻿import streamlit as st
+import streamlit as st
 
 # Clear all session state
 for key in list(st.session_state.keys()):

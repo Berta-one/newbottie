@@ -1,2 +1,2 @@
-﻿[phases.install]
+[phases.install]
 cmds = ["pip install -r requirements.txt"]
