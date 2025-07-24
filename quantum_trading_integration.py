@@ -38,7 +38,9 @@ class QuantumTrader:
         """
         return self.analyzer.generate_quantum_signal(market_data)
 
-    def execute_quantum_trade(self, symbol: str, market_data: Dict[str, Any], quantity: float) -> Dict[str, Any]:
+    def execute_quantum_trade(
+        self, symbol: str, market_data: Dict[str, Any], quantity: float
+    ) -> Dict[str, Any]:
         """
         Executes a trade based on quantum signal.
         :param symbol: e.g. "BTCUSDT"
@@ -52,12 +54,15 @@ class QuantumTrader:
         if decision == "BUY":
             result = self.trade_executor.manual_trade(symbol, quantity, "BUY")
             if result.get("status") == "SUCCESS":
-                self.position_monitor.add_position(symbol, {
-                    "side": "BUY",
-                    "qty": quantity,
-                    "opened_at": datetime.now().isoformat(),
-                    "decision": "Quantum BUY"
-                })
+                self.position_monitor.add_position(
+                    symbol,
+                    {
+                        "side": "BUY",
+                        "qty": quantity,
+                        "opened_at": datetime.now().isoformat(),
+                        "decision": "Quantum BUY",
+                    },
+                )
         elif decision == "SELL":
             result = self.trade_executor.manual_trade(symbol, quantity, "SELL")
             if result.get("status") == "SUCCESS":
@@ -68,7 +73,9 @@ class QuantumTrader:
         self._log_trade(symbol, decision, quantity, signal)
         return {"signal": signal, "trade_result": result}
 
-    def _log_trade(self, symbol: str, decision: str, qty: float, signal: Dict[str, Any]):
+    def _log_trade(
+        self, symbol: str, decision: str, qty: float, signal: Dict[str, Any]
+    ):
         """
         Logs each quantum trade for audit.
         """
@@ -76,12 +83,23 @@ class QuantumTrader:
         with open(self.log_file, "a", newline="") as f:
             writer = csv.writer(f)
             if not log_exists:
-                writer.writerow(["timestamp", "symbol", "decision", "quantity", "distribution", "confidence"])
-            writer.writerow([
-                datetime.now().isoformat(),
-                symbol,
-                decision,
-                qty,
-                signal.get("distribution"),
-                signal.get("confidence")
-            ])
+                writer.writerow(
+                    [
+                        "timestamp",
+                        "symbol",
+                        "decision",
+                        "quantity",
+                        "distribution",
+                        "confidence",
+                    ]
+                )
+            writer.writerow(
+                [
+                    datetime.now().isoformat(),
+                    symbol,
+                    decision,
+                    qty,
+                    signal.get("distribution"),
+                    signal.get("confidence"),
+                ]
+            )

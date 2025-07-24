@@ -14,6 +14,7 @@ import plotly.graph_objects as go  # for charts
 try:
     import ccxt  # noqa: F401
     import scipy  # noqa: F401
+
     DEPS_OK = True
     DEPS_ERR = None
 except Exception as e:
@@ -36,7 +37,9 @@ class BacktestingIntegration:
             )
         self.last_exception = None
 
-    def _run_engine(self, pairs, timeframe, capital, fee_rate, days=365, refresh_cache=False):
+    def _run_engine(
+        self, pairs, timeframe, capital, fee_rate, days=365, refresh_cache=False
+    ):
         engine = BacktestEngineReal(
             pairs=pairs,
             timeframe=timeframe,
@@ -47,7 +50,9 @@ class BacktestingIntegration:
 
         # Save reference to raw OHLCV data (for charts)
         self.raw_data = getattr(engine, "raw_data", {})
-        self.data_info = {pair: f"{days} days of {timeframe} data loaded" for pair in pairs}
+        self.data_info = {
+            pair: f"{days} days of {timeframe} data loaded" for pair in pairs
+        }
         return df
 
     def _plot_price_chart(self, df_price, pair):
@@ -62,7 +67,7 @@ class BacktestingIntegration:
                     high=df_price["high"],
                     low=df_price["low"],
                     close=df_price["close"],
-                    name=pair
+                    name=pair,
                 )
             ]
         )
@@ -70,7 +75,7 @@ class BacktestingIntegration:
             title=f"{pair} Price History",
             xaxis_rangeslider_visible=False,
             template="plotly_dark",
-            height=400
+            height=400,
         )
         return fig
 
@@ -124,9 +129,7 @@ class BacktestingIntegration:
                     "tech": tech_best,
                     "time": datetime.utcnow().isoformat(timespec="seconds") + "Z",
                 }
-                st.success(
-                    f"✅ Applied best strategy from {best_row['Pair']}!"
-                )
+                st.success(f"✅ Applied best strategy from {best_row['Pair']}!")
                 st.rerun()
 
             for i, row in df.iterrows():
@@ -160,9 +163,7 @@ class BacktestingIntegration:
                             "time": datetime.utcnow().isoformat(timespec="seconds")
                             + "Z",
                         }
-                        st.success(
-                            f"✅ Applied strategy from {row['Pair']}!"
-                        )
+                        st.success(f"✅ Applied strategy from {row['Pair']}!")
                         st.rerun()
 
         agg = df.groupby("Pair").agg(
@@ -238,7 +239,9 @@ class BacktestingIntegration:
 
     def render_backtesting_tab(self):
         st.header("🔬 Backtesting")
-        st.caption("Run historical strategy sweeps across ML / Quantum / Technical weights.")
+        st.caption(
+            "Run historical strategy sweeps across ML / Quantum / Technical weights."
+        )
 
         # reset any previous exception
         self.last_exception = None
@@ -278,17 +281,11 @@ class BacktestingIntegration:
 
         # --- Lookback Period ---
         lookback_option = st.selectbox(
-            "Historical Lookback",
-            ["1M", "3M", "6M", "1Y", "2Y"],
-            index=3  # default 1Y
+            "Historical Lookback", ["1M", "3M", "6M", "1Y", "2Y"], index=3  # default 1Y
         )
-        lookback_days = {
-            "1M": 30,
-            "3M": 90,
-            "6M": 180,
-            "1Y": 365,
-            "2Y": 730
-        }[lookback_option]
+        lookback_days = {"1M": 30, "3M": 90, "6M": 180, "1Y": 365, "2Y": 730}[
+            lookback_option
+        ]
 
         refresh_cache = st.checkbox("Force re-download historical data", value=False)
         pairs = [p.strip().upper() for p in pairs_text.split(",") if p.strip()]

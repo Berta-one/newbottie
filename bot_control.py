@@ -8,6 +8,7 @@ st.title("🤖 Bottie Control Panel")
 # Paths and commands
 BOT_SCRIPT = "bot_service.py"  # Make sure this file is in your repo root
 
+
 def is_bot_running():
     """Check if bot_service.py is running"""
     try:
@@ -15,6 +16,7 @@ def is_bot_running():
         return bool(result.stdout)
     except:
         return False
+
 
 # ✅ Status Indicator
 if is_bot_running():

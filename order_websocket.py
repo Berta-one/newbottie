@@ -10,8 +10,17 @@ import threading
 from binance import ThreadedWebsocketManager
 from datetime import datetime
 
+
 class OrderWebSocket:
-    def __init__(self, client, trade_executor, position_monitor, portfolio_manager, ui_refresh=None, log_callback=None):
+    def __init__(
+        self,
+        client,
+        trade_executor,
+        position_monitor,
+        portfolio_manager,
+        ui_refresh=None,
+        log_callback=None,
+    ):
         self.client = client
         self.trade_executor = trade_executor
         self.position_monitor = position_monitor
@@ -26,7 +35,9 @@ class OrderWebSocket:
         if self._running:
             self.log("[WebSocket] Already running.")
             return
-        self.ws_manager = ThreadedWebsocketManager(api_key=self.client.API_KEY, api_secret=self.client.API_SECRET)
+        self.ws_manager = ThreadedWebsocketManager(
+            api_key=self.client.API_KEY, api_secret=self.client.API_SECRET
+        )
         self.ws_manager.start()
         self.listen_key = self.client.stream_get_listen_key()
         self.ws_manager.start_user_socket(callback=self._handle_event)
@@ -63,4 +74,6 @@ class OrderWebSocket:
                 self.trade_executor.active_orders.pop(symbol, None)
             elif side == "BUY":
                 self.position_monitor.open_position(symbol, executed_qty, price)
-                self.log(f"[Order] Buy filled for {symbol} @ {price}, Qty={executed_qty}")
+                self.log(
+                    f"[Order] Buy filled for {symbol} @ {price}, Qty={executed_qty}"
+                )

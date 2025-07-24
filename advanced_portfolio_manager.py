@@ -6,6 +6,7 @@ from typing import Dict, List, Optional, Tuple
 import json
 import logging
 
+
 @dataclass
 class Position:
     symbol: str
@@ -23,6 +24,7 @@ class Position:
     max_pnl: float = 0.0
     min_pnl: float = 0.0
 
+
 @dataclass
 class StrategyAllocation:
     strategy_name: str
@@ -30,6 +32,7 @@ class StrategyAllocation:
     max_positions: int
     risk_per_trade: float
     active_positions: List[Position]
+
 
 class AdvancedPortfolioManager:
     def __init__(self, total_capital: float, max_portfolio_risk: float = 0.02):
@@ -41,5 +44,6 @@ class AdvancedPortfolioManager:
         self.performance_metrics = {}
         self.trade_history = []
         self._initialize_strategies()
+
     # ...existing code for all methods and logic...
     # (Paste the full class code you provided here)

@@ -31,7 +31,9 @@ class AdvancedMLStrategy:
         rs = gain / loss
         return 100 - (100 / (1 + rs))
 
-    def calculate_macd(self, close: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9) -> pd.DataFrame:
+    def calculate_macd(
+        self, close: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9
+    ) -> pd.DataFrame:
         ema_fast = close.ewm(span=fast, adjust=False).mean()
         ema_slow = close.ewm(span=slow, adjust=False).mean()
         macd = ema_fast - ema_slow
@@ -71,13 +73,15 @@ class AdvancedMLStrategy:
     def predict_signal(self, latest_data: Dict[str, Any]) -> str:
         if not self.trained:
             return "HOLD"
-        features = np.array([
-            latest_data["RSI"],
-            latest_data["MACD"],
-            latest_data["Signal"],
-            latest_data["MA20"],
-            latest_data["MA50"]
-        ]).reshape(1, -1)
+        features = np.array(
+            [
+                latest_data["RSI"],
+                latest_data["MACD"],
+                latest_data["Signal"],
+                latest_data["MA20"],
+                latest_data["MA50"],
+            ]
+        ).reshape(1, -1)
         features_scaled = self.scaler.transform(features)
         prediction = self.model.predict(features_scaled)[0]
         return "BUY" if prediction == 1 else "SELL"

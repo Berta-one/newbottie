@@ -2,6 +2,7 @@ import json
 import threading
 import websocket
 
+
 class BinancePriceWebSocket:
     def __init__(self, symbols, on_price_update):
         self.symbols = [s.lower() for s in symbols]
@@ -16,9 +17,9 @@ class BinancePriceWebSocket:
 
     def _on_message(self, ws, message):
         data = json.loads(message)
-        if 'data' in data and 's' in data['data'] and 'c' in data['data']:
-            symbol = data['data']['s']
-            price = float(data['data']['c'])
+        if "data" in data and "s" in data["data"] and "c" in data["data"]:
+            symbol = data["data"]["s"]
+            price = float(data["data"]["c"])
             self.on_price_update(symbol, price)
 
     def _on_error(self, ws, error):
@@ -38,7 +39,7 @@ class BinancePriceWebSocket:
             on_message=self._on_message,
             on_error=self._on_error,
             on_close=self._on_close,
-            on_open=self._on_open
+            on_open=self._on_open,
         )
         self.thread = threading.Thread(target=self.ws.run_forever)
         self.thread.daemon = True

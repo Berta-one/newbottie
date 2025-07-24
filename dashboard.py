@@ -15,14 +15,16 @@ import psutil
 BOT_SCRIPT = "bot_service.py"
 LOG_FILE = "bot_service.log"
 
+
 # =========================
 # BOT STATUS & CONTROL
 # =========================
 def is_bot_running():
-    for proc in psutil.process_iter(['cmdline']):
-        if BOT_SCRIPT in ' '.join(proc.info['cmdline']):
+    for proc in psutil.process_iter(["cmdline"]):
+        if BOT_SCRIPT in " ".join(proc.info["cmdline"]):
             return True
     return False
+
 
 # =========================
 # DATA UTILITIES
@@ -32,17 +34,19 @@ def safe_get_column_sum(df, column_name, default=0.0):
         return default
     return df[column_name].sum()
 
+
 def safe_get_column_mean(df, column_name, default=0.0):
     if df.empty or column_name not in df.columns:
         return default
     return df[column_name].mean()
 
+
 def load_trade_data():
     data_sources = [
-        'logs/trades.csv',
-        'logs/trade_history.csv',
-        'logs/portfolio_trades.csv',
-        'logs/trading_log.csv'
+        "logs/trades.csv",
+        "logs/trade_history.csv",
+        "logs/portfolio_trades.csv",
+        "logs/trading_log.csv",
     ]
     for source in data_sources:
         if os.path.exists(source):
@@ -52,22 +56,40 @@ def load_trade_data():
                     return df
             except:
                 continue
-    return pd.DataFrame(columns=['timestamp', 'symbol', 'pnl', 'pnl_percent', 'quantity', 'entry_price', 'exit_price'])
+    return pd.DataFrame(
+        columns=[
+            "timestamp",
+            "symbol",
+            "pnl",
+            "pnl_percent",
+            "quantity",
+            "entry_price",
+            "exit_price",
+        ]
+    )
+
 
 def calculate_pnl_if_missing(df):
     if df.empty:
         return df
-    if 'pnl' not in df.columns:
-        if 'entry_price' in df.columns and 'exit_price' in df.columns and 'quantity' in df.columns:
-            df['pnl'] = (df['exit_price'] - df['entry_price']) * df['quantity']
+    if "pnl" not in df.columns:
+        if (
+            "entry_price" in df.columns
+            and "exit_price" in df.columns
+            and "quantity" in df.columns
+        ):
+            df["pnl"] = (df["exit_price"] - df["entry_price"]) * df["quantity"]
         else:
-            df['pnl'] = 0.0
-    if 'pnl_percent' not in df.columns:
-        if 'entry_price' in df.columns and 'exit_price' in df.columns:
-            df['pnl_percent'] = ((df['exit_price'] - df['entry_price']) / df['entry_price']) * 100
+            df["pnl"] = 0.0
+    if "pnl_percent" not in df.columns:
+        if "entry_price" in df.columns and "exit_price" in df.columns:
+            df["pnl_percent"] = (
+                (df["exit_price"] - df["entry_price"]) / df["entry_price"]
+            ) * 100
         else:
-            df['pnl_percent'] = 0.0
+            df["pnl_percent"] = 0.0
     return df
+
 
 # =========================
 # MAIN DASHBOARD
@@ -79,7 +101,10 @@ def render_analytics_dashboard():
     bot_running = is_bot_running()
     status_text = "🟢 Bot is Running" if bot_running else "🔴 Bot is Stopped"
     status_color = "green" if bot_running else "red"
-    st.markdown(f"### **Bot Status:** <span style='color:{status_color};'>{status_text}</span>", unsafe_allow_html=True)
+    st.markdown(
+        f"### **Bot Status:** <span style='color:{status_color};'>{status_text}</span>",
+        unsafe_allow_html=True,
+    )
 
     col1, col2 = st.columns(2)
     with col1:
@@ -122,18 +147,18 @@ def render_analytics_dashboard():
         return
 
     # Convert timestamp
-    if 'timestamp' in df.columns:
+    if "timestamp" in df.columns:
         try:
-            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            df["timestamp"] = pd.to_datetime(df["timestamp"])
         except:
             pass
 
     # Metrics
     col1, col2, col3, col4 = st.columns(4)
     total_trades = len(df)
-    total_pnl = safe_get_column_sum(df, 'pnl', 0.0)
-    best_trade = df['pnl'].max() if 'pnl' in df.columns and not df.empty else 0
-    wins = len(df[df['pnl'] > 0]) if 'pnl' in df.columns else 0
+    total_pnl = safe_get_column_sum(df, "pnl", 0.0)
+    best_trade = df["pnl"].max() if "pnl" in df.columns and not df.empty else 0
+    wins = len(df[df["pnl"] > 0]) if "pnl" in df.columns else 0
     win_rate = (wins / total_trades) * 100 if total_trades > 0 else 0
 
     with col1:
@@ -147,18 +172,28 @@ def render_analytics_dashboard():
 
     # Performance chart
     st.subheader("📈 Portfolio Performance")
-    if 'timestamp' in df.columns and 'pnl' in df.columns and len(df) > 0:
-        df_sorted = df.sort_values('timestamp')
-        df_sorted['cumulative_pnl'] = df_sorted['pnl'].cumsum()
-        fig = px.line(df_sorted, x='timestamp', y='cumulative_pnl', title="Cumulative P&L Over Time")
+    if "timestamp" in df.columns and "pnl" in df.columns and len(df) > 0:
+        df_sorted = df.sort_values("timestamp")
+        df_sorted["cumulative_pnl"] = df_sorted["pnl"].cumsum()
+        fig = px.line(
+            df_sorted,
+            x="timestamp",
+            y="cumulative_pnl",
+            title="Cumulative P&L Over Time",
+        )
         fig.update_layout(xaxis_title="Time", yaxis_title="Cumulative P&L (USD)")
         st.plotly_chart(fig, use_container_width=True)
 
     # Recent trades
     st.subheader("📋 Recent Trades")
     if len(df) > 0:
-        display_columns = [col for col in ['timestamp', 'symbol', 'pnl', 'pnl_percent'] if col in df.columns]
+        display_columns = [
+            col
+            for col in ["timestamp", "symbol", "pnl", "pnl_percent"]
+            if col in df.columns
+        ]
         st.dataframe(df.tail(10)[display_columns], use_container_width=True)
+
 
 # Run app
 if __name__ == "__main__":

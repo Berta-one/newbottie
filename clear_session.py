@@ -4,5 +4,5 @@ import streamlit as st
 for key in list(st.session_state.keys()):
     del st.session_state[key]
 
-st.success('Session state cleared! Refresh the page.')
-st.button('Refresh Page', key='refresh')
+st.success("Session state cleared! Refresh the page.")
+st.button("Refresh Page", key="refresh")

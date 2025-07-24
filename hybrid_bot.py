@@ -29,7 +29,6 @@ Author: Bottie Build (ChatGPT assist)
 """
 from portfolio_value_fix import get_unified_portfolio_value, debug_portfolio_calculation
 from quantum_trader import quantum_trader
-from __future__ import annotations
 
 import os
 import sys
@@ -44,8 +43,13 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import pandas as pd
 import psutil
+from portfolio_value_fix import get_unified_portfolio_value, debug_portfolio_calculation
+from quantum_trader import quantum_trader
 import streamlit as st
 
+# Add these lines at the top of hybrid_bot.py (around line 10-20)
+from portfolio_value_fix import get_unified_portfolio_value, debug_portfolio_calculation
+from quantum_trader import quantum_trader
 # ------------------------------------------------------------------
 # Streamlit page config must happen *early*.
 # ------------------------------------------------------------------
@@ -738,12 +742,13 @@ def render_dashboard():
     except Exception:
         tv = 0.0
     with col1:
-        st.metric("Portfolio Value", total_usd, total_gbp, asset_count = get_unified_portfolio_value(portfolio)")
+    st.metric("?? Portfolio Value (USD)", f"${total_usd:,.2f}" if "total_usd" in locals() else "$0.00")
+
     with col2:
-        mode = "Testnet" if os.getenv("USE_TESTNET", "false").lower() == "true" else "Live"
-        st.metric("Mode", mode)
+    st.metric("?? Portfolio Value (GBP)", f"£{total_gbp:,.2f}" if "total_gbp" in locals() else "£0.00")
+
     with col3:
-        st.metric("Scanner", "Running" if st.session_state["auto_scanner"].is_running() else "Stopped")
+        st.metric("ðŸª™ Total Assets", asset_count)
     with col4:
         health = get_system_health()
         st.metric("CPU", health["CPU"])
@@ -780,7 +785,7 @@ def render_portfolio():
         port = {}
 
     if port:
-        total_usd = sum(v.get("value", 0.0) for v in port.values())
+        total_usd, total_gbp, asset_count = get_unified_portfolio_value(portfolio)
         if total_usd <= 0:
             total_usd = pm.total_value() if hasattr(pm, "total_value") else 0
 

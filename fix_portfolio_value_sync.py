@@ -9,9 +9,10 @@ import sys
 from pathlib import Path
 from datetime import datetime
 
+
 def create_unified_portfolio_calculator():
     """Create a unified portfolio value calculator"""
-    
+
     calculator_code = """#!/usr/bin/env python3
 '''
 Unified Portfolio Value Calculator
@@ -182,16 +183,17 @@ def debug_portfolio_values(portfolio_data, location="unknown"):
     
     return total_debug
 """
-    
+
     # Save the calculator
     with open("unified_portfolio_calculator.py", "w", encoding="utf-8") as f:
         f.write(calculator_code)
-    
+
     print("✅ Created unified_portfolio_calculator.py")
+
 
 def create_quick_fix_patch():
     """Create a simple patch file to apply to hybrid_bot.py"""
-    
+
     patch_code = """#!/usr/bin/env python3
 '''
 Quick Portfolio Value Fix Patch
@@ -269,15 +271,16 @@ def apply_portfolio_fix():
 if __name__ == "__main__":
     apply_portfolio_fix()
 """
-    
+
     with open("apply_portfolio_fix.py", "w", encoding="utf-8") as f:
         f.write(patch_code)
-    
+
     print("✅ Created apply_portfolio_fix.py")
+
 
 def create_manual_fix_instructions():
     """Create manual fix instructions"""
-    
+
     instructions = """
 # MANUAL PORTFOLIO VALUE FIX INSTRUCTIONS
 
@@ -339,41 +342,43 @@ streamlit run hybrid_bot.py
 3. Ensure Binance API is working
 4. Check if USE_TESTNET vs LIVE mode issue
 """
-    
+
     with open("PORTFOLIO_FIX_INSTRUCTIONS.md", "w", encoding="utf-8") as f:
         f.write(instructions)
-    
+
     print("✅ Created PORTFOLIO_FIX_INSTRUCTIONS.md")
+
 
 def main():
     """Main function to create all portfolio sync fixes"""
     print("🔧 Portfolio Value Synchronization Fix - CORRECTED")
     print("=" * 60)
-    
+
     print("\\n1. Creating unified portfolio calculator...")
     create_unified_portfolio_calculator()
-    
+
     print("\\n2. Creating quick fix patch...")
     create_quick_fix_patch()
-    
+
     print("\\n3. Creating manual instructions...")
     create_manual_fix_instructions()
-    
+
     print("\\n" + "=" * 60)
     print("🎉 PORTFOLIO SYNC FIX COMPLETED!")
     print("=" * 60)
-    
+
     print("\\n🚀 Quick Fix Steps:")
     print("1. Run: python apply_portfolio_fix.py")
     print("2. Test: streamlit run hybrid_bot.py")
     print("3. Check both Dashboard and Portfolio tabs")
-    
+
     print("\\n📋 Files Created:")
     print("✅ unified_portfolio_calculator.py - Single source of truth")
     print("✅ apply_portfolio_fix.py - Automated patcher")
     print("✅ PORTFOLIO_FIX_INSTRUCTIONS.md - Manual instructions")
-    
+
     print("\\n🎯 This will sync portfolio values across all tabs!")
+
 
 if __name__ == "__main__":
     main()

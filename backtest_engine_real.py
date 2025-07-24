@@ -110,9 +110,14 @@ class BacktestEngineReal:
             if len(cached) >= target_candles * 0.9:
                 return cached.reset_index(drop=True)
             else:
-                print(f"Cache short for {pair} ({len(cached)}/{target_candles}). Fetching more...")
+                print(
+                    f"Cache short for {pair} ({len(cached)}/{target_candles}). Fetching more..."
+                )
                 missing_start = (
-                    int(cached["timestamp"].iloc[-1].to_datetime64().astype("int64") / 1_000_000)
+                    int(
+                        cached["timestamp"].iloc[-1].to_datetime64().astype("int64")
+                        / 1_000_000
+                    )
                     + tf_ms
                     if len(cached)
                     else start_ms
@@ -120,7 +125,8 @@ class BacktestEngineReal:
                 rows = self._download_history(pair, missing_start, end_ms=now_ms)
                 if rows:
                     new_df = pd.DataFrame(
-                        rows, columns=["timestamp", "open", "high", "low", "close", "volume"]
+                        rows,
+                        columns=["timestamp", "open", "high", "low", "close", "volume"],
                     )
                     new_df["timestamp"] = pd.to_datetime(new_df["timestamp"], unit="ms")
                     df = pd.concat([cached, new_df], ignore_index=True)
@@ -137,9 +143,15 @@ class BacktestEngineReal:
             )
             df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
 
-        df = df.sort_values("timestamp").drop_duplicates(subset="timestamp").reset_index(drop=True)
+        df = (
+            df.sort_values("timestamp")
+            .drop_duplicates(subset="timestamp")
+            .reset_index(drop=True)
+        )
         self._save_cache(pair, df)
-        df = df[df["timestamp"] >= pd.to_datetime(start_ms, unit="ms")].reset_index(drop=True)
+        df = df[df["timestamp"] >= pd.to_datetime(start_ms, unit="ms")].reset_index(
+            drop=True
+        )
         return df
 
     # ------------------------------------------------------------------
@@ -162,7 +174,7 @@ class BacktestEngineReal:
         for i in range(14, len(df)):
             price = df["close"].iloc[i]
             ml_conf = np.random.uniform(0.4, 0.8)  # placeholder for ML signal
-            q_conf = np.random.uniform(0.4, 0.8)   # placeholder for Quantum signal
+            q_conf = np.random.uniform(0.4, 0.8)  # placeholder for Quantum signal
             tech_signal = "BUY" if price > df["ema"].iloc[i] else "SELL"
             tech_conf = 0.6 if tech_signal == "BUY" else 0.4
 
@@ -218,17 +230,21 @@ class BacktestEngineReal:
                     if tech < 0:
                         continue
 
-                    roi, win_rate, trades, dd = self.simulate_signals(df, (ml, quantum, tech))
-                    self.results.append({
-                        "Pair": pair,
-                        "ML Weight": ml,
-                        "Quantum Weight": quantum,
-                        "Technical Weight": tech,
-                        "ROI (USDT)": round(roi, 2),
-                        "Win Rate": round(win_rate, 2),
-                        "Trades": trades,
-                        "Max Drawdown (%)": round(dd * 100, 2),
-                    })
+                    roi, win_rate, trades, dd = self.simulate_signals(
+                        df, (ml, quantum, tech)
+                    )
+                    self.results.append(
+                        {
+                            "Pair": pair,
+                            "ML Weight": ml,
+                            "Quantum Weight": quantum,
+                            "Technical Weight": tech,
+                            "ROI (USDT)": round(roi, 2),
+                            "Win Rate": round(win_rate, 2),
+                            "Trades": trades,
+                            "Max Drawdown (%)": round(dd * 100, 2),
+                        }
+                    )
 
         return pd.DataFrame(self.results)
 

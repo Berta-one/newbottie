@@ -17,7 +17,7 @@ class QuantumAnalyzer:
 
     def __init__(self):
         # Use AerSimulator for modern Qiskit compatibility
-        self.backend = AerSimulator(method='statevector')
+        self.backend = AerSimulator(method="statevector")
 
     def generate_quantum_signal(self, market_data: Dict[str, Any]) -> Dict[str, Any]:
         # Normalize features
@@ -37,14 +37,14 @@ class QuantumAnalyzer:
             # Modern Qiskit execution
             job = self.backend.run(qc, shots=1024)
             result = job.result()
-            
+
             # Get statevector
-            if hasattr(result, 'get_statevector'):
+            if hasattr(result, "get_statevector"):
                 statevector_data = result.get_statevector(qc)
             else:
                 # Fallback: run circuit to get statevector directly
                 statevector_data = Statevector.from_instruction(qc)
-            
+
             statevector = Statevector(statevector_data)
             probs = statevector.probabilities_dict()
 
@@ -54,29 +54,34 @@ class QuantumAnalyzer:
             # Generate realistic quantum-like probabilities
             probs = {
                 "00": np.random.uniform(0.2, 0.4),
-                "01": np.random.uniform(0.1, 0.3), 
+                "01": np.random.uniform(0.1, 0.3),
                 "10": np.random.uniform(0.1, 0.3),
-                "11": np.random.uniform(0.1, 0.3)
+                "11": np.random.uniform(0.1, 0.3),
             }
             # Normalize
             total = sum(probs.values())
-            probs = {k: v/total for k, v in probs.items()}
+            probs = {k: v / total for k, v in probs.items()}
             statevector = [0.5, 0.3, 0.2, 0.0]  # Dummy statevector
 
         # Calculate probabilities
         buy_prob = probs.get("00", 0) + probs.get("01", 0)
         sell_prob = probs.get("10", 0)
         hold_prob = probs.get("11", 0)
-        
+
         # Normalize probabilities
         total = buy_prob + sell_prob + hold_prob
         if total > 0:
-            buy_prob, sell_prob, hold_prob = [p / total for p in [buy_prob, sell_prob, hold_prob]]
+            buy_prob, sell_prob, hold_prob = [
+                p / total for p in [buy_prob, sell_prob, hold_prob]
+            ]
         else:
             buy_prob, sell_prob, hold_prob = 0.33, 0.33, 0.34
 
         # Determine decision
-        decision = max([("BUY", buy_prob), ("SELL", sell_prob), ("HOLD", hold_prob)], key=lambda x: x[1])[0]
+        decision = max(
+            [("BUY", buy_prob), ("SELL", sell_prob), ("HOLD", hold_prob)],
+            key=lambda x: x[1],
+        )[0]
 
         return {
             "decision": decision,
@@ -84,18 +89,24 @@ class QuantumAnalyzer:
             "distribution": {
                 "BUY": round(buy_prob, 4),
                 "SELL": round(sell_prob, 4),
-                "HOLD": round(hold_prob, 4)
+                "HOLD": round(hold_prob, 4),
             },
-            "statevector": [complex(x).real if hasattr(x, 'real') else float(x) for x in statevector],
-            "circuit": str(qc.draw(output="text")) if hasattr(qc, 'draw') else "Quantum Circuit"
+            "statevector": [
+                complex(x).real if hasattr(x, "real") else float(x) for x in statevector
+            ],
+            "circuit": (
+                str(qc.draw(output="text"))
+                if hasattr(qc, "draw")
+                else "Quantum Circuit"
+            ),
         }
 
     def get_quantum_diagnostics(self) -> Dict[str, Any]:
         return {
             "entanglement_score": round(np.random.uniform(0.5, 1.0), 4),
             "superposition_index": round(np.random.uniform(0.5, 1.0), 4),
-            "backend": getattr(self.backend, 'name', lambda: 'AerSimulator')(),
-            "quantum_enabled": True
+            "backend": getattr(self.backend, "name", lambda: "AerSimulator")(),
+            "quantum_enabled": True,
         }
 
     def evaluate_signal(self, market_data: Dict[str, Any]) -> Dict[str, Any]:

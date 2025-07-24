@@ -9,17 +9,18 @@ import subprocess
 import sys
 from pathlib import Path
 
+
 def create_basic_tests():
     """Create basic tests to satisfy pytest requirements"""
-    
+
     # Create tests directory
     test_dir = Path("tests")
     test_dir.mkdir(exist_ok=True)
-    
+
     # Create __init__.py
     with open(test_dir / "__init__.py", "w", encoding="utf-8") as f:
         f.write("")
-    
+
     # Create basic test file - NO UNICODE CHARACTERS
     test_content = '''#!/usr/bin/env python3
 """
@@ -159,14 +160,15 @@ if __name__ == "__main__":
     
     print("\\nAll tests passed!")
 '''
-    
+
     with open(test_dir / "test_basic.py", "w", encoding="utf-8") as f:
         f.write(test_content)
     print("[PASS] Created basic tests")
 
+
 def create_minimal_requirements():
     """Create minimal requirements.txt for CI"""
-    
+
     minimal_requirements = """# Core Dependencies (Required)
 requests>=2.31.0
 python-dotenv>=1.0.0
@@ -188,18 +190,19 @@ pytest>=7.4.0
 # qiskit>=0.45.0
 # qiskit-aer>=0.12.0
 """
-    
+
     with open("requirements.txt", "w", encoding="utf-8") as f:
         f.write(minimal_requirements)
-    
+
     print("[PASS] Created minimal requirements.txt")
+
 
 def update_github_workflow():
     """Update GitHub workflow to handle optional dependencies"""
-    
+
     workflow_dir = Path(".github/workflows")
     workflow_dir.mkdir(parents=True, exist_ok=True)
-    
+
     workflow_content = """name: Python package
 
 on:
@@ -305,16 +308,17 @@ except ImportError:
 print('[PASS] Module tests completed!')
 "
 """
-    
+
     workflow_file = workflow_dir / "python-package.yml"
     with open(workflow_file, "w", encoding="utf-8") as f:
         f.write(workflow_content)
-    
+
     print("[PASS] Updated GitHub workflow")
+
 
 def create_pytest_config():
     """Create pytest configuration"""
-    
+
     pytest_config = """[tool:pytest]
 testpaths = tests
 python_files = test_*.py
@@ -329,18 +333,19 @@ filterwarnings =
     ignore::DeprecationWarning
     ignore::PendingDeprecationWarning
 """
-    
+
     with open("setup.cfg", "w", encoding="utf-8") as f:
         f.write(pytest_config)
-    
+
     print("[PASS] Created pytest configuration")
+
 
 def create_fallback_modules():
     """Create fallback modules for missing dependencies"""
-    
+
     fallback_dir = Path("fallbacks")
     fallback_dir.mkdir(exist_ok=True)
-    
+
     # Create fallback quantum trader
     fallback_quantum = '''"""
 Fallback Quantum Trader
@@ -383,25 +388,29 @@ except ImportError:
 
 __all__ = ['trader', 'trader_status', 'FallbackQuantumTrader']
 '''
-    
+
     with open(fallback_dir / "__init__.py", "w", encoding="utf-8") as f:
         f.write("")
     with open(fallback_dir / "quantum_fallback.py", "w", encoding="utf-8") as f:
         f.write(fallback_quantum)
-    
+
     print("[PASS] Created fallback modules")
+
 
 def run_local_tests():
     """Run tests locally to verify they pass"""
-    
+
     print("\nRunning local tests to verify fixes...")
-    
+
     try:
         # Run the basic test
-        result = subprocess.run([
-            sys.executable, "-m", "pytest", "tests/", "-v"
-        ], capture_output=True, text=True, timeout=60)
-        
+        result = subprocess.run(
+            [sys.executable, "-m", "pytest", "tests/", "-v"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
         if result.returncode == 0:
             print("[PASS] Local tests passed!")
             print("Test output:")
@@ -410,58 +419,62 @@ def run_local_tests():
             print("[FAIL] Local tests failed:")
             print(result.stdout)
             print(result.stderr)
-            
+
     except subprocess.TimeoutExpired:
         print("[WARN] Tests timed out (this might be OK)")
     except FileNotFoundError:
         print("[WARN] pytest not found - install with: pip install pytest")
 
+
 def main():
     """Main fix function"""
     print("Fixing GitHub CI/CD Pipeline Issues")
     print("=" * 50)
-    
+
     print("\n1. Creating basic tests...")
     create_basic_tests()
-    
+
     print("\n2. Creating minimal requirements...")
     create_minimal_requirements()
-    
+
     print("\n3. Updating GitHub workflow...")
     update_github_workflow()
-    
+
     print("\n4. Creating pytest configuration...")
     create_pytest_config()
-    
+
     print("\n5. Creating fallback modules...")
     create_fallback_modules()
-    
+
     print("\n6. Testing locally...")
     run_local_tests()
-    
+
     print("\n" + "=" * 50)
     print("CI/CD FIXES COMPLETED!")
     print("=" * 50)
-    
+
     print("\nNext Steps:")
     print("1. Commit these changes:")
     print("   git add .")
-    print("   git commit -m 'Fix CI/CD pipeline: Add tests and handle optional dependencies'")
+    print(
+        "   git commit -m 'Fix CI/CD pipeline: Add tests and handle optional dependencies'"
+    )
     print("   git push origin main")
-    
+
     print("\n2. Check GitHub Actions:")
     print("   - Go to your repo's Actions tab")
     print("   - Watch the new build (should pass now)")
-    
+
     print("\n3. The fixes include:")
     print("   [PASS] Basic tests that always pass")
     print("   [PASS] Optional Qiskit dependency handling")
     print("   [PASS] Improved requirements.txt")
     print("   [PASS] Better GitHub workflow")
     print("   [PASS] Fallback modules for missing dependencies")
-    
+
     print("\nNote: Qiskit installation might still be slow/fail in CI")
     print("   This is now handled gracefully with fallbacks")
+
 
 if __name__ == "__main__":
     main()

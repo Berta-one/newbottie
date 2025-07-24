@@ -4,6 +4,7 @@
 import statistics
 from datetime import datetime
 
+
 def check_relaxed_breakout(klines):
     if len(klines) < 120:
         return "HOLD"
@@ -19,6 +20,7 @@ def check_relaxed_breakout(klines):
             return "HOLD"
     except Exception:
         return "HOLD"
+
 
 def check_momentum_strategy(klines):
     if len(klines) < 20:
@@ -36,12 +38,15 @@ def check_momentum_strategy(klines):
     except Exception:
         return "HOLD"
 
+
 def check_volatility_breakout(klines):
     if len(klines) < 50:
         return "HOLD"
     try:
         closes = [float(kline[4]) for kline in klines[-50:]]
-        returns = [(closes[i] - closes[i-1]) / closes[i-1] for i in range(1, len(closes))]
+        returns = [
+            (closes[i] - closes[i - 1]) / closes[i - 1] for i in range(1, len(closes))
+        ]
         volatility = statistics.stdev(returns) if len(returns) > 1 else 0
         current_price = closes[-1]
         past_price = closes[-10] if len(closes) >= 10 else closes[0]
@@ -56,6 +61,7 @@ def check_volatility_breakout(klines):
     except Exception:
         return "HOLD"
 
+
 def check_simple_rsi_strategy(klines):
     if len(klines) < 20:
         return "HOLD"
@@ -64,7 +70,7 @@ def check_simple_rsi_strategy(klines):
         gains = []
         losses = []
         for i in range(1, len(closes)):
-            change = closes[i] - closes[i-1]
+            change = closes[i] - closes[i - 1]
             if change > 0:
                 gains.append(change)
                 losses.append(0)
@@ -86,6 +92,7 @@ def check_simple_rsi_strategy(klines):
             return "HOLD"
     except Exception:
         return "HOLD"
+
 
 def get_combined_signal(klines):
     if len(klines) < 120:
@@ -116,11 +123,12 @@ def get_combined_signal(klines):
     else:
         return "HOLD", 0.5
 
+
 def enhanced_strategy_check(klines):
     signal, confidence = get_combined_signal(klines)
     return {
-        'signal': signal,
-        'confidence': confidence,
-        'timestamp': datetime.now().isoformat(),
-        'strategy': 'relaxed_multi'
+        "signal": signal,
+        "confidence": confidence,
+        "timestamp": datetime.now().isoformat(),
+        "strategy": "relaxed_multi",
     }
