@@ -660,9 +660,11 @@ def get_usd_to_gbp_rate(force_refresh: bool = False) -> float:
         resp = requests.get("https://api.exchangerate.host/latest?base=USD&symbols=GBP", timeout=5)
         if resp.ok:
             data = resp.json()
-            rate = float(data["rates"]["GBP"])
+            if "rates" in data and "GBP" in data["rates"]:rate = float(data["rates"]["GBP"])
             _USD_GBP_CACHE.update({"rate": rate, "ts": time.time()})
             return rate
+        else:
+            print(f"FX API response missing 'rates': {data}") 
     except Exception as e:  # noqa: BLE001
         print(f"FX rate error: {e}")
     return _USD_GBP_CACHE["rate"]
