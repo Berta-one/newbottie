@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 """
 Enhanced Position Management System - trader.py
@@ -298,7 +299,7 @@ class EnhancedTrader:
         position_id = f"{symbol}_{int(start_time.timestamp())}"
 
         print(
-            f"🔍 Monitoring position: {symbol} | Entry: ${entry_price:.6f} | TP: {take_profit_pct:.1f}% | SL: {stop_loss_pct:.1f}%"
+            f"ðŸ” Monitoring position: {symbol} | Entry: ${entry_price:.6f} | TP: {take_profit_pct:.1f}% | SL: {stop_loss_pct:.1f}%"
         )
 
         try:
@@ -336,7 +337,7 @@ class EnhancedTrader:
                                 1 + trailing_stop_pct / 100
                             )
                         print(
-                            f"🔄 Trailing stop activated at ${trailing_stop_price:.6f}"
+                            f"ðŸ”„ Trailing stop activated at ${trailing_stop_price:.6f}"
                         )
 
                     # Update trailing stop price
@@ -397,12 +398,12 @@ class EnhancedTrader:
                 # Print status update every minute
                 if int(time_held.total_seconds()) % 60 == 0:
                     print(
-                        f"📊 {symbol}: P&L {pnl_pct:+.2f}% | ${pnl_usd:+.2f} | Time: {int(time_held.total_seconds()/60)}m"
+                        f"ðŸ“Š {symbol}: P&L {pnl_pct:+.2f}% | ${pnl_usd:+.2f} | Time: {int(time_held.total_seconds()/60)}m"
                     )
 
                 # Exit if condition met
                 if exit_reason:
-                    print(f"🚪 Exiting position: {exit_reason}")
+                    print(f"ðŸšª Exiting position: {exit_reason}")
                     exit_result = self.execute_exit(
                         symbol=symbol,
                         quantity=quantity,
@@ -430,13 +431,13 @@ class EnhancedTrader:
                 time.sleep(10)  # Check every 10 seconds
 
         except KeyboardInterrupt:
-            print("🛑 Monitoring interrupted by user")
+            print("ðŸ›‘ Monitoring interrupted by user")
             return self.execute_exit(
                 symbol, quantity, None, entry_price, "User interruption", signal_type
             )
 
         except Exception as e:
-            print(f"❌ Error monitoring position: {e}")
+            print(f"âŒ Error monitoring position: {e}")
             return self.execute_exit(
                 symbol, quantity, None, entry_price, f"Error: {e}", signal_type
             )
@@ -525,7 +526,7 @@ class EnhancedTrader:
             log_trade({**result, "trade_type": "EXIT", "status": "FILLED"})
 
             print(
-                f"✅ Position closed: {symbol} | P&L: {pnl_pct:+.2f}% (${net_pnl_usd:+.2f}) | {reason}"
+                f"âœ… Position closed: {symbol} | P&L: {pnl_pct:+.2f}% (${net_pnl_usd:+.2f}) | {reason}"
             )
 
             return result
@@ -541,7 +542,7 @@ class EnhancedTrader:
 
             log_trade({**error_result, "trade_type": "EXIT"})
 
-            print(f"❌ Failed to close position: {e}")
+            print(f"âŒ Failed to close position: {e}")
             return error_result
 
     def get_account_balance(self, asset: str = "USDT") -> float:
@@ -568,7 +569,7 @@ class EnhancedTrader:
             return 0.0
 
         except Exception as e:
-            print(f"⚠️ Error getting account balance: {e}")
+            print(f"âš ï¸ Error getting account balance: {e}")
             return 0.0
 
     def calculate_portfolio_metrics(
@@ -691,7 +692,7 @@ class EnhancedTrader:
             return float(ticker["price"])
 
         except Exception as e:
-            print(f"⚠️ Error getting price for {symbol}: {e}")
+            print(f"âš ï¸ Error getting price for {symbol}: {e}")
             return None
 
     def _validate_minimum_quantity(self, symbol: str, quantity: float) -> bool:
@@ -866,7 +867,7 @@ def validate_trade_parameters(
 
 # Example usage and testing
 if __name__ == "__main__":
-    print("🚀 Enhanced Trader Module Test")
+    print("ðŸš€ Enhanced Trader Module Test")
     print("=" * 50)
 
     # Initialize trader
@@ -896,7 +897,7 @@ if __name__ == "__main__":
     print(f"Trailing Stop: {exit_levels['trailing_stop']:.1f}%")
 
     # Test mock trade execution
-    print(f"\n🔄 Testing Mock Trade Execution:")
+    print(f"\nðŸ”„ Testing Mock Trade Execution:")
 
     entry_result = trader.execute_entry(
         symbol="BTCUSDT",
@@ -911,7 +912,7 @@ if __name__ == "__main__":
         print(f"Quantity: {entry_result['quantity']:.6f}")
 
         # Test position monitoring (abbreviated for demo)
-        print(f"\n📊 Starting Position Monitoring...")
+        print(f"\nðŸ“Š Starting Position Monitoring...")
         print(f"(This would normally run until exit conditions are met)")
 
         # Simulate exit after some conditions
@@ -929,4 +930,5 @@ if __name__ == "__main__":
             print(f"P&L: {exit_result['pnl_percent']:+.2f}%")
             print(f"P&L USD: ${exit_result['net_pnl_usd']:+.2f}")
 
-    print("\n✅ Enhanced Trader Module Test Complete")
+    print("\nâœ… Enhanced Trader Module Test Complete")
+

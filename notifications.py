@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 """
 Email Notification System - notifications.py
@@ -167,24 +168,24 @@ class EmailNotificationSystem:
         price = trade_data.get("price", 0)
         value = trade_data.get("value", quantity * price if quantity and price else 0)
 
-        subject = f"🤖 Bottie Trade: {side} {symbol}"
+        subject = f"ðŸ¤– Bottie Trade: {side} {symbol}"
 
         body = f"""
-🚀 BOTTIE TRADING ALERT - Trade Executed
+ðŸš€ BOTTIE TRADING ALERT - Trade Executed
 
-📊 Trade Details:
-• Symbol: {symbol}
-• Side: {side}
-• Quantity: {quantity}
-• Price: ${price:,.4f}
-• Value: ${value:,.2f}
-• Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
+ðŸ“Š Trade Details:
+â€¢ Symbol: {symbol}
+â€¢ Side: {side}
+â€¢ Quantity: {quantity}
+â€¢ Price: ${price:,.4f}
+â€¢ Value: ${value:,.2f}
+â€¢ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
 
-🎯 Strategy: Enhanced breakout detection
-💰 Portfolio Impact: {'+' if side.upper() == 'BUY' else '-'}${value:,.2f}
-🔗 Monitor: {os.getenv('RAILWAY_STATIC_URL', 'Your Dashboard URL')}
+ðŸŽ¯ Strategy: Enhanced breakout detection
+ðŸ’° Portfolio Impact: {'+' if side.upper() == 'BUY' else '-'}${value:,.2f}
+ðŸ”— Monitor: {os.getenv('RAILWAY_STATIC_URL', 'Your Dashboard URL')}
 
-Happy Trading! 🚀
+Happy Trading! ðŸš€
 Bottie Bot System
         """
 
@@ -200,23 +201,23 @@ Bottie Bot System
         pnl_percent = trade_data.get("pnl_percent", 0)
         reason = trade_data.get("reason", "Unknown")
 
-        emoji = "📈" if pnl > 0 else "📉"
+        emoji = "ðŸ“ˆ" if pnl > 0 else "ðŸ“‰"
         subject = f"{emoji} Position Closed: {symbol} ({pnl_percent:+.2f}%)"
 
         body = f"""
 {emoji} BOTTIE TRADING ALERT - Position Closed
 
-📊 Position Summary:
-• Symbol: {symbol}
-• P&L: ${pnl:,.2f} ({pnl_percent:+.2f}%)
-• Exit Reason: {reason}
-• Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
+ðŸ“Š Position Summary:
+â€¢ Symbol: {symbol}
+â€¢ P&L: ${pnl:,.2f} ({pnl_percent:+.2f}%)
+â€¢ Exit Reason: {reason}
+â€¢ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
 
-{'🎉 Profitable trade! Great job Bottie!' if pnl > 0 else '📊 Loss contained by risk management'}
+{'ðŸŽ‰ Profitable trade! Great job Bottie!' if pnl > 0 else 'ðŸ“Š Loss contained by risk management'}
 
-🔗 View Analytics: {os.getenv('RAILWAY_STATIC_URL', 'Your Dashboard URL')}
+ðŸ”— View Analytics: {os.getenv('RAILWAY_STATIC_URL', 'Your Dashboard URL')}
 
-Keep Trading! 🚀
+Keep Trading! ðŸš€
 Bottie Bot System
         """
 
@@ -236,28 +237,28 @@ Bottie Bot System
         if confidence < 0.8:
             return
 
-        subject = f"🎯 Strong Signal: {signal} {symbol} ({confidence:.1%})"
+        subject = f"ðŸŽ¯ Strong Signal: {signal} {symbol} ({confidence:.1%})"
 
         body = f"""
-🎯 BOTTIE SIGNAL ALERT - High Confidence Detection
+ðŸŽ¯ BOTTIE SIGNAL ALERT - High Confidence Detection
 
-📊 Signal Analysis:
-• Symbol: {symbol}
-• Signal: {signal}
-• Confidence: {confidence:.1%}
-• Current Price: ${price:,.4f}
-• Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
+ðŸ“Š Signal Analysis:
+â€¢ Symbol: {symbol}
+â€¢ Signal: {signal}
+â€¢ Confidence: {confidence:.1%}
+â€¢ Current Price: ${price:,.4f}
+â€¢ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
 
-🔍 Technical Analysis:
-• Breakout Strength: {signal_data.get('breakout_strength', 'N/A')}
-• Volume Ratio: {signal_data.get('volume_ratio', 'N/A')}
-• RSI Level: {signal_data.get('rsi', 'N/A')}
+ðŸ” Technical Analysis:
+â€¢ Breakout Strength: {signal_data.get('breakout_strength', 'N/A')}
+â€¢ Volume Ratio: {signal_data.get('volume_ratio', 'N/A')}
+â€¢ RSI Level: {signal_data.get('rsi', 'N/A')}
 
-{'🤖 Auto-executing if enabled...' if os.getenv('AUTO_TRADE_ENABLED', 'false') == 'true' else '✋ Manual review recommended'}
+{'ðŸ¤– Auto-executing if enabled...' if os.getenv('AUTO_TRADE_ENABLED', 'false') == 'true' else 'âœ‹ Manual review recommended'}
 
-🔗 Dashboard: {os.getenv('RAILWAY_STATIC_URL', 'Your Dashboard URL')}
+ðŸ”— Dashboard: {os.getenv('RAILWAY_STATIC_URL', 'Your Dashboard URL')}
 
-Stay Alert! 🚀
+Stay Alert! ðŸš€
 Bottie Bot System
         """
 
@@ -269,31 +270,31 @@ Bottie Bot System
             return
 
         emoji_map = {
-            "started": "🟢",
-            "stopped": "🔴",
-            "error": "❌",
-            "warning": "⚠️",
-            "maintenance": "🔧",
-            "scanning": "🔍",
-            "trading": "📈",
+            "started": "ðŸŸ¢",
+            "stopped": "ðŸ”´",
+            "error": "âŒ",
+            "warning": "âš ï¸",
+            "maintenance": "ðŸ”§",
+            "scanning": "ðŸ”",
+            "trading": "ðŸ“ˆ",
         }
 
-        emoji = emoji_map.get(status.lower(), "ℹ️")
+        emoji = emoji_map.get(status.lower(), "â„¹ï¸")
         subject = f"{emoji} Bottie System: {status.title()}"
 
         body = f"""
 {emoji} BOTTIE SYSTEM ALERT
 
-🖥️ System Status: {status.title()}
-🕐 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
+ðŸ–¥ï¸ System Status: {status.title()}
+ðŸ• Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
 
-📝 Details:
+ðŸ“ Details:
 {details}
 
-🔗 Dashboard: {os.getenv('RAILWAY_STATIC_URL', 'Your Dashboard URL')}
-📊 Railway Logs: Check your Railway dashboard for technical details
+ðŸ”— Dashboard: {os.getenv('RAILWAY_STATIC_URL', 'Your Dashboard URL')}
+ðŸ“Š Railway Logs: Check your Railway dashboard for technical details
 
-System Monitoring 🤖
+System Monitoring ðŸ¤–
 Bottie Bot System
         """
 
@@ -306,30 +307,30 @@ Bottie Bot System
         if not self.send_errors:
             return
 
-        subject = f"❌ Bottie Error: {error_type}"
+        subject = f"âŒ Bottie Error: {error_type}"
 
         body = f"""
-❌ BOTTIE ERROR ALERT
+âŒ BOTTIE ERROR ALERT
 
-🚨 Error Type: {error_type}
-🕐 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
+ðŸš¨ Error Type: {error_type}
+ðŸ• Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
 
-📝 Error Details:
+ðŸ“ Error Details:
 {error_message}
 
-🔍 Context:
+ðŸ” Context:
 {json.dumps(context, indent=2) if context else 'No additional context available'}
 
-🔧 Recommended Actions:
+ðŸ”§ Recommended Actions:
 1. Check Railway application logs for detailed traces
 2. Verify Binance API connection and credentials
 3. Monitor system resources and performance
 4. Restart application if necessary
 
-🔗 Dashboard: {os.getenv('RAILWAY_STATIC_URL', 'Your Dashboard URL')}
-📱 Railway Console: Check your Railway project dashboard
+ðŸ”— Dashboard: {os.getenv('RAILWAY_STATIC_URL', 'Your Dashboard URL')}
+ðŸ“± Railway Console: Check your Railway project dashboard
 
-System Recovery 🤖
+System Recovery ðŸ¤–
 Bottie Bot System
         """
 
@@ -340,25 +341,25 @@ Bottie Bot System
         milestone_type = milestone_data.get("type", "unknown")
         value = milestone_data.get("value", 0)
 
-        subject = f"🎉 Portfolio Milestone: {milestone_type}"
+        subject = f"ðŸŽ‰ Portfolio Milestone: {milestone_type}"
 
         body = f"""
-🎉 BOTTIE MILESTONE ALERT
+ðŸŽ‰ BOTTIE MILESTONE ALERT
 
-🏆 Achievement: {milestone_type}
-💰 Current Value: ${value:,.2f}
-🕐 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
+ðŸ† Achievement: {milestone_type}
+ðŸ’° Current Value: ${value:,.2f}
+ðŸ• Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
 
-📊 Statistics:
-• Total Trades: {milestone_data.get('total_trades', 'N/A')}
-• Win Rate: {milestone_data.get('win_rate', 'N/A')}%
-• Best Trade: {milestone_data.get('best_trade', 'N/A')}%
+ðŸ“Š Statistics:
+â€¢ Total Trades: {milestone_data.get('total_trades', 'N/A')}
+â€¢ Win Rate: {milestone_data.get('win_rate', 'N/A')}%
+â€¢ Best Trade: {milestone_data.get('best_trade', 'N/A')}%
 
-🚀 Keep up the great work!
+ðŸš€ Keep up the great work!
 
-🔗 View Details: {os.getenv('RAILWAY_STATIC_URL', 'Your Dashboard URL')}
+ðŸ”— View Details: {os.getenv('RAILWAY_STATIC_URL', 'Your Dashboard URL')}
 
-Celebrating Success! 🎊
+Celebrating Success! ðŸŽŠ
 Bottie Bot System
         """
 
@@ -366,30 +367,30 @@ Bottie Bot System
 
     def send_test_email(self) -> bool:
         """Send test email to verify configuration"""
-        subject = "🧪 Bottie Email Test - System Ready"
+        subject = "ðŸ§ª Bottie Email Test - System Ready"
 
         body = f"""
-🧪 BOTTIE EMAIL TEST
+ðŸ§ª BOTTIE EMAIL TEST
 
-✅ Email notification system is operational!
+âœ… Email notification system is operational!
 
-📧 Configuration:
-• SMTP Server: {self.smtp_server}:{self.smtp_port}
-• From: {self.from_email}
-• To: {', '.join(self.to_emails)}
-• Rate Limit: {self.max_emails_per_hour} emails/hour
+ðŸ“§ Configuration:
+â€¢ SMTP Server: {self.smtp_server}:{self.smtp_port}
+â€¢ From: {self.from_email}
+â€¢ To: {', '.join(self.to_emails)}
+â€¢ Rate Limit: {self.max_emails_per_hour} emails/hour
 
-🔧 Enabled Notifications:
-• Trade Execution: {'✅' if self.send_trades else '❌'}
-• Strong Signals: {'✅' if self.send_signals else '❌'}
-• System Status: {'✅' if self.send_system else '❌'}
-• Error Alerts: {'✅' if self.send_errors else '❌'}
+ðŸ”§ Enabled Notifications:
+â€¢ Trade Execution: {'âœ…' if self.send_trades else 'âŒ'}
+â€¢ Strong Signals: {'âœ…' if self.send_signals else 'âŒ'}
+â€¢ System Status: {'âœ…' if self.send_system else 'âŒ'}
+â€¢ Error Alerts: {'âœ…' if self.send_errors else 'âŒ'}
 
-🚀 Bottie will now send you important trading updates!
+ðŸš€ Bottie will now send you important trading updates!
 
-🔗 Dashboard: {os.getenv('RAILWAY_STATIC_URL', 'Your Dashboard URL')}
+ðŸ”— Dashboard: {os.getenv('RAILWAY_STATIC_URL', 'Your Dashboard URL')}
 
-System Ready ✅
+System Ready âœ…
 Bottie Bot System
 
 ---
@@ -493,9 +494,10 @@ if __name__ == "__main__":
     if status["enabled"] and status["configured"]:
         print("\nSending test email...")
         success = notifier.send_test_email()
-        print(f"Test Result: {'✅ SUCCESS' if success else '❌ FAILED'}")
+        print(f"Test Result: {'âœ… SUCCESS' if success else 'âŒ FAILED'}")
     else:
-        print("\n⚠️ Email notifications not fully configured.")
+        print("\nâš ï¸ Email notifications not fully configured.")
         print(
             "Set EMAIL_ENABLED=true and configure EMAIL_USERNAME, EMAIL_PASSWORD, EMAIL_TO"
         )
+

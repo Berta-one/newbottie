@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 """
 Health monitoring script for Railway bot
@@ -18,13 +19,13 @@ def check_bot_health():
         response = requests.get(f"{base_url}/health", timeout=30)
         if response.status_code == 200:
             data = response.json()
-            print(f"✅ Bot alive - Uptime: {data.get('uptime_seconds', 0):.0f}s")
+            print(f"âœ… Bot alive - Uptime: {data.get('uptime_seconds', 0):.0f}s")
             return True
         else:
-            print(f"❌ Bot unhealthy - Status: {response.status_code}")
+            print(f"âŒ Bot unhealthy - Status: {response.status_code}")
             return False
     except Exception as e:
-        print(f"❌ Health check failed: {e}")
+        print(f"âŒ Health check failed: {e}")
         return False
 
 
@@ -35,13 +36,13 @@ def check_dashboard():
     try:
         response = requests.get(base_url, timeout=30)
         if response.status_code == 200:
-            print("✅ Dashboard accessible")
+            print("âœ… Dashboard accessible")
             return True
         else:
-            print(f"⚠️ Dashboard returned {response.status_code}")
+            print(f"âš ï¸ Dashboard returned {response.status_code}")
             return False
     except Exception as e:
-        print(f"❌ Dashboard check failed: {e}")
+        print(f"âŒ Dashboard check failed: {e}")
         return False
 
 
@@ -50,50 +51,50 @@ def monitor_continuously():
     consecutive_failures = 0
     check_count = 0
 
-    print("🔍 Starting continuous monitoring...")
+    print("ðŸ” Starting continuous monitoring...")
 
     while True:
         try:
             check_count += 1
-            print(f"\n🔍 Check #{check_count} - {datetime.now().strftime('%H:%M:%S')}")
+            print(f"\nðŸ” Check #{check_count} - {datetime.now().strftime('%H:%M:%S')}")
 
             health_ok = check_bot_health()
             dashboard_ok = check_dashboard()
 
             if health_ok or dashboard_ok:
                 consecutive_failures = 0
-                print("✅ Bot is healthy")
+                print("âœ… Bot is healthy")
             else:
                 consecutive_failures += 1
-                print(f"❌ Failed (consecutive: {consecutive_failures})")
+                print(f"âŒ Failed (consecutive: {consecutive_failures})")
 
             if consecutive_failures >= 5:
-                print("🚨 ALERT: Bot appears down!")
+                print("ðŸš¨ ALERT: Bot appears down!")
 
             time.sleep(300)  # 5 minutes
 
         except KeyboardInterrupt:
-            print("\n🛑 Monitoring stopped")
+            print("\nðŸ›‘ Monitoring stopped")
             break
         except Exception as e:
-            print(f"❌ Monitor error: {e}")
+            print(f"âŒ Monitor error: {e}")
             time.sleep(60)
 
 
 def quick_check():
     """Quick status check"""
-    print("🔍 Quick Bot Status Check")
+    print("ðŸ” Quick Bot Status Check")
     print("=" * 30)
 
     health_ok = check_bot_health()
     dashboard_ok = check_dashboard()
 
     if health_ok and dashboard_ok:
-        print("\n✅ HEALTHY - All systems responding")
+        print("\nâœ… HEALTHY - All systems responding")
     elif health_ok or dashboard_ok:
-        print("\n⚠️ PARTIAL - Some systems responding")
+        print("\nâš ï¸ PARTIAL - Some systems responding")
     else:
-        print("\n❌ DOWN - No systems responding")
+        print("\nâŒ DOWN - No systems responding")
 
     return health_ok or dashboard_ok
 
@@ -105,3 +106,4 @@ if __name__ == "__main__":
         monitor_continuously()
     else:
         quick_check()
+

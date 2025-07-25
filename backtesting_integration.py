@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 """
 Streamlit Backtesting Integration
@@ -90,7 +91,7 @@ class BacktestingIntegration:
 
         if hasattr(self, "data_info"):
             for p, info in self.data_info.items():
-                st.caption(f"📊 {p}: {info}")
+                st.caption(f"ðŸ“Š {p}: {info}")
                 if p in self.raw_data:
                     st.plotly_chart(
                         self._plot_price_chart(self.raw_data[p], p),
@@ -99,9 +100,9 @@ class BacktestingIntegration:
 
         weight_cols = {"Quantum Weight", "ML Weight", "Technical Weight"}
         if weight_cols.issubset(df.columns):
-            st.subheader("🎯 Apply Strategy")
+            st.subheader("ðŸŽ¯ Apply Strategy")
             st.caption(
-                "Click to push these weights into the Multi‑Strategy tab sliders."
+                "Click to push these weights into the Multiâ€‘Strategy tab sliders."
             )
 
             best_row = df.loc[df["ROI (USDT)"].idxmax()]
@@ -129,7 +130,7 @@ class BacktestingIntegration:
                     "tech": tech_best,
                     "time": datetime.utcnow().isoformat(timespec="seconds") + "Z",
                 }
-                st.success(f"✅ Applied best strategy from {best_row['Pair']}!")
+                st.success(f"âœ… Applied best strategy from {best_row['Pair']}!")
                 st.rerun()
 
             for i, row in df.iterrows():
@@ -163,7 +164,7 @@ class BacktestingIntegration:
                             "time": datetime.utcnow().isoformat(timespec="seconds")
                             + "Z",
                         }
-                        st.success(f"✅ Applied strategy from {row['Pair']}!")
+                        st.success(f"âœ… Applied strategy from {row['Pair']}!")
                         st.rerun()
 
         agg = df.groupby("Pair").agg(
@@ -180,7 +181,7 @@ class BacktestingIntegration:
         csv_buf = io.StringIO()
         df.to_csv(csv_buf, index=False)
         st.download_button(
-            "💾 Download CSV",
+            "ðŸ’¾ Download CSV",
             data=csv_buf.getvalue(),
             file_name="backtest_results.csv",
             mime="text/csv",
@@ -238,7 +239,7 @@ class BacktestingIntegration:
         self._display_results(df)
 
     def render_backtesting_tab(self):
-        st.header("🔬 Backtesting")
+        st.header("ðŸ”¬ Backtesting")
         st.caption(
             "Run historical strategy sweeps across ML / Quantum / Technical weights."
         )
@@ -250,7 +251,7 @@ class BacktestingIntegration:
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             pairs_text = st.text_input(
-                "Pairs (comma‑sep)",
+                "Pairs (commaâ€‘sep)",
                 value="BTCUSDT,ETHUSDT,SOLUSDT",
                 help="Symbols must exist on Binance. Use USDT quote.",
             )
@@ -276,7 +277,7 @@ class BacktestingIntegration:
                 value=0.001,
                 step=0.0001,
                 format="%.4f",
-                help="Trading fee fraction per round‑trip.",
+                help="Trading fee fraction per roundâ€‘trip.",
             )
 
         # --- Lookback Period ---
@@ -290,8 +291,8 @@ class BacktestingIntegration:
         refresh_cache = st.checkbox("Force re-download historical data", value=False)
         pairs = [p.strip().upper() for p in pairs_text.split(",") if p.strip()]
 
-        run_bt = st.button("🚀 Run Backtest", type="primary")
-        run_portfolio_bt = st.button("📊 Backtest My Portfolio")
+        run_bt = st.button("ðŸš€ Run Backtest", type="primary")
+        run_portfolio_bt = st.button("ðŸ“Š Backtest My Portfolio")
 
         if run_bt:
             with st.spinner(
@@ -323,9 +324,10 @@ class BacktestingIntegration:
             )
 
         # Diagnostics
-        with st.expander("⚙️ Diagnostics"):
+        with st.expander("âš™ï¸ Diagnostics"):
             st.write(f"Dependencies OK: {DEPS_OK}")
             if DEPS_ERR:
                 st.write(f"Error: {DEPS_ERR}")
             if self.last_exception:
                 st.code(self.last_exception, language="python")
+

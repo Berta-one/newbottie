@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 """
 quantum_engine.py
 ==================
@@ -112,3 +113,4 @@ class QuantumAnalyzer:
     def evaluate_signal(self, market_data: Dict[str, Any]) -> Dict[str, Any]:
         """Alias for generate_quantum_signal for compatibility"""
         return self.generate_quantum_signal(market_data)
+

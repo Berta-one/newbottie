@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 class PositionMonitor:
     def __init__(self):
         self.positions = {}
@@ -19,3 +20,4 @@ class PositionMonitor:
 
     def get_realized_pnl(self):
         return self.realized_pnl
+

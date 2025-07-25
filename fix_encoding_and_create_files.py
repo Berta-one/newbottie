@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 """
 Fix Encoding Issues and Create Files
@@ -14,10 +15,10 @@ def safe_write_file(filename, content):
     try:
         with open(filename, "w", encoding="utf-8", newline="\n") as f:
             f.write(content)
-        print(f"✅ Created {filename}")
+        print(f"âœ… Created {filename}")
         return True
     except Exception as e:
-        print(f"❌ Failed to create {filename}: {e}")
+        print(f"âŒ Failed to create {filename}: {e}")
         return False
 
 
@@ -161,7 +162,7 @@ def create_test_file():
         total_usd, total_gbp, count = get_unified_portfolio_value(test_portfolio)
         print(f"Portfolio Fix Working:")
         print(f"  Total USD: ${total_usd:.2f}")
-        print(f"  Total GBP: £{total_gbp:.2f}")
+        print(f"  Total GBP: Â£{total_gbp:.2f}")
         print(f"  Assets: {count}")
         
         return True
@@ -225,12 +226,12 @@ def install_dependencies():
             )
 
             if result.returncode == 0:
-                print(f"✅ {package} installed")
+                print(f"âœ… {package} installed")
             else:
-                print(f"⚠️ {package} installation had issues")
+                print(f"âš ï¸ {package} installation had issues")
 
         except Exception as e:
-            print(f"⚠️ {package} installation failed: {e}")
+            print(f"âš ï¸ {package} installation failed: {e}")
 
 
 def cleanup_bad_files():
@@ -241,14 +242,14 @@ def cleanup_bad_files():
         if os.path.exists(filename):
             try:
                 os.remove(filename)
-                print(f"🗑️ Removed problematic file: {filename}")
+                print(f"ðŸ—‘ï¸ Removed problematic file: {filename}")
             except Exception as e:
-                print(f"❌ Could not remove {filename}: {e}")
+                print(f"âŒ Could not remove {filename}: {e}")
 
 
 def main():
     """Main function"""
-    print("🔧 Fix Encoding Issues and Create Files")
+    print("ðŸ”§ Fix Encoding Issues and Create Files")
     print("=" * 50)
 
     print("\n1. Cleaning up problematic files...")
@@ -268,16 +269,17 @@ def main():
 
     print("\n" + "=" * 50)
     if portfolio_ok and quantum_ok and test_ok:
-        print("🎉 ALL FILES CREATED SUCCESSFULLY!")
-        print("\n📋 Next Steps:")
+        print("ðŸŽ‰ ALL FILES CREATED SUCCESSFULLY!")
+        print("\nðŸ“‹ Next Steps:")
         print("1. Test the fixes: python test_simple.py")
         print("2. Add imports to hybrid_bot.py")
         print("3. Update portfolio calculations")
     else:
-        print("❌ Some files failed to create")
+        print("âŒ Some files failed to create")
 
     print("=" * 50)
 
 
 if __name__ == "__main__":
     main()
+

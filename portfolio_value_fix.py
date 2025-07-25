@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 def get_unified_portfolio_value(portfolio_data):
     if not portfolio_data:
         return 0.0, 0.0, 0
@@ -49,3 +50,4 @@ def debug_portfolio_calculation(portfolio_data, location="Unknown"):
 
     print(f"Total: ${total:.2f}")
     return total
+

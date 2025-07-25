@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 """
 Order WebSocket Listener
@@ -77,3 +78,4 @@ class OrderWebSocket:
                 self.log(
                     f"[Order] Buy filled for {symbol} @ {price}, Qty={executed_qty}"
                 )
+

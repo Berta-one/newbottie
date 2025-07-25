@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 import streamlit as st
 import pandas as pd
 from datetime import datetime
@@ -233,7 +234,7 @@ def start_auto_trader():
                 with open("logs/portfolio_scans.log", "r") as f:
                     for line in f.readlines()[-200:]:
                         if "|" in line and "Signal:" in line:
-                            # Example: ETHUSDT | Δ%: +3.65 | Vol: 1.26x | Conf: 0.62 | Signal: BUY_LONG
+                            # Example: ETHUSDT | Î”%: +3.65 | Vol: 1.26x | Conf: 0.62 | Signal: BUY_LONG
                             parts = line.split("|")
                             if len(parts) == 5:
                                 # Remove timestamp if present, extract only the symbol
@@ -368,16 +369,16 @@ def start_auto_trader():
 
 
 def bot_trade_dashboard():
-    st.title("🤖 Bot Trade (Live)")
+    st.title("ðŸ¤– Bot Trade (Live)")
     st.caption("Live multi-crypto trading dashboard with real Binance data and signals")
 
     # --- Status indicators ---
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         status = (
-            "🟢 Running"
+            "ðŸŸ¢ Running"
             if st.session_state.get("auto_trader_running")
-            else "🔴 Stopped"
+            else "ðŸ”´ Stopped"
         )
         st.metric("Bot Status", status)
     with col2:
@@ -390,18 +391,18 @@ def bot_trade_dashboard():
         st.metric("Time", datetime.now().strftime("%H:%M:%S"), "Live")
     # --- Bot control ---
     if not st.session_state.get("auto_trader_running"):
-        if st.button("▶️ Start Auto-Trader", type="primary"):
+        if st.button("â–¶ï¸ Start Auto-Trader", type="primary"):
             start_auto_trader()
             st.success("Auto-trader started!")
     else:
-        if st.button("⏹️ Stop Auto-Trader", type="secondary"):
+        if st.button("â¹ï¸ Stop Auto-Trader", type="secondary"):
             st.session_state["auto_trader_running"] = False
             st.warning("Auto-trader stopped.")
     # --- Last action ---
     st.info(f"Last action: {st.session_state.get('last_action', 'None')}")
 
     # --- Multi-Asset Market Signals ---
-    st.subheader("� Recent Opportunities (from Scan Log)")
+    st.subheader("ï¿½ Recent Opportunities (from Scan Log)")
     import os, json
 
     log_path = "logs/portfolio_scans.log"
@@ -436,14 +437,14 @@ def bot_trade_dashboard():
     else:
         st.info("No recent opportunities found in scan log.")
     # --- Open positions ---
-    st.subheader("🔓 Open Positions")
+    st.subheader("ðŸ”“ Open Positions")
     open_positions = get_open_positions()
     if open_positions:
         st.dataframe(pd.DataFrame(open_positions), use_container_width=True)
     else:
         st.info("No open positions.")
     # --- Recent actions ---
-    st.subheader("⚡ Recent Actions")
+    st.subheader("âš¡ Recent Actions")
     try:
         with open("logs/trade_executions.json", "r") as f:
             lines = f.readlines()[-10:]
@@ -497,7 +498,7 @@ def bot_trade_dashboard():
         )
 
     # --- Historical Opportunities from Logs ---
-    st.subheader("🕒 Historical Opportunities (Scans Log)")
+    st.subheader("ðŸ•’ Historical Opportunities (Scans Log)")
     log_path = "logs/portfolio_scans.log"
     if os.path.exists(log_path):
         log_rows = []
@@ -508,7 +509,7 @@ def bot_trade_dashboard():
                 if line.startswith("[") and "Scan" in line:
                     scan_time = line.split("]")[0][1:]
                 elif "|" in line and "Signal:" in line:
-                    # Example: ETHUSDT | Δ%: +3.65 | Vol: 1.26x | Conf: 0.62 | Signal: HOLD
+                    # Example: ETHUSDT | Î”%: +3.65 | Vol: 1.26x | Conf: 0.62 | Signal: HOLD
                     parts = line.split("|")
                     if len(parts) == 5:
                         pair = parts[0].strip()
@@ -535,7 +536,7 @@ def bot_trade_dashboard():
         st.info("No scan log file found.")
 
     # --- Trade History ---
-    st.subheader("📋 Trade History (BTC/USDT)")
+    st.subheader("ðŸ“‹ Trade History (BTC/USDT)")
     trades = get_trade_history()
     if trades:
         df = pd.DataFrame(trades)
@@ -544,7 +545,7 @@ def bot_trade_dashboard():
         st.info("No trade history yet.")
 
     # --- Configuration ---
-    with st.expander("⚙️ Bot Configuration"):
+    with st.expander("âš™ï¸ Bot Configuration"):
         st.json(
             {
                 "Strategy": st.session_state.get("selected_strategy", "Breakout"),
@@ -556,11 +557,12 @@ def bot_trade_dashboard():
         )
 
     # --- Next steps/help ---
-    st.subheader("🚀 Next Steps")
+    st.subheader("ðŸš€ Next Steps")
     st.info(
         """
-    **Current Status:** ✅ Live trading enabled with real Binance data.
+    **Current Status:** âœ… Live trading enabled with real Binance data.
     - Monitor open positions and trade history above.
     - All trades and signals are based on live market data.
     """
     )
+

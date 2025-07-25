@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 # working_integration.py - Working example of ML integration
 
@@ -67,15 +68,15 @@ class EnhancedTradingBot:
             from simplified_ml_strategy import SimplifiedMLStrategy
 
             self.ml_strategy = SimplifiedMLStrategy()
-            logging.info("✅ ML Strategy initialized successfully")
+            logging.info("âœ… ML Strategy initialized successfully")
         except ImportError as e:
-            logging.error(f"❌ Failed to import ML strategy: {e}")
+            logging.error(f"âŒ Failed to import ML strategy: {e}")
             logging.info(
-                "💡 Make sure simplified_ml_strategy.py is in the same directory"
+                "ðŸ’¡ Make sure simplified_ml_strategy.py is in the same directory"
             )
             self.ml_strategy = None
         except Exception as e:
-            logging.error(f"❌ Failed to initialize ML strategy: {e}")
+            logging.error(f"âŒ Failed to initialize ML strategy: {e}")
             self.ml_strategy = None
 
     def basic_strategy(self, klines):
@@ -195,33 +196,33 @@ class EnhancedTradingBot:
                 if opportunity["meets_threshold"]:
                     opportunities.append(opportunity)
                     logging.info(
-                        f"✅ Opportunity found: {symbol} - {opportunity['final_signal']} ({opportunity['final_confidence']:.2%})"
+                        f"âœ… Opportunity found: {symbol} - {opportunity['final_signal']} ({opportunity['final_confidence']:.2%})"
                     )
                 else:
                     logging.info(
-                        f"⚠️  Below threshold: {symbol} - {opportunity['final_signal']} ({opportunity['final_confidence']:.2%})"
+                        f"âš ï¸  Below threshold: {symbol} - {opportunity['final_signal']} ({opportunity['final_confidence']:.2%})"
                     )
 
             except Exception as e:
-                logging.error(f"❌ Error analyzing {symbol}: {e}")
+                logging.error(f"âŒ Error analyzing {symbol}: {e}")
 
         return opportunities
 
     def display_results(self, opportunities):
         """Display scan results"""
         print("\n" + "=" * 80)
-        print("📊 TRADING OPPORTUNITIES FOUND")
+        print("ðŸ“Š TRADING OPPORTUNITIES FOUND")
         print("=" * 80)
 
         if not opportunities:
-            print("❌ No opportunities found meeting confidence threshold")
+            print("âŒ No opportunities found meeting confidence threshold")
             return
 
-        print(f"✅ Found {len(opportunities)} opportunities:")
+        print(f"âœ… Found {len(opportunities)} opportunities:")
         print()
 
         for i, opp in enumerate(opportunities, 1):
-            print(f"🎯 Opportunity #{i}:")
+            print(f"ðŸŽ¯ Opportunity #{i}:")
             print(f"   Symbol: {opp['symbol']}")
             print(f"   Final Signal: {opp['final_signal']}")
             print(f"   Final Confidence: {opp['final_confidence']:.2%}")
@@ -242,7 +243,7 @@ class EnhancedTradingBot:
 
 def main():
     """Main test function"""
-    print("🚀 Testing Enhanced Trading Bot with ML Integration")
+    print("ðŸš€ Testing Enhanced Trading Bot with ML Integration")
     print("=" * 80)
 
     # Initialize bot
@@ -251,8 +252,8 @@ def main():
     # Test symbols
     test_symbols = ["BTCUSDT", "ETHUSDT", "ADAUSDT", "SOLUSDT", "BNBUSDT"]
 
-    print(f"🔍 Scanning {len(test_symbols)} symbols...")
-    print(f"📊 Minimum confidence threshold: {bot.MIN_CONFIDENCE:.0%}")
+    print(f"ðŸ” Scanning {len(test_symbols)} symbols...")
+    print(f"ðŸ“Š Minimum confidence threshold: {bot.MIN_CONFIDENCE:.0%}")
 
     # Scan for opportunities
     opportunities = bot.scan_opportunities(test_symbols)
@@ -262,22 +263,23 @@ def main():
 
     # Show ML performance if available
     if bot.ml_strategy:
-        print("\n🧠 ML PERFORMANCE METRICS:")
+        print("\nðŸ§  ML PERFORMANCE METRICS:")
         print("=" * 40)
         metrics = bot.ml_strategy.get_performance_metrics()
         print(f"Total Predictions: {metrics['total_predictions']}")
         print(f"Correct Predictions: {metrics['correct_predictions']}")
         print(f"Accuracy: {metrics['accuracy']:.2%}")
 
-        print("\n🔍 ML FEATURE IMPORTANCE:")
+        print("\nðŸ” ML FEATURE IMPORTANCE:")
         print("=" * 40)
         importance = bot.ml_strategy.get_feature_importance()
         for feature, weight in importance[:5]:  # Top 5 features
             print(f"{feature}: {weight:.3f}")
 
-    print("\n✅ Test completed successfully!")
-    print("🎯 You can now integrate this enhanced system with your actual bot!")
+    print("\nâœ… Test completed successfully!")
+    print("ðŸŽ¯ You can now integrate this enhanced system with your actual bot!")
 
 
 if __name__ == "__main__":
     main()
+

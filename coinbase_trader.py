@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 # coinbase_trader.py - Coinbase Pro API Integration
 import time
 import json
@@ -57,7 +58,7 @@ class CoinbaseProClient:
             return response.json()
 
         except requests.exceptions.RequestException as e:
-            print(f"❌ Coinbase API Error: {e}")
+            print(f"âŒ Coinbase API Error: {e}")
             return None
 
     def get_accounts(self):
@@ -134,7 +135,7 @@ def get_account_balance_coinbase(client, asset="USD"):
     try:
         return client.get_account_balance(asset)
     except Exception as e:
-        print(f"❌ Error getting account balance: {e}")
+        print(f"âŒ Error getting account balance: {e}")
         return 0.0
 
 
@@ -165,14 +166,14 @@ def calculate_dynamic_position_size_coinbase(
         return round(position_size_usd, 2)
 
     except Exception as e:
-        print(f"❌ Error calculating position size: {e}")
+        print(f"âŒ Error calculating position size: {e}")
         return 50.0  # Default $50 position
 
 
 def execute_entry_coinbase(client, product_id, funds_usd, signal_type):
     """Execute entry trade on Coinbase"""
     try:
-        print(f"📈 Executing {signal_type} entry for {product_id}")
+        print(f"ðŸ“ˆ Executing {signal_type} entry for {product_id}")
         print(f"   Funds: ${funds_usd}")
 
         # Coinbase spot trading - buy with USD funds
@@ -225,7 +226,7 @@ def execute_exit_coinbase(
 ):
     """Execute exit trade on Coinbase"""
     try:
-        print(f"📉 Executing exit for {product_id}")
+        print(f"ðŸ“‰ Executing exit for {product_id}")
         print(f"   Quantity: {quantity}")
         print(f"   Reason: {reason}")
 
@@ -316,7 +317,7 @@ def get_coinbase_candles(client, product_id, periods=120):
         return None
 
     except Exception as e:
-        print(f"❌ Error getting Coinbase candles: {e}")
+        print(f"âŒ Error getting Coinbase candles: {e}")
         return None
 
 
@@ -339,7 +340,7 @@ def monitor_position_enhanced_coinbase(client, product_id, entry_price):
         return False, "Error getting price"
 
     except Exception as e:
-        print(f"❌ Error monitoring position: {e}")
+        print(f"âŒ Error monitoring position: {e}")
         return False, "Error"
 
 
@@ -360,3 +361,4 @@ def coinbase_to_binance_symbol(coinbase_product):
         base = coinbase_product.replace("-USD", "")
         return f"{base}USDT"
     return coinbase_product
+

@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 """
 Quick Railway Fix - Add this file to your GitHub repo
@@ -32,9 +33,9 @@ def fix_portfolio_manager():
         use_testnet = os.getenv("USE_TESTNET", "false").lower() == "true"
         if use_testnet:
             self._client.API_URL = "https://testnet.binance.vision/api"
-            print("🧪 Portfolio Manager using TESTNET")
+            print("ðŸ§ª Portfolio Manager using TESTNET")
         else:
-            print("🚀 Portfolio Manager using LIVE")"""
+            print("ðŸš€ Portfolio Manager using LIVE")"""
 
         content = content.replace(
             "self._client.get_server_time()",
@@ -44,7 +45,7 @@ def fix_portfolio_manager():
     with open(filename, "w") as f:
         f.write(content)
 
-    print(f"✅ Fixed {filename}")
+    print(f"âœ… Fixed {filename}")
 
 
 def fix_hybrid_bot():
@@ -62,16 +63,16 @@ def fix_hybrid_bot():
 
     new_setup = """if use_testnet:
             client.API_URL = 'https://testnet.binance.vision/api'
-            print("🧪 Dashboard using TESTNET")
+            print("ðŸ§ª Dashboard using TESTNET")
         else:
-            print("🚀 Dashboard using LIVE")"""
+            print("ðŸš€ Dashboard using LIVE")"""
 
     content = content.replace(old_setup, new_setup)
 
     with open(filename, "w") as f:
         f.write(content)
 
-    print(f"✅ Fixed {filename}")
+    print(f"âœ… Fixed {filename}")
 
 
 def fix_other_files():
@@ -103,19 +104,19 @@ def fix_other_files():
         if content != original:
             with open(filename, "w") as f:
                 f.write(content)
-            print(f"✅ Fixed {filename}")
+            print(f"âœ… Fixed {filename}")
 
 
 def main():
     """Apply all fixes"""
-    print("🔧 APPLYING RAILWAY FIXES...")
+    print("ðŸ”§ APPLYING RAILWAY FIXES...")
     print("=" * 40)
 
     # Show current environment
     use_testnet = os.getenv("USE_TESTNET", "false").lower() == "true"
     api_key = os.getenv("BINANCE_API_KEY", "MISSING")
 
-    print(f"📊 Environment Check:")
+    print(f"ðŸ“Š Environment Check:")
     print(f"   USE_TESTNET: {use_testnet}")
     print(f"   API_KEY: {api_key[:8] + '...' if len(api_key) > 8 else 'MISSING'}")
 
@@ -124,9 +125,10 @@ def main():
     fix_hybrid_bot()
     fix_other_files()
 
-    print("\n✅ ALL FIXES APPLIED!")
-    print("🚀 Railway bots should now work correctly")
+    print("\nâœ… ALL FIXES APPLIED!")
+    print("ðŸš€ Railway bots should now work correctly")
 
 
 if __name__ == "__main__":
     main()
+

@@ -1,4 +1,5 @@
-﻿#!/usr/bin/env python3
+﻿ -*- coding: utf-8 -*-
+#!/usr/bin/env python3
 """
 GitHub CI/CD Pipeline Fixer - Windows Compatible
 Fixes failing Python package build checks without Unicode issues
@@ -478,3 +479,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

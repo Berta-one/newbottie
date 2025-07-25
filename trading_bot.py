@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 """
 Crypto Trading Bot Demo
 
@@ -34,12 +35,12 @@ def trading_dashboard(settings_compact=False):
     selected_risk = st.session_state.get("selected_risk_level", "Balanced")
 
     # --- Main Logo and Title ---
-    st.title("🤖 Crypto Trading Bot Demo (Integrated)")
+    st.title("ðŸ¤– Crypto Trading Bot Demo (Integrated)")
 
     # --- Status indicators ---
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("Status", "🟢 Online", "24/7 Active")
+        st.metric("Status", "ðŸŸ¢ Online", "24/7 Active")
     with col2:
         st.metric("Platform", "Railway", "Cloud Hosted")
     with col3:
@@ -48,7 +49,7 @@ def trading_dashboard(settings_compact=False):
         st.metric("Mode", mode, "Demo" if mode == "Demo" else "Live")
 
     # --- Bot Health Panel ---
-    st.markdown("### 🩺 Bot Health & System Status")
+    st.markdown("### ðŸ©º Bot Health & System Status")
     health_cols = st.columns(4)
     health_cols[0].success("API: OK")
     health_cols[1].info("Logs: OK")
@@ -65,7 +66,7 @@ def trading_dashboard(settings_compact=False):
     args, _, _, values = inspect.getargvalues(frame)
     settings_compact = values.get("settings_compact", False)
     if settings_compact:
-        with st.expander("⚙️ Demo Settings", expanded=False):
+        with st.expander("âš™ï¸ Demo Settings", expanded=False):
             col1, col2 = st.columns(2)
             with col1:
                 strategy = st.selectbox(
@@ -99,10 +100,10 @@ def trading_dashboard(settings_compact=False):
         st.button("Update Settings", key="update_demo_settings")
 
     # --- Main Demo Content (as before) ---
-    st.subheader("📈 Trading Simulation (Multi-Pair)")
+    st.subheader("ðŸ“ˆ Trading Simulation (Multi-Pair)")
     if st.session_state.get("bot_override", False):
         st.warning(
-            "🚨 Bot is currently BLOCKED by override. No trades or signals will be generated."
+            "ðŸš¨ Bot is currently BLOCKED by override. No trades or signals will be generated."
         )
     else:
         pairs = [
@@ -207,7 +208,7 @@ def trading_dashboard(settings_compact=False):
                 )
 
         # --- Summary Statistics ---
-        st.markdown("### 📊 Summary Statistics")
+        st.markdown("### ðŸ“Š Summary Statistics")
         trades_df = pd.DataFrame(st.session_state["trading_log"])
         if not trades_df.empty:
             pnl_vals = trades_df["P&L"].str.replace("%", "").astype(float)
@@ -227,11 +228,11 @@ def trading_dashboard(settings_compact=False):
             )
 
         # --- Trading Log Table ---
-        st.markdown("### � Recent Activity")
+        st.markdown("### ï¿½ Recent Activity")
         st.table(st.session_state["trading_log"][:10])
 
         # --- Leaderboard/Performance vs Market (simulated) ---
-        st.markdown("### 🏆 Leaderboard vs Market")
+        st.markdown("### ðŸ† Leaderboard vs Market")
         leaderboard = pd.DataFrame(
             {
                 "Bot": ["Your Bot", "BTC HODL", "ETH HODL", "Random"],
@@ -241,7 +242,7 @@ def trading_dashboard(settings_compact=False):
         st.bar_chart(leaderboard.set_index("Bot"))
 
         # --- News & Alerts Panel (crypto news headlines) ---
-        st.markdown("### 📰 News & Alerts")
+        st.markdown("### ðŸ“° News & Alerts")
         try:
             news = requests.get(
                 "https://cryptopanic.com/api/v1/posts/?auth_token=demo&public=true"
@@ -252,20 +253,20 @@ def trading_dashboard(settings_compact=False):
             st.info("Crypto news unavailable (demo mode)")
 
         # --- Bot Configuration (show actual selected strategy/risk) ---
-        st.markdown("### ⚙️ Bot Configuration")
+        st.markdown("### âš™ï¸ Bot Configuration")
         st.info(
             f"""
         **Current Setup:**
-        - 🎯 Strategy: {selected_strategy} ({strategy_info['description']})
-        - 💰 Risk: {risk}% per trade (Risk Level: {selected_risk})
-        - ⏱️ Scan Interval: {scan_interval} minutes
-        - 🛡️ Mode: {mode}
-        - 📊 Exchange: Binance Testnet
+        - ðŸŽ¯ Strategy: {selected_strategy} ({strategy_info['description']})
+        - ðŸ’° Risk: {risk}% per trade (Risk Level: {selected_risk})
+        - â±ï¸ Scan Interval: {scan_interval} minutes
+        - ðŸ›¡ï¸ Mode: {mode}
+        - ðŸ“Š Exchange: Binance Testnet
         """
         )
 
         # --- Help & Documentation ---
-        with st.expander("❓ Help & Documentation"):
+        with st.expander("â“ Help & Documentation"):
             st.markdown(
                 """
             **How to use this dashboard:**
@@ -279,7 +280,7 @@ def trading_dashboard(settings_compact=False):
             )
 
     # --- Bot Trades Table (All) ---
-    st.subheader("🤖 Bot Trades (All)")
+    st.subheader("ðŸ¤– Bot Trades (All)")
     import csv
 
     try:
@@ -297,10 +298,10 @@ def trading_dashboard(settings_compact=False):
         st.error(f"Could not load trades: {e}")
 
     # --- Trading simulation for multiple pairs ---
-    st.subheader("📈 Trading Simulation (Multi-Pair)")
+    st.subheader("ðŸ“ˆ Trading Simulation (Multi-Pair)")
     if st.session_state.get("bot_override", False):
         st.warning(
-            "🚨 Bot is currently BLOCKED by override. No trades or signals will be generated."
+            "ðŸš¨ Bot is currently BLOCKED by override. No trades or signals will be generated."
         )
     else:
         pairs = [
@@ -405,7 +406,7 @@ def trading_dashboard(settings_compact=False):
                 )
 
     # --- Summary Statistics ---
-    st.markdown("### 📊 Summary Statistics")
+    st.markdown("### ðŸ“Š Summary Statistics")
     trades_df = pd.DataFrame(st.session_state["trading_log"])
     if not trades_df.empty:
         pnl_vals = trades_df["P&L"].str.replace("%", "").astype(float)
@@ -425,11 +426,11 @@ def trading_dashboard(settings_compact=False):
         )
 
     # --- Trading Log Table ---
-    st.markdown("### � Recent Activity")
+    st.markdown("### ï¿½ Recent Activity")
     st.table(st.session_state["trading_log"][:10])
 
     # --- Leaderboard/Performance vs Market (simulated) ---
-    st.markdown("### 🏆 Leaderboard vs Market")
+    st.markdown("### ðŸ† Leaderboard vs Market")
     leaderboard = pd.DataFrame(
         {
             "Bot": ["Your Bot", "BTC HODL", "ETH HODL", "Random"],
@@ -439,7 +440,7 @@ def trading_dashboard(settings_compact=False):
     st.bar_chart(leaderboard.set_index("Bot"))
 
     # --- News & Alerts Panel (crypto news headlines) ---
-    st.markdown("### 📰 News & Alerts")
+    st.markdown("### ðŸ“° News & Alerts")
     try:
         news = requests.get(
             "https://cryptopanic.com/api/v1/posts/?auth_token=demo&public=true"
@@ -450,20 +451,20 @@ def trading_dashboard(settings_compact=False):
         st.info("Crypto news unavailable (demo mode)")
 
     # --- Bot Configuration ---
-    st.markdown("### ⚙️ Bot Configuration")
+    st.markdown("### âš™ï¸ Bot Configuration")
     st.info(
         f"""
     **Current Setup:**
-    - 🎯 Strategy: 5% Breakout + ML Enhancement
-    - 💰 Risk: {risk}% per trade
-    - ⏱️ Scan Interval: {scan_interval} minutes
-    - 🛡️ Mode: {mode}
-    - 📊 Exchange: {'Binance Live' if mode == 'Live' else 'Binance Testnet'}
+    - ðŸŽ¯ Strategy: 5% Breakout + ML Enhancement
+    - ðŸ’° Risk: {risk}% per trade
+    - â±ï¸ Scan Interval: {scan_interval} minutes
+    - ðŸ›¡ï¸ Mode: {mode}
+    - ðŸ“Š Exchange: {'Binance Live' if mode == 'Live' else 'Binance Testnet'}
     """
     )
 
     # --- Help & Documentation ---
-    with st.expander("❓ Help & Documentation"):
+    with st.expander("â“ Help & Documentation"):
         st.markdown(
             """
         **How to use this dashboard:**
@@ -483,3 +484,4 @@ def trading_dashboard(settings_compact=False):
 
 if __name__ == "__main__":
     trading_dashboard()
+

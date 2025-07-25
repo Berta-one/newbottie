@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 import json
 import threading
 import websocket
@@ -51,3 +52,4 @@ class BinancePriceWebSocket:
             self.ws.close()
         if self.thread:
             self.thread.join()
+

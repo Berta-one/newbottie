@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 # --- Strategy Selection Logic ---
 def select_strategy(market_condition, user_selected_strategy=None):
     """
@@ -392,7 +393,7 @@ class MLEnhancedStrategy:
 
     def train_model(self, historical_data, labels):
         """Train ML model on historical data"""
-        print("🧠 Training ML model...")
+        print("ðŸ§  Training ML model...")
 
         # Prepare training data
         X = []
@@ -404,7 +405,7 @@ class MLEnhancedStrategy:
                 X.append([features[col] for col in self.feature_columns])
 
         if len(X) < 50:
-            print("❌ Insufficient training data")
+            print("âŒ Insufficient training data")
             return False
 
         X = np.array(X)
@@ -431,7 +432,7 @@ class MLEnhancedStrategy:
             }
         ).sort_values("importance", ascending=False)
 
-        print("📊 Feature Importance:")
+        print("ðŸ“Š Feature Importance:")
         print(feature_importance)
 
         return True
@@ -447,7 +448,7 @@ class MLEnhancedStrategy:
             },
             self.model_path,
         )
-        print(f"💾 Model saved to {self.model_path}")
+        print(f"ðŸ’¾ Model saved to {self.model_path}")
 
     def load_model(self):
         """Load trained model and scaler"""
@@ -457,10 +458,10 @@ class MLEnhancedStrategy:
                 self.model = data["model"]
                 self.scaler = data["scaler"]
                 self.feature_columns = data["feature_columns"]
-                print(f"📂 Model loaded from {self.model_path}")
+                print(f"ðŸ“‚ Model loaded from {self.model_path}")
                 return True
             except Exception as e:
-                print(f"❌ Error loading model: {e}")
+                print(f"âŒ Error loading model: {e}")
         return False
 
 
@@ -491,3 +492,4 @@ ml_strategy = MLEnhancedStrategy()
 def get_ml_enhanced_signal(klines):
     """Convenience function for ML-enhanced signals"""
     return check_breakout_ml_enhanced(klines, ml_strategy)
+

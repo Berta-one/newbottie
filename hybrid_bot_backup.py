@@ -1,22 +1,23 @@
+﻿ -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 """
 Hybrid Quantum Crypto Trading Bot (Rebuild)
 ==========================================
 
 **Purpose**
-A consolidated, deployment‑safe Streamlit application that brings back:
+A consolidated, deploymentâ€‘safe Streamlit application that brings back:
 
 - Icons + stable tab indexing (no more tuple index errors)
-- Working **Multi‑Strategy Market Scanner** wired to advanced ML, quantum & ensemble modules (with graceful fallbacks)
-- **Backtesting tab** (via BacktestingIntegration) that lets you click any result row to **apply its weights** back to Multi‑Strategy sliders
-- **Portfolio tab** with live balances + **Last 100 Trades w/ Realized & Unrealized PnL** (websocket‑aware; falls back to REST/demo)
+- Working **Multiâ€‘Strategy Market Scanner** wired to advanced ML, quantum & ensemble modules (with graceful fallbacks)
+- **Backtesting tab** (via BacktestingIntegration) that lets you click any result row to **apply its weights** back to Multiâ€‘Strategy sliders
+- **Portfolio tab** with live balances + **Last 100 Trades w/ Realized & Unrealized PnL** (websocketâ€‘aware; falls back to REST/demo)
 - **Manual Trading** & **Auto Trader** controls
 - **Settings** (risk + notification + system toggles)
 - **Logs**
 
 **Deployment notes**
 - Works on Railway without the `$PORT` interpolation bug. We *read* the `PORT` env var and set Streamlit config programmatically.
-- All 3rd‑party imports are wrapped in try/except; app degrades gracefully to demo when a dependency is missing.
+- All 3rdâ€‘party imports are wrapped in try/except; app degrades gracefully to demo when a dependency is missing.
 - Websockets (Binance) are optional; set `ENABLE_WEBSOCKETS=true` to attempt live fills & ticker streaming.
 
 ---
@@ -52,7 +53,7 @@ os.environ.setdefault("STREAMLIT_SERVER_ADDRESS", "0.0.0.0")
 os.environ.setdefault("STREAMLIT_BROWSER_GATHER_USAGE_STATS", "false")
 
 st.set_page_config(
-    page_title="Hybrid Quantum Trading Bot", page_icon="🧠", layout="wide"
+    page_title="Hybrid Quantum Trading Bot", page_icon="ðŸ§ ", layout="wide"
 )
 
 # ============================================================================
@@ -128,7 +129,7 @@ try:
         get_notification_status,
     )
 except Exception:
-    # graceful no‑ops
+    # graceful noâ€‘ops
     def get_notification_system():
         return None
 
@@ -251,7 +252,7 @@ class FallbackPortfolioManager:
         return False
 
     def get_connection_status(self):
-        return "❌ Using demo data - Portfolio Manager not available"
+        return "âŒ Using demo data - Portfolio Manager not available"
 
     def get_trade_history(self, symbol=None, limit=100):
         hist = []
@@ -348,7 +349,7 @@ class FallbackTradeExecutor:
         }
         record_trade_to_session(_trade)
         notify_trade(_trade)
-        return f"📝 Demo trade {side} {qty} {symbol}"
+        return f"ðŸ“ Demo trade {side} {qty} {symbol}"
 
     def auto_execute(
         self, signal, total_balance=None, open_positions=0, sl_mult=1.5, tp_mult=3.0
@@ -382,28 +383,28 @@ class FallbackTradeExecutor:
 
 def setup_binance_client() -> (Optional["BinanceClient"], str):
     if not BINANCE_AVAILABLE:
-        return None, "❌ Binance library not available (demo mode)"
+        return None, "âŒ Binance library not available (demo mode)"
     api_key = os.getenv("BINANCE_API_KEY")
     api_secret = os.getenv("BINANCE_API_SECRET")
     if not api_key or not api_secret:
-        return None, "⚠️ API keys not configured - using demo"
+        return None, "âš ï¸ API keys not configured - using demo"
     try:
         client = BinanceClient(api_key, api_secret)
         if USE_TESTNET and hasattr(client, "API_URL"):
             client.API_URL = "https://testnet.binance.vision/api"
         # sanity ping
         client.get_server_time()
-        mode = "🧪 TESTNET" if USE_TESTNET else "🚀 LIVE"
-        return client, f"✅ Connected to Binance {mode}"
+        mode = "ðŸ§ª TESTNET" if USE_TESTNET else "ðŸš€ LIVE"
+        return client, f"âœ… Connected to Binance {mode}"
     except Exception as e:
-        return None, f"❌ Connection failed: {e}"
+        return None, f"âŒ Connection failed: {e}"
 
 
 # ------------------------------------------------------------------
 # Websocket Manager
 # ------------------------------------------------------------------
 class WSManager:
-    """Light wrapper around python‑binance ThreadedWebsocketManager.
+    """Light wrapper around pythonâ€‘binance ThreadedWebsocketManager.
     Collects ticker & user trade updates into st.session_state caches.
     """
 
@@ -495,7 +496,7 @@ ss_init("ws_prices", defaultdict(float))
 ss_init("auto_running", False)
 ss_init("last_action", "None")
 
-# Multi‑Strategy states
+# Multiâ€‘Strategy states
 ss_init("weight_quantum", 30)
 ss_init("weight_ml", 30)
 ss_init("weight_technical", 40)
@@ -726,14 +727,14 @@ with st.sidebar:
     st.markdown(
         """
     <div style='text-align:center;margin-bottom:20px;'>
-        <h3>🧠 Quantum Trading Bot</h3>
-        <p style='font-size:12px;'>Rondanini Publishing Ltd. • © 2025</p>
+        <h3>ðŸ§  Quantum Trading Bot</h3>
+        <p style='font-size:12px;'>Rondanini Publishing Ltd. â€¢ Â© 2025</p>
     </div>
     """,
         unsafe_allow_html=True,
     )
 
-    st.subheader("📈 Status")
+    st.subheader("ðŸ“ˆ Status")
     st.info(client_status)
 
     try:
@@ -742,7 +743,7 @@ with st.sidebar:
         total_value = 0.0
     st.metric("Portfolio", f"${total_value:,.2f}")
 
-    if st.button("🔄 Refresh Portfolio", key="sb_refresh_port"):
+    if st.button("ðŸ”„ Refresh Portfolio", key="sb_refresh_port"):
         try:
             components["portfolio_mgr"].refresh_portfolio()
         except Exception as e:
@@ -753,8 +754,8 @@ with st.sidebar:
 
     # Quick Backtest
     if BACKTESTING_AVAILABLE:
-        st.markdown("**🔬 Quick Backtest**")
-        if st.button("🚀 Run Quick Test", use_container_width=True, key="sb_quick_bt"):
+        st.markdown("**ðŸ”¬ Quick Backtest**")
+        if st.button("ðŸš€ Run Quick Test", use_container_width=True, key="sb_quick_bt"):
             try:
                 bt = BacktestingIntegration()
                 df = bt._run_engine(
@@ -770,10 +771,10 @@ with st.sidebar:
                 st.error(f"Backtest failed: {e}")
         st.markdown("---")
 
-    st.subheader("🔔 Notifications")
+    st.subheader("ðŸ”” Notifications")
     ns = get_notification_status()
     st.write("Enabled:" if ns["enabled"] else "Disabled:", ns["enabled"])
-    if st.button("📧 Test Email", key="sb_test_email"):
+    if st.button("ðŸ“§ Test Email", key="sb_test_email"):
         ok = send_test_notification()
         st.success("Sent" if ok else "Failed")
 
@@ -782,15 +783,15 @@ with st.sidebar:
 # ============================================================================
 TABS = st.tabs(
     [
-        "🏠 Dashboard",  # [0]
-        "✋ Manual",  # [1]
-        "🤖 Auto",  # [2]
-        "⚛ Multi-Strategy",  # [3]
-        "💼 Portfolio",  # [4]
-        "📈 Performance",  # [5]
-        "🔬 Backtesting",  # [6]
-        "⚙ Settings",  # [7]
-        "📝 Logs",  # [8]
+        "ðŸ  Dashboard",  # [0]
+        "âœ‹ Manual",  # [1]
+        "ðŸ¤– Auto",  # [2]
+        "âš› Multi-Strategy",  # [3]
+        "ðŸ’¼ Portfolio",  # [4]
+        "ðŸ“ˆ Performance",  # [5]
+        "ðŸ”¬ Backtesting",  # [6]
+        "âš™ Settings",  # [7]
+        "ðŸ“ Logs",  # [8]
     ]
 )
 
@@ -798,7 +799,7 @@ TABS = st.tabs(
 # DASHBOARD TAB [0]
 # ============================================================================
 with TABS[0]:
-    st.header("📊 Portfolio Overview")
+    st.header("ðŸ“Š Portfolio Overview")
     st.caption("High level status of your account & system health.")
 
     try:
@@ -840,7 +841,7 @@ with TABS[0]:
 # MANUAL TAB [1]
 # ============================================================================
 with TABS[1]:
-    st.header("✋ Manual Trading")
+    st.header("âœ‹ Manual Trading")
     ma = components["market_analyzer"]
     pairs = ma.get_trading_pairs() if ma else []
     sym = st.selectbox("Pair", pairs, key="man_pair")
@@ -857,7 +858,7 @@ with TABS[1]:
     )
     side = st.selectbox("Side", ["BUY", "SELL"], key="man_side")
 
-    if st.button("🚀 Execute", type="primary", key="man_exec"):
+    if st.button("ðŸš€ Execute", type="primary", key="man_exec"):
         res = components["trade_exec"].manual_trade(
             sym, qty, st.session_state.sl_mult, st.session_state.tp_mult, side=side
         )
@@ -867,7 +868,7 @@ with TABS[1]:
 # AUTO TAB [2]
 # ============================================================================
 with TABS[2]:
-    st.header("🤖 Auto Trader Control")
+    st.header("ðŸ¤– Auto Trader Control")
     st.write("Status:", "Running" if st.session_state.auto_running else "Stopped")
     st.write("Last Action:", st.session_state.last_action)
     colA, colB = st.columns(2)
@@ -887,7 +888,7 @@ with TABS[2]:
             st.experimental_rerun()
 
     st.markdown("---")
-    st.subheader("📡 Auto Scanner Snapshot")
+    st.subheader("ðŸ“¡ Auto Scanner Snapshot")
     snaps = (
         components["market_analyzer"].analyze_market_signals(
             ["BTCUSDT", "ETHUSDT", "BNBUSDT"]
@@ -898,10 +899,10 @@ with TABS[2]:
     st.json(snaps)
 
 # ============================================================================
-# MULTI‑STRATEGY TAB [3]
+# MULTIâ€‘STRATEGY TAB [3]
 # ============================================================================
 with TABS[3]:
-    st.header("⚛ Multi-Strategy Market Scanner")
+    st.header("âš› Multi-Strategy Market Scanner")
     st.caption("Quantum + ML + Technical ensemble across multiple pairs.")
 
     ma = components["market_analyzer"]
@@ -910,7 +911,7 @@ with TABS[3]:
     # --- Config section ------------------------------------------------------
     c1, c2 = st.columns([2, 1])
     with c1:
-        st.write("**Strategy Weights (auto‑normalize to 100%)**")
+        st.write("**Strategy Weights (autoâ€‘normalize to 100%)**")
         sc1, sc2, sc3 = st.columns(3)
         with sc1:
             wq = st.slider(
@@ -942,22 +943,22 @@ with TABS[3]:
         wc3.progress(wt / 100)
         # Presets
         pc1, pc2, pc3, pc4 = st.columns(4)
-        if pc1.button("⚛ Focus", key="ms_p_q"):
+        if pc1.button("âš› Focus", key="ms_p_q"):
             st.session_state.weight_quantum = 60
             st.session_state.weight_ml = 20
             st.session_state.weight_technical = 20
             st.experimental_rerun()
-        if pc2.button("🤖 Focus", key="ms_p_ml"):
+        if pc2.button("ðŸ¤– Focus", key="ms_p_ml"):
             st.session_state.weight_quantum = 20
             st.session_state.weight_ml = 60
             st.session_state.weight_technical = 20
             st.experimental_rerun()
-        if pc3.button("📊 Tech", key="ms_p_t"):
+        if pc3.button("ðŸ“Š Tech", key="ms_p_t"):
             st.session_state.weight_quantum = 20
             st.session_state.weight_ml = 20
             st.session_state.weight_technical = 60
             st.experimental_rerun()
-        if pc4.button("⚖ Balanced", key="ms_p_bal"):
+        if pc4.button("âš– Balanced", key="ms_p_bal"):
             st.session_state.weight_quantum = 33
             st.session_state.weight_ml = 33
             st.session_state.weight_technical = 34
@@ -1022,9 +1023,9 @@ with TABS[3]:
 
     # Scan controls
     scc1, scc2, scc3 = st.columns(3)
-    if scc1.button("🔍 Scan", type="primary", key="ms_scan"):
+    if scc1.button("ðŸ” Scan", type="primary", key="ms_scan"):
         st.session_state.manual_scan_requested = True
-    if scc2.button("🔄 Refresh", key="ms_refresh"):
+    if scc2.button("ðŸ”„ Refresh", key="ms_refresh"):
         st.session_state.manual_scan_requested = True
     show_only = scc3.checkbox(
         "Show Only Signals",
@@ -1121,7 +1122,7 @@ with TABS[3]:
                 and d["final"]["confidence"] >= st.session_state.multi_min_conf
             ]
         if data:
-            st.subheader(f"📊 Results ({len(data)})")
+            st.subheader(f"ðŸ“Š Results ({len(data)})")
             disp = []
             for s in data:
                 disp.append(
@@ -1142,13 +1143,13 @@ with TABS[3]:
             st.dataframe(df, use_container_width=True)
 
             # Quick trade picks
-            st.subheader("⚡ Quick Trade Picks")
+            st.subheader("âš¡ Quick Trade Picks")
             buys = [s for s in data if s["final"]["decision"] == "BUY"]
             sells = [s for s in data if s["final"]["decision"] == "SELL"]
             tc1, tc2 = st.columns(2)
             with tc1:
                 if buys:
-                    st.write("**🟢 BUY**")
+                    st.write("**ðŸŸ¢ BUY**")
                 for i, s in enumerate(buys[:5]):
                     bc1, bc2 = st.columns([3, 1])
                     bc1.write(
@@ -1166,7 +1167,7 @@ with TABS[3]:
                         st.experimental_rerun()
             with tc2:
                 if sells:
-                    st.write("**🔴 SELL**")
+                    st.write("**ðŸ”´ SELL**")
                 for i, s in enumerate(sells[:5]):
                     sc1, sc2 = st.columns([3, 1])
                     sc1.write(
@@ -1187,7 +1188,7 @@ with TABS[3]:
             tr = st.session_state.selected_trade
             if tr and tr.get("source") == "multi_strategy":
                 st.divider()
-                st.subheader(f"🎯 Execute {tr['action']} {tr['symbol']}")
+                st.subheader(f"ðŸŽ¯ Execute {tr['action']} {tr['symbol']}")
                 e1, e2, e3 = st.columns(3)
                 with e1:
                     st.info(f"Price: {tr['price']:.4f}")
@@ -1218,7 +1219,7 @@ with TABS[3]:
                         st.experimental_rerun()
 
             # Stats
-            st.subheader("📈 Signal Stats")
+            st.subheader("ðŸ“ˆ Signal Stats")
             ts1, ts2, ts3, ts4 = st.columns(4)
             ts1.metric("Total Scanned", len(st.session_state.latest_signals))
             ts2.metric("Signals", len(data))
@@ -1232,7 +1233,7 @@ with TABS[3]:
         else:
             st.warning("No strong signals.")
     else:
-        st.info("🔍 Click Scan to analyze.")
+        st.info("ðŸ” Click Scan to analyze.")
         if ms_pairs:
             st.write("Pairs to scan:")
             st.write(", ".join(ms_pairs))
@@ -1241,7 +1242,7 @@ with TABS[3]:
 # PORTFOLIO TAB [4]
 # ============================================================================
 with TABS[4]:
-    st.header("💼 Portfolio")
+    st.header("ðŸ’¼ Portfolio")
     pm = components["portfolio_mgr"]
     try:
         portfolio = pm.get_portfolio()
@@ -1251,7 +1252,7 @@ with TABS[4]:
     with col1:
         st.info(pm.get_connection_status())
     with col2:
-        if st.button("🔄 Refresh", key="pf_refresh"):
+        if st.button("ðŸ”„ Refresh", key="pf_refresh"):
             pm.refresh_portfolio()
             st.experimental_rerun()
     with col3:
@@ -1284,7 +1285,7 @@ with TABS[4]:
         st.warning("No portfolio data.")
 
     st.markdown("---")
-    st.subheader("📜 Last 100 Trades (Realized & Unrealized PnL)")
+    st.subheader("ðŸ“œ Last 100 Trades (Realized & Unrealized PnL)")
 
     # If we need to recompute (new trades appended) do so
     if st.session_state.get("_needs_pnl_refresh", True):
@@ -1319,7 +1320,7 @@ with TABS[4]:
 # PERFORMANCE TAB [5]
 # ============================================================================
 with TABS[5]:
-    st.header("📈 Performance Analytics")
+    st.header("ðŸ“ˆ Performance Analytics")
     st.caption("Equity curve & trade distribution from recorded history.")
     hist = list(st.session_state.trade_history)
     if hist:
@@ -1347,7 +1348,7 @@ with TABS[5]:
 # BACKTESTING TAB [6]
 # ============================================================================
 with TABS[6]:
-    st.header("🔬 Backtesting")
+    st.header("ðŸ”¬ Backtesting")
     if BACKTESTING_AVAILABLE:
         try:
             bt = BacktestingIntegration()
@@ -1362,7 +1363,7 @@ with TABS[6]:
 # SETTINGS TAB [7]
 # ============================================================================
 with TABS[7]:
-    st.header("⚙ Settings & Configuration")
+    st.header("âš™ Settings & Configuration")
     sc1, sc2 = st.columns(2)
     with sc1:
         st.subheader("Risk Management")
@@ -1404,7 +1405,7 @@ with TABS[7]:
 # LOGS TAB [8]
 # ============================================================================
 with TABS[8]:
-    st.header("📝 Logs")
+    st.header("ðŸ“ Logs")
     if st.button("Clear Logs", key="lg_clear"):
         st.session_state.logs = []
     if st.session_state.logs:
@@ -1416,3 +1417,4 @@ with TABS[8]:
 # ============================================================================
 # End of File
 # ============================================================================
+

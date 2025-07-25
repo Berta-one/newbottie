@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 """
 Basic tests for crypto trading bot
@@ -144,3 +145,4 @@ if __name__ == "__main__":
     test_performance_benchmark()
 
     print("\nAll tests passed!")
+

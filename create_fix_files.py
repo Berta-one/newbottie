@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 """
 Create Fix Files Script
@@ -65,11 +66,11 @@ def get_unified_portfolio_value(portfolio_data):
 
 def debug_portfolio_calculation(portfolio_data, location="Unknown"):
     """Debug portfolio calculations"""
-    print(f"\\n🔍 Portfolio Debug [{location}]")
+    print(f"\\nðŸ” Portfolio Debug [{location}]")
     print("-" * 40)
     
     if not portfolio_data:
-        print("❌ Portfolio data is empty")
+        print("âŒ Portfolio data is empty")
         return 0.0
     
     total = 0.0
@@ -82,10 +83,10 @@ def debug_portfolio_calculation(portfolio_data, location="Unknown"):
             elif 'value' in data:
                 usd_value = float(data['value'])
             
-            print(f"🪙 {asset}: ${usd_value:.2f}")
+            print(f"ðŸª™ {asset}: ${usd_value:.2f}")
             total += usd_value
     
-    print(f"🔢 Total: ${total:.2f}")
+    print(f"ðŸ”¢ Total: ${total:.2f}")
     print("-" * 40)
     return total
 '''
@@ -93,7 +94,7 @@ def debug_portfolio_calculation(portfolio_data, location="Unknown"):
     with open("portfolio_value_fix.py", "w", encoding="utf-8") as f:
         f.write(portfolio_code)
 
-    print("✅ Created portfolio_value_fix.py")
+    print("âœ… Created portfolio_value_fix.py")
 
 
 def create_quantum_trader():
@@ -113,7 +114,7 @@ class FallbackQuantumTrader:
     
     def __init__(self):
         self.name = "FallbackQuantumTrader"
-        self.status = "❌ Quantum Trader disabled - No module named 'qiskit'"
+        self.status = "âŒ Quantum Trader disabled - No module named 'qiskit'"
         
     def quantum_analyze(self, market_data):
         """Classical market analysis fallback"""
@@ -171,7 +172,7 @@ try:
         
         def __init__(self):
             self.name = "QuantumTrader"
-            self.status = "✅ Quantum Trader enabled"
+            self.status = "âœ… Quantum Trader enabled"
             self.simulator = AerSimulator()
         
         def quantum_analyze(self, market_data):
@@ -211,7 +212,7 @@ __all__ = ['quantum_trader', 'QUANTUM_AVAILABLE']
     with open("quantum_trader.py", "w", encoding="utf-8") as f:
         f.write(quantum_code)
 
-    print("✅ Created quantum_trader.py")
+    print("âœ… Created quantum_trader.py")
 
 
 def create_test_file():
@@ -235,15 +236,15 @@ def test_portfolio_fix():
         }
         
         total_usd, total_gbp, count = get_unified_portfolio_value(test_portfolio)
-        print(f"✅ Portfolio Fix Working:")
-        print(f"   💰 Total USD: ${total_usd:.2f}")
-        print(f"   💷 Total GBP: £{total_gbp:.2f}")
-        print(f"   🪙 Assets: {count}")
+        print(f"âœ… Portfolio Fix Working:")
+        print(f"   ðŸ’° Total USD: ${total_usd:.2f}")
+        print(f"   ðŸ’· Total GBP: Â£{total_gbp:.2f}")
+        print(f"   ðŸª™ Assets: {count}")
         
         return True
         
     except Exception as e:
-        print(f"❌ Portfolio fix failed: {e}")
+        print(f"âŒ Portfolio fix failed: {e}")
         return False
 
 def test_quantum_trader():
@@ -252,22 +253,22 @@ def test_quantum_trader():
         from quantum_trader import quantum_trader
         
         status = quantum_trader.get_status()
-        print(f"✅ Quantum Status: {status}")
+        print(f"âœ… Quantum Status: {status}")
         
         # Test analysis
         test_data = [100, 102, 105, 103, 107]
         result = quantum_trader.quantum_analyze(test_data)
-        print(f"✅ Analysis: {result}")
+        print(f"âœ… Analysis: {result}")
         
         return True
         
     except Exception as e:
-        print(f"❌ Quantum trader failed: {e}")
+        print(f"âŒ Quantum trader failed: {e}")
         return False
 
 def main():
     """Run quick tests"""
-    print("🧪 Quick Test: Portfolio + Quantum Fixes")
+    print("ðŸ§ª Quick Test: Portfolio + Quantum Fixes")
     print("=" * 50)
     
     portfolio_ok = test_portfolio_fix()
@@ -276,10 +277,10 @@ def main():
     
     print("\\n" + "=" * 50)
     if portfolio_ok and quantum_ok:
-        print("🎉 ALL TESTS PASSED!")
-        print("✅ Ready to update your dashboard")
+        print("ðŸŽ‰ ALL TESTS PASSED!")
+        print("âœ… Ready to update your dashboard")
     else:
-        print("❌ Some tests failed")
+        print("âŒ Some tests failed")
 
 if __name__ == "__main__":
     main()
@@ -288,12 +289,12 @@ if __name__ == "__main__":
     with open("test_quick.py", "w", encoding="utf-8") as f:
         f.write(test_code)
 
-    print("✅ Created test_quick.py")
+    print("âœ… Created test_quick.py")
 
 
 def install_qiskit():
     """Install Qiskit packages"""
-    print("🔬 Installing Qiskit...")
+    print("ðŸ”¬ Installing Qiskit...")
 
     import subprocess
     import sys
@@ -302,20 +303,20 @@ def install_qiskit():
 
     for package in packages:
         try:
-            print(f"📦 Installing {package}...")
+            print(f"ðŸ“¦ Installing {package}...")
             subprocess.run(
                 [sys.executable, "-m", "pip", "install", package],
                 check=True,
                 capture_output=True,
             )
-            print(f"✅ {package} installed")
+            print(f"âœ… {package} installed")
         except subprocess.CalledProcessError:
-            print(f"⚠️ {package} installation failed (continuing...)")
+            print(f"âš ï¸ {package} installation failed (continuing...)")
 
 
 def main():
     """Create all fix files"""
-    print("🔧 Creating Portfolio and Quantum Trader Fix Files")
+    print("ðŸ”§ Creating Portfolio and Quantum Trader Fix Files")
     print("=" * 60)
 
     print("\\n1. Creating portfolio value fix...")
@@ -331,10 +332,10 @@ def main():
     install_qiskit()
 
     print("\\n" + "=" * 60)
-    print("🎉 ALL FILES CREATED!")
+    print("ðŸŽ‰ ALL FILES CREATED!")
     print("=" * 60)
 
-    print("\\n📋 Next Steps:")
+    print("\\nðŸ“‹ Next Steps:")
     print("1. Test the fixes:")
     print("   python test_quick.py")
 
@@ -348,3 +349,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

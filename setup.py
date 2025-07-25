@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 # setup.py - Quick Setup Script
 
@@ -8,32 +9,32 @@ import sys
 
 def install_requirements():
     """Install required packages"""
-    print("📦 Installing requirements...")
+    print("ðŸ“¦ Installing requirements...")
     try:
         subprocess.check_call(
             [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"]
         )
-        print("✅ Requirements installed successfully")
+        print("âœ… Requirements installed successfully")
         return True
     except subprocess.CalledProcessError as e:
-        print(f"❌ Error installing requirements: {e}")
+        print(f"âŒ Error installing requirements: {e}")
         return False
 
 
 def create_directories():
     """Create necessary directories"""
-    print("📁 Creating directories...")
+    print("ðŸ“ Creating directories...")
     directories = ["logs"]
 
     for directory in directories:
         os.makedirs(directory, exist_ok=True)
-        print(f"✅ Created {directory}/")
+        print(f"âœ… Created {directory}/")
 
 
 def create_env_template():
     """Create .env template if it doesn't exist"""
     if not os.path.exists(".env"):
-        print("📄 Creating .env template...")
+        print("ðŸ“„ Creating .env template...")
         env_template = """# Binance API Configuration
 BINANCE_API_KEY=your_binance_api_key_here
 BINANCE_API_SECRET=your_binance_api_secret_here
@@ -57,15 +58,15 @@ CUSTOM_SYMBOLS=BTCUSDT,ETHUSDT,ADAUSDT,SOLUSDT,BNBUSDT
         with open(".env", "w") as f:
             f.write(env_template)
 
-        print("✅ Created .env template")
-        print("⚠️  IMPORTANT: Edit .env file with your actual Binance API keys!")
+        print("âœ… Created .env template")
+        print("âš ï¸  IMPORTANT: Edit .env file with your actual Binance API keys!")
     else:
-        print("✅ .env file already exists")
+        print("âœ… .env file already exists")
 
 
 def main():
     """Main setup function"""
-    print("🚀 Crypto Trading Bot Setup")
+    print("ðŸš€ Crypto Trading Bot Setup")
     print("=" * 40)
 
     # Create directories
@@ -73,20 +74,20 @@ def main():
 
     # Install requirements
     if not install_requirements():
-        print("❌ Setup failed during package installation")
+        print("âŒ Setup failed during package installation")
         return
 
     # Create .env template
     create_env_template()
 
-    print("\n✅ Setup completed successfully!")
-    print("\n📋 Next steps:")
+    print("\nâœ… Setup completed successfully!")
+    print("\nðŸ“‹ Next steps:")
     print("1. Edit .env file with your Binance API credentials")
     print("2. Test with testnet: python main.py")
     print("3. Run multi-pair scanner: python scanner_main.py")
     print("4. Launch dashboard: streamlit run dashboard.py")
 
-    print("\n⚠️  Remember:")
+    print("\nâš ï¸  Remember:")
     print("- Always test on testnet first (USE_TESTNET=True)")
     print("- Start with small amounts when going live")
     print("- Monitor your bot regularly")
@@ -94,3 +95,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

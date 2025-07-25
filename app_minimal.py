@@ -1,19 +1,20 @@
+﻿ -*- coding: utf-8 -*-
 import streamlit as st
 import os
 import socket
 
-st.set_page_config(page_title="Bottie Trading Bot", page_icon="🤖", layout="wide")
+st.set_page_config(page_title="Bottie Trading Bot", page_icon="ðŸ¤–", layout="wide")
 
-st.title("🤖 Bottie Trading Bot - Railway Deployment")
+st.title("ðŸ¤– Bottie Trading Bot - Railway Deployment")
 
 # Show deployment status
 if os.environ.get("RAILWAY_ENVIRONMENT"):
-    st.success("✅ Running on Railway!")
+    st.success("âœ… Running on Railway!")
 else:
-    st.info("🏠 Running locally")
+    st.info("ðŸ  Running locally")
 
 # Debug information
-st.subheader("🔧 Connection Debug")
+st.subheader("ðŸ”§ Connection Debug")
 col1, col2 = st.columns(2)
 
 with col1:
@@ -25,13 +26,13 @@ with col2:
     st.metric("Service", os.environ.get("RAILWAY_SERVICE_NAME", "Unknown"))
 
 # Test connectivity
-if st.button("🧪 Test Connection", type="primary"):
+if st.button("ðŸ§ª Test Connection", type="primary"):
     st.balloons()
-    st.success("🎉 Connection successful!")
+    st.success("ðŸŽ‰ Connection successful!")
     st.write(f"App is responding on Railway!")
 
 # Show all environment variables for debugging
-with st.expander("🔍 All Environment Variables"):
+with st.expander("ðŸ” All Environment Variables"):
     env_vars = {
         k: v
         for k, v in os.environ.items()
@@ -40,4 +41,5 @@ with st.expander("🔍 All Environment Variables"):
     st.json(env_vars)
 
 st.markdown("---")
-st.markdown("**🚀 Ready to add your sophisticated Bottie features!**")
+st.markdown("**ðŸš€ Ready to add your sophisticated Bottie features!**")
+

@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 import numpy as np
 import pandas as pd
 import requests
@@ -71,3 +72,4 @@ class AdvancedMarketIntelligence:
 
     # (All other methods as provided in your last message)
     # The rest of the class implementation is already present in the file as per your previous message.
+

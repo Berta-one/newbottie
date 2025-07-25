@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 """
 Complete Multi-Pair Cryptocurrency Scanner - multi_pair_scanner.py
@@ -119,11 +120,11 @@ class CryptoPairScanner:
             List of trading pair dictionaries
         """
         if not self.client:
-            print("⚠️ Binance client not available, using mock data")
+            print("âš ï¸ Binance client not available, using mock data")
             return self._get_mock_pairs()
 
         try:
-            print("📡 Fetching all USDT pairs from Binance...")
+            print("ðŸ“¡ Fetching all USDT pairs from Binance...")
 
             # Get exchange info
             exchange_info = self.client.get_exchange_info()
@@ -170,11 +171,11 @@ class CryptoPairScanner:
 
                 pairs.append(pair_info)
 
-            print(f"✅ Found {len(pairs)} eligible USDT pairs")
+            print(f"âœ… Found {len(pairs)} eligible USDT pairs")
             return sorted(pairs, key=lambda x: x["volume_24h"], reverse=True)
 
         except Exception as e:
-            print(f"❌ Error fetching USDT pairs: {e}")
+            print(f"âŒ Error fetching USDT pairs: {e}")
             return self._get_mock_pairs()
 
     def get_selected_pairs(self) -> List[Dict[str, Any]]:
@@ -199,7 +200,7 @@ class CryptoPairScanner:
                         pair_info["volume_24h"] = float(ticker["quoteVolume"])
                         pair_info["change_24h"] = float(ticker["priceChangePercent"])
                     except Exception as e:
-                        print(f"⚠️ Error getting data for {pair['symbol']}: {e}")
+                        print(f"âš ï¸ Error getting data for {pair['symbol']}: {e}")
                         pair_info.update(
                             {
                                 "price": 50000 if "BTC" in pair["symbol"] else 100,
@@ -260,7 +261,7 @@ class CryptoPairScanner:
                         }
                     )
                 except Exception as e:
-                    print(f"⚠️ Error getting data for {symbol}: {e}")
+                    print(f"âš ï¸ Error getting data for {symbol}: {e}")
                     pair_info.update(
                         {"price": 100, "volume_24h": 1000000, "change_24h": 0.0}
                     )
@@ -355,7 +356,7 @@ class CryptoPairScanner:
             return result
 
         except Exception as e:
-            print(f"❌ Error analyzing {symbol}: {e}")
+            print(f"âŒ Error analyzing {symbol}: {e}")
             return {
                 "symbol": symbol,
                 "signal": "HOLD",
@@ -376,7 +377,7 @@ class CryptoPairScanner:
         Returns:
             List of analysis results
         """
-        print(f"🔍 Scanning {len(pairs_list)} pairs with {max_workers} workers...")
+        print(f"ðŸ” Scanning {len(pairs_list)} pairs with {max_workers} workers...")
 
         results = []
         completed_count = 0
@@ -400,11 +401,11 @@ class CryptoPairScanner:
                     # Progress indicator
                     if completed_count % 10 == 0 or completed_count == len(pairs_list):
                         print(
-                            f"📊 Progress: {completed_count}/{len(pairs_list)} pairs analyzed"
+                            f"ðŸ“Š Progress: {completed_count}/{len(pairs_list)} pairs analyzed"
                         )
 
                 except Exception as e:
-                    print(f"⚠️ Error analyzing {pair.get('symbol', 'unknown')}: {e}")
+                    print(f"âš ï¸ Error analyzing {pair.get('symbol', 'unknown')}: {e}")
                     results.append(
                         {
                             "symbol": pair.get("symbol", "unknown"),
@@ -414,7 +415,7 @@ class CryptoPairScanner:
                         }
                     )
 
-        print(f"✅ Scan completed: {len(results)} pairs analyzed")
+        print(f"âœ… Scan completed: {len(results)} pairs analyzed")
         return results
 
     def filter_opportunities(
@@ -468,7 +469,7 @@ class CryptoPairScanner:
             top_n: Number of top results to display
         """
         if not opportunities:
-            print("📭 No opportunities found in scan")
+            print("ðŸ“­ No opportunities found in scan")
             return
 
         # Filter opportunities vs all results
@@ -480,13 +481,13 @@ class CryptoPairScanner:
             display_ops = opportunities
 
         if not display_ops:
-            print("📭 No trading opportunities found")
+            print("ðŸ“­ No trading opportunities found")
             return
 
         # Limit results
         display_ops = display_ops[:top_n]
 
-        print(f"\n🎯 Trading Opportunities Found: {len(display_ops)}")
+        print(f"\nðŸŽ¯ Trading Opportunities Found: {len(display_ops)}")
         print("=" * 120)
 
         # Table header
@@ -560,7 +561,7 @@ class CryptoPairScanner:
             with open(latest_filepath, "w") as f:
                 json.dump(scan_data, f, indent=2, default=str)
 
-            print(f"💾 Scan results saved: {filepath}")
+            print(f"ðŸ’¾ Scan results saved: {filepath}")
 
             # Log scan to logger
             log_scan(scan_data)
@@ -568,7 +569,7 @@ class CryptoPairScanner:
             return filepath
 
         except Exception as e:
-            print(f"❌ Error saving scan results: {e}")
+            print(f"âŒ Error saving scan results: {e}")
             return ""
 
     def _count_signals(self, opportunities: List[Dict[str, Any]]) -> Dict[str, int]:
@@ -689,7 +690,7 @@ def scan_custom_pairs(
 # Main execution function
 def main():
     """Main scanner execution for testing"""
-    print("🚀 Multi-Pair Cryptocurrency Scanner")
+    print("ðŸš€ Multi-Pair Cryptocurrency Scanner")
     print("=" * 50)
 
     # Initialize scanner
@@ -705,26 +706,26 @@ def main():
                 if os.getenv("USE_TESTNET", "false").lower() == "true":
                     client.API_URL = "https://testnet.binance.vision/api"
                 scanner = CryptoPairScanner(client)
-                print("✅ Connected to Binance API")
+                print("âœ… Connected to Binance API")
             else:
                 scanner = CryptoPairScanner()
-                print("⚠️ No API credentials, using mock data")
+                print("âš ï¸ No API credentials, using mock data")
         else:
             scanner = CryptoPairScanner()
-            print("⚠️ Binance library not available, using mock data")
+            print("âš ï¸ Binance library not available, using mock data")
 
     except Exception as e:
         scanner = CryptoPairScanner()
-        print(f"⚠️ Error initializing Binance client: {e}")
+        print(f"âš ï¸ Error initializing Binance client: {e}")
 
     # Get scan mode from environment
     scan_mode = os.getenv("SCAN_MODE", "SELECTED").upper()
     min_confidence = float(os.getenv("MIN_CONFIDENCE", 0.65))
     max_workers = int(os.getenv("MAX_WORKERS", 8))
 
-    print(f"🎯 Scan Mode: {scan_mode}")
-    print(f"📊 Min Confidence: {min_confidence:.1%}")
-    print(f"🔄 Max Workers: {max_workers}")
+    print(f"ðŸŽ¯ Scan Mode: {scan_mode}")
+    print(f"ðŸ“Š Min Confidence: {min_confidence:.1%}")
+    print(f"ðŸ”„ Max Workers: {max_workers}")
     print()
 
     # Execute scan based on mode
@@ -752,16 +753,17 @@ def main():
     scan_time = time.time() - start_time
 
     # Display results
-    print(f"⏱️ Scan completed in {scan_time:.2f} seconds")
+    print(f"â±ï¸ Scan completed in {scan_time:.2f} seconds")
     scanner.display_scan_results(opportunities, show_all=False, top_n=10)
 
     # Save results
     if opportunities:
         saved_file = scanner.save_scan_results(opportunities)
-        print(f"💾 Results saved to: {saved_file}")
+        print(f"ðŸ’¾ Results saved to: {saved_file}")
 
     return opportunities
 
 
 if __name__ == "__main__":
     main()
+

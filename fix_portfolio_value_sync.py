@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 """
 Portfolio Value Synchronization Fix - CORRECTED VERSION
@@ -96,7 +97,7 @@ class UnifiedPortfolioCalculator:
             'asset_count': len(portfolio_data) if portfolio_data else 0,
             'largest_holding_pct': self._get_largest_holding_percentage(portfolio_data, total_usd),
             'formatted_usd': f"${total_usd:,.2f}",
-            'formatted_gbp': f"£{total_gbp:,.2f}"
+            'formatted_gbp': f"Â£{total_gbp:,.2f}"
         }
     
     def _get_largest_holding_percentage(self, portfolio_data, total_usd):
@@ -140,7 +141,7 @@ class UnifiedPortfolioCalculator:
                     'Balance': f"{balance:.8f}".rstrip('0').rstrip('.'),
                     'Price (USD)': f"${price_usd:.4f}",
                     'Value (USD)': f"${usd_value:.2f}",
-                    'Value (GBP)': f"£{usd_value * gbp_rate:.2f}",
+                    'Value (GBP)': f"Â£{usd_value * gbp_rate:.2f}",
                     '24h Change': f"{change_24h:.2f}%",
                     'Percentage': f"{(usd_value / total_usd * 100):.1f}%" if total_usd > 0 else "0.0%"
                 })
@@ -168,7 +169,7 @@ def debug_portfolio_values(portfolio_data, location="unknown"):
     print(f"\\n=== PORTFOLIO DEBUG [{location}] ===")
     
     if not portfolio_data:
-        print("❌ Portfolio data is empty")
+        print("âŒ Portfolio data is empty")
         return 0.0
     
     total_debug = 0.0
@@ -178,7 +179,7 @@ def debug_portfolio_values(portfolio_data, location="unknown"):
             print(f"{asset}: ${usd_value:.2f}")
             total_debug += float(usd_value)
     
-    print(f"🔢 Total calculated: ${total_debug:.2f}")
+    print(f"ðŸ”¢ Total calculated: ${total_debug:.2f}")
     print("=" * 40)
     
     return total_debug
@@ -188,7 +189,7 @@ def debug_portfolio_values(portfolio_data, location="unknown"):
     with open("unified_portfolio_calculator.py", "w", encoding="utf-8") as f:
         f.write(calculator_code)
 
-    print("✅ Created unified_portfolio_calculator.py")
+    print("âœ… Created unified_portfolio_calculator.py")
 
 
 def create_quick_fix_patch():
@@ -207,14 +208,14 @@ from pathlib import Path
 def apply_portfolio_fix():
     '''Apply portfolio value synchronization fix'''
     
-    print("🔧 Applying Portfolio Value Fix...")
+    print("ðŸ”§ Applying Portfolio Value Fix...")
     
     # Files to patch
     files_to_patch = ["hybrid_bot.py", "portfolio_trading_bot.py", "bot_controller.py"]
     
     for filename in files_to_patch:
         if Path(filename).exists():
-            print(f"📄 Patching {filename}...")
+            print(f"ðŸ“„ Patching {filename}...")
             
             try:
                 with open(filename, "r", encoding="utf-8") as f:
@@ -229,7 +230,7 @@ def apply_portfolio_fix():
                 if "from unified_portfolio_calculator import" not in content:
                     import_line = "from unified_portfolio_calculator import get_portfolio_totals, debug_portfolio_values\\n"
                     content = import_line + content
-                    print(f"  ✅ Added unified calculator import")
+                    print(f"  âœ… Added unified calculator import")
                 
                 # Look for portfolio calculation patterns
                 patterns_fixed = []
@@ -253,17 +254,17 @@ def apply_portfolio_fix():
                     f.write(content)
                 
                 if patterns_fixed:
-                    print(f"  ✅ Fixed: {', '.join(patterns_fixed)}")
+                    print(f"  âœ… Fixed: {', '.join(patterns_fixed)}")
                 else:
-                    print(f"  ✅ No patterns to fix found")
+                    print(f"  âœ… No patterns to fix found")
                     
             except Exception as e:
-                print(f"  ❌ Error patching {filename}: {e}")
+                print(f"  âŒ Error patching {filename}: {e}")
         else:
-            print(f"  ⚠️ {filename} not found")
+            print(f"  âš ï¸ {filename} not found")
     
-    print("\\n🎉 Portfolio fix applied!")
-    print("\\n📋 Next steps:")
+    print("\\nðŸŽ‰ Portfolio fix applied!")
+    print("\\nðŸ“‹ Next steps:")
     print("1. Test your dashboard: streamlit run hybrid_bot.py")
     print("2. Check both Dashboard and Portfolio tabs show same value")
     print("3. If issues persist, check debug output in console")
@@ -275,7 +276,7 @@ if __name__ == "__main__":
     with open("apply_portfolio_fix.py", "w", encoding="utf-8") as f:
         f.write(patch_code)
 
-    print("✅ Created apply_portfolio_fix.py")
+    print("âœ… Created apply_portfolio_fix.py")
 
 
 def create_manual_fix_instructions():
@@ -346,12 +347,12 @@ streamlit run hybrid_bot.py
     with open("PORTFOLIO_FIX_INSTRUCTIONS.md", "w", encoding="utf-8") as f:
         f.write(instructions)
 
-    print("✅ Created PORTFOLIO_FIX_INSTRUCTIONS.md")
+    print("âœ… Created PORTFOLIO_FIX_INSTRUCTIONS.md")
 
 
 def main():
     """Main function to create all portfolio sync fixes"""
-    print("🔧 Portfolio Value Synchronization Fix - CORRECTED")
+    print("ðŸ”§ Portfolio Value Synchronization Fix - CORRECTED")
     print("=" * 60)
 
     print("\\n1. Creating unified portfolio calculator...")
@@ -364,21 +365,22 @@ def main():
     create_manual_fix_instructions()
 
     print("\\n" + "=" * 60)
-    print("🎉 PORTFOLIO SYNC FIX COMPLETED!")
+    print("ðŸŽ‰ PORTFOLIO SYNC FIX COMPLETED!")
     print("=" * 60)
 
-    print("\\n🚀 Quick Fix Steps:")
+    print("\\nðŸš€ Quick Fix Steps:")
     print("1. Run: python apply_portfolio_fix.py")
     print("2. Test: streamlit run hybrid_bot.py")
     print("3. Check both Dashboard and Portfolio tabs")
 
-    print("\\n📋 Files Created:")
-    print("✅ unified_portfolio_calculator.py - Single source of truth")
-    print("✅ apply_portfolio_fix.py - Automated patcher")
-    print("✅ PORTFOLIO_FIX_INSTRUCTIONS.md - Manual instructions")
+    print("\\nðŸ“‹ Files Created:")
+    print("âœ… unified_portfolio_calculator.py - Single source of truth")
+    print("âœ… apply_portfolio_fix.py - Automated patcher")
+    print("âœ… PORTFOLIO_FIX_INSTRUCTIONS.md - Manual instructions")
 
-    print("\\n🎯 This will sync portfolio values across all tabs!")
+    print("\\nðŸŽ¯ This will sync portfolio values across all tabs!")
 
 
 if __name__ == "__main__":
     main()
+

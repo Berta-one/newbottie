@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 # Binance Order Rejection Debugger
 # This script diagnoses exactly why your orders are being rejected
 
@@ -15,7 +16,7 @@ def debug_order_rejection(symbol="BTCUSDT", quantity=0.001):
     """
     Comprehensive order rejection debugging
     """
-    print("🔍 BINANCE ORDER REJECTION DEBUGGER")
+    print("ðŸ” BINANCE ORDER REJECTION DEBUGGER")
     print("=" * 60)
 
     # Initialize client
@@ -23,18 +24,18 @@ def debug_order_rejection(symbol="BTCUSDT", quantity=0.001):
     api_secret = os.getenv("BINANCE_API_SECRET")
 
     if not api_key or not api_secret:
-        print("❌ Missing API credentials")
+        print("âŒ Missing API credentials")
         return
 
     # Start with testnet
     client = Client(api_key, api_secret, testnet=True)
-    print(f"🧪 Testing with TESTNET for safety")
+    print(f"ðŸ§ª Testing with TESTNET for safety")
 
     try:
         # Step 1: Test connection and permissions
         print("\n1. Testing API Connection & Permissions...")
         account = client.get_account()
-        print(f"   ✅ Connected successfully")
+        print(f"   âœ… Connected successfully")
         print(f"   Account Type: {account.get('accountType', 'Unknown')}")
         print(f"   Can Trade: {account.get('canTrade', False)}")
         print(f"   Can Withdraw: {account.get('canWithdraw', False)}")
@@ -50,8 +51,8 @@ def debug_order_rejection(symbol="BTCUSDT", quantity=0.001):
         )
 
         if not account.get("canTrade"):
-            print("   ❌ CRITICAL: API key doesn't have TRADING permissions!")
-            print("   🔧 FIX: Enable 'Spot & Margin Trading' in Binance API settings")
+            print("   âŒ CRITICAL: API key doesn't have TRADING permissions!")
+            print("   ðŸ”§ FIX: Enable 'Spot & Margin Trading' in Binance API settings")
             return
 
         # Step 2: Check account balances
@@ -67,8 +68,8 @@ def debug_order_rejection(symbol="BTCUSDT", quantity=0.001):
         print(f"   USDT Balance: ${usdt_balance:,.2f}")
 
         if usdt_balance < 10:
-            print("   ❌ CRITICAL: Insufficient USDT balance for trading!")
-            print("   🔧 FIX: Add testnet funds from https://testnet.binance.vision/")
+            print("   âŒ CRITICAL: Insufficient USDT balance for trading!")
+            print("   ðŸ”§ FIX: Add testnet funds from https://testnet.binance.vision/")
             if usdt_balance == 0:
                 return
 
@@ -80,17 +81,17 @@ def debug_order_rejection(symbol="BTCUSDT", quantity=0.001):
         )
 
         if not symbol_info:
-            print(f"   ❌ Symbol {symbol} not found!")
-            print("   🔧 Available symbols include: BTCUSDT, ETHUSDT, BNBUSDT, etc.")
+            print(f"   âŒ Symbol {symbol} not found!")
+            print("   ðŸ”§ Available symbols include: BTCUSDT, ETHUSDT, BNBUSDT, etc.")
             return
 
-        print(f"   ✅ Symbol found: {symbol}")
+        print(f"   âœ… Symbol found: {symbol}")
         print(f"   Status: {symbol_info['status']}")
         print(f"   Base Asset: {symbol_info['baseAsset']}")
         print(f"   Quote Asset: {symbol_info['quoteAsset']}")
 
         if symbol_info["status"] != "TRADING":
-            print(f"   ❌ Symbol status is {symbol_info['status']}, not TRADING")
+            print(f"   âŒ Symbol status is {symbol_info['status']}, not TRADING")
             return
 
         # Extract trading filters
@@ -125,13 +126,13 @@ def debug_order_rejection(symbol="BTCUSDT", quantity=0.001):
         print(f"\n5. Validating Quantity: {quantity}...")
 
         if quantity < min_qty:
-            print(f"   ❌ Quantity {quantity} is below minimum {min_qty}")
+            print(f"   âŒ Quantity {quantity} is below minimum {min_qty}")
             suggested_qty = min_qty
-            print(f"   🔧 FIX: Use minimum quantity {suggested_qty}")
+            print(f"   ðŸ”§ FIX: Use minimum quantity {suggested_qty}")
             quantity = suggested_qty
 
         if quantity > max_qty:
-            print(f"   ❌ Quantity {quantity} is above maximum {max_qty}")
+            print(f"   âŒ Quantity {quantity} is above maximum {max_qty}")
             return
 
         # Check step size compliance
@@ -139,15 +140,15 @@ def debug_order_rejection(symbol="BTCUSDT", quantity=0.001):
             remainder = (quantity - min_qty) % step_size
             if remainder != 0:
                 print(
-                    f"   ❌ Quantity {quantity} doesn't comply with step size {step_size}"
+                    f"   âŒ Quantity {quantity} doesn't comply with step size {step_size}"
                 )
                 # Round to nearest valid quantity
                 steps = round((quantity - min_qty) / step_size)
                 corrected_qty = min_qty + (steps * step_size)
-                print(f"   🔧 FIX: Corrected quantity: {corrected_qty}")
+                print(f"   ðŸ”§ FIX: Corrected quantity: {corrected_qty}")
                 quantity = corrected_qty
 
-        print(f"   ✅ Final quantity: {quantity}")
+        print(f"   âœ… Final quantity: {quantity}")
 
         # Step 5: Check minimum notional value
         print(f"\n6. Checking Order Value...")
@@ -160,27 +161,27 @@ def debug_order_rejection(symbol="BTCUSDT", quantity=0.001):
 
         if order_value < min_notional_value:
             print(
-                f"   ❌ Order value ${order_value:.2f} below minimum ${min_notional_value}"
+                f"   âŒ Order value ${order_value:.2f} below minimum ${min_notional_value}"
             )
             required_qty = min_notional_value / current_price
-            print(f"   🔧 FIX: Need quantity of at least {required_qty:.8f}")
+            print(f"   ðŸ”§ FIX: Need quantity of at least {required_qty:.8f}")
             quantity = required_qty
             order_value = quantity * current_price
-            print(f"   🔧 Adjusted: quantity={quantity:.8f}, value=${order_value:.2f}")
+            print(f"   ðŸ”§ Adjusted: quantity={quantity:.8f}, value=${order_value:.2f}")
 
         # Check if we have enough balance for this order
         required_usdt = order_value * 1.001  # Add small buffer for fees
         if usdt_balance < required_usdt:
             print(
-                f"   ❌ Insufficient balance: need ${required_usdt:.2f}, have ${usdt_balance:.2f}"
+                f"   âŒ Insufficient balance: need ${required_usdt:.2f}, have ${usdt_balance:.2f}"
             )
             max_affordable_qty = (
                 usdt_balance * 0.99
             ) / current_price  # 99% to account for fees
-            print(f"   🔧 FIX: Maximum affordable quantity: {max_affordable_qty:.8f}")
+            print(f"   ðŸ”§ FIX: Maximum affordable quantity: {max_affordable_qty:.8f}")
             return
 
-        print(f"   ✅ Order value and balance check passed")
+        print(f"   âœ… Order value and balance check passed")
 
         # Step 6: Test order placement (ONLY in testnet!)
         print(f"\n7. Testing Order Placement (TESTNET ONLY)...")
@@ -193,14 +194,14 @@ def debug_order_rejection(symbol="BTCUSDT", quantity=0.001):
                 type=Client.ORDER_TYPE_MARKET,
                 quantity=quantity,
             )
-            print("   ✅ TEST ORDER SUCCESSFUL!")
-            print("   ✅ Your order parameters are valid")
+            print("   âœ… TEST ORDER SUCCESSFUL!")
+            print("   âœ… Your order parameters are valid")
 
             # Now try a real order if in testnet
             print(f"\n8. Placing REAL testnet order...")
             real_order = client.order_market_buy(symbol=symbol, quantity=quantity)
 
-            print("   🎉 REAL ORDER SUCCESSFUL!")
+            print("   ðŸŽ‰ REAL ORDER SUCCESSFUL!")
             print(f"   Order ID: {real_order['orderId']}")
             print(f"   Status: {real_order['status']}")
             print(f"   Executed Qty: {real_order.get('executedQty', 'N/A')}")
@@ -212,7 +213,7 @@ def debug_order_rejection(symbol="BTCUSDT", quantity=0.001):
             return True
 
         except BinanceAPIException as e:
-            print(f"   ❌ ORDER REJECTED!")
+            print(f"   âŒ ORDER REJECTED!")
             print(f"   Error Code: {e.code}")
             print(f"   Error Message: {e.message}")
 
@@ -229,19 +230,19 @@ def debug_order_rejection(symbol="BTCUSDT", quantity=0.001):
             }
 
             if e.code in error_fixes:
-                print(f"   🔧 SUGGESTED FIX: {error_fixes[e.code]}")
+                print(f"   ðŸ”§ SUGGESTED FIX: {error_fixes[e.code]}")
 
             return False
 
     except Exception as e:
-        print(f"❌ Unexpected error: {str(e)}")
+        print(f"âŒ Unexpected error: {str(e)}")
         return False
 
 
 def test_multiple_symbols():
     """Test order validation for multiple common symbols"""
     print("\n" + "=" * 60)
-    print("🧪 TESTING MULTIPLE SYMBOLS")
+    print("ðŸ§ª TESTING MULTIPLE SYMBOLS")
     print("=" * 60)
 
     test_symbols = [
@@ -253,15 +254,15 @@ def test_multiple_symbols():
     ]
 
     for symbol, qty in test_symbols:
-        print(f"\n🔍 Testing {symbol} with quantity {qty}...")
+        print(f"\nðŸ” Testing {symbol} with quantity {qty}...")
         try:
             success = debug_order_rejection(symbol, qty)
             if success:
-                print(f"   ✅ {symbol}: Working!")
+                print(f"   âœ… {symbol}: Working!")
             else:
-                print(f"   ❌ {symbol}: Has issues")
+                print(f"   âŒ {symbol}: Has issues")
         except Exception as e:
-            print(f"   ❌ {symbol}: Error - {e}")
+            print(f"   âŒ {symbol}: Error - {e}")
 
 
 def quick_balance_check():
@@ -270,7 +271,7 @@ def quick_balance_check():
     api_secret = os.getenv("BINANCE_API_SECRET")
 
     if not api_key or not api_secret:
-        print("❌ Missing API credentials")
+        print("âŒ Missing API credentials")
         return
 
     client = Client(api_key, api_secret, testnet=True)
@@ -283,7 +284,7 @@ def quick_balance_check():
             if float(b["free"]) > 0
         }
 
-        print("💰 CURRENT TESTNET BALANCES:")
+        print("ðŸ’° CURRENT TESTNET BALANCES:")
         for asset, balance in balances.items():
             if balance > 0.001:  # Only show meaningful balances
                 print(f"   {asset}: {balance:,.8f}")
@@ -292,11 +293,11 @@ def quick_balance_check():
             print("   No balances found - need testnet funds!")
 
     except Exception as e:
-        print(f"❌ Error checking balances: {e}")
+        print(f"âŒ Error checking balances: {e}")
 
 
 if __name__ == "__main__":
-    print("🚀 Choose an option:")
+    print("ðŸš€ Choose an option:")
     print("1. Debug specific order rejection")
     print("2. Test multiple symbols")
     print("3. Quick balance check")
@@ -315,3 +316,4 @@ if __name__ == "__main__":
     else:
         print("Running default debug...")
         debug_order_rejection()
+

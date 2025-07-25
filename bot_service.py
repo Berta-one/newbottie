@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 """
 Bottie Background Service (Railway Ready)
 Author: Rondanini Publishing Ltd
@@ -10,17 +11,17 @@ import time
 from hybrid_bot import AutoScanner, AutoTrader
 from datetime import datetime
 
-# ✅ Environment Variables
+# âœ… Environment Variables
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 SCAN_INTERVAL = int(os.getenv("SCAN_INTERVAL", 30))
 TRADING_PAIRS = os.getenv("TRADING_PAIRS", "BTCUSDT,ETHUSDT").split(",")
 API_KEY = os.getenv("BINANCE_API_KEY")
 API_SECRET = os.getenv("BINANCE_API_SECRET")
 
-# ✅ Connect to SocketIO message queue
+# âœ… Connect to SocketIO message queue
 socketio = SocketIO(message_queue=REDIS_URL)
 
-# ✅ Logging
+# âœ… Logging
 logging.basicConfig(
     filename="bot_service.log",
     level=logging.INFO,
@@ -34,21 +35,21 @@ def log_activity(message):
 
 
 def main():
-    log_activity("🚀 Bottie Background Service started.")
+    log_activity("ðŸš€ Bottie Background Service started.")
     scanner = AutoScanner(pairs=TRADING_PAIRS)
     trader = AutoTrader(api_key=API_KEY, api_secret=API_SECRET)
 
     while True:
         try:
-            log_activity("🔍 Running market scan...")
+            log_activity("ðŸ” Running market scan...")
             signals = scanner.run_scan()
             log_activity(f"Signals detected: {signals}")
             for signal in signals:
-                log_activity(f"📈 Processing trade signal: {signal}")
+                log_activity(f"ðŸ“ˆ Processing trade signal: {signal}")
                 result = trader.execute(signal)
-                log_activity(f"✅ Trade executed: {result}")
+                log_activity(f"âœ… Trade executed: {result}")
         except Exception as e:
-            log_activity(f"❌ Error in bot loop: {e}")
+            log_activity(f"âŒ Error in bot loop: {e}")
         time.sleep(SCAN_INTERVAL)
 
 
@@ -56,4 +57,5 @@ if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        log_activity("🛑 Bottie Background Service stopped.")
+        log_activity("ðŸ›‘ Bottie Background Service stopped.")
+

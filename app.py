@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 """
 Bottie Flask Dashboard (Railway Ready)
@@ -16,7 +17,7 @@ import psutil
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
-# ✅ Use Redis for SocketIO messaging
+# âœ… Use Redis for SocketIO messaging
 REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379')
 socketio = SocketIO(app, cors_allowed_origins="*", message_queue=REDIS_URL)
 
@@ -33,7 +34,7 @@ def is_bot_running():
 def start_bot():
     if not is_bot_running():
         subprocess.Popen(["python", BOT_SCRIPT])
-        flash("✅ Bot started!", "success")
+        flash("âœ… Bot started!", "success")
     else:
         flash("Bot already running.", "info")
     return redirect(url_for('dashboard'))
@@ -42,14 +43,14 @@ def start_bot():
 def stop_bot():
     if is_bot_running():
         os.system(f"pkill -f {BOT_SCRIPT}")
-        flash("🛑 Bot stopped.", "warning")
+        flash("ðŸ›‘ Bot stopped.", "warning")
     else:
         flash("Bot is not running.", "info")
     return redirect(url_for('dashboard'))
 
 @socketio.on('connect', namespace='/logs')
 def logs_connect():
-    print("✅ Client connected to logs namespace")
+    print("âœ… Client connected to logs namespace")
 
 BASE_TEMPLATE = """
 <!DOCTYPE html>
@@ -69,7 +70,7 @@ BASE_TEMPLATE = """
 </head>
 <body>
     <div class="navbar">
-        <div><strong>🤖 Bottie Dashboard</strong></div>
+        <div><strong>ðŸ¤– Bottie Dashboard</strong></div>
         <div>
             <a href="/">Dashboard</a>
             <a href="/bot/start" class="btn btn-start">Start Bot</a>
@@ -78,7 +79,7 @@ BASE_TEMPLATE = """
     </div>
     <div class="container" style="padding:20px;">
         {% block content %}{% endblock %}
-        <h3>📜 Live Logs</h3>
+        <h3>ðŸ“œ Live Logs</h3>
         <div id="logs"><p>Waiting for logs...</p></div>
     </div>
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
@@ -98,7 +99,7 @@ BASE_TEMPLATE = """
 
 @app.route('/')
 def dashboard():
-    bot_status = "🟢 Running" if is_bot_running() else "🔴 Stopped"
+    bot_status = "ðŸŸ¢ Running" if is_bot_running() else "ðŸ”´ Stopped"
     content = f"""
     {% extends "base" %}
     {% block content %}
@@ -113,5 +114,6 @@ def health():
     return jsonify({"status": "healthy", "timestamp": datetime.now().isoformat()})
 
 if __name__ == '__main__':
-    print("🚀 Starting Flask-SocketIO on Railway...")
+    print("ðŸš€ Starting Flask-SocketIO on Railway...")
     socketio.run(app, host='0.0.0.0', port=int(os.getenv('PORT', 8080)))
+

@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 """
 Railway Health Check Server
@@ -63,10 +64,10 @@ class HealthHandler(BaseHTTPRequestHandler):
         <html>
         <head><title>Hybrid Crypto Bot - Railway</title></head>
         <body>
-            <h1>🧠 Hybrid Crypto Bot</h1>
-            <p>✅ Running on Railway</p>
-            <p>⚛️ Quantum + 🤖 ML + 📊 Technical Analysis</p>
-            <p>🔗 <a href="/health">Health Check</a></p>
+            <h1>ðŸ§  Hybrid Crypto Bot</h1>
+            <p>âœ… Running on Railway</p>
+            <p>âš›ï¸ Quantum + ðŸ¤– ML + ðŸ“Š Technical Analysis</p>
+            <p>ðŸ”— <a href="/health">Health Check</a></p>
         </body>
         </html>
         """
@@ -91,3 +92,4 @@ def start_health_server():
 
 if __name__ == "__main__":
     start_health_server()
+

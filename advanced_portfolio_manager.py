@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
@@ -47,3 +48,4 @@ class AdvancedPortfolioManager:
 
     # ...existing code for all methods and logic...
     # (Paste the full class code you provided here)
+

@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 """
 Fallback Quantum Trader
 Used when Qiskit is not available
@@ -43,3 +44,4 @@ except ImportError:
     trader_status = trader.get_status()
 
 __all__ = ["trader", "trader_status", "FallbackQuantumTrader"]
+

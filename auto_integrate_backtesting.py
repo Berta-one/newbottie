@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 """
 Automated Backtesting Integration Script
@@ -20,10 +21,10 @@ def backup_existing_file():
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_name = f"hybrid_bot_backup_{timestamp}.py"
         shutil.copy("hybrid_bot.py", backup_name)
-        print(f"✅ Created backup: {backup_name}")
+        print(f"âœ… Created backup: {backup_name}")
         return True
     else:
-        print("❌ hybrid_bot.py not found!")
+        print("âŒ hybrid_bot.py not found!")
         return False
 
 
@@ -33,7 +34,7 @@ def read_file(filename):
         with open(filename, "r", encoding="utf-8") as f:
             return f.read()
     except Exception as e:
-        print(f"❌ Error reading {filename}: {e}")
+        print(f"âŒ Error reading {filename}: {e}")
         return None
 
 
@@ -44,7 +45,7 @@ def write_file(filename, content):
             f.write(content)
         return True
     except Exception as e:
-        print(f"❌ Error writing {filename}: {e}")
+        print(f"âŒ Error writing {filename}: {e}")
         return False
 
 
@@ -56,7 +57,7 @@ def add_backtesting_import(content):
 
     # Check if already imported
     if "from backtesting_integration import BacktestingIntegration" in content:
-        print("✅ Backtesting import already exists")
+        print("âœ… Backtesting import already exists")
         return content
 
     # Add the import after streamlit import
@@ -67,7 +68,7 @@ try:
     BACKTESTING_AVAILABLE = True
 except ImportError:
     BACKTESTING_AVAILABLE = False
-    print("⚠️ Backtesting not available - install: pip install ccxt scipy")
+    print("âš ï¸ Backtesting not available - install: pip install ccxt scipy")
 """
 
     # Find where to insert
@@ -81,10 +82,10 @@ except ImportError:
 
     if insert_position > 0:
         lines.insert(insert_position, new_import)
-        print("✅ Added backtesting import")
+        print("âœ… Added backtesting import")
         return "\n".join(lines)
     else:
-        print("⚠️ Could not find streamlit import - adding at top")
+        print("âš ï¸ Could not find streamlit import - adding at top")
         return new_import + "\n" + content
 
 
@@ -104,22 +105,22 @@ def update_tabs_definition(content):
 
             # Check if backtesting already included
             if "Backtesting" in existing_tabs:
-                print("✅ Backtesting tab already exists")
+                print("âœ… Backtesting tab already exists")
                 return content
 
             # Add backtesting tab
             # Remove the closing bracket and add backtesting
             updated_tabs = (
-                existing_tabs.rstrip().rstrip(",") + ',\n        "🔬 Backtesting"'
+                existing_tabs.rstrip().rstrip(",") + ',\n        "ðŸ”¬ Backtesting"'
             )
 
             new_tabs_def = f"tabs = st.tabs([\n        {updated_tabs}\n    ])"
 
             updated_content = re.sub(pattern, new_tabs_def, content, flags=re.DOTALL)
-            print("✅ Added backtesting tab to tabs definition")
+            print("âœ… Added backtesting tab to tabs definition")
             return updated_content
 
-    print("⚠️ Could not find tabs definition - you may need to add manually")
+    print("âš ï¸ Could not find tabs definition - you may need to add manually")
     return content
 
 
@@ -128,7 +129,7 @@ def add_backtesting_tab_implementation(content):
 
     # Check if already implemented
     if "render_backtesting_tab" in content or "BacktestingIntegration()" in content:
-        print("✅ Backtesting tab implementation already exists")
+        print("âœ… Backtesting tab implementation already exists")
         return content
 
     # Look for the last tab implementation
@@ -156,10 +157,10 @@ with tabs[{next_tab_index}]:
             backtesting = BacktestingIntegration()
             backtesting.render_backtesting_tab()
         except Exception as e:
-            st.error(f"❌ Backtesting error: {{str(e)}}")
+            st.error(f"âŒ Backtesting error: {{str(e)}}")
             st.info("Try running: pip install ccxt scipy")
     else:
-        st.error("🔬 Backtesting Unavailable")
+        st.error("ðŸ”¬ Backtesting Unavailable")
         st.markdown(\"\"\"
         **Backtesting requires additional dependencies:**
         
@@ -181,11 +182,11 @@ with tabs[{next_tab_index}]:
         updated_content = (
             content[:insert_position] + backtesting_tab_code + content[insert_position:]
         )
-        print(f"✅ Added backtesting tab implementation at index {next_tab_index}")
+        print(f"âœ… Added backtesting tab implementation at index {next_tab_index}")
         return updated_content
 
     else:
-        print("⚠️ Could not find tab implementations - you may need to add manually")
+        print("âš ï¸ Could not find tab implementations - you may need to add manually")
         return content
 
 
@@ -194,7 +195,7 @@ def enhance_sidebar(content):
 
     # Check if already enhanced
     if "Quick Backtest" in content:
-        print("✅ Sidebar already enhanced with backtesting")
+        print("âœ… Sidebar already enhanced with backtesting")
         return content
 
     # Look for sidebar section
@@ -209,9 +210,9 @@ def enhance_sidebar(content):
         sidebar_enhancement = """
         # Quick backtesting
         if BACKTESTING_AVAILABLE:
-            st.markdown("**🔬 Quick Backtest**")
+            st.markdown("**ðŸ”¬ Quick Backtest**")
             
-            if st.button("🚀 Run Quick Test", use_container_width=True):
+            if st.button("ðŸš€ Run Quick Test", use_container_width=True):
                 try:
                     # Initialize and run demo backtest
                     backtesting = BacktestingIntegration()
@@ -226,10 +227,10 @@ def enhance_sidebar(content):
         updated_content = (
             content[:insert_position] + sidebar_enhancement + content[insert_position:]
         )
-        print("✅ Enhanced sidebar with quick backtesting")
+        print("âœ… Enhanced sidebar with quick backtesting")
         return updated_content
 
-    print("⚠️ Could not find sidebar section")
+    print("âš ï¸ Could not find sidebar section")
     return content
 
 
@@ -241,33 +242,33 @@ def validate_integration(content):
             "Backtesting import",
             "from backtesting_integration import BacktestingIntegration" in content,
         ),
-        ("Backtesting tab", '"🔬 Backtesting"' in content),
+        ("Backtesting tab", '"ðŸ”¬ Backtesting"' in content),
         ("Tab implementation", "BacktestingIntegration()" in content),
         ("Error handling", "BACKTESTING_AVAILABLE" in content),
     ]
 
-    print("\n🔍 INTEGRATION VALIDATION:")
+    print("\nðŸ” INTEGRATION VALIDATION:")
     print("=" * 40)
 
     all_passed = True
     for check_name, passed in checks:
-        status = "✅" if passed else "❌"
+        status = "âœ…" if passed else "âŒ"
         print(f"{status} {check_name}")
         if not passed:
             all_passed = False
 
     if all_passed:
-        print("\n🎉 All integration checks passed!")
+        print("\nðŸŽ‰ All integration checks passed!")
         return True
     else:
-        print("\n⚠️ Some checks failed - manual review needed")
+        print("\nâš ï¸ Some checks failed - manual review needed")
         return False
 
 
 def main():
     """Main integration script"""
 
-    print("🚀 AUTOMATED BACKTESTING INTEGRATION")
+    print("ðŸš€ AUTOMATED BACKTESTING INTEGRATION")
     print("=" * 50)
 
     # Step 1: Backup existing file
@@ -275,13 +276,13 @@ def main():
         return False
 
     # Step 2: Read existing content
-    print("📖 Reading existing hybrid_bot.py...")
+    print("ðŸ“– Reading existing hybrid_bot.py...")
     content = read_file("hybrid_bot.py")
     if not content:
         return False
 
     # Step 3: Apply modifications
-    print("🔧 Applying backtesting integration...")
+    print("ðŸ”§ Applying backtesting integration...")
 
     content = add_backtesting_import(content)
     content = update_tabs_definition(content)
@@ -289,7 +290,7 @@ def main():
     content = enhance_sidebar(content)
 
     # Step 4: Write updated file
-    print("💾 Writing updated hybrid_bot.py...")
+    print("ðŸ’¾ Writing updated hybrid_bot.py...")
     if not write_file("hybrid_bot.py", content):
         return False
 
@@ -297,32 +298,32 @@ def main():
     validate_integration(content)
 
     print("\n" + "=" * 50)
-    print("✅ INTEGRATION COMPLETE!")
+    print("âœ… INTEGRATION COMPLETE!")
     print("=" * 50)
     print(
         """
-🎯 WHAT WAS DONE:
-✅ Created backup of original file
-✅ Added backtesting imports with error handling
-✅ Updated tabs to include 🔬 Backtesting
-✅ Added full backtesting tab implementation  
-✅ Enhanced sidebar with quick actions
-✅ Validated all changes
+ðŸŽ¯ WHAT WAS DONE:
+âœ… Created backup of original file
+âœ… Added backtesting imports with error handling
+âœ… Updated tabs to include ðŸ”¬ Backtesting
+âœ… Added full backtesting tab implementation  
+âœ… Enhanced sidebar with quick actions
+âœ… Validated all changes
 
-🚀 NEXT STEPS:
+ðŸš€ NEXT STEPS:
 1. Save the backtesting_integration.py file (from first artifact)
 2. Install dependencies: pip install ccxt scipy
 3. Run your bot: streamlit run hybrid_bot.py
-4. Navigate to the new 🔬 Backtesting tab
-5. Click "🔄 Demo Backtest" to test functionality
+4. Navigate to the new ðŸ”¬ Backtesting tab
+5. Click "ðŸ”„ Demo Backtest" to test functionality
 
-🔧 IF ISSUES OCCUR:
+ðŸ”§ IF ISSUES OCCUR:
 - Check the backup file created
 - Manually review the changes
 - Install missing dependencies
 - Check console for error messages
 
-Your Bottie now has professional backtesting! 🎉
+Your Bottie now has professional backtesting! ðŸŽ‰
 """
     )
 
@@ -332,8 +333,9 @@ Your Bottie now has professional backtesting! 🎉
 if __name__ == "__main__":
     success = main()
     if not success:
-        print("\n❌ Integration failed - check errors above")
+        print("\nâŒ Integration failed - check errors above")
         exit(1)
     else:
-        print("\n🎉 Integration successful!")
+        print("\nðŸŽ‰ Integration successful!")
         exit(0)
+

@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 import random
 
 
@@ -68,3 +69,4 @@ try:
 
 except ImportError:
     quantum_trader = FallbackQuantumTrader()
+

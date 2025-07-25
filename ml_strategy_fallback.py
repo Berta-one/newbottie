@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 """
 ml_strategy_fallback.py
 ======================
@@ -147,3 +148,4 @@ class MLEnhancedStrategy:
             final_signal = "HOLD" if combined_confidence < 0.6 else traditional_signal
 
         return final_signal, min(1.0, combined_confidence)
+

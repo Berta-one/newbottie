@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 import os
 import time
 import streamlit as st
@@ -432,7 +433,7 @@ class MultiCoinPortfolioBot:
             self.client.get_server_time()
             return True
         except Exception as e:
-            st.error(f"❌ Binance connection failed: {e}")
+            st.error(f"âŒ Binance connection failed: {e}")
             return False
 
     def get_portfolio_holdings(self):
@@ -514,7 +515,7 @@ class MultiCoinPortfolioBot:
             return portfolio
 
         except Exception as e:
-            st.error(f"❌ Error fetching portfolio: {e}")
+            st.error(f"âŒ Error fetching portfolio: {e}")
             return {}
 
 
@@ -537,11 +538,11 @@ def render_overview_tab(
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        st.metric("💷 Portfolio Value", f"£{total_gbp:,.2f}")
+        st.metric("ðŸ’· Portfolio Value", f"Â£{total_gbp:,.2f}")
 
     with col2:
         condition_color = (
-            "🟢" if condition_score > 0.6 else "🟡" if condition_score > 0.4 else "🔴"
+            "ðŸŸ¢" if condition_score > 0.6 else "ðŸŸ¡" if condition_score > 0.4 else "ðŸ”´"
         )
         st.metric(
             f"{condition_color} Market", market_condition.replace("_", " ").title()
@@ -553,17 +554,17 @@ def render_overview_tab(
             if avg_volatility > 3
             else "Medium" if avg_volatility > 1.5 else "Low"
         )
-        st.metric("📈 Volatility", f"{avg_volatility:.1f}%")
+        st.metric("ðŸ“ˆ Volatility", f"{avg_volatility:.1f}%")
 
     with col4:
         st.metric(
-            "🎯 Active Profile", risk_manager.risk_profiles[recommended_profile]["name"]
+            "ðŸŽ¯ Active Profile", risk_manager.risk_profiles[recommended_profile]["name"]
         )
 
     st.divider()
 
     # Portfolio breakdown
-    st.subheader("💼 Portfolio Holdings")
+    st.subheader("ðŸ’¼ Portfolio Holdings")
 
     # Create portfolio table
     portfolio_data = []
@@ -574,7 +575,7 @@ def render_overview_tab(
                 "Balance": f"{data['balance']:.4f}",
                 "Price (USD)": f"${data['price_usd']:.4f}",
                 "Value (USD)": f"${data['usd_value']:.2f}",
-                "Value (GBP)": f"£{bot.get_portfolio_value_gbp(data['usd_value']):.2f}",
+                "Value (GBP)": f"Â£{bot.get_portfolio_value_gbp(data['usd_value']):.2f}",
                 "Percentage": f"{(data['usd_value'] / total_usd * 100):.1f}%",
             }
         )
@@ -585,11 +586,11 @@ def render_overview_tab(
     # Quick stats
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("🪙 Total Assets", len(portfolio))
+        st.metric("ðŸª™ Total Assets", len(portfolio))
     with col2:
-        st.metric("💰 USD Value", f"${total_usd:,.2f}")
+        st.metric("ðŸ’° USD Value", f"${total_usd:,.2f}")
     with col3:
-        st.metric("🔄 Exchange Rate", f"1 USD = £{bot.usd_to_gbp_rate:.4f}")
+        st.metric("ðŸ”„ Exchange Rate", f"1 USD = Â£{bot.usd_to_gbp_rate:.4f}")
 
 
 def render_risk_management_tab(
@@ -597,7 +598,7 @@ def render_risk_management_tab(
 ):
     """Render the risk management details tab"""
 
-    st.subheader("⚖️ Dynamic Risk Rules by Asset")
+    st.subheader("âš–ï¸ Dynamic Risk Rules by Asset")
 
     for asset, data in portfolio.items():
         confidence = np.random.uniform(0.6, 0.95)  # Simulated confidence
@@ -614,7 +615,7 @@ def render_risk_management_tab(
                 st.metric("Holdings", f"{data['balance']:.4f} {asset}")
             with col2:
                 st.metric("USD Value", f"${data['usd_value']:.2f}")
-                st.metric("GBP Value", f"£{data['usd_value'] * 0.79:.2f}")
+                st.metric("GBP Value", f"Â£{data['usd_value'] * 0.79:.2f}")
 
             st.divider()
 
@@ -666,12 +667,12 @@ def render_risk_management_tab(
 def render_profiles_tab(risk_manager):
     """Render the risk profiles information tab"""
 
-    st.subheader("📊 Professional Risk Management Profiles")
+    st.subheader("ðŸ“Š Professional Risk Management Profiles")
 
     col1, col2 = st.columns(2)
 
     with col1:
-        st.markdown("### 🛡️ Available Profiles")
+        st.markdown("### ðŸ›¡ï¸ Available Profiles")
         for profile_key, profile in risk_manager.risk_profiles.items():
             with st.expander(f"{profile['name']} Profile"):
                 st.write(f"**Description:** {profile['description']}")
@@ -687,22 +688,22 @@ def render_profiles_tab(risk_manager):
                 st.write(f"**Min Confidence:** {profile['confidence_threshold']:.0%}")
 
     with col2:
-        st.markdown("### 🌍 Market Conditions")
+        st.markdown("### ðŸŒ Market Conditions")
 
         for condition, description in risk_manager.market_conditions.items():
             condition_formatted = condition.replace("_", " ").title()
 
             # Add icons for conditions
             icon = (
-                "🟢"
+                "ðŸŸ¢"
                 if "BULL" in condition
                 else (
-                    "🔴"
+                    "ðŸ”´"
                     if "BEAR" in condition
                     else (
-                        "🟡"
+                        "ðŸŸ¡"
                         if "VOLATILITY" in condition
-                        else "⚪" if "CONSOLIDATING" in condition else "❓"
+                        else "âšª" if "CONSOLIDATING" in condition else "â“"
                     )
                 )
             )
@@ -711,7 +712,7 @@ def render_profiles_tab(risk_manager):
 
         st.divider()
 
-        st.markdown("### 🧠 Auto-Selection Logic")
+        st.markdown("### ðŸ§  Auto-Selection Logic")
         st.write(
             """
         **The system automatically selects profiles based on:**
@@ -727,13 +728,13 @@ def render_profiles_tab(risk_manager):
 def render_analytics_tab(portfolio, market_condition, avg_volatility):
     """Render analytics and insights tab"""
 
-    st.subheader("📈 Market Analysis & Insights")
+    st.subheader("ðŸ“ˆ Market Analysis & Insights")
 
     # Market condition details
     col1, col2 = st.columns(2)
 
     with col1:
-        st.markdown("### 🌐 Current Market State")
+        st.markdown("### ðŸŒ Current Market State")
 
         condition_color = (
             "success"
@@ -759,45 +760,45 @@ def render_analytics_tab(portfolio, market_condition, avg_volatility):
         st.write(f"**Volatility Assessment:** {vol_class}")
 
     with col2:
-        st.markdown("### 💡 Trading Insights")
+        st.markdown("### ðŸ’¡ Trading Insights")
 
         # Generate insights based on market condition
         insights = []
 
         if market_condition == "BULL_TRENDING":
             insights = [
-                "🟢 Consider swing trading strategies",
-                "📈 Trend following approaches favored",
-                "⏳ Longer hold times may be beneficial",
-                "🎯 Higher take profit targets appropriate",
+                "ðŸŸ¢ Consider swing trading strategies",
+                "ðŸ“ˆ Trend following approaches favored",
+                "â³ Longer hold times may be beneficial",
+                "ðŸŽ¯ Higher take profit targets appropriate",
             ]
         elif market_condition == "BEAR_TRENDING":
             insights = [
-                "🔴 Focus on capital preservation",
-                "🛡️ Tighter stop losses recommended",
-                "⚡ Quick scalping may be safer",
-                "💰 Consider reducing position sizes",
+                "ðŸ”´ Focus on capital preservation",
+                "ðŸ›¡ï¸ Tighter stop losses recommended",
+                "âš¡ Quick scalping may be safer",
+                "ðŸ’° Consider reducing position sizes",
             ]
         elif market_condition == "HIGH_VOLATILITY":
             insights = [
-                "⚡ High frequency trading opportunities",
-                "🎯 Smaller, quicker profit targets",
-                "⏱️ Shorter hold times preferred",
-                "📊 Monitor closely for rapid changes",
+                "âš¡ High frequency trading opportunities",
+                "ðŸŽ¯ Smaller, quicker profit targets",
+                "â±ï¸ Shorter hold times preferred",
+                "ðŸ“Š Monitor closely for rapid changes",
             ]
         elif market_condition == "CONSOLIDATING":
             insights = [
-                "📦 Range trading strategies favored",
-                "🔄 Buy support, sell resistance",
-                "⏳ Patience required for breakouts",
-                "📊 Volume confirmation important",
+                "ðŸ“¦ Range trading strategies favored",
+                "ðŸ”„ Buy support, sell resistance",
+                "â³ Patience required for breakouts",
+                "ðŸ“Š Volume confirmation important",
             ]
         else:  # UNCERTAIN
             insights = [
-                "❓ Wait for clearer signals",
-                "🛡️ Conservative approach recommended",
-                "📊 Monitor multiple timeframes",
-                "⏳ Patience is key in uncertainty",
+                "â“ Wait for clearer signals",
+                "ðŸ›¡ï¸ Conservative approach recommended",
+                "ðŸ“Š Monitor multiple timeframes",
+                "â³ Patience is key in uncertainty",
             ]
 
         for insight in insights:
@@ -806,7 +807,7 @@ def render_analytics_tab(portfolio, market_condition, avg_volatility):
     st.divider()
 
     # Portfolio insights
-    st.markdown("### 💼 Portfolio Insights")
+    st.markdown("### ðŸ’¼ Portfolio Insights")
 
     # Calculate portfolio metrics
     total_value = sum(coin["usd_value"] for coin in portfolio.values())
@@ -850,9 +851,9 @@ def render_analytics_tab(portfolio, market_condition, avg_volatility):
 
 
 def main():
-    st.set_page_config(page_title="🎯 Adaptive Risk Management Bot", layout="wide")
+    st.set_page_config(page_title="ðŸŽ¯ Adaptive Risk Management Bot", layout="wide")
 
-    st.title("🎯 Adaptive Risk Management Trading Bot")
+    st.title("ðŸŽ¯ Adaptive Risk Management Trading Bot")
     st.caption("Professional, emotion-free trading with dynamic risk adjustment")
 
     # Initialize bot
@@ -916,11 +917,11 @@ def main():
         # Create tabs
         tab1, tab2, tab3, tab4, tab5 = st.tabs(
             [
-                "🏠 Overview",
-                "⚖️ Risk Management",
-                "📊 Profiles",
-                "📈 Analytics",
-                "⚙️ Settings",
+                "ðŸ  Overview",
+                "âš–ï¸ Risk Management",
+                "ðŸ“Š Profiles",
+                "ðŸ“ˆ Analytics",
+                "âš™ï¸ Settings",
             ]
         )
 
@@ -947,12 +948,12 @@ def main():
             render_analytics_tab(portfolio, market_condition, avg_volatility)
 
         with tab5:
-            st.subheader("⚙️ System Configuration")
+            st.subheader("âš™ï¸ System Configuration")
 
             col1, col2 = st.columns(2)
 
             with col1:
-                st.markdown("### 🔧 Current Settings")
+                st.markdown("### ðŸ”§ Current Settings")
                 settings = {
                     "Risk Management": "Adaptive, market-condition based",
                     "Profiles Available": len(risk_manager.risk_profiles),
@@ -968,30 +969,30 @@ def main():
                     st.write(f"**{key}:** {value}")
 
             with col2:
-                st.markdown("### 🔗 Connection Status")
+                st.markdown("### ðŸ”— Connection Status")
 
                 # Connection info
                 if bot.client:
-                    st.success("✅ Binance API Connected")
+                    st.success("âœ… Binance API Connected")
                     mode = "Testnet" if USE_TESTNET else "Live Trading"
-                    st.info(f"📡 Mode: {mode}")
+                    st.info(f"ðŸ“¡ Mode: {mode}")
                 else:
-                    st.error("❌ Binance API Not Connected")
+                    st.error("âŒ Binance API Not Connected")
 
-                st.write(f"**Exchange Rate:** 1 USD = £{bot.usd_to_gbp_rate:.4f}")
+                st.write(f"**Exchange Rate:** 1 USD = Â£{bot.usd_to_gbp_rate:.4f}")
                 st.write(f"**Min Balance Filter:** ${MIN_BALANCE_USD}")
                 st.write(f"**Last Update:** {datetime.now().strftime('%H:%M:%S')}")
 
                 # Manual refresh button
-                if st.button("🔄 Refresh Data"):
+                if st.button("ðŸ”„ Refresh Data"):
                     st.rerun()
 
     else:
         st.warning(
-            "⚠️ No portfolio data available. Please check your Binance API connection."
+            "âš ï¸ No portfolio data available. Please check your Binance API connection."
         )
 
-        with st.expander("🔧 Setup Instructions"):
+        with st.expander("ðŸ”§ Setup Instructions"):
             st.markdown(
                 """
             ### Quick Setup:
@@ -1033,3 +1034,4 @@ class BotController:
 
     def is_running(self):
         return self.running
+

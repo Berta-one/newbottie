@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 """
 Advanced Risk Management System - risk_manager.py
@@ -555,3 +556,4 @@ if __name__ == "__main__":
     print(f"  Reason: {validation.reason}")
     print(f"  Risk Score: {validation.risk_score}")
     print(f"  Warnings: {validation.warnings}")
+

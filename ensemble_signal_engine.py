@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 """
 ensemble_signal_engine.py
 ===========================
@@ -57,3 +58,4 @@ class EnsembleSignalEngine:
             "distribution": {"buy": final_score, "sell": 1 - final_score, "hold": 0.1},
             "circuit": q_signal.get("circuit", ""),
         }
+

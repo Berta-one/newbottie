@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 # relaxed_strategy.py
 # Place your enhanced_strategy_check and related functions here (from Claude's code or your own)
 
@@ -132,3 +133,4 @@ def enhanced_strategy_check(klines):
         "timestamp": datetime.now().isoformat(),
         "strategy": "relaxed_multi",
     }
+

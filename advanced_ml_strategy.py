@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 """
 advanced_ml_strategy.py
 =======================
@@ -85,3 +86,4 @@ class AdvancedMLStrategy:
         features_scaled = self.scaler.transform(features)
         prediction = self.model.predict(features_scaled)[0]
         return "BUY" if prediction == 1 else "SELL"
+

@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 import os
 import subprocess
 import sys
@@ -41,3 +42,4 @@ try:
 except Exception as e:
     print(f"Error starting Streamlit: {e}")
     sys.exit(1)
+

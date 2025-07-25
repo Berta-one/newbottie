@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 """
 Update requirements.txt with missing dependencies
@@ -50,15 +51,16 @@ def update_requirements():
             for dep in additions:
                 f.write(f"{dep}\n")
 
-        print(f"\n✅ Updated {req_file}")
+        print(f"\nâœ… Updated {req_file}")
     else:
-        print("✅ All dependencies already present")
+        print("âœ… All dependencies already present")
 
     # Show final requirements
-    print(f"\n📋 Final requirements.txt:")
+    print(f"\nðŸ“‹ Final requirements.txt:")
     with open(req_file, "r") as f:
         print(f.read())
 
 
 if __name__ == "__main__":
     update_requirements()
+

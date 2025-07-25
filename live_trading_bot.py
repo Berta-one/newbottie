@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 import os
 import time
 import streamlit as st
@@ -16,7 +17,7 @@ class TradingBot:
         import random
 
         # Simulate realistic price movement
-        change = random.uniform(-0.01, 0.01)  # ±1% change
+        change = random.uniform(-0.01, 0.01)  # Â±1% change
         self.base_price *= 1 + change
         return self.base_price
 
@@ -33,7 +34,7 @@ class TradingBot:
 
 def main():
 
-    st.title("🚀 Live Crypto Trading Bot - Enhanced Version")
+    st.title("ðŸš€ Live Crypto Trading Bot - Enhanced Version")
     st.caption("Real-time trading simulation with advanced features")
 
     # Initialize bot
@@ -46,36 +47,36 @@ def main():
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        st.metric("🟢 Status", "LIVE", "24/7 Active")
+        st.metric("ðŸŸ¢ Status", "LIVE", "24/7 Active")
 
     with col2:
-        st.metric("☁️ Platform", "Railway", "Cloud Hosted")
+        st.metric("â˜ï¸ Platform", "Railway", "Cloud Hosted")
 
     with col3:
-        st.metric("💰 Balance", "$10,000.00", "USDT (Simulated)")
+        st.metric("ðŸ’° Balance", "$10,000.00", "USDT (Simulated)")
 
     with col4:
-        st.metric("⏰ Time", datetime.now().strftime("%H:%M:%S"), "Live")
+        st.metric("â° Time", datetime.now().strftime("%H:%M:%S"), "Live")
 
     # Market data
     current_price = bot.get_current_price()
     signal, confidence = bot.analyze_market()
 
-    st.subheader("📈 Market Analysis")
+    st.subheader("ðŸ“ˆ Market Analysis")
 
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        st.metric("💰 BTC/USDT", f"${current_price:,.2f}", "+1.23%")
+        st.metric("ðŸ’° BTC/USDT", f"${current_price:,.2f}", "+1.23%")
 
     with col2:
         signal_color = (
-            "🟢" if signal == "BUY_LONG" else "🔴" if signal == "BUY_SHORT" else "🟡"
+            "ðŸŸ¢" if signal == "BUY_LONG" else "ðŸ”´" if signal == "BUY_SHORT" else "ðŸŸ¡"
         )
         st.metric(f"{signal_color} Signal", signal, f"Conf: {confidence:.1%}")
 
     with col3:
-        st.metric("📊 Strategy", "Enhanced 5%", "Breakout Detection")
+        st.metric("ðŸ“Š Strategy", "Enhanced 5%", "Breakout Detection")
 
     # Simulate trading activity
     if signal != "HOLD" and confidence > 0.8:
@@ -92,36 +93,36 @@ def main():
             bot.trades.pop(0)  # Keep only last 10
         bot.trades.append(trade)
 
-        st.success(f"🎯 New Signal: {signal} at ${current_price:,.2f}")
+        st.success(f"ðŸŽ¯ New Signal: {signal} at ${current_price:,.2f}")
 
     # Display recent activity
-    st.subheader("📋 Recent Trading Activity")
+    st.subheader("ðŸ“‹ Recent Trading Activity")
 
     if bot.trades:
         df = pd.DataFrame(bot.trades)
         st.dataframe(df, use_container_width=True)
     else:
-        st.info("🕐 Waiting for high-confidence trading signals...")
+        st.info("ðŸ• Waiting for high-confidence trading signals...")
 
     # Performance metrics
-    st.subheader("📊 Performance Summary")
+    st.subheader("ðŸ“Š Performance Summary")
 
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        st.metric("🎯 Total Signals", len(bot.trades))
+        st.metric("ðŸŽ¯ Total Signals", len(bot.trades))
 
     with col2:
-        st.metric("📈 Success Rate", "87.5%")
+        st.metric("ðŸ“ˆ Success Rate", "87.5%")
 
     with col3:
-        st.metric("💰 Total P&L", "+12.4%")
+        st.metric("ðŸ’° Total P&L", "+12.4%")
 
     with col4:
-        st.metric("⚡ Avg Trade", "+1.8%")
+        st.metric("âš¡ Avg Trade", "+1.8%")
 
     # Configuration
-    with st.expander("⚙️ Bot Configuration"):
+    with st.expander("âš™ï¸ Bot Configuration"):
         st.json(
             {
                 "Strategy": "Enhanced 5% Breakout",
@@ -135,16 +136,16 @@ def main():
         )
 
     # Next steps info
-    st.subheader("🚀 Next Steps")
+    st.subheader("ðŸš€ Next Steps")
     st.info(
         """
-    **Current Status:** ✅ Advanced simulation running on Railway
+    **Current Status:** âœ… Advanced simulation running on Railway
     
     **Ready to add:**
-    1. 🔗 Real Binance testnet connection
-    2. 📊 Live market data feed
-    3. 🎯 Actual trade execution
-    4. 📈 Real performance tracking
+    1. ðŸ”— Real Binance testnet connection
+    2. ðŸ“Š Live market data feed
+    3. ðŸŽ¯ Actual trade execution
+    4. ðŸ“ˆ Real performance tracking
     
     **Safe approach:** Test thoroughly before going live!
     """
@@ -157,3 +158,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 """
 Authentication System - auth.py
@@ -107,14 +108,14 @@ class AuthSystem:
 
     def render_login_form(self) -> bool:
         """Render login form and handle authentication"""
-        st.title("🔐 Trading Bot Login")
+        st.title("ðŸ” Trading Bot Login")
         st.markdown("---")
 
         # Check lockout
         if self.is_locked_out():
             lockout_time = self.get_lockout_time_remaining()
             st.error(
-                f"🚫 Too many failed attempts. Try again in {lockout_time} seconds."
+                f"ðŸš« Too many failed attempts. Try again in {lockout_time} seconds."
             )
             st.stop()
 
@@ -124,7 +125,7 @@ class AuthSystem:
                 self.max_login_attempts - st.session_state.login_attempts
             )
             st.warning(
-                f"⚠️ {st.session_state.login_attempts} failed attempts. {remaining_attempts} remaining."
+                f"âš ï¸ {st.session_state.login_attempts} failed attempts. {remaining_attempts} remaining."
             )
 
         # Login form
@@ -132,25 +133,25 @@ class AuthSystem:
             col1, col2, col3 = st.columns([1, 2, 1])
 
             with col2:
-                st.subheader("🤖 Bot Access")
-                username = st.text_input("👤 Username", value="admin")
-                password = st.text_input("🔑 Password", type="password")
+                st.subheader("ðŸ¤– Bot Access")
+                username = st.text_input("ðŸ‘¤ Username", value="admin")
+                password = st.text_input("ðŸ”‘ Password", type="password")
                 submit_button = st.form_submit_button(
-                    "🚀 Login", use_container_width=True
+                    "ðŸš€ Login", use_container_width=True
                 )
 
                 if submit_button:
                     if not username or not password:
-                        st.error("❌ Please enter both username and password")
+                        st.error("âŒ Please enter both username and password")
                         return False
 
                     if self.authenticate(username, password):
-                        st.success("✅ Login successful! Redirecting...")
+                        st.success("âœ… Login successful! Redirecting...")
                         time.sleep(1)
                         st.rerun()
                         return True
                     else:
-                        st.error("❌ Invalid credentials")
+                        st.error("âŒ Invalid credentials")
                         time.sleep(1)
                         st.rerun()
                         return False
@@ -160,11 +161,11 @@ class AuthSystem:
         col1, col2 = st.columns(2)
         with col1:
             st.info(
-                "🛡️ **Security Features:**\n- Session timeout: 8 hours\n- Max attempts: 5\n- Lockout: 5 minutes"
+                "ðŸ›¡ï¸ **Security Features:**\n- Session timeout: 8 hours\n- Max attempts: 5\n- Lockout: 5 minutes"
             )
         with col2:
             st.info(
-                "🚀 **Railway Deployment:**\n- Live trading enabled\n- Real-time monitoring\n- Auto-notifications"
+                "ðŸš€ **Railway Deployment:**\n- Live trading enabled\n- Real-time monitoring\n- Auto-notifications"
             )
 
         return False
@@ -173,21 +174,21 @@ class AuthSystem:
         """Render logout button in sidebar"""
         with st.sidebar:
             st.markdown("---")
-            if st.button("🚪 Logout", use_container_width=True):
+            if st.button("ðŸšª Logout", use_container_width=True):
                 self.logout()
-                st.success("👋 Logged out successfully")
+                st.success("ðŸ‘‹ Logged out successfully")
                 time.sleep(1)
                 st.rerun()
 
             # Show session info
             if st.session_state.login_time:
                 login_time = datetime.fromtimestamp(st.session_state.login_time)
-                st.caption(f"🕐 Logged in: {login_time.strftime('%H:%M:%S')}")
+                st.caption(f"ðŸ• Logged in: {login_time.strftime('%H:%M:%S')}")
 
                 time_elapsed = time.time() - st.session_state.login_time
                 hours, remainder = divmod(int(time_elapsed), 3600)
                 minutes, seconds = divmod(remainder, 60)
-                st.caption(f"⏱️ Session: {hours:02d}:{minutes:02d}:{seconds:02d}")
+                st.caption(f"â±ï¸ Session: {hours:02d}:{minutes:02d}:{seconds:02d}")
 
 
 def require_authentication():
@@ -211,3 +212,4 @@ def require_authentication():
 # auth = require_authentication()
 #
 # # Rest of your app code continues normally...
+

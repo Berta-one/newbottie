@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 """
 Unified Portfolio Value Calculator
@@ -87,7 +88,7 @@ class UnifiedPortfolioCalculator:
                 portfolio_data, total_usd
             ),
             "formatted_usd": f"${total_usd:,.2f}",
-            "formatted_gbp": f"£{total_gbp:,.2f}",
+            "formatted_gbp": f"Â£{total_gbp:,.2f}",
         }
 
     def _get_largest_holding_percentage(self, portfolio_data, total_usd):
@@ -132,7 +133,7 @@ class UnifiedPortfolioCalculator:
                         "Balance": f"{balance:.8f}".rstrip("0").rstrip("."),
                         "Price (USD)": f"${price_usd:.4f}",
                         "Value (USD)": f"${usd_value:.2f}",
-                        "Value (GBP)": f"£{usd_value * gbp_rate:.2f}",
+                        "Value (GBP)": f"Â£{usd_value * gbp_rate:.2f}",
                         "24h Change": f"{change_24h:.2f}%",
                         "Percentage": (
                             f"{(usd_value / total_usd * 100):.1f}%"
@@ -170,7 +171,7 @@ def debug_portfolio_values(portfolio_data, location="unknown"):
     print(f"\n=== PORTFOLIO DEBUG [{location}] ===")
 
     if not portfolio_data:
-        print("❌ Portfolio data is empty")
+        print("âŒ Portfolio data is empty")
         return 0.0
 
     total_debug = 0.0
@@ -180,7 +181,8 @@ def debug_portfolio_values(portfolio_data, location="unknown"):
             print(f"{asset}: ${usd_value:.2f}")
             total_debug += float(usd_value)
 
-    print(f"🔢 Total calculated: ${total_debug:.2f}")
+    print(f"ðŸ”¢ Total calculated: ${total_debug:.2f}")
     print("=" * 40)
 
     return total_debug
+

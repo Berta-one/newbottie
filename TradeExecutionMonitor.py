@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 """
 Real-Time Trade Execution Monitor
@@ -259,14 +260,14 @@ class TradeExecutionMonitor:
 
             # Step 4: Ask for real trade confirmation
             print("\n" + "=" * 60)
-            print("🎯 READY TO EXECUTE REAL TRADE")
+            print("ðŸŽ¯ READY TO EXECUTE REAL TRADE")
             print("=" * 60)
             print(f"Symbol: {symbol}")
             print(f"Side: BUY")
             print(f"Quantity: {quantity:.8f}")
             print(f"Estimated Cost: ${notional_value:.2f}")
             print(f"Current Price: ${current_price:,.2f}")
-            print("\n⚠️ WARNING: This will be a REAL trade with REAL money!")
+            print("\nâš ï¸ WARNING: This will be a REAL trade with REAL money!")
 
             confirm = input("\nType 'EXECUTE' to place real order: ")
 
@@ -311,18 +312,18 @@ class TradeExecutionMonitor:
 
             # Provide specific error guidance
             if e.code == -1013:
-                print(f"\n🔧 SOLUTION FOR -1013:")
+                print(f"\nðŸ”§ SOLUTION FOR -1013:")
                 print(f"   Order violates trading rules")
                 print(f"   Min quantity: {trading_rules.get('min_qty', 'Unknown')}")
                 print(
                     f"   Min notional: ${trading_rules.get('min_notional', 'Unknown')}"
                 )
             elif e.code == -2010:
-                print(f"\n🔧 SOLUTION FOR -2010:")
+                print(f"\nðŸ”§ SOLUTION FOR -2010:")
                 print(f"   Insufficient account balance")
                 print(f"   Check USDT balance vs required ${notional_value:.2f}")
             elif e.code == -2015:
-                print(f"\n🔧 SOLUTION FOR -2015:")
+                print(f"\nðŸ”§ SOLUTION FOR -2015:")
                 print(f"   API permissions issue - enable 'Spot & Margin Trading'")
 
             return False
@@ -335,8 +336,8 @@ class TradeExecutionMonitor:
 
     def run_full_diagnostic(self):
         """Run complete trade execution diagnostic"""
-        print(f"🚀 STARTING COMPREHENSIVE TRADE EXECUTION DIAGNOSTIC")
-        print(f"📝 Logging to: {self.log_file}")
+        print(f"ðŸš€ STARTING COMPREHENSIVE TRADE EXECUTION DIAGNOSTIC")
+        print(f"ðŸ“ Logging to: {self.log_file}")
         print("=" * 80)
 
         # Step 1: Initialize
@@ -357,7 +358,7 @@ class TradeExecutionMonitor:
 
 
 def main():
-    print("🔍 LIVE TRADE EXECUTION DIAGNOSTIC")
+    print("ðŸ” LIVE TRADE EXECUTION DIAGNOSTIC")
     print("This will show EXACTLY why your trades fail")
     print("=" * 60)
 
@@ -367,16 +368,17 @@ def main():
 
     print("\n" + "=" * 80)
     if success:
-        print("🎉 DIAGNOSTIC COMPLETE!")
-        print("✅ Your setup CAN execute trades")
-        print(f"📝 Full log saved to: {monitor.log_file}")
+        print("ðŸŽ‰ DIAGNOSTIC COMPLETE!")
+        print("âœ… Your setup CAN execute trades")
+        print(f"ðŸ“ Full log saved to: {monitor.log_file}")
         print("\nIf your bot still fails, the issue is in the bot code logic,")
         print("not in the API connection or permissions.")
     else:
-        print("🛑 DIAGNOSTIC FAILED!")
-        print("❌ Fix the errors above before attempting live trades")
-        print(f"📝 Error details saved to: {monitor.log_file}")
+        print("ðŸ›‘ DIAGNOSTIC FAILED!")
+        print("âŒ Fix the errors above before attempting live trades")
+        print(f"ðŸ“ Error details saved to: {monitor.log_file}")
 
 
 if __name__ == "__main__":
     main()
+

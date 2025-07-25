@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 """
 quantum_trading_integration.py
 ===============================
@@ -103,3 +104,4 @@ class QuantumTrader:
                     signal.get("confidence"),
                 ]
             )
+

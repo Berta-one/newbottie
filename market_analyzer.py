@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 """
 market_analyzer.py - Enhanced Market Analysis
 ============================================
@@ -248,3 +249,4 @@ class MarketAnalyzer:
                 "neutral_signals": 0,
                 "market_sentiment": "NEUTRAL",
             }
+

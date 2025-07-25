@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 import streamlit as st
 import os
 from dotenv import load_dotenv
@@ -15,3 +16,4 @@ st.metric("Trading Mode", mode)
 if st.button("Test Bot"):
     st.balloons()
     st.success("Working perfectly!")
+

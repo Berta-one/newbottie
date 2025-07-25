@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 # Simplified Railway bot without ML
 import os
 import time
@@ -8,7 +9,7 @@ from strategy import check_breakout_enhanced, get_strategy_confidence
 
 load_dotenv()
 
-print("🚀 Railway Trading Bot Starting...")
+print("ðŸš€ Railway Trading Bot Starting...")
 
 # Configuration
 API_KEY = os.getenv("BINANCE_API_KEY")
@@ -22,13 +23,13 @@ try:
     if USE_TESTNET:
         client.API_URL = "https://testnet.binance.vision/api"
 
-    print("✅ Connected to Binance")
+    print("âœ… Connected to Binance")
 
     loop_count = 0
     while True:
         try:
             loop_count += 1
-            print(f"\n🔄 Loop #{loop_count} - {datetime.now().strftime('%H:%M:%S')}")
+            print(f"\nðŸ”„ Loop #{loop_count} - {datetime.now().strftime('%H:%M:%S')}")
 
             # Get market data
             klines = client.get_klines(symbol=TRADE_SYMBOL, interval="1m", limit=120)
@@ -39,14 +40,15 @@ try:
             signal = check_breakout_enhanced(klines)
             confidence = get_strategy_confidence(klines)
 
-            print(f"📈 {TRADE_SYMBOL}: ${current_price:.2f}")
-            print(f"🎯 Signal: {signal} (confidence: {confidence:.2f})")
+            print(f"ðŸ“ˆ {TRADE_SYMBOL}: ${current_price:.2f}")
+            print(f"ðŸŽ¯ Signal: {signal} (confidence: {confidence:.2f})")
 
             time.sleep(SCAN_INTERVAL)
 
         except Exception as e:
-            print(f"❌ Loop error: {e}")
+            print(f"âŒ Loop error: {e}")
             time.sleep(60)
 
 except Exception as e:
-    print(f"❌ Bot failed: {e}")
+    print(f"âŒ Bot failed: {e}")
+

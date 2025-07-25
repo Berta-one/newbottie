@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 import os
 import time
 import streamlit as st
@@ -432,7 +433,7 @@ class MultiCoinPortfolioBot:
             self.client.get_server_time()
             return True
         except Exception as e:
-            st.error(f"❌ Binance connection failed: {e}")
+            st.error(f"âŒ Binance connection failed: {e}")
             return False
 
     def get_portfolio_holdings(self):
@@ -514,13 +515,13 @@ class MultiCoinPortfolioBot:
             return portfolio
 
         except Exception as e:
-            st.error(f"❌ Error fetching portfolio: {e}")
+            st.error(f"âŒ Error fetching portfolio: {e}")
             return {}
 
 
 def main():
 
-    st.title("🎯 Adaptive Risk Management Trading Bot")
+    st.title("ðŸŽ¯ Adaptive Risk Management Trading Bot")
     st.caption("Professional, emotion-free trading with dynamic risk adjustment")
 
     # Initialize bot
@@ -531,12 +532,12 @@ def main():
     risk_manager = bot.risk_manager
 
     # Risk Profile Overview
-    st.subheader("⚙️ Professional Risk Management Profiles")
+    st.subheader("âš™ï¸ Professional Risk Management Profiles")
 
     col1, col2 = st.columns(2)
 
     with col1:
-        st.markdown("### 📊 Available Risk Profiles")
+        st.markdown("### ðŸ“Š Available Risk Profiles")
         for profile_key, profile in risk_manager.risk_profiles.items():
             with st.expander(f"{profile['name']} Profile"):
                 st.write(f"**Description:** {profile['description']}")
@@ -547,12 +548,12 @@ def main():
                 st.write(f"**Min Confidence:** {profile['confidence_threshold']:.0%}")
 
     with col2:
-        st.markdown("### 🌍 Market Conditions")
+        st.markdown("### ðŸŒ Market Conditions")
         for condition, description in risk_manager.market_conditions.items():
             st.write(f"**{condition.replace('_', ' ').title()}:** {description}")
 
     # Live Market Analysis
-    st.subheader("📊 Live Market Condition Analysis")
+    st.subheader("ðŸ“Š Live Market Condition Analysis")
 
     # Simulate market analysis for demo
     portfolio = bot.get_portfolio_holdings()
@@ -610,9 +611,9 @@ def main():
 
         with col1:
             condition_color = (
-                "🟢"
+                "ðŸŸ¢"
                 if condition_score > 0.6
-                else "🟡" if condition_score > 0.4 else "🔴"
+                else "ðŸŸ¡" if condition_score > 0.4 else "ðŸ”´"
             )
             st.metric(
                 f"{condition_color} Market Condition",
@@ -626,20 +627,20 @@ def main():
                 if avg_volatility > 3
                 else "Medium" if avg_volatility > 1.5 else "Low"
             )
-            st.metric("📈 Volatility", f"{avg_volatility:.1f}%", volatility_level)
+            st.metric("ðŸ“ˆ Volatility", f"{avg_volatility:.1f}%", volatility_level)
 
         with col3:
             st.metric(
-                "🎯 Recommended Profile",
+                "ðŸŽ¯ Recommended Profile",
                 risk_manager.risk_profiles[recommended_profile]["name"],
                 "Auto-Selected",
             )
 
         with col4:
-            st.metric("⏰ Last Update", datetime.now().strftime("%H:%M:%S"), "Live")
+            st.metric("â° Last Update", datetime.now().strftime("%H:%M:%S"), "Live")
 
         # Dynamic rules for each asset
-        st.subheader("⚖️ Dynamic Risk Rules by Asset")
+        st.subheader("âš–ï¸ Dynamic Risk Rules by Asset")
 
         for asset, data in portfolio.items():
             confidence = random.uniform(0.6, 0.95)  # Simulated confidence
@@ -668,18 +669,18 @@ def main():
         total_usd = sum(coin["usd_value"] for coin in portfolio.values())
         total_gbp = bot.get_portfolio_value_gbp(total_usd)
 
-        st.subheader("💼 Portfolio Overview")
+        st.subheader("ðŸ’¼ Portfolio Overview")
 
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric("💷 Total Value (GBP)", f"£{total_gbp:,.2f}")
+            st.metric("ðŸ’· Total Value (GBP)", f"Â£{total_gbp:,.2f}")
         with col2:
-            st.metric("💰 Total Value (USD)", f"${total_usd:,.2f}")
+            st.metric("ðŸ’° Total Value (USD)", f"${total_usd:,.2f}")
         with col3:
-            st.metric("🪙 Assets", len(portfolio))
+            st.metric("ðŸª™ Assets", len(portfolio))
 
     # Configuration
-    with st.expander("🔧 System Configuration"):
+    with st.expander("ðŸ”§ System Configuration"):
         st.json(
             {
                 "Risk Management": "Adaptive, market-condition based",
@@ -700,3 +701,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

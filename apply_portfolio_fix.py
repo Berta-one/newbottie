@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 """
 Quick Portfolio Value Fix Patch
@@ -12,14 +13,14 @@ from pathlib import Path
 def apply_portfolio_fix():
     """Apply portfolio value synchronization fix"""
 
-    print("🔧 Applying Portfolio Value Fix...")
+    print("ðŸ”§ Applying Portfolio Value Fix...")
 
     # Files to patch
     files_to_patch = ["hybrid_bot.py", "portfolio_trading_bot.py", "bot_controller.py"]
 
     for filename in files_to_patch:
         if Path(filename).exists():
-            print(f"📄 Patching {filename}...")
+            print(f"ðŸ“„ Patching {filename}...")
 
             try:
                 with open(filename, "r", encoding="utf-8") as f:
@@ -34,7 +35,7 @@ def apply_portfolio_fix():
                 if "from unified_portfolio_calculator import" not in content:
                     import_line = "from unified_portfolio_calculator import get_portfolio_totals, debug_portfolio_values\n"
                     content = import_line + content
-                    print(f"  ✅ Added unified calculator import")
+                    print(f"  âœ… Added unified calculator import")
 
                 # Look for portfolio calculation patterns
                 patterns_fixed = []
@@ -60,17 +61,17 @@ def apply_portfolio_fix():
                     f.write(content)
 
                 if patterns_fixed:
-                    print(f"  ✅ Fixed: {', '.join(patterns_fixed)}")
+                    print(f"  âœ… Fixed: {', '.join(patterns_fixed)}")
                 else:
-                    print(f"  ✅ No patterns to fix found")
+                    print(f"  âœ… No patterns to fix found")
 
             except Exception as e:
-                print(f"  ❌ Error patching {filename}: {e}")
+                print(f"  âŒ Error patching {filename}: {e}")
         else:
-            print(f"  ⚠️ {filename} not found")
+            print(f"  âš ï¸ {filename} not found")
 
-    print("\n🎉 Portfolio fix applied!")
-    print("\n📋 Next steps:")
+    print("\nðŸŽ‰ Portfolio fix applied!")
+    print("\nðŸ“‹ Next steps:")
     print("1. Test your dashboard: streamlit run hybrid_bot.py")
     print("2. Check both Dashboard and Portfolio tabs show same value")
     print("3. If issues persist, check debug output in console")
@@ -78,3 +79,4 @@ def apply_portfolio_fix():
 
 if __name__ == "__main__":
     apply_portfolio_fix()
+

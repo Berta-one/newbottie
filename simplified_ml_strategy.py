@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 """
 simplified_ml_strategy.py
 ===========================
@@ -129,3 +130,4 @@ class SimplifiedMLStrategy:
         sma = np.mean(prices[-period:])
         std = np.std(prices[-period:])
         return sma + (2 * std), sma - (2 * std)
+

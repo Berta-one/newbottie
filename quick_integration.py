@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 # quick_integration.py - Integrate simplified ML with your existing bot
 
 # 1. Add this to your existing scanner_main.py imports
@@ -91,7 +92,7 @@ class MultiPairTradingBot:
             if self.ml_strategy.performance_metrics["total_predictions"] % 50 == 0:
                 metrics = self.ml_strategy.get_performance_metrics()
                 logging.info(
-                    f"🧠 ML Performance: Accuracy: {metrics['accuracy']:.2%}, "
+                    f"ðŸ§  ML Performance: Accuracy: {metrics['accuracy']:.2%}, "
                     f"Total Predictions: {metrics['total_predictions']}"
                 )
 
@@ -103,7 +104,7 @@ def create_ml_dashboard():
     import pandas as pd
     import plotly.graph_objects as go
 
-    st.title("🧠 ML-Enhanced Trading Bot")
+    st.title("ðŸ§  ML-Enhanced Trading Bot")
 
     # Initialize ML strategy
     if "ml_strategy" not in st.session_state:
@@ -116,14 +117,14 @@ def create_ml_dashboard():
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("🎯 ML Accuracy", f"{metrics['accuracy']:.1%}")
+        st.metric("ðŸŽ¯ ML Accuracy", f"{metrics['accuracy']:.1%}")
     with col2:
-        st.metric("📊 Total Predictions", metrics["total_predictions"])
+        st.metric("ðŸ“Š Total Predictions", metrics["total_predictions"])
     with col3:
-        st.metric("✅ Correct Predictions", metrics["correct_predictions"])
+        st.metric("âœ… Correct Predictions", metrics["correct_predictions"])
 
     # Feature importance
-    st.subheader("🔍 Feature Importance")
+    st.subheader("ðŸ” Feature Importance")
     importance_data = ml_strategy.get_feature_importance()
 
     features = [item[0] for item in importance_data]
@@ -134,7 +135,7 @@ def create_ml_dashboard():
     st.plotly_chart(fig, use_container_width=True)
 
     # Recent predictions
-    st.subheader("🔮 Recent Predictions")
+    st.subheader("ðŸ”® Recent Predictions")
     if ml_strategy.prediction_history:
         recent_predictions = ml_strategy.prediction_history[-10:]  # Last 10
 
@@ -152,7 +153,7 @@ def create_ml_dashboard():
 # 4. Quick test function
 def test_ml_integration():
     """Test the ML integration with sample data"""
-    print("🧪 Testing ML Integration...")
+    print("ðŸ§ª Testing ML Integration...")
 
     # Create sample klines data
     import random
@@ -191,13 +192,14 @@ def test_ml_integration():
         sample_klines
     )
 
-    print(f"✅ ML Signal: {signal}")
-    print(f"✅ Confidence: {confidence:.2%}")
-    print(f"✅ Probabilities: {probabilities}")
-    print("✅ ML Integration test passed!")
+    print(f"âœ… ML Signal: {signal}")
+    print(f"âœ… Confidence: {confidence:.2%}")
+    print(f"âœ… Probabilities: {probabilities}")
+    print("âœ… ML Integration test passed!")
 
     return True
 
 
 if __name__ == "__main__":
     test_ml_integration()
+

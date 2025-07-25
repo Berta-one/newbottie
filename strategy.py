@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 """
 Enhanced Cryptocurrency Breakout Trading Strategy
@@ -354,3 +355,4 @@ if __name__ == "__main__":
     print(f"RSI: {calculate_rsi(mock_klines):.1f}")
     print(f"Volume Confirmed: {has_volume_confirmation(mock_klines)}")
     print(f"Good Trading Time: {is_good_trading_time()}")
+

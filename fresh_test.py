@@ -1,8 +1,10 @@
+﻿ -*- coding: utf-8 -*-
 import streamlit as st
 
-st.title("🧪 Fresh Start Test")
+st.title("ðŸ§ª Fresh Start Test")
 st.write("This should work after restart!")
-st.success("✅ Streamlit is working!")
+st.success("âœ… Streamlit is working!")
 
 if st.button("Test Button"):
     st.balloons()
+

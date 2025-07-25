@@ -1,3 +1,4 @@
+﻿ -*- coding: utf-8 -*-
 """
 smart_imports.py
 ===============
@@ -83,3 +84,4 @@ class SmartImportManager:
 
 # Global instance
 smart_imports = SmartImportManager()
+
