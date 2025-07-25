@@ -801,6 +801,14 @@ with col4:
 def render_portfolio():
     st.header(" Portfolio Overview")
     pm = COMPONENTS["portfolio_mgr"]
+
+    # Always define portfolio, even if the try/except below fails
+    portfolio = {}
+    try:
+        portfolio = pm.get_portfolio()
+    except Exception as e:
+        st.error(f"Failed to fetch portfolio: {e}")
+
     col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
         st.info(pm.get_connection_status())
@@ -814,6 +822,15 @@ def render_portfolio():
             st.rerun()
     with col3:
         st.caption(f"Last updated: {pm.last_updated()}")
+
+    if portfolio:
+        total_usd, total_gbp, asset_count = get_unified_portfolio_value(portfolio)
+        st.metric("Total Value (USD)", f"${total_usd:,.2f}")
+        st.metric("Total Value (GBP)", f"£{total_gbp:,.2f}")
+        st.metric("Total Assets", asset_count)
+        # ...further display logic...
+    else:
+        st.warning("No portfolio data available.")
 
     # Portfolio table ------------------------------------------------------
     try:
