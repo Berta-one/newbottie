@@ -800,6 +800,8 @@ with col4:
 def render_portfolio():
     st.header(" Portfolio Overview")
     pm = COMPONENTS["portfolio_mgr"]
+    portfolio = pm.get_portfolio()
+    total_usd, total_gbp, asset_count = get_unified_portfolio_value(portfolio)
     col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
         st.info(pm.get_connection_status())
