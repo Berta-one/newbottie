@@ -1,4 +1,4 @@
- -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 dashboard.py
 ============
@@ -96,11 +96,11 @@ def calculate_pnl_if_missing(df):
 # MAIN DASHBOARD
 # =========================
 def render_analytics_dashboard():
-    st.title("ðŸ“Š Trading Analytics Dashboard")
+    st.title("📊 Trading Analytics Dashboard")
 
     # ✔️ Bot Status & Control
     bot_running = is_bot_running()
-    status_text = "ðŸŸ¢ Bot is Running" if bot_running else "ðŸ”´ Bot is Stopped"
+    status_text = "🟢 Bot is Running" if bot_running else "🔴 Bot is Stopped"
     status_color = "green" if bot_running else "red"
     st.markdown(
         f"### **Bot Status:** <span style='color:{status_color};'>{status_text}</span>",
@@ -109,24 +109,24 @@ def render_analytics_dashboard():
 
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("â–¶ Start Bot"):
+        if st.button("▶ Start Bot"):
             if not bot_running:
                 subprocess.Popen(["python", BOT_SCRIPT])
                 st.success("✔️ Bot started!")
             else:
                 st.info("Bot is already running")
     with col2:
-        if st.button("â¹ Stop Bot"):
+        if st.button("⏹ Stop Bot"):
             if bot_running:
                 os.system(f"pkill -f {BOT_SCRIPT}")
-                st.warning("ðŸ›‘ Bot stopped!")
+                st.warning("🛑 Bot stopped!")
             else:
                 st.info("Bot is not running")
 
     st.divider()
 
     # ✔️ Live Logs
-    st.subheader("ðŸ“œ Live Bot Logs")
+    st.subheader("📜 Live Bot Logs")
     if os.path.exists(LOG_FILE):
         try:
             with open(LOG_FILE, "r") as f:
@@ -172,7 +172,7 @@ def render_analytics_dashboard():
         st.metric("Best Trade", f"${best_trade:,.2f}")
 
     # Performance chart
-    st.subheader("ðŸ“ˆ Portfolio Performance")
+    st.subheader("📈 Portfolio Performance")
     if "timestamp" in df.columns and "pnl" in df.columns and len(df) > 0:
         df_sorted = df.sort_values("timestamp")
         df_sorted["cumulative_pnl"] = df_sorted["pnl"].cumsum()
@@ -186,7 +186,7 @@ def render_analytics_dashboard():
         st.plotly_chart(fig, use_container_width=True)
 
     # Recent trades
-    st.subheader("ðŸ“‹ Recent Trades")
+    st.subheader("📋 Recent Trades")
     if len(df) > 0:
         display_columns = [
             col
@@ -197,6 +197,4 @@ def render_analytics_dashboard():
 
 
 # Run app
-if __name__ == "__main__":
-    render_analytics_dashboard()
-
+if __name__ ==
