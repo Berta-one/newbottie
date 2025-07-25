@@ -171,11 +171,11 @@ class CryptoPairScanner:
 
                 pairs.append(pair_info)
 
-            print(f"âœ… Found {len(pairs)} eligible USDT pairs")
+            print(f"✔️ Found {len(pairs)} eligible USDT pairs")
             return sorted(pairs, key=lambda x: x["volume_24h"], reverse=True)
 
         except Exception as e:
-            print(f"âŒ Error fetching USDT pairs: {e}")
+            print(f"❌ Error fetching USDT pairs: {e}")
             return self._get_mock_pairs()
 
     def get_selected_pairs(self) -> List[Dict[str, Any]]:
@@ -356,7 +356,7 @@ class CryptoPairScanner:
             return result
 
         except Exception as e:
-            print(f"âŒ Error analyzing {symbol}: {e}")
+            print(f"❌ Error analyzing {symbol}: {e}")
             return {
                 "symbol": symbol,
                 "signal": "HOLD",
@@ -415,7 +415,7 @@ class CryptoPairScanner:
                         }
                     )
 
-        print(f"âœ… Scan completed: {len(results)} pairs analyzed")
+        print(f"✔️ Scan completed: {len(results)} pairs analyzed")
         return results
 
     def filter_opportunities(
@@ -487,7 +487,7 @@ class CryptoPairScanner:
         # Limit results
         display_ops = display_ops[:top_n]
 
-        print(f"\nðŸŽ¯ Trading Opportunities Found: {len(display_ops)}")
+        print(f"\n🎯 Trading Opportunities Found: {len(display_ops)}")
         print("=" * 120)
 
         # Table header
@@ -569,7 +569,7 @@ class CryptoPairScanner:
             return filepath
 
         except Exception as e:
-            print(f"âŒ Error saving scan results: {e}")
+            print(f"❌ Error saving scan results: {e}")
             return ""
 
     def _count_signals(self, opportunities: List[Dict[str, Any]]) -> Dict[str, int]:
@@ -706,7 +706,7 @@ def main():
                 if os.getenv("USE_TESTNET", "false").lower() == "true":
                     client.API_URL = "https://testnet.binance.vision/api"
                 scanner = CryptoPairScanner(client)
-                print("âœ… Connected to Binance API")
+                print("✔️ Connected to Binance API")
             else:
                 scanner = CryptoPairScanner()
                 print("âš ï¸ No API credentials, using mock data")
@@ -723,7 +723,7 @@ def main():
     min_confidence = float(os.getenv("MIN_CONFIDENCE", 0.65))
     max_workers = int(os.getenv("MAX_WORKERS", 8))
 
-    print(f"ðŸŽ¯ Scan Mode: {scan_mode}")
+    print(f"🎯 Scan Mode: {scan_mode}")
     print(f"ðŸ“Š Min Confidence: {min_confidence:.1%}")
     print(f"ðŸ”„ Max Workers: {max_workers}")
     print()

@@ -12,7 +12,7 @@ def verify_live():
     api_key = os.getenv("BINANCE_API_KEY")
 
     print(f"USE_TESTNET: {use_testnet}")
-    print(f"API Key: {'âœ… Set' if api_key else 'âŒ Missing'}")
+    print(f"API Key: {'✔️ Set' if api_key else '❌ Missing'}")
 
     if use_testnet == "true":
         print("âš ï¸ WARNING: Still in TESTNET mode!")
@@ -21,7 +21,7 @@ def verify_live():
     try:
         client = Client(api_key, os.getenv("BINANCE_API_SECRET"))
         account = client.get_account()
-        print(f"âœ… Connected to Binance LIVE")
+        print(f"✔️ Connected to Binance LIVE")
 
         usdt_balance = next(
             (float(b["free"]) for b in account["balances"] if b["asset"] == "USDT"), 0
@@ -29,7 +29,7 @@ def verify_live():
         print(f"USDT Balance: ${usdt_balance:.2f}")
         return True
     except Exception as e:
-        print(f"âŒ Connection failed: {e}")
+        print(f"❌ Connection failed: {e}")
         return False
 
 

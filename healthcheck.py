@@ -19,13 +19,13 @@ def check_bot_health():
         response = requests.get(f"{base_url}/health", timeout=30)
         if response.status_code == 200:
             data = response.json()
-            print(f"âœ… Bot alive - Uptime: {data.get('uptime_seconds', 0):.0f}s")
+            print(f"✔️ Bot alive - Uptime: {data.get('uptime_seconds', 0):.0f}s")
             return True
         else:
-            print(f"âŒ Bot unhealthy - Status: {response.status_code}")
+            print(f"❌ Bot unhealthy - Status: {response.status_code}")
             return False
     except Exception as e:
-        print(f"âŒ Health check failed: {e}")
+        print(f"❌ Health check failed: {e}")
         return False
 
 
@@ -36,13 +36,13 @@ def check_dashboard():
     try:
         response = requests.get(base_url, timeout=30)
         if response.status_code == 200:
-            print("âœ… Dashboard accessible")
+            print("✔️ Dashboard accessible")
             return True
         else:
             print(f"âš ï¸ Dashboard returned {response.status_code}")
             return False
     except Exception as e:
-        print(f"âŒ Dashboard check failed: {e}")
+        print(f"❌ Dashboard check failed: {e}")
         return False
 
 
@@ -63,10 +63,10 @@ def monitor_continuously():
 
             if health_ok or dashboard_ok:
                 consecutive_failures = 0
-                print("âœ… Bot is healthy")
+                print("✔️ Bot is healthy")
             else:
                 consecutive_failures += 1
-                print(f"âŒ Failed (consecutive: {consecutive_failures})")
+                print(f"❌ Failed (consecutive: {consecutive_failures})")
 
             if consecutive_failures >= 5:
                 print("ðŸš¨ ALERT: Bot appears down!")
@@ -77,7 +77,7 @@ def monitor_continuously():
             print("\nðŸ›‘ Monitoring stopped")
             break
         except Exception as e:
-            print(f"âŒ Monitor error: {e}")
+            print(f"❌ Monitor error: {e}")
             time.sleep(60)
 
 
@@ -90,11 +90,11 @@ def quick_check():
     dashboard_ok = check_dashboard()
 
     if health_ok and dashboard_ok:
-        print("\nâœ… HEALTHY - All systems responding")
+        print("\n✔️ HEALTHY - All systems responding")
     elif health_ok or dashboard_ok:
         print("\nâš ï¸ PARTIAL - Some systems responding")
     else:
-        print("\nâŒ DOWN - No systems responding")
+        print("\n❌ DOWN - No systems responding")
 
     return health_ok or dashboard_ok
 

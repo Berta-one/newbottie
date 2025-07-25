@@ -257,8 +257,8 @@ def trading_dashboard(settings_compact=False):
         st.info(
             f"""
         **Current Setup:**
-        - ðŸŽ¯ Strategy: {selected_strategy} ({strategy_info['description']})
-        - ðŸ’° Risk: {risk}% per trade (Risk Level: {selected_risk})
+        - 🎯 Strategy: {selected_strategy} ({strategy_info['description']})
+        - 💰 Risk: {risk}% per trade (Risk Level: {selected_risk})
         - â±ï¸ Scan Interval: {scan_interval} minutes
         - ðŸ›¡ï¸ Mode: {mode}
         - ðŸ“Š Exchange: Binance Testnet
@@ -455,8 +455,8 @@ def trading_dashboard(settings_compact=False):
     st.info(
         f"""
     **Current Setup:**
-    - ðŸŽ¯ Strategy: 5% Breakout + ML Enhancement
-    - ðŸ’° Risk: {risk}% per trade
+    - 🎯 Strategy: 5% Breakout + ML Enhancement
+    - 💰 Risk: {risk}% per trade
     - â±ï¸ Scan Interval: {scan_interval} minutes
     - ðŸ›¡ï¸ Mode: {mode}
     - ðŸ“Š Exchange: {'Binance Live' if mode == 'Live' else 'Binance Testnet'}

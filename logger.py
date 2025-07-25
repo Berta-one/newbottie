@@ -67,9 +67,9 @@ class TradingLogger:
                         trade_data.get("volume_ratio", 0),
                     ]
                 )
-            print(f"ðŸ“ Trade logged to {self.trade_log_file}")
+            print(f"📝 Trade logged to {self.trade_log_file}")
         except Exception as e:
-            print(f"âŒ Error logging trade: {e}")
+            print(f"❌ Error logging trade: {e}")
 
     def calculate_performance_metrics(self):
         """Calculate comprehensive performance metrics from trade log"""
@@ -139,7 +139,7 @@ class TradingLogger:
             return metrics
 
         except Exception as e:
-            print(f"âŒ Error calculating metrics: {e}")
+            print(f"❌ Error calculating metrics: {e}")
             return {}
 
     def log_scan_result(self, scan_data):
@@ -171,7 +171,7 @@ class TradingLogger:
                 json.dump(scan_history, f, indent=2)
 
         except Exception as e:
-            print(f"âŒ Error logging scan: {e}")
+            print(f"❌ Error logging scan: {e}")
 
     def get_trade_summary(self, last_n_days=30):
         """Get trading summary for last N days"""
@@ -203,7 +203,7 @@ Worst Trade: {recent_df['pnl_percent'].min():.2f}%
 ðŸ“ˆ BY CATEGORY:
 {recent_df.groupby('category')['pnl_percent'].agg(['count', 'mean', 'sum']).round(2)}
 
-ðŸŽ¯ BY SIGNAL TYPE:
+🎯 BY SIGNAL TYPE:
 {recent_df.groupby('signal_type')['pnl_percent'].agg(['count', 'mean']).round(2)}
             """
 

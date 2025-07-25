@@ -117,11 +117,11 @@ def create_ml_dashboard():
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("ðŸŽ¯ ML Accuracy", f"{metrics['accuracy']:.1%}")
+        st.metric("🎯 ML Accuracy", f"{metrics['accuracy']:.1%}")
     with col2:
         st.metric("ðŸ“Š Total Predictions", metrics["total_predictions"])
     with col3:
-        st.metric("âœ… Correct Predictions", metrics["correct_predictions"])
+        st.metric("✔️ Correct Predictions", metrics["correct_predictions"])
 
     # Feature importance
     st.subheader("ðŸ” Feature Importance")
@@ -192,10 +192,10 @@ def test_ml_integration():
         sample_klines
     )
 
-    print(f"âœ… ML Signal: {signal}")
-    print(f"âœ… Confidence: {confidence:.2%}")
-    print(f"âœ… Probabilities: {probabilities}")
-    print("âœ… ML Integration test passed!")
+    print(f"✔️ ML Signal: {signal}")
+    print(f"✔️ Confidence: {confidence:.2%}")
+    print(f"✔️ Probabilities: {probabilities}")
+    print("✔️ ML Integration test passed!")
 
     return True
 

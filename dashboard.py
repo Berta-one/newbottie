@@ -1,4 +1,4 @@
-﻿ -*- coding: utf-8 -*-
+ -*- coding: utf-8 -*-
 """
 dashboard.py
 ============
@@ -98,7 +98,7 @@ def calculate_pnl_if_missing(df):
 def render_analytics_dashboard():
     st.title("ðŸ“Š Trading Analytics Dashboard")
 
-    # âœ… Bot Status & Control
+    # ✔️ Bot Status & Control
     bot_running = is_bot_running()
     status_text = "ðŸŸ¢ Bot is Running" if bot_running else "ðŸ”´ Bot is Stopped"
     status_color = "green" if bot_running else "red"
@@ -112,7 +112,7 @@ def render_analytics_dashboard():
         if st.button("â–¶ Start Bot"):
             if not bot_running:
                 subprocess.Popen(["python", BOT_SCRIPT])
-                st.success("âœ… Bot started!")
+                st.success("✔️ Bot started!")
             else:
                 st.info("Bot is already running")
     with col2:
@@ -125,7 +125,7 @@ def render_analytics_dashboard():
 
     st.divider()
 
-    # âœ… Live Logs
+    # ✔️ Live Logs
     st.subheader("ðŸ“œ Live Bot Logs")
     if os.path.exists(LOG_FILE):
         try:
@@ -139,12 +139,12 @@ def render_analytics_dashboard():
 
     st.divider()
 
-    # âœ… Load trade data
+    # ✔️ Load trade data
     df = load_trade_data()
     df = calculate_pnl_if_missing(df)
 
     if df.empty:
-        st.warning("ðŸ“ No trade data available yet. Start trading to see analytics!")
+        st.warning("📝 No trade data available yet. Start trading to see analytics!")
         return
 
     # Convert timestamp

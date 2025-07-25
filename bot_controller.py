@@ -433,7 +433,7 @@ class MultiCoinPortfolioBot:
             self.client.get_server_time()
             return True
         except Exception as e:
-            st.error(f"âŒ Binance connection failed: {e}")
+            st.error(f"❌ Binance connection failed: {e}")
             return False
 
     def get_portfolio_holdings(self):
@@ -515,7 +515,7 @@ class MultiCoinPortfolioBot:
             return portfolio
 
         except Exception as e:
-            st.error(f"âŒ Error fetching portfolio: {e}")
+            st.error(f"❌ Error fetching portfolio: {e}")
             return {}
 
 
@@ -538,7 +538,7 @@ def render_overview_tab(
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        st.metric("ðŸ’· Portfolio Value", f"Â£{total_gbp:,.2f}")
+        st.metric("💷 Portfolio Value", f"£{total_gbp:,.2f}")
 
     with col2:
         condition_color = (
@@ -558,7 +558,7 @@ def render_overview_tab(
 
     with col4:
         st.metric(
-            "ðŸŽ¯ Active Profile", risk_manager.risk_profiles[recommended_profile]["name"]
+            "🎯 Active Profile", risk_manager.risk_profiles[recommended_profile]["name"]
         )
 
     st.divider()
@@ -575,7 +575,7 @@ def render_overview_tab(
                 "Balance": f"{data['balance']:.4f}",
                 "Price (USD)": f"${data['price_usd']:.4f}",
                 "Value (USD)": f"${data['usd_value']:.2f}",
-                "Value (GBP)": f"Â£{bot.get_portfolio_value_gbp(data['usd_value']):.2f}",
+                "Value (GBP)": f"£{bot.get_portfolio_value_gbp(data['usd_value']):.2f}",
                 "Percentage": f"{(data['usd_value'] / total_usd * 100):.1f}%",
             }
         )
@@ -588,9 +588,9 @@ def render_overview_tab(
     with col1:
         st.metric("ðŸª™ Total Assets", len(portfolio))
     with col2:
-        st.metric("ðŸ’° USD Value", f"${total_usd:,.2f}")
+        st.metric("💰 USD Value", f"${total_usd:,.2f}")
     with col3:
-        st.metric("ðŸ”„ Exchange Rate", f"1 USD = Â£{bot.usd_to_gbp_rate:.4f}")
+        st.metric("ðŸ”„ Exchange Rate", f"1 USD = £{bot.usd_to_gbp_rate:.4f}")
 
 
 def render_risk_management_tab(
@@ -615,7 +615,7 @@ def render_risk_management_tab(
                 st.metric("Holdings", f"{data['balance']:.4f} {asset}")
             with col2:
                 st.metric("USD Value", f"${data['usd_value']:.2f}")
-                st.metric("GBP Value", f"Â£{data['usd_value'] * 0.79:.2f}")
+                st.metric("GBP Value", f"£{data['usd_value'] * 0.79:.2f}")
 
             st.divider()
 
@@ -770,19 +770,19 @@ def render_analytics_tab(portfolio, market_condition, avg_volatility):
                 "ðŸŸ¢ Consider swing trading strategies",
                 "ðŸ“ˆ Trend following approaches favored",
                 "â³ Longer hold times may be beneficial",
-                "ðŸŽ¯ Higher take profit targets appropriate",
+                "🎯 Higher take profit targets appropriate",
             ]
         elif market_condition == "BEAR_TRENDING":
             insights = [
                 "ðŸ”´ Focus on capital preservation",
                 "ðŸ›¡ï¸ Tighter stop losses recommended",
                 "âš¡ Quick scalping may be safer",
-                "ðŸ’° Consider reducing position sizes",
+                "💰 Consider reducing position sizes",
             ]
         elif market_condition == "HIGH_VOLATILITY":
             insights = [
                 "âš¡ High frequency trading opportunities",
-                "ðŸŽ¯ Smaller, quicker profit targets",
+                "🎯 Smaller, quicker profit targets",
                 "â±ï¸ Shorter hold times preferred",
                 "ðŸ“Š Monitor closely for rapid changes",
             ]
@@ -851,9 +851,9 @@ def render_analytics_tab(portfolio, market_condition, avg_volatility):
 
 
 def main():
-    st.set_page_config(page_title="ðŸŽ¯ Adaptive Risk Management Bot", layout="wide")
+    st.set_page_config(page_title="🎯 Adaptive Risk Management Bot", layout="wide")
 
-    st.title("ðŸŽ¯ Adaptive Risk Management Trading Bot")
+    st.title("🎯 Adaptive Risk Management Trading Bot")
     st.caption("Professional, emotion-free trading with dynamic risk adjustment")
 
     # Initialize bot
@@ -973,13 +973,13 @@ def main():
 
                 # Connection info
                 if bot.client:
-                    st.success("âœ… Binance API Connected")
+                    st.success("✔️ Binance API Connected")
                     mode = "Testnet" if USE_TESTNET else "Live Trading"
                     st.info(f"ðŸ“¡ Mode: {mode}")
                 else:
-                    st.error("âŒ Binance API Not Connected")
+                    st.error("❌ Binance API Not Connected")
 
-                st.write(f"**Exchange Rate:** 1 USD = Â£{bot.usd_to_gbp_rate:.4f}")
+                st.write(f"**Exchange Rate:** 1 USD = £{bot.usd_to_gbp_rate:.4f}")
                 st.write(f"**Min Balance Filter:** ${MIN_BALANCE_USD}")
                 st.write(f"**Last Update:** {datetime.now().strftime('%H:%M:%S')}")
 

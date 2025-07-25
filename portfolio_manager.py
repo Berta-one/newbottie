@@ -114,11 +114,11 @@ class PortfolioManager:
                 try:
                     test_response = self.client.get_account()
                     self.api_available = True
-                    logger.info("âœ… Binance API connection successful")
+                    logger.info("✔️ Binance API connection successful")
                 except Exception as e:
                     self.api_available = False
                     self.api_error = str(e)
-                    logger.error(f"âŒ Binance API connection failed: {e}")
+                    logger.error(f"❌ Binance API connection failed: {e}")
                     self.client = None
             else:
                 self.api_available = False
@@ -128,7 +128,7 @@ class PortfolioManager:
         except Exception as e:
             self.api_available = False
             self.api_error = str(e)
-            logger.error(f"âŒ Failed to initialize Binance client: {e}")
+            logger.error(f"❌ Failed to initialize Binance client: {e}")
             self.client = None
 
         self.base_currency = "USDT"
@@ -909,7 +909,7 @@ class PortfolioManager:
         """Get Binance API connection status"""
         try:
             if not self.client:
-                return "âŒ Not Connected - Missing API credentials"
+                return "❌ Not Connected - Missing API credentials"
 
             # Test connection with a simple API call
             account_info = self.client.get_account()
@@ -920,17 +920,17 @@ class PortfolioManager:
                 else:
                     return "ðŸš€ Connected to Binance Live Trading"
             else:
-                return "âŒ Connection Failed"
+                return "❌ Connection Failed"
 
         except BinanceAPIException as e:
             if e.code == -2015:
-                return "âŒ Invalid API Key or Secret"
+                return "❌ Invalid API Key or Secret"
             elif e.code == -1021:
-                return "âŒ Timestamp Error - Check system clock"
+                return "❌ Timestamp Error - Check system clock"
             else:
-                return f"âŒ API Error: {e.message}"
+                return f"❌ API Error: {e.message}"
         except Exception as e:
-            return f"âŒ Connection Error: {str(e)}"
+            return f"❌ Connection Error: {str(e)}"
 
     def get_api_permissions(self) -> Dict[str, bool]:
         """Check API key permissions"""
@@ -961,7 +961,7 @@ class PortfolioManager:
                 return {
                     "connected": False,
                     "error": "No Binance client initialized",
-                    "status": "âŒ Not Connected",
+                    "status": "❌ Not Connected",
                 }
 
             # Test server time
@@ -997,13 +997,13 @@ class PortfolioManager:
                 "connected": False,
                 "error": f"Binance API Error: {e.message}",
                 "error_code": e.code,
-                "status": f"âŒ API Error ({e.code})",
+                "status": f"❌ API Error ({e.code})",
             }
         except Exception as e:
             return {
                 "connected": False,
                 "error": str(e),
-                "status": "âŒ Connection Failed",
+                "status": "❌ Connection Failed",
             }
 
     def last_updated(self) -> str:
@@ -1108,7 +1108,7 @@ class PortfolioManager:
         try:
             if not self.client:
                 return {
-                    "status": "âŒ Not Connected",
+                    "status": "❌ Not Connected",
                     "data_source": "Demo Mode",
                     "connected": False,
                     "api_url": "None",
@@ -1133,7 +1133,7 @@ class PortfolioManager:
 
         except Exception as e:
             return {
-                "status": f"âŒ Connection Error: {str(e)}",
+                "status": f"❌ Connection Error: {str(e)}",
                 "data_source": "Error - Check API credentials",
                 "connected": False,
                 "api_url": "Unknown",

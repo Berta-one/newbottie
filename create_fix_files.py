@@ -70,7 +70,7 @@ def debug_portfolio_calculation(portfolio_data, location="Unknown"):
     print("-" * 40)
     
     if not portfolio_data:
-        print("âŒ Portfolio data is empty")
+        print("❌ Portfolio data is empty")
         return 0.0
     
     total = 0.0
@@ -94,7 +94,7 @@ def debug_portfolio_calculation(portfolio_data, location="Unknown"):
     with open("portfolio_value_fix.py", "w", encoding="utf-8") as f:
         f.write(portfolio_code)
 
-    print("âœ… Created portfolio_value_fix.py")
+    print("✔️ Created portfolio_value_fix.py")
 
 
 def create_quantum_trader():
@@ -114,7 +114,7 @@ class FallbackQuantumTrader:
     
     def __init__(self):
         self.name = "FallbackQuantumTrader"
-        self.status = "âŒ Quantum Trader disabled - No module named 'qiskit'"
+        self.status = "❌ Quantum Trader disabled - No module named 'qiskit'"
         
     def quantum_analyze(self, market_data):
         """Classical market analysis fallback"""
@@ -172,7 +172,7 @@ try:
         
         def __init__(self):
             self.name = "QuantumTrader"
-            self.status = "âœ… Quantum Trader enabled"
+            self.status = "✔️ Quantum Trader enabled"
             self.simulator = AerSimulator()
         
         def quantum_analyze(self, market_data):
@@ -212,7 +212,7 @@ __all__ = ['quantum_trader', 'QUANTUM_AVAILABLE']
     with open("quantum_trader.py", "w", encoding="utf-8") as f:
         f.write(quantum_code)
 
-    print("âœ… Created quantum_trader.py")
+    print("✔️ Created quantum_trader.py")
 
 
 def create_test_file():
@@ -236,15 +236,15 @@ def test_portfolio_fix():
         }
         
         total_usd, total_gbp, count = get_unified_portfolio_value(test_portfolio)
-        print(f"âœ… Portfolio Fix Working:")
-        print(f"   ðŸ’° Total USD: ${total_usd:.2f}")
-        print(f"   ðŸ’· Total GBP: Â£{total_gbp:.2f}")
+        print(f"✔️ Portfolio Fix Working:")
+        print(f"   💰 Total USD: ${total_usd:.2f}")
+        print(f"   💷 Total GBP: £{total_gbp:.2f}")
         print(f"   ðŸª™ Assets: {count}")
         
         return True
         
     except Exception as e:
-        print(f"âŒ Portfolio fix failed: {e}")
+        print(f"❌ Portfolio fix failed: {e}")
         return False
 
 def test_quantum_trader():
@@ -253,17 +253,17 @@ def test_quantum_trader():
         from quantum_trader import quantum_trader
         
         status = quantum_trader.get_status()
-        print(f"âœ… Quantum Status: {status}")
+        print(f"✔️ Quantum Status: {status}")
         
         # Test analysis
         test_data = [100, 102, 105, 103, 107]
         result = quantum_trader.quantum_analyze(test_data)
-        print(f"âœ… Analysis: {result}")
+        print(f"✔️ Analysis: {result}")
         
         return True
         
     except Exception as e:
-        print(f"âŒ Quantum trader failed: {e}")
+        print(f"❌ Quantum trader failed: {e}")
         return False
 
 def main():
@@ -278,9 +278,9 @@ def main():
     print("\\n" + "=" * 50)
     if portfolio_ok and quantum_ok:
         print("ðŸŽ‰ ALL TESTS PASSED!")
-        print("âœ… Ready to update your dashboard")
+        print("✔️ Ready to update your dashboard")
     else:
-        print("âŒ Some tests failed")
+        print("❌ Some tests failed")
 
 if __name__ == "__main__":
     main()
@@ -289,7 +289,7 @@ if __name__ == "__main__":
     with open("test_quick.py", "w", encoding="utf-8") as f:
         f.write(test_code)
 
-    print("âœ… Created test_quick.py")
+    print("✔️ Created test_quick.py")
 
 
 def install_qiskit():
@@ -309,7 +309,7 @@ def install_qiskit():
                 check=True,
                 capture_output=True,
             )
-            print(f"âœ… {package} installed")
+            print(f"✔️ {package} installed")
         except subprocess.CalledProcessError:
             print(f"âš ï¸ {package} installation failed (continuing...)")
 

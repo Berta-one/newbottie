@@ -23,7 +23,7 @@ try:
     if USE_TESTNET:
         client.API_URL = "https://testnet.binance.vision/api"
 
-    print("âœ… Connected to Binance")
+    print("✔️ Connected to Binance")
 
     loop_count = 0
     while True:
@@ -41,14 +41,14 @@ try:
             confidence = get_strategy_confidence(klines)
 
             print(f"ðŸ“ˆ {TRADE_SYMBOL}: ${current_price:.2f}")
-            print(f"ðŸŽ¯ Signal: {signal} (confidence: {confidence:.2f})")
+            print(f"🎯 Signal: {signal} (confidence: {confidence:.2f})")
 
             time.sleep(SCAN_INTERVAL)
 
         except Exception as e:
-            print(f"âŒ Loop error: {e}")
+            print(f"❌ Loop error: {e}")
             time.sleep(60)
 
 except Exception as e:
-    print(f"âŒ Bot failed: {e}")
+    print(f"❌ Bot failed: {e}")
 

@@ -142,16 +142,16 @@ class AuthSystem:
 
                 if submit_button:
                     if not username or not password:
-                        st.error("âŒ Please enter both username and password")
+                        st.error("❌ Please enter both username and password")
                         return False
 
                     if self.authenticate(username, password):
-                        st.success("âœ… Login successful! Redirecting...")
+                        st.success("✔️ Login successful! Redirecting...")
                         time.sleep(1)
                         st.rerun()
                         return True
                     else:
-                        st.error("âŒ Invalid credentials")
+                        st.error("❌ Invalid credentials")
                         time.sleep(1)
                         st.rerun()
                         return False

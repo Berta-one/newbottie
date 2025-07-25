@@ -260,7 +260,7 @@ class TradeExecutionMonitor:
 
             # Step 4: Ask for real trade confirmation
             print("\n" + "=" * 60)
-            print("ðŸŽ¯ READY TO EXECUTE REAL TRADE")
+            print("🎯 READY TO EXECUTE REAL TRADE")
             print("=" * 60)
             print(f"Symbol: {symbol}")
             print(f"Side: BUY")
@@ -337,7 +337,7 @@ class TradeExecutionMonitor:
     def run_full_diagnostic(self):
         """Run complete trade execution diagnostic"""
         print(f"ðŸš€ STARTING COMPREHENSIVE TRADE EXECUTION DIAGNOSTIC")
-        print(f"ðŸ“ Logging to: {self.log_file}")
+        print(f"📝 Logging to: {self.log_file}")
         print("=" * 80)
 
         # Step 1: Initialize
@@ -369,14 +369,14 @@ def main():
     print("\n" + "=" * 80)
     if success:
         print("ðŸŽ‰ DIAGNOSTIC COMPLETE!")
-        print("âœ… Your setup CAN execute trades")
-        print(f"ðŸ“ Full log saved to: {monitor.log_file}")
+        print("✔️ Your setup CAN execute trades")
+        print(f"📝 Full log saved to: {monitor.log_file}")
         print("\nIf your bot still fails, the issue is in the bot code logic,")
         print("not in the API connection or permissions.")
     else:
         print("ðŸ›‘ DIAGNOSTIC FAILED!")
-        print("âŒ Fix the errors above before attempting live trades")
-        print(f"ðŸ“ Error details saved to: {monitor.log_file}")
+        print("❌ Fix the errors above before attempting live trades")
+        print(f"📝 Error details saved to: {monitor.log_file}")
 
 
 if __name__ == "__main__":

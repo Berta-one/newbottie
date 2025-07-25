@@ -45,7 +45,7 @@ def fix_portfolio_manager():
     with open(filename, "w") as f:
         f.write(content)
 
-    print(f"âœ… Fixed {filename}")
+    print(f"✔️ Fixed {filename}")
 
 
 def fix_hybrid_bot():
@@ -72,7 +72,7 @@ def fix_hybrid_bot():
     with open(filename, "w") as f:
         f.write(content)
 
-    print(f"âœ… Fixed {filename}")
+    print(f"✔️ Fixed {filename}")
 
 
 def fix_other_files():
@@ -104,7 +104,7 @@ def fix_other_files():
         if content != original:
             with open(filename, "w") as f:
                 f.write(content)
-            print(f"âœ… Fixed {filename}")
+            print(f"✔️ Fixed {filename}")
 
 
 def main():
@@ -125,7 +125,7 @@ def main():
     fix_hybrid_bot()
     fix_other_files()
 
-    print("\nâœ… ALL FIXES APPLIED!")
+    print("\n✔️ ALL FIXES APPLIED!")
     print("ðŸš€ Railway bots should now work correctly")
 
 

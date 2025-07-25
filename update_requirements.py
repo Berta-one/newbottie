@@ -51,9 +51,9 @@ def update_requirements():
             for dep in additions:
                 f.write(f"{dep}\n")
 
-        print(f"\nâœ… Updated {req_file}")
+        print(f"\n✔️ Updated {req_file}")
     else:
-        print("âœ… All dependencies already present")
+        print("✔️ All dependencies already present")
 
     # Show final requirements
     print(f"\nðŸ“‹ Final requirements.txt:")

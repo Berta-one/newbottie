@@ -560,7 +560,7 @@ def bot_trade_dashboard():
     st.subheader("ðŸš€ Next Steps")
     st.info(
         """
-    **Current Status:** âœ… Live trading enabled with real Binance data.
+    **Current Status:** ✔️ Live trading enabled with real Binance data.
     - Monitor open positions and trade history above.
     - All trades and signals are based on live market data.
     """

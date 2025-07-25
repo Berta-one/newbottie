@@ -19,20 +19,20 @@ def is_bot_running():
         return False
 
 
-# âœ… Status Indicator
+# ✔️ Status Indicator
 if is_bot_running():
-    st.success("âœ… Bot is currently running in the background.")
+    st.success("✔️ Bot is currently running in the background.")
 else:
     st.warning("âš ï¸ Bot is not running.")
 
-# âœ… Control Buttons
+# ✔️ Control Buttons
 col1, col2 = st.columns(2)
 
 with col1:
     if st.button("â–¶ Start Bot"):
         if not is_bot_running():
             os.system(f"nohup python {BOT_SCRIPT} &")
-            st.success("âœ… Bot started successfully!")
+            st.success("✔️ Bot started successfully!")
             time.sleep(2)
             st.experimental_rerun()
         else:
@@ -48,7 +48,7 @@ with col2:
         else:
             st.info("Bot is not running.")
 
-# âœ… Show Recent Logs
+# ✔️ Show Recent Logs
 st.subheader("ðŸ“œ Recent Bot Logs")
 try:
     with open("bot_service.log", "r") as log_file:

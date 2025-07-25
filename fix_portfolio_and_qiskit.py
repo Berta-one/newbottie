@@ -29,14 +29,14 @@ def install_qiskit():
             ], capture_output=True, text=True, timeout=300)
             
             if result.returncode == 0:
-                print(f"âœ… {package} installed successfully")
+                print(f"✔️ {package} installed successfully")
             else:
-                print(f"âŒ Failed to install {package}: {result.stderr}")
+                print(f"❌ Failed to install {package}: {result.stderr}")
                 
         except subprocess.TimeoutExpired:
             print(f"â° {package} installation timed out")
         except Exception as e:
-            print(f"âŒ Error installing {package}: {e}")
+            print(f"❌ Error installing {package}: {e}")
 
 def create_qiskit_fallback():
     """Create fallback quantum trader when Qiskit is not available"""
@@ -58,7 +58,7 @@ class FallbackQuantumTrader:
     def __init__(self):
         self.name = "FallbackQuantumTrader"
         self.quantum_available = False
-        self.status = "âŒ Quantum Trader disabled - No module named 'qiskit'"
+        self.status = "❌ Quantum Trader disabled - No module named 'qiskit'"
         
     def quantum_random(self, size: int = 1) -> List[float]:
         """Fallback to classical random number generation"""
@@ -176,7 +176,7 @@ try:
         def __init__(self):
             self.name = "QuantumTrader"
             self.quantum_available = True
-            self.status = "âœ… Quantum Trader enabled"
+            self.status = "✔️ Quantum Trader enabled"
             self.simulator = AerSimulator()
         
         def quantum_random(self, size: int = 1) -> List[float]:
@@ -246,7 +246,7 @@ __all__ = ['quantum_trader', 'QUANTUM_AVAILABLE', 'FallbackQuantumTrader']
     with open("quantum_trader.py", "w", encoding="utf-8") as f:
         f.write(fallback_code)
     
-    print("âœ… Created quantum_trader.py with fallback system")
+    print("✔️ Created quantum_trader.py with fallback system")
 
 def fix_portfolio_value_issue():
     """Fix the specific portfolio value synchronization issue"""
@@ -313,7 +313,7 @@ def debug_portfolio_calculation(portfolio_data, location="Unknown"):
     print("-" * 40)
     
     if not portfolio_data:
-        print("âŒ Portfolio data is empty or None")
+        print("❌ Portfolio data is empty or None")
         return 0.0
     
     total = 0.0
@@ -326,13 +326,13 @@ def debug_portfolio_calculation(portfolio_data, location="Unknown"):
             
             if 'usd_value' in data:
                 usd_value = float(data['usd_value'])
-                print(f"   ðŸ’° usd_value: ${usd_value:.2f}")
+                print(f"   💰 usd_value: ${usd_value:.2f}")
             elif 'value' in data:
                 usd_value = float(data['value'])
-                print(f"   ðŸ’° value: ${usd_value:.2f}")
+                print(f"   💰 value: ${usd_value:.2f}")
             elif 'market_value' in data:
                 usd_value = float(data['market_value'])
-                print(f"   ðŸ’° market_value: ${usd_value:.2f}")
+                print(f"   💰 market_value: ${usd_value:.2f}")
             else:
                 print(f"   âš ï¸  No USD value found in keys: {list(data.keys())}")
             
@@ -360,9 +360,9 @@ def render_dashboard_with_fixed_portfolio(portfolio):
     # Use the unified values in your metrics
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("ðŸ’° Portfolio Value (USD)", f"${total_usd:,.2f}")
+        st.metric("💰 Portfolio Value (USD)", f"${total_usd:,.2f}")
     with col2: 
-        st.metric("ðŸ’· Portfolio Value (GBP)", f"Â£{total_gbp:,.2f}")
+        st.metric("💷 Portfolio Value (GBP)", f"£{total_gbp:,.2f}")
     with col3:
         st.metric("ðŸª™ Total Assets", asset_count)
     
@@ -381,13 +381,13 @@ def render_portfolio_tab_with_fixed_values(portfolio):
     with open("portfolio_patch_instructions.py", "w", encoding="utf-8") as f:
         f.write(patch_code)
     
-    print("âœ… Created portfolio patch instructions")
+    print("✔️ Created portfolio patch instructions")
 '''
     
     with open("portfolio_value_fix.py", "w", encoding="utf-8") as f:
         f.write(portfolio_fix_code)
     
-    print("âœ… Created portfolio_value_fix.py")
+    print("✔️ Created portfolio_value_fix.py")
 
 def update_requirements_with_missing_deps():
     """Update requirements.txt with all missing dependencies"""
@@ -436,7 +436,7 @@ def update_requirements_with_missing_deps():
             for dep in missing_deps:
                 f.write(f"{dep}\n")
     
-    print("âœ… Requirements.txt updated")
+    print("✔️ Requirements.txt updated")
 
 def create_comprehensive_test():
     """Create a comprehensive test to verify both fixes"""
@@ -465,9 +465,9 @@ def test_portfolio_values():
         # Test unified calculation
         total_usd, total_gbp, asset_count = get_unified_portfolio_value(test_portfolio)
         
-        print(f"âœ… Unified calculation successful:")
-        print(f"   ðŸ’° Total USD: ${total_usd:.2f}")
-        print(f"   ðŸ’· Total GBP: Â£{total_gbp:.2f}")
+        print(f"✔️ Unified calculation successful:")
+        print(f"   💰 Total USD: ${total_usd:.2f}")
+        print(f"   💷 Total GBP: £{total_gbp:.2f}")
         print(f"   ðŸª™ Assets: {asset_count}")
         
         # Test debug function
@@ -475,14 +475,14 @@ def test_portfolio_values():
         
         # Verify consistency
         if abs(total_usd - debug_total) < 0.01:
-            print("âœ… Portfolio calculations are consistent")
+            print("✔️ Portfolio calculations are consistent")
             return True
         else:
-            print(f"âŒ Inconsistent calculations: {total_usd} vs {debug_total}")
+            print(f"❌ Inconsistent calculations: {total_usd} vs {debug_total}")
             return False
             
     except Exception as e:
-        print(f"âŒ Portfolio test failed: {e}")
+        print(f"❌ Portfolio test failed: {e}")
         return False
 
 def test_quantum_trader():
@@ -506,14 +506,14 @@ def test_quantum_trader():
         print(f"ðŸ“ˆ Analysis result: {analysis}")
         
         if analysis and 'confidence' in analysis:
-            print("âœ… Quantum trader working correctly")
+            print("✔️ Quantum trader working correctly")
             return True
         else:
-            print("âŒ Quantum trader analysis failed")
+            print("❌ Quantum trader analysis failed")
             return False
             
     except Exception as e:
-        print(f"âŒ Quantum trader test failed: {e}")
+        print(f"❌ Quantum trader test failed: {e}")
         return False
 
 def main():
@@ -527,10 +527,10 @@ def main():
     print("\\n" + "=" * 60)
     if portfolio_ok and quantum_ok:
         print("ðŸŽ‰ ALL TESTS PASSED!")
-        print("âœ… Portfolio values will be synchronized")
-        print("âœ… Quantum trader is functional")
+        print("✔️ Portfolio values will be synchronized")
+        print("✔️ Quantum trader is functional")
     else:
-        print("âŒ Some tests failed:")
+        print("❌ Some tests failed:")
         if not portfolio_ok:
             print("   - Portfolio value synchronization needs attention")  
         if not quantum_ok:
@@ -545,7 +545,7 @@ if __name__ == "__main__":
     with open("comprehensive_test.py", "w", encoding="utf-8") as f:
         f.write(test_code)
     
-    print("âœ… Created comprehensive_test.py")
+    print("✔️ Created comprehensive_test.py")
 
 def main():
     """Main function to fix both issues"""
@@ -585,10 +585,10 @@ def main():
     print("\n4. Test your dashboard:")
     print("   streamlit run hybrid_bot.py")
     
-    print("\nðŸŽ¯ Expected Results:")
-    print("âœ… Dashboard and Portfolio tabs show same values")
-    print("âœ… Quantum Trader shows enabled status")
-    print("âœ… No import errors")
+    print("\n🎯 Expected Results:")
+    print("✔️ Dashboard and Portfolio tabs show same values")
+    print("✔️ Quantum Trader shows enabled status")
+    print("✔️ No import errors")
 
 if __name__ == "__main__":
     main()

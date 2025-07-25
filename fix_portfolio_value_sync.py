@@ -97,7 +97,7 @@ class UnifiedPortfolioCalculator:
             'asset_count': len(portfolio_data) if portfolio_data else 0,
             'largest_holding_pct': self._get_largest_holding_percentage(portfolio_data, total_usd),
             'formatted_usd': f"${total_usd:,.2f}",
-            'formatted_gbp': f"Â£{total_gbp:,.2f}"
+            'formatted_gbp': f"£{total_gbp:,.2f}"
         }
     
     def _get_largest_holding_percentage(self, portfolio_data, total_usd):
@@ -141,7 +141,7 @@ class UnifiedPortfolioCalculator:
                     'Balance': f"{balance:.8f}".rstrip('0').rstrip('.'),
                     'Price (USD)': f"${price_usd:.4f}",
                     'Value (USD)': f"${usd_value:.2f}",
-                    'Value (GBP)': f"Â£{usd_value * gbp_rate:.2f}",
+                    'Value (GBP)': f"£{usd_value * gbp_rate:.2f}",
                     '24h Change': f"{change_24h:.2f}%",
                     'Percentage': f"{(usd_value / total_usd * 100):.1f}%" if total_usd > 0 else "0.0%"
                 })
@@ -169,7 +169,7 @@ def debug_portfolio_values(portfolio_data, location="unknown"):
     print(f"\\n=== PORTFOLIO DEBUG [{location}] ===")
     
     if not portfolio_data:
-        print("âŒ Portfolio data is empty")
+        print("❌ Portfolio data is empty")
         return 0.0
     
     total_debug = 0.0
@@ -189,7 +189,7 @@ def debug_portfolio_values(portfolio_data, location="unknown"):
     with open("unified_portfolio_calculator.py", "w", encoding="utf-8") as f:
         f.write(calculator_code)
 
-    print("âœ… Created unified_portfolio_calculator.py")
+    print("✔️ Created unified_portfolio_calculator.py")
 
 
 def create_quick_fix_patch():
@@ -230,7 +230,7 @@ def apply_portfolio_fix():
                 if "from unified_portfolio_calculator import" not in content:
                     import_line = "from unified_portfolio_calculator import get_portfolio_totals, debug_portfolio_values\\n"
                     content = import_line + content
-                    print(f"  âœ… Added unified calculator import")
+                    print(f"  ✔️ Added unified calculator import")
                 
                 # Look for portfolio calculation patterns
                 patterns_fixed = []
@@ -254,12 +254,12 @@ def apply_portfolio_fix():
                     f.write(content)
                 
                 if patterns_fixed:
-                    print(f"  âœ… Fixed: {', '.join(patterns_fixed)}")
+                    print(f"  ✔️ Fixed: {', '.join(patterns_fixed)}")
                 else:
-                    print(f"  âœ… No patterns to fix found")
+                    print(f"  ✔️ No patterns to fix found")
                     
             except Exception as e:
-                print(f"  âŒ Error patching {filename}: {e}")
+                print(f"  ❌ Error patching {filename}: {e}")
         else:
             print(f"  âš ï¸ {filename} not found")
     
@@ -276,7 +276,7 @@ if __name__ == "__main__":
     with open("apply_portfolio_fix.py", "w", encoding="utf-8") as f:
         f.write(patch_code)
 
-    print("âœ… Created apply_portfolio_fix.py")
+    print("✔️ Created apply_portfolio_fix.py")
 
 
 def create_manual_fix_instructions():
@@ -347,7 +347,7 @@ streamlit run hybrid_bot.py
     with open("PORTFOLIO_FIX_INSTRUCTIONS.md", "w", encoding="utf-8") as f:
         f.write(instructions)
 
-    print("âœ… Created PORTFOLIO_FIX_INSTRUCTIONS.md")
+    print("✔️ Created PORTFOLIO_FIX_INSTRUCTIONS.md")
 
 
 def main():
@@ -374,11 +374,11 @@ def main():
     print("3. Check both Dashboard and Portfolio tabs")
 
     print("\\nðŸ“‹ Files Created:")
-    print("âœ… unified_portfolio_calculator.py - Single source of truth")
-    print("âœ… apply_portfolio_fix.py - Automated patcher")
-    print("âœ… PORTFOLIO_FIX_INSTRUCTIONS.md - Manual instructions")
+    print("✔️ unified_portfolio_calculator.py - Single source of truth")
+    print("✔️ apply_portfolio_fix.py - Automated patcher")
+    print("✔️ PORTFOLIO_FIX_INSTRUCTIONS.md - Manual instructions")
 
-    print("\\nðŸŽ¯ This will sync portfolio values across all tabs!")
+    print("\\n🎯 This will sync portfolio values across all tabs!")
 
 
 if __name__ == "__main__":

@@ -103,7 +103,7 @@
 #         pass
 #         # Initialize quantum engine
 #         self.quantum_engine = QuantumTradingEngine()
-#         self.logger.info("âœ… Quantum engine initialized")
+#         self.logger.info("✔️ Quantum engine initialized")
 #
 #         # Initialize Binance client
 #         api_key = os.getenv('BINANCE_API_KEY')
@@ -117,7 +117,7 @@
 #             self.client = Client(api_key, api_secret)
 #             # if self.config['TESTNET_MODE']:
 #             #     self.client.API_URL = "https://testnet.binance.vision/api"
-#             self.logger.info("âœ… Binance client initialized (LIVE)")
+#             self.logger.info("✔️ Binance client initialized (LIVE)")
 #             else:
 #                 # TODO: Implement logic here
 #                 pass
@@ -133,7 +133,7 @@
 #
 #                     # Initialize quantum trader
 #                     self.quantum_trader = get_quantum_trader(self.client)
-#                     self.logger.info("âœ… Quantum trader initialized")
+#                     self.logger.info("✔️ Quantum trader initialized")
 #
 #                 return True
 #
@@ -142,7 +142,7 @@
 #                         pass
 #                         # TODO: Implement logic here
 #                         pass
-#                         self.logger.error(f"âŒ Failed to initialize systems: {e}")
+#                         self.logger.error(f"❌ Failed to initialize systems: {e}")
 #                     return False
 #
 # def get_portfolio_data(self) -> Dict[str, Any]:
@@ -254,7 +254,7 @@
 #                 'timestamp': datetime.now().isoformat()
 #                 })
 #
-#                 self.logger.info(f"âœ… Strong quantum signal for {symbol}: {quantum_result['quantum_signal']} ({quantum_result['quantum_confidence']:.1%})")
+#                 self.logger.info(f"✔️ Strong quantum signal for {symbol}: {quantum_result['quantum_signal']} ({quantum_result['quantum_confidence']:.1%})")
 #                 else:
 #                     # TODO: Implement logic here
 #                     pass
@@ -341,7 +341,7 @@
 #                 pass
 #                 # TODO: Implement logic here
 #                 pass
-#                 self.logger.info(f"âœ… Quantum trade executed successfully for {symbol}")
+#                 self.logger.info(f"✔️ Quantum trade executed successfully for {symbol}")
 #                 else:
 #                     # TODO: Implement logic here
 #                     pass
@@ -354,7 +354,7 @@
 #                         pass
 #                         # TODO: Implement logic here
 #                         pass
-#                         self.logger.error(f"âŒ Error executing quantum trade for {symbol}: {e}")
+#                         self.logger.error(f"❌ Error executing quantum trade for {symbol}: {e}")
 #                         results.append({
 #                         'symbol': symbol,
 #                         'result': {'status': 'ERROR', 'message': str(e)},
@@ -418,7 +418,7 @@
 #             pass
 #             # TODO: Implement logic here
 #             pass
-#             self.logger.info(f"ðŸŽ¯ Found {len(signals)} qualifying quantum signals")
+#             self.logger.info(f"🎯 Found {len(signals)} qualifying quantum signals")
 #             execution_results = self.execute_quantum_signals(signals)
 #
 #             # Log execution results
@@ -428,7 +428,7 @@
 #                     pass
 #                     # TODO: Implement logic here
 #                     pass
-#                     self.logger.info(f"âœ… {result['symbol']}: Trade executed")
+#                     self.logger.info(f"✔️ {result['symbol']}: Trade executed")
 #                     else:
 #                         # TODO: Implement logic here
 #                         pass
@@ -487,7 +487,7 @@
 #         pass
 #         # TODO: Implement logic here
 #         pass
-#         self.logger.error("âŒ Cannot start - missing required modules")
+#         self.logger.error("❌ Cannot start - missing required modules")
 #     return
 #
 #         if not self.config['AUTO_TRADE_ENABLED']:
@@ -538,7 +538,7 @@
 #                                     pass
 #                                     # TODO: Implement logic here
 #                                     pass
-#                                     self.logger.error(f"âŒ Unexpected error in main loop: {e}")
+#                                     self.logger.error(f"❌ Unexpected error in main loop: {e}")
 #                                     time.sleep(60)  # Wait 1 minute before retrying
 #
 #                                     self.logger.info("ðŸ Autonomous quantum trading bot stopped")

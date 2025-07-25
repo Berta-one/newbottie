@@ -100,7 +100,7 @@ class BacktestingIntegration:
 
         weight_cols = {"Quantum Weight", "ML Weight", "Technical Weight"}
         if weight_cols.issubset(df.columns):
-            st.subheader("ðŸŽ¯ Apply Strategy")
+            st.subheader("🎯 Apply Strategy")
             st.caption(
                 "Click to push these weights into the Multiâ€‘Strategy tab sliders."
             )
@@ -130,7 +130,7 @@ class BacktestingIntegration:
                     "tech": tech_best,
                     "time": datetime.utcnow().isoformat(timespec="seconds") + "Z",
                 }
-                st.success(f"âœ… Applied best strategy from {best_row['Pair']}!")
+                st.success(f"✔️ Applied best strategy from {best_row['Pair']}!")
                 st.rerun()
 
             for i, row in df.iterrows():
@@ -164,7 +164,7 @@ class BacktestingIntegration:
                             "time": datetime.utcnow().isoformat(timespec="seconds")
                             + "Z",
                         }
-                        st.success(f"âœ… Applied strategy from {row['Pair']}!")
+                        st.success(f"✔️ Applied strategy from {row['Pair']}!")
                         st.rerun()
 
         agg = df.groupby("Pair").agg(

@@ -22,7 +22,7 @@ try:
     BINANCE_AVAILABLE = True
 except ImportError:
     BINANCE_AVAILABLE = False
-    print("âŒ python-binance not available. Install with: pip install python-binance")
+    print("❌ python-binance not available. Install with: pip install python-binance")
 
 
 class BackgroundTradingBot:
@@ -40,17 +40,17 @@ class BackgroundTradingBot:
     def initialize_client(self):
         """Initialize Binance client"""
         if not BINANCE_AVAILABLE or not API_KEY or not API_SECRET:
-            print("âŒ Binance client initialization failed")
+            print("❌ Binance client initialization failed")
             return False
 
         try:
             self.client = Client(API_KEY, API_SECRET)
             if USE_TESTNET:
                 self.client.API_URL = "https://testnet.binance.vision/api"
-            print("âœ… Binance client initialized")
+            print("✔️ Binance client initialized")
             return True
         except Exception as e:
-            print(f"âŒ Error connecting to Binance: {e}")
+            print(f"❌ Error connecting to Binance: {e}")
             return False
 
     def get_portfolio(self):
@@ -98,7 +98,7 @@ class BackgroundTradingBot:
             return portfolio
 
         except Exception as e:
-            print(f"âŒ Error fetching portfolio: {e}")
+            print(f"❌ Error fetching portfolio: {e}")
             return {}
 
     def analyze_opportunity(self, symbol):
@@ -146,7 +146,7 @@ class BackgroundTradingBot:
             }
 
         except Exception as e:
-            print(f"âŒ Error analyzing {symbol}: {e}")
+            print(f"❌ Error analyzing {symbol}: {e}")
             return None
 
     def scan_portfolio(self):
@@ -188,7 +188,7 @@ class BackgroundTradingBot:
             with open("logs/background_bot_scans.log", "a") as f:
                 f.write(f"{json.dumps(scan_result)}\n")
         except Exception as e:
-            print(f"âŒ Error logging scan result: {e}")
+            print(f"❌ Error logging scan result: {e}")
 
     def log_bot_event(self, event, data=None):
         """Log bot events"""
@@ -231,7 +231,7 @@ class BackgroundTradingBot:
 
                 # Display results
                 if opportunities:
-                    print(f"ðŸŽ¯ Found {len(opportunities)} trading opportunities:")
+                    print(f"🎯 Found {len(opportunities)} trading opportunities:")
                     for opp in opportunities:
                         print(
                             f"   {opp['asset']}: {opp['signal']} "
@@ -248,7 +248,7 @@ class BackgroundTradingBot:
         except KeyboardInterrupt:
             print(f"\nðŸ›‘ Bot stopped by user after {self.scan_count} scans")
         except Exception as e:
-            print(f"\nâŒ Unexpected error: {e}")
+            print(f"\n❌ Unexpected error: {e}")
         finally:
             self.running = False
             self.log_bot_event("bot_stopped", {"final_scan_count": self.scan_count})
@@ -257,16 +257,16 @@ class BackgroundTradingBot:
 
 def main():
     """Main entry point"""
-    print("ðŸŽ¯ Background Crypto Trading Bot")
+    print("🎯 Background Crypto Trading Bot")
     print("=" * 40)
 
     # Validate configuration
     if not API_KEY or not API_SECRET:
-        print("âŒ Error: BINANCE_API_KEY and BINANCE_API_SECRET must be set")
+        print("❌ Error: BINANCE_API_KEY and BINANCE_API_SECRET must be set")
         return
 
     if not BINANCE_AVAILABLE:
-        print("âŒ Error: python-binance library not available")
+        print("❌ Error: python-binance library not available")
         return
 
     # Create and run bot
@@ -275,7 +275,7 @@ def main():
     if bot.client:
         bot.run_continuous()
     else:
-        print("âŒ Failed to initialize Binance client")
+        print("❌ Failed to initialize Binance client")
 
 
 if __name__ == "__main__":

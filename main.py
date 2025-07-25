@@ -24,7 +24,7 @@ def test_api_connection():
         use_testnet = os.getenv("USE_TESTNET", "True").lower() == "true"
 
         if not api_key or not api_secret:
-            print("âŒ API credentials not found in environment")
+            print("❌ API credentials not found in environment")
             return False
 
         # Initialize client
@@ -38,9 +38,9 @@ def test_api_connection():
 
         # Test connection
         account = client.get_account()
-        print(f"âœ… API Connection Successful!")
+        print(f"✔️ API Connection Successful!")
         print(f"ðŸ“Š Account Type: {account.get('accountType', 'Unknown')}")
-        print(f"ðŸ’° Can Trade: {account.get('canTrade', False)}")
+        print(f"💰 Can Trade: {account.get('canTrade', False)}")
 
         # Test market data
         ticker = client.get_symbol_ticker(symbol="BTCUSDT")
@@ -49,7 +49,7 @@ def test_api_connection():
         return True
 
     except Exception as e:
-        print(f"âŒ API Connection Failed: {e}")
+        print(f"❌ API Connection Failed: {e}")
         return False
 
 
@@ -78,7 +78,7 @@ def simple_trading_loop():
     except KeyboardInterrupt:
         print("\nðŸ›‘ Bot stopped by user")
     except Exception as e:
-        print(f"\nâŒ Bot error: {e}")
+        print(f"\n❌ Bot error: {e}")
 
 
 if __name__ == "__main__":

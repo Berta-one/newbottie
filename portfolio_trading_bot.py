@@ -13,7 +13,7 @@ import numpy as np
 load_dotenv()
 
 # Page configuration
-st.set_page_config(page_title="ðŸŽ¯ Multi-Coin Portfolio Bot", layout="wide")
+st.set_page_config(page_title="🎯 Multi-Coin Portfolio Bot", layout="wide")
 
 # Configuration
 USE_TESTNET = os.getenv("USE_TESTNET", "True").lower() == "true"
@@ -85,7 +85,7 @@ def get_binance_client():
             client.API_URL = "https://testnet.binance.vision/api"
         return client
     except Exception as e:
-        st.error(f"âŒ Error connecting to Binance: {e}")
+        st.error(f"❌ Error connecting to Binance: {e}")
         return None
 
 
@@ -150,7 +150,7 @@ def get_real_portfolio():
         return portfolio, gbp_rate
 
     except Exception as e:
-        st.error(f"âŒ Error fetching real portfolio: {e}")
+        st.error(f"❌ Error fetching real portfolio: {e}")
         return {}, get_gbp_exchange_rate()
 
 
@@ -328,10 +328,10 @@ def render_portfolio_overview(portfolio, gbp_rate):
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        st.metric("ðŸ’° Total Value (USD)", f"${total_usd:,.2f}")
+        st.metric("💰 Total Value (USD)", f"${total_usd:,.2f}")
 
     with col2:
-        st.metric("ðŸ’· Total Value (GBP)", f"Â£{total_gbp:,.2f}")
+        st.metric("💷 Total Value (GBP)", f"£{total_gbp:,.2f}")
 
     with col3:
         st.metric("ðŸª™ Total Assets", len(portfolio))
@@ -360,7 +360,7 @@ def render_portfolio_overview(portfolio, gbp_rate):
 
     with col4:
         opportunities = len(st.session_state.get("last_opportunities", []))
-        st.metric("ðŸŽ¯ Opportunities", opportunities)
+        st.metric("🎯 Opportunities", opportunities)
 
     st.divider()
 
@@ -372,7 +372,7 @@ def render_portfolio_overview(portfolio, gbp_rate):
                 "Balance": f"{data['balance']:.8f}".rstrip("0").rstrip("."),
                 "Price (USD)": f"${data['price_usd']:.4f}",
                 "Value (USD)": f"${data['usd_value']:.2f}",
-                "Value (GBP)": f"Â£{data['gbp_value']:.2f}",
+                "Value (GBP)": f"£{data['gbp_value']:.2f}",
                 "24h Change": f"{data.get('change_24h', 0):.2f}%",
                 "Percentage": f"{(data['usd_value'] / total_usd * 100):.1f}%",
             }
@@ -414,7 +414,7 @@ def render_market_indicators(portfolio):
 
         for i, opp in enumerate(opportunities):
             with st.expander(
-                f"ðŸŽ¯ {opp['asset']} - {opp['signal']} (Confidence: {opp['confidence']:.1%})"
+                f"🎯 {opp['asset']} - {opp['signal']} (Confidence: {opp['confidence']:.1%})"
             ):
                 col1, col2, col3 = st.columns(3)
 
@@ -569,7 +569,7 @@ def render_settings_tab():
         st.subheader("ðŸ¤– Bot Control")
 
         if st.session_state["bot_running"]:
-            st.success("âœ… Bot is RUNNING continuously")
+            st.success("✔️ Bot is RUNNING continuously")
             st.info(f"ðŸ” Completed {st.session_state['scan_count']} scans")
 
             if st.button("ðŸ›‘ Stop Bot", type="secondary"):
@@ -586,7 +586,7 @@ def render_settings_tab():
                     time.sleep(1)
                     st.rerun()
                 else:
-                    st.error("âŒ Failed to start bot")
+                    st.error("❌ Failed to start bot")
 
         st.markdown("---")
         st.subheader("âš™ï¸ Bot Configuration")
@@ -625,11 +625,11 @@ def render_settings_tab():
 
         client = get_binance_client()
         if client:
-            st.success("âœ… Binance API Connected")
+            st.success("✔️ Binance API Connected")
             mode = "Testnet" if USE_TESTNET else "Live Trading"
             st.info(f"ðŸ“¡ Mode: {mode}")
         else:
-            st.error("âŒ Binance API Not Connected")
+            st.error("❌ Binance API Not Connected")
 
         st.write(f"**Min Balance Filter:** ${MIN_BALANCE_USD}")
         st.write(f"**Current Time:** {datetime.now().strftime('%H:%M:%S')}")
@@ -644,7 +644,7 @@ def render_settings_tab():
                     datetime.now() - st.session_state["last_scan_time"]
                 ).seconds
                 if time_since_scan < 60:
-                    st.success(f"âœ… Last scan: {time_since_scan}s ago")
+                    st.success(f"✔️ Last scan: {time_since_scan}s ago")
                 else:
                     st.warning(f"âš ï¸ Last scan: {time_since_scan}s ago (may be stuck)")
         else:
@@ -713,9 +713,9 @@ def render_health_tab():
 
     client = get_binance_client()
     if client:
-        st.success("âœ… Binance API Connection: Healthy")
+        st.success("✔️ Binance API Connection: Healthy")
     else:
-        st.error("âŒ Binance API Connection: Failed")
+        st.error("❌ Binance API Connection: Failed")
 
     col1, col2, col3 = st.columns(3)
 
@@ -748,9 +748,9 @@ def render_health_tab():
     for check, status in health_checks.items():
         if isinstance(status, bool):
             if status:
-                st.success(f"âœ… {check}")
+                st.success(f"✔️ {check}")
             else:
-                st.error(f"âŒ {check}")
+                st.error(f"❌ {check}")
         else:
             st.info(f"â„¹ï¸ {check}: {status}")
 
@@ -759,7 +759,7 @@ def render_health_tab():
     st.subheader("ðŸ”§ Continuous Bot Diagnostics")
 
     if st.session_state["bot_running"]:
-        st.success("âœ… Continuous bot is running in background thread")
+        st.success("✔️ Continuous bot is running in background thread")
         st.info("ðŸ”„ Bot will scan every 30 seconds automatically")
         st.info("ðŸ›¡ï¸ Bot has error recovery and will never stop unless manually stopped")
 
@@ -820,7 +820,7 @@ def log_bot_event(event_type, message, data=None):
 def main():
     """Main application function"""
     try:
-        st.title("ðŸŽ¯ Multi-Coin Portfolio Trading Bot")
+        st.title("🎯 Multi-Coin Portfolio Trading Bot")
         st.caption(
             "Continuous 24/7 scanning of your cryptocurrency holdings for trading opportunities"
         )
@@ -867,17 +867,17 @@ def main():
             # Quick start
             if st.sidebar.button("ðŸš€ Start Continuous Bot", type="primary"):
                 if trading_bot.start():
-                    st.sidebar.success("âœ… Bot started!")
+                    st.sidebar.success("✔️ Bot started!")
                     st.rerun()
                 else:
-                    st.sidebar.error("âŒ Failed to start")
+                    st.sidebar.error("❌ Failed to start")
 
         # Bot statistics in sidebar
         st.sidebar.markdown("---")
         st.sidebar.markdown("### ðŸ“Š Bot Statistics")
 
         opportunities = len(st.session_state.get("last_opportunities", []))
-        st.sidebar.metric("ðŸŽ¯ Active Opportunities", opportunities)
+        st.sidebar.metric("🎯 Active Opportunities", opportunities)
         st.sidebar.metric("ðŸ”„ Total Scans", st.session_state["scan_count"])
 
         if st.session_state["bot_running"]:

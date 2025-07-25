@@ -15,10 +15,10 @@ def safe_write_file(filename, content):
     try:
         with open(filename, "w", encoding="utf-8", newline="\n") as f:
             f.write(content)
-        print(f"âœ… Created {filename}")
+        print(f"✔️ Created {filename}")
         return True
     except Exception as e:
-        print(f"âŒ Failed to create {filename}: {e}")
+        print(f"❌ Failed to create {filename}: {e}")
         return False
 
 
@@ -162,7 +162,7 @@ def create_test_file():
         total_usd, total_gbp, count = get_unified_portfolio_value(test_portfolio)
         print(f"Portfolio Fix Working:")
         print(f"  Total USD: ${total_usd:.2f}")
-        print(f"  Total GBP: Â£{total_gbp:.2f}")
+        print(f"  Total GBP: £{total_gbp:.2f}")
         print(f"  Assets: {count}")
         
         return True
@@ -226,7 +226,7 @@ def install_dependencies():
             )
 
             if result.returncode == 0:
-                print(f"âœ… {package} installed")
+                print(f"✔️ {package} installed")
             else:
                 print(f"âš ï¸ {package} installation had issues")
 
@@ -244,7 +244,7 @@ def cleanup_bad_files():
                 os.remove(filename)
                 print(f"ðŸ—‘ï¸ Removed problematic file: {filename}")
             except Exception as e:
-                print(f"âŒ Could not remove {filename}: {e}")
+                print(f"❌ Could not remove {filename}: {e}")
 
 
 def main():
@@ -275,7 +275,7 @@ def main():
         print("2. Add imports to hybrid_bot.py")
         print("3. Update portfolio calculations")
     else:
-        print("âŒ Some files failed to create")
+        print("❌ Some files failed to create")
 
     print("=" * 50)
 

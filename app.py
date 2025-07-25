@@ -17,7 +17,7 @@ import psutil
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
-# âœ… Use Redis for SocketIO messaging
+# ✔️ Use Redis for SocketIO messaging
 REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379')
 socketio = SocketIO(app, cors_allowed_origins="*", message_queue=REDIS_URL)
 
@@ -34,7 +34,7 @@ def is_bot_running():
 def start_bot():
     if not is_bot_running():
         subprocess.Popen(["python", BOT_SCRIPT])
-        flash("âœ… Bot started!", "success")
+        flash("✔️ Bot started!", "success")
     else:
         flash("Bot already running.", "info")
     return redirect(url_for('dashboard'))
@@ -50,7 +50,7 @@ def stop_bot():
 
 @socketio.on('connect', namespace='/logs')
 def logs_connect():
-    print("âœ… Client connected to logs namespace")
+    print("✔️ Client connected to logs namespace")
 
 BASE_TEMPLATE = """
 <!DOCTYPE html>

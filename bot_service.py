@@ -11,17 +11,17 @@ import time
 from hybrid_bot import AutoScanner, AutoTrader
 from datetime import datetime
 
-# âœ… Environment Variables
+# ✔️ Environment Variables
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 SCAN_INTERVAL = int(os.getenv("SCAN_INTERVAL", 30))
 TRADING_PAIRS = os.getenv("TRADING_PAIRS", "BTCUSDT,ETHUSDT").split(",")
 API_KEY = os.getenv("BINANCE_API_KEY")
 API_SECRET = os.getenv("BINANCE_API_SECRET")
 
-# âœ… Connect to SocketIO message queue
+# ✔️ Connect to SocketIO message queue
 socketio = SocketIO(message_queue=REDIS_URL)
 
-# âœ… Logging
+# ✔️ Logging
 logging.basicConfig(
     filename="bot_service.log",
     level=logging.INFO,
@@ -47,9 +47,9 @@ def main():
             for signal in signals:
                 log_activity(f"ðŸ“ˆ Processing trade signal: {signal}")
                 result = trader.execute(signal)
-                log_activity(f"âœ… Trade executed: {result}")
+                log_activity(f"✔️ Trade executed: {result}")
         except Exception as e:
-            log_activity(f"âŒ Error in bot loop: {e}")
+            log_activity(f"❌ Error in bot loop: {e}")
         time.sleep(SCAN_INTERVAL)
 
 

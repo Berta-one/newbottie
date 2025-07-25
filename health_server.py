@@ -65,7 +65,7 @@ class HealthHandler(BaseHTTPRequestHandler):
         <head><title>Hybrid Crypto Bot - Railway</title></head>
         <body>
             <h1>ðŸ§  Hybrid Crypto Bot</h1>
-            <p>âœ… Running on Railway</p>
+            <p>✔️ Running on Railway</p>
             <p>âš›ï¸ Quantum + ðŸ¤– ML + ðŸ“Š Technical Analysis</p>
             <p>ðŸ”— <a href="/health">Health Check</a></p>
         </body>

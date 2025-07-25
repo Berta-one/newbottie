@@ -68,15 +68,15 @@ class EnhancedTradingBot:
             from simplified_ml_strategy import SimplifiedMLStrategy
 
             self.ml_strategy = SimplifiedMLStrategy()
-            logging.info("âœ… ML Strategy initialized successfully")
+            logging.info("✔️ ML Strategy initialized successfully")
         except ImportError as e:
-            logging.error(f"âŒ Failed to import ML strategy: {e}")
+            logging.error(f"❌ Failed to import ML strategy: {e}")
             logging.info(
                 "ðŸ’¡ Make sure simplified_ml_strategy.py is in the same directory"
             )
             self.ml_strategy = None
         except Exception as e:
-            logging.error(f"âŒ Failed to initialize ML strategy: {e}")
+            logging.error(f"❌ Failed to initialize ML strategy: {e}")
             self.ml_strategy = None
 
     def basic_strategy(self, klines):
@@ -196,7 +196,7 @@ class EnhancedTradingBot:
                 if opportunity["meets_threshold"]:
                     opportunities.append(opportunity)
                     logging.info(
-                        f"âœ… Opportunity found: {symbol} - {opportunity['final_signal']} ({opportunity['final_confidence']:.2%})"
+                        f"✔️ Opportunity found: {symbol} - {opportunity['final_signal']} ({opportunity['final_confidence']:.2%})"
                     )
                 else:
                     logging.info(
@@ -204,7 +204,7 @@ class EnhancedTradingBot:
                     )
 
             except Exception as e:
-                logging.error(f"âŒ Error analyzing {symbol}: {e}")
+                logging.error(f"❌ Error analyzing {symbol}: {e}")
 
         return opportunities
 
@@ -215,14 +215,14 @@ class EnhancedTradingBot:
         print("=" * 80)
 
         if not opportunities:
-            print("âŒ No opportunities found meeting confidence threshold")
+            print("❌ No opportunities found meeting confidence threshold")
             return
 
-        print(f"âœ… Found {len(opportunities)} opportunities:")
+        print(f"✔️ Found {len(opportunities)} opportunities:")
         print()
 
         for i, opp in enumerate(opportunities, 1):
-            print(f"ðŸŽ¯ Opportunity #{i}:")
+            print(f"🎯 Opportunity #{i}:")
             print(f"   Symbol: {opp['symbol']}")
             print(f"   Final Signal: {opp['final_signal']}")
             print(f"   Final Confidence: {opp['final_confidence']:.2%}")
@@ -276,8 +276,8 @@ def main():
         for feature, weight in importance[:5]:  # Top 5 features
             print(f"{feature}: {weight:.3f}")
 
-    print("\nâœ… Test completed successfully!")
-    print("ðŸŽ¯ You can now integrate this enhanced system with your actual bot!")
+    print("\n✔️ Test completed successfully!")
+    print("🎯 You can now integrate this enhanced system with your actual bot!")
 
 
 if __name__ == "__main__":

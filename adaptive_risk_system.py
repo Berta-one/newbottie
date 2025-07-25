@@ -433,7 +433,7 @@ class MultiCoinPortfolioBot:
             self.client.get_server_time()
             return True
         except Exception as e:
-            st.error(f"âŒ Binance connection failed: {e}")
+            st.error(f"❌ Binance connection failed: {e}")
             return False
 
     def get_portfolio_holdings(self):
@@ -515,13 +515,13 @@ class MultiCoinPortfolioBot:
             return portfolio
 
         except Exception as e:
-            st.error(f"âŒ Error fetching portfolio: {e}")
+            st.error(f"❌ Error fetching portfolio: {e}")
             return {}
 
 
 def main():
 
-    st.title("ðŸŽ¯ Adaptive Risk Management Trading Bot")
+    st.title("🎯 Adaptive Risk Management Trading Bot")
     st.caption("Professional, emotion-free trading with dynamic risk adjustment")
 
     # Initialize bot
@@ -631,7 +631,7 @@ def main():
 
         with col3:
             st.metric(
-                "ðŸŽ¯ Recommended Profile",
+                "🎯 Recommended Profile",
                 risk_manager.risk_profiles[recommended_profile]["name"],
                 "Auto-Selected",
             )
@@ -673,9 +673,9 @@ def main():
 
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric("ðŸ’· Total Value (GBP)", f"Â£{total_gbp:,.2f}")
+            st.metric("💷 Total Value (GBP)", f"£{total_gbp:,.2f}")
         with col2:
-            st.metric("ðŸ’° Total Value (USD)", f"${total_usd:,.2f}")
+            st.metric("💰 Total Value (USD)", f"${total_usd:,.2f}")
         with col3:
             st.metric("ðŸª™ Assets", len(portfolio))
 

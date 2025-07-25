@@ -12,7 +12,7 @@ def test_portfolio_fix():
         total_usd, total_gbp, count = get_unified_portfolio_value(test_portfolio)
         print(f"Portfolio Fix Working:")
         print(f"  Total USD: ${total_usd:.2f}")
-        print(f"  Total GBP: Â£{total_gbp:.2f}")
+        print(f"  Total GBP: £{total_gbp:.2f}")
         print(f"  Assets: {count}")
 
         return True

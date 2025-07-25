@@ -252,7 +252,7 @@ class FallbackPortfolioManager:
         return False
 
     def get_connection_status(self):
-        return "âŒ Using demo data - Portfolio Manager not available"
+        return "❌ Using demo data - Portfolio Manager not available"
 
     def get_trade_history(self, symbol=None, limit=100):
         hist = []
@@ -349,7 +349,7 @@ class FallbackTradeExecutor:
         }
         record_trade_to_session(_trade)
         notify_trade(_trade)
-        return f"ðŸ“ Demo trade {side} {qty} {symbol}"
+        return f"📝 Demo trade {side} {qty} {symbol}"
 
     def auto_execute(
         self, signal, total_balance=None, open_positions=0, sl_mult=1.5, tp_mult=3.0
@@ -383,7 +383,7 @@ class FallbackTradeExecutor:
 
 def setup_binance_client() -> (Optional["BinanceClient"], str):
     if not BINANCE_AVAILABLE:
-        return None, "âŒ Binance library not available (demo mode)"
+        return None, "❌ Binance library not available (demo mode)"
     api_key = os.getenv("BINANCE_API_KEY")
     api_secret = os.getenv("BINANCE_API_SECRET")
     if not api_key or not api_secret:
@@ -395,9 +395,9 @@ def setup_binance_client() -> (Optional["BinanceClient"], str):
         # sanity ping
         client.get_server_time()
         mode = "ðŸ§ª TESTNET" if USE_TESTNET else "ðŸš€ LIVE"
-        return client, f"âœ… Connected to Binance {mode}"
+        return client, f"✔️ Connected to Binance {mode}"
     except Exception as e:
-        return None, f"âŒ Connection failed: {e}"
+        return None, f"❌ Connection failed: {e}"
 
 
 # ------------------------------------------------------------------
@@ -728,7 +728,7 @@ with st.sidebar:
         """
     <div style='text-align:center;margin-bottom:20px;'>
         <h3>ðŸ§  Quantum Trading Bot</h3>
-        <p style='font-size:12px;'>Rondanini Publishing Ltd. â€¢ Â© 2025</p>
+        <p style='font-size:12px;'>Rondanini Publishing Ltd. • Â© 2025</p>
     </div>
     """,
         unsafe_allow_html=True,
@@ -791,7 +791,7 @@ TABS = st.tabs(
         "ðŸ“ˆ Performance",  # [5]
         "ðŸ”¬ Backtesting",  # [6]
         "âš™ Settings",  # [7]
-        "ðŸ“ Logs",  # [8]
+        "📝 Logs",  # [8]
     ]
 )
 
@@ -1188,7 +1188,7 @@ with TABS[3]:
             tr = st.session_state.selected_trade
             if tr and tr.get("source") == "multi_strategy":
                 st.divider()
-                st.subheader(f"ðŸŽ¯ Execute {tr['action']} {tr['symbol']}")
+                st.subheader(f"🎯 Execute {tr['action']} {tr['symbol']}")
                 e1, e2, e3 = st.columns(3)
                 with e1:
                     st.info(f"Price: {tr['price']:.4f}")
@@ -1405,7 +1405,7 @@ with TABS[7]:
 # LOGS TAB [8]
 # ============================================================================
 with TABS[8]:
-    st.header("ðŸ“ Logs")
+    st.header("📝 Logs")
     if st.button("Clear Logs", key="lg_clear"):
         st.session_state.logs = []
     if st.session_state.logs:

@@ -174,15 +174,15 @@ class EmailNotificationSystem:
 ðŸš€ BOTTIE TRADING ALERT - Trade Executed
 
 ðŸ“Š Trade Details:
-â€¢ Symbol: {symbol}
-â€¢ Side: {side}
-â€¢ Quantity: {quantity}
-â€¢ Price: ${price:,.4f}
-â€¢ Value: ${value:,.2f}
-â€¢ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
+• Symbol: {symbol}
+• Side: {side}
+• Quantity: {quantity}
+• Price: ${price:,.4f}
+• Value: ${value:,.2f}
+• Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
 
-ðŸŽ¯ Strategy: Enhanced breakout detection
-ðŸ’° Portfolio Impact: {'+' if side.upper() == 'BUY' else '-'}${value:,.2f}
+🎯 Strategy: Enhanced breakout detection
+💰 Portfolio Impact: {'+' if side.upper() == 'BUY' else '-'}${value:,.2f}
 ðŸ”— Monitor: {os.getenv('RAILWAY_STATIC_URL', 'Your Dashboard URL')}
 
 Happy Trading! ðŸš€
@@ -208,10 +208,10 @@ Bottie Bot System
 {emoji} BOTTIE TRADING ALERT - Position Closed
 
 ðŸ“Š Position Summary:
-â€¢ Symbol: {symbol}
-â€¢ P&L: ${pnl:,.2f} ({pnl_percent:+.2f}%)
-â€¢ Exit Reason: {reason}
-â€¢ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
+• Symbol: {symbol}
+• P&L: ${pnl:,.2f} ({pnl_percent:+.2f}%)
+• Exit Reason: {reason}
+• Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
 
 {'ðŸŽ‰ Profitable trade! Great job Bottie!' if pnl > 0 else 'ðŸ“Š Loss contained by risk management'}
 
@@ -237,22 +237,22 @@ Bottie Bot System
         if confidence < 0.8:
             return
 
-        subject = f"ðŸŽ¯ Strong Signal: {signal} {symbol} ({confidence:.1%})"
+        subject = f"🎯 Strong Signal: {signal} {symbol} ({confidence:.1%})"
 
         body = f"""
-ðŸŽ¯ BOTTIE SIGNAL ALERT - High Confidence Detection
+🎯 BOTTIE SIGNAL ALERT - High Confidence Detection
 
 ðŸ“Š Signal Analysis:
-â€¢ Symbol: {symbol}
-â€¢ Signal: {signal}
-â€¢ Confidence: {confidence:.1%}
-â€¢ Current Price: ${price:,.4f}
-â€¢ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
+• Symbol: {symbol}
+• Signal: {signal}
+• Confidence: {confidence:.1%}
+• Current Price: ${price:,.4f}
+• Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
 
 ðŸ” Technical Analysis:
-â€¢ Breakout Strength: {signal_data.get('breakout_strength', 'N/A')}
-â€¢ Volume Ratio: {signal_data.get('volume_ratio', 'N/A')}
-â€¢ RSI Level: {signal_data.get('rsi', 'N/A')}
+• Breakout Strength: {signal_data.get('breakout_strength', 'N/A')}
+• Volume Ratio: {signal_data.get('volume_ratio', 'N/A')}
+• RSI Level: {signal_data.get('rsi', 'N/A')}
 
 {'ðŸ¤– Auto-executing if enabled...' if os.getenv('AUTO_TRADE_ENABLED', 'false') == 'true' else 'âœ‹ Manual review recommended'}
 
@@ -272,7 +272,7 @@ Bottie Bot System
         emoji_map = {
             "started": "ðŸŸ¢",
             "stopped": "ðŸ”´",
-            "error": "âŒ",
+            "error": "❌",
             "warning": "âš ï¸",
             "maintenance": "ðŸ”§",
             "scanning": "ðŸ”",
@@ -288,7 +288,7 @@ Bottie Bot System
 ðŸ–¥ï¸ System Status: {status.title()}
 ðŸ• Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
 
-ðŸ“ Details:
+📝 Details:
 {details}
 
 ðŸ”— Dashboard: {os.getenv('RAILWAY_STATIC_URL', 'Your Dashboard URL')}
@@ -307,15 +307,15 @@ Bottie Bot System
         if not self.send_errors:
             return
 
-        subject = f"âŒ Bottie Error: {error_type}"
+        subject = f"❌ Bottie Error: {error_type}"
 
         body = f"""
-âŒ BOTTIE ERROR ALERT
+❌ BOTTIE ERROR ALERT
 
 ðŸš¨ Error Type: {error_type}
 ðŸ• Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
 
-ðŸ“ Error Details:
+📝 Error Details:
 {error_message}
 
 ðŸ” Context:
@@ -347,13 +347,13 @@ Bottie Bot System
 ðŸŽ‰ BOTTIE MILESTONE ALERT
 
 ðŸ† Achievement: {milestone_type}
-ðŸ’° Current Value: ${value:,.2f}
+💰 Current Value: ${value:,.2f}
 ðŸ• Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
 
 ðŸ“Š Statistics:
-â€¢ Total Trades: {milestone_data.get('total_trades', 'N/A')}
-â€¢ Win Rate: {milestone_data.get('win_rate', 'N/A')}%
-â€¢ Best Trade: {milestone_data.get('best_trade', 'N/A')}%
+• Total Trades: {milestone_data.get('total_trades', 'N/A')}
+• Win Rate: {milestone_data.get('win_rate', 'N/A')}%
+• Best Trade: {milestone_data.get('best_trade', 'N/A')}%
 
 ðŸš€ Keep up the great work!
 
@@ -372,25 +372,25 @@ Bottie Bot System
         body = f"""
 ðŸ§ª BOTTIE EMAIL TEST
 
-âœ… Email notification system is operational!
+✔️ Email notification system is operational!
 
 ðŸ“§ Configuration:
-â€¢ SMTP Server: {self.smtp_server}:{self.smtp_port}
-â€¢ From: {self.from_email}
-â€¢ To: {', '.join(self.to_emails)}
-â€¢ Rate Limit: {self.max_emails_per_hour} emails/hour
+• SMTP Server: {self.smtp_server}:{self.smtp_port}
+• From: {self.from_email}
+• To: {', '.join(self.to_emails)}
+• Rate Limit: {self.max_emails_per_hour} emails/hour
 
 ðŸ”§ Enabled Notifications:
-â€¢ Trade Execution: {'âœ…' if self.send_trades else 'âŒ'}
-â€¢ Strong Signals: {'âœ…' if self.send_signals else 'âŒ'}
-â€¢ System Status: {'âœ…' if self.send_system else 'âŒ'}
-â€¢ Error Alerts: {'âœ…' if self.send_errors else 'âŒ'}
+• Trade Execution: {'✔️' if self.send_trades else '❌'}
+• Strong Signals: {'✔️' if self.send_signals else '❌'}
+• System Status: {'✔️' if self.send_system else '❌'}
+• Error Alerts: {'✔️' if self.send_errors else '❌'}
 
 ðŸš€ Bottie will now send you important trading updates!
 
 ðŸ”— Dashboard: {os.getenv('RAILWAY_STATIC_URL', 'Your Dashboard URL')}
 
-System Ready âœ…
+System Ready ✔️
 Bottie Bot System
 
 ---
@@ -494,7 +494,7 @@ if __name__ == "__main__":
     if status["enabled"] and status["configured"]:
         print("\nSending test email...")
         success = notifier.send_test_email()
-        print(f"Test Result: {'âœ… SUCCESS' if success else 'âŒ FAILED'}")
+        print(f"Test Result: {'✔️ SUCCESS' if success else '❌ FAILED'}")
     else:
         print("\nâš ï¸ Email notifications not fully configured.")
         print(

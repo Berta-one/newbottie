@@ -437,7 +437,7 @@ class EnhancedTrader:
             )
 
         except Exception as e:
-            print(f"âŒ Error monitoring position: {e}")
+            print(f"❌ Error monitoring position: {e}")
             return self.execute_exit(
                 symbol, quantity, None, entry_price, f"Error: {e}", signal_type
             )
@@ -526,7 +526,7 @@ class EnhancedTrader:
             log_trade({**result, "trade_type": "EXIT", "status": "FILLED"})
 
             print(
-                f"âœ… Position closed: {symbol} | P&L: {pnl_pct:+.2f}% (${net_pnl_usd:+.2f}) | {reason}"
+                f"✔️ Position closed: {symbol} | P&L: {pnl_pct:+.2f}% (${net_pnl_usd:+.2f}) | {reason}"
             )
 
             return result
@@ -542,7 +542,7 @@ class EnhancedTrader:
 
             log_trade({**error_result, "trade_type": "EXIT"})
 
-            print(f"âŒ Failed to close position: {e}")
+            print(f"❌ Failed to close position: {e}")
             return error_result
 
     def get_account_balance(self, asset: str = "USDT") -> float:
@@ -930,5 +930,5 @@ if __name__ == "__main__":
             print(f"P&L: {exit_result['pnl_percent']:+.2f}%")
             print(f"P&L USD: ${exit_result['net_pnl_usd']:+.2f}")
 
-    print("\nâœ… Enhanced Trader Module Test Complete")
+    print("\n✔️ Enhanced Trader Module Test Complete")
 

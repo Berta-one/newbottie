@@ -14,21 +14,21 @@ def install_requirements():
         subprocess.check_call(
             [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"]
         )
-        print("âœ… Requirements installed successfully")
+        print("✔️ Requirements installed successfully")
         return True
     except subprocess.CalledProcessError as e:
-        print(f"âŒ Error installing requirements: {e}")
+        print(f"❌ Error installing requirements: {e}")
         return False
 
 
 def create_directories():
     """Create necessary directories"""
-    print("ðŸ“ Creating directories...")
+    print("📁 Creating directories...")
     directories = ["logs"]
 
     for directory in directories:
         os.makedirs(directory, exist_ok=True)
-        print(f"âœ… Created {directory}/")
+        print(f"✔️ Created {directory}/")
 
 
 def create_env_template():
@@ -58,10 +58,10 @@ CUSTOM_SYMBOLS=BTCUSDT,ETHUSDT,ADAUSDT,SOLUSDT,BNBUSDT
         with open(".env", "w") as f:
             f.write(env_template)
 
-        print("âœ… Created .env template")
+        print("✔️ Created .env template")
         print("âš ï¸  IMPORTANT: Edit .env file with your actual Binance API keys!")
     else:
-        print("âœ… .env file already exists")
+        print("✔️ .env file already exists")
 
 
 def main():
@@ -74,13 +74,13 @@ def main():
 
     # Install requirements
     if not install_requirements():
-        print("âŒ Setup failed during package installation")
+        print("❌ Setup failed during package installation")
         return
 
     # Create .env template
     create_env_template()
 
-    print("\nâœ… Setup completed successfully!")
+    print("\n✔️ Setup completed successfully!")
     print("\nðŸ“‹ Next steps:")
     print("1. Edit .env file with your Binance API credentials")
     print("2. Test with testnet: python main.py")

@@ -405,7 +405,7 @@ class MLEnhancedStrategy:
                 X.append([features[col] for col in self.feature_columns])
 
         if len(X) < 50:
-            print("âŒ Insufficient training data")
+            print("❌ Insufficient training data")
             return False
 
         X = np.array(X)
@@ -461,7 +461,7 @@ class MLEnhancedStrategy:
                 print(f"ðŸ“‚ Model loaded from {self.model_path}")
                 return True
             except Exception as e:
-                print(f"âŒ Error loading model: {e}")
+                print(f"❌ Error loading model: {e}")
         return False
 
 

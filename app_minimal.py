@@ -9,7 +9,7 @@ st.title("ðŸ¤– Bottie Trading Bot - Railway Deployment")
 
 # Show deployment status
 if os.environ.get("RAILWAY_ENVIRONMENT"):
-    st.success("âœ… Running on Railway!")
+    st.success("✔️ Running on Railway!")
 else:
     st.info("ðŸ  Running locally")
 

@@ -10,7 +10,7 @@ def home():
     port = os.environ.get("PORT", "Not Set")
     return f"""
    <h1>ðŸ¤– Bottie Trading Bot</h1>
-   <h2>âœ… Successfully deployed on Railway!</h2>
+   <h2>✔️ Successfully deployed on Railway!</h2>
    <p><strong>PORT:</strong> {port}</p>
    <p><strong>Environment:</strong> {os.environ.get('RAILWAY_ENVIRONMENT', 'Unknown')}</p>
    <p>Flask is working perfectly on Railway!</p>

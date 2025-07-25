@@ -256,5 +256,5 @@ if __name__ == "__main__":
     df = engine.run_backtest(days=365, refresh_cache=False)
     os.makedirs("backtest_output", exist_ok=True)
     df.to_csv("backtest_output/backtest_results.csv", index=False)
-    print("âœ… Backtest complete. Results saved to backtest_output/backtest_results.csv")
+    print("✔️ Backtest complete. Results saved to backtest_output/backtest_results.csv")
 
