@@ -1,5 +1,4 @@
-﻿ -*- coding: utf-8 -*-
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Hybrid Quantum Crypto Trading Bot (Final)
 =======================================

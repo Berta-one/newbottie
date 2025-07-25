@@ -69,4 +69,5 @@ try:
 
 except ImportError:
     quantum_trader = FallbackQuantumTrader()
-
+# Export the class for hybrid_bot.py imports
+    QuantumTraderClass = RealQuantumTrader if 'RealQuantumTrader' in locals() else FallbackQuantumTrader
