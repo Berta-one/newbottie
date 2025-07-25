@@ -1,4 +1,5 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Hybrid Quantum Crypto Trading Bot (Final)
 =======================================
@@ -188,7 +189,7 @@ IMPORT_TARGETS = [
     ("position_monitor", "PositionMonitor"),
     ("market_analyzer", "MarketAnalyzer"),
     ("quantum_trading_integration", "QuantumTrader"),
-    ("quantum_engine", "QuantumAnalyzer"),
+    ("quantum_trader", "QuantumTraderClass"),
     ("ensemble_signal_engine", "EnsembleSignalEngine"),
     ("advanced_market_intelligence", "AdvancedMarketIntelligence"),
     ("adaptive_risk_system", "AdaptiveRiskManager"),
