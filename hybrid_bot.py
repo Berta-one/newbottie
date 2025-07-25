@@ -1778,7 +1778,7 @@ if st.button(" Execute Trade", type="primary", key="manual_execute", disabled=(c
                 })
             except Exception:
                 pass
-    else:
+        else:
         st.error(" Invalid quantity")
         except Exception as e:
                 st.error(f" Trade execution failed: {e}")
