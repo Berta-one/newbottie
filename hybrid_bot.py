@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Hybrid Quantum Crypto Trading Bot (Final)
 =======================================
@@ -45,40 +44,53 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import pandas as pd
 import psutil
-from portfolio_value_fix import get_unified_portfolio_value, debug_portfolio_calculation
-from quantum_trader import quantum_trader
 import streamlit as st
-import time
-import os
 
-def _display_logs(limit=15, log_file="logs.txt", refresh_interval=10):
+# Unified _display_logs function
+def _display_logs(limit=50, log_file=None, refresh_interval=None):
     """
     Display recent logs in the Streamlit dashboard.
-    Auto-refreshes every `refresh_interval` seconds.
+    If log_file is provided, display from file; otherwise, use session logs.
+    If refresh_interval is set, auto-refreshes every `refresh_interval` seconds.
     """
-    st.subheader(" Recent Logs")
-    
-    # Check if log file exists
-    if not os.path.exists(log_file):
-        st.info("No logs available yet.")
-        return
+    logs = []
 
-    # Auto-refresh using Streamlit's built-in functionality
-    with st.empty():
-        while True:
-            try:
-                with open(log_file, "r", encoding="utf-8") as f:
-                    lines = f.readlines()[-limit:]  # Get last N lines
-                    st.code("".join(lines), language="plaintext")
-            except Exception as e:
-                st.error(f"Error reading logs: {e}")
-            
-            time.sleep(refresh_interval)
+    if log_file:
+        if not os.path.exists(log_file):
+            st.info("No logs available yet.")
+            return
+        try:
+            with open(log_file, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+                logs = lines[-limit:] if limit else lines
+        except Exception as e:
+            st.error(f"Error reading logs: {e}")
+            return
+    else:
+        logs = st.session_state.get("logs", [])
+        logs = logs[-limit:] if limit else logs
 
+    logs = list(reversed(logs))
+
+    for log in logs:
+        if "ERROR" in log or "FAIL" in log:
+            st.error(log)
+        elif "WARNING" in log:
+            st.warning(log)
+        elif "SUCCESS" in log or "..." in log:
+            st.success(log)
+        else:
+            st.text(log)
+
+    # Optional: auto-refresh with refresh_interval
+    if refresh_interval is not None:
+        time.sleep(refresh_interval)
+        st.experimental_rerun()
 
 # Add these lines at the top of hybrid_bot.py (around line 10-20)
 from portfolio_value_fix import get_unified_portfolio_value, debug_portfolio_calculation
 from quantum_trader import quantum_trader
+
 # ------------------------------------------------------------------
 # Streamlit page config must happen *early*.
 # ------------------------------------------------------------------
@@ -127,7 +139,6 @@ def require_authentication() -> bool:
         else:
             st.error(" Incorrect password.")
     st.stop()  # Halt until authenticated
-
 
 # Enforce auth now (stops script if not passed)
 require_authentication()
@@ -226,14 +237,26 @@ try:
 except Exception:  # noqa: BLE001
     Client = None
 
-# Quantum fallback --------------------------------------------------
-if MODULES.get("QuantumAnalyzer") is None:
-    try:
-        from quantum_engine_fallback import QuantumAnalyzer as FallbackQuantumAnalyzer  # type: ignore
-    except Exception:  # noqa: BLE001
-        FallbackQuantumAnalyzer = None
+# Quantum stack (prefer full, fallback math sim)
+try:
+    from quantum_engine import QuantumAnalyzer as QuantumAnalyzerFull
+except Exception:
+    QuantumAnalyzerFull = None
+
+try:
+    from quantum_engine_fallback import QuantumAnalyzer as QuantumAnalyzerFB
+except Exception:
+    QuantumAnalyzerFB = None
+
+# Instantiate the preferred analyzer, fallback if necessary
+if QuantumAnalyzerFull is not None:
+    QuantumAnalyzer = QuantumAnalyzerFull
+    print("Using QuantumAnalyzerFull")
+elif QuantumAnalyzerFB is not None:
+    QuantumAnalyzer = QuantumAnalyzerFB
+    print("Using FallbackQuantumAnalyzer")
 else:
-    FallbackQuantumAnalyzer = None
+    raise ImportError("No QuantumAnalyzer implementation available!")
 
 
 # ------------------------------------------------------------------
@@ -425,6 +448,20 @@ def setup_binance_client():
     except Exception as e:  # noqa: BLE001
         return None, f" Connection failed: {e}"
 
+def adjust_quantity(symbol: str, qty: float, client) -> float:
+    """Adjust quantity to comply with Binance LOT_SIZE filter."""
+    try:
+        info = client.get_symbol_info(symbol)
+        if info and 'filters' in info:
+            for f in info['filters']:
+                if f['filterType'] == 'LOT_SIZE':
+                    step_size = float(f['stepSize'])
+                    # Determine precision from step size (e.g., 0.000001 -> 6 decimals)
+                    precision = len(str(step_size).split('.')[-1].rstrip('0'))
+                    return round(qty, precision)
+    except Exception as e:
+        print(f"[adjust_quantity] Error: {e}")
+    return qty
 
 # ------------------------------------------------------------------
 # Component initialization -------------------------------------------------------
@@ -651,20 +688,22 @@ _USD_GBP_CACHE = {"rate": 0.79, "ts": 0.0}
 
 
 def get_usd_to_gbp_rate(force_refresh: bool = False) -> float:
-    import requests  # local import to avoid overhead
-
+    import requests
     if not force_refresh:
         age = time.time() - _USD_GBP_CACHE["ts"]
-        if age < 300:  # 5m cache
+        if age < 300:
             return _USD_GBP_CACHE["rate"]
     try:
         resp = requests.get("https://api.exchangerate.host/latest?base=USD&symbols=GBP", timeout=5)
         if resp.ok:
             data = resp.json()
-            rate = float(data["rates"]["GBP"])
-            _USD_GBP_CACHE.update({"rate": rate, "ts": time.time()})
-            return rate
-    except Exception as e:  # noqa: BLE001
+            if "rates" in data and "GBP" in data["rates"]:
+                rate = float(data["rates"]["GBP"])
+                _USD_GBP_CACHE.update({"rate": rate, "ts": time.time()})
+                return rate
+            else:
+                print(f"FX API response missing 'rates': {data}")
+    except Exception as e:
         print(f"FX rate error: {e}")
     return _USD_GBP_CACHE["rate"]
 
@@ -845,7 +884,6 @@ def render_portfolio():
         trade_df["timestamp"] = pd.to_datetime(trade_df["timestamp"]).dt.tz_localize(None)
         st.dataframe(trade_df, use_container_width=True)
 
-    else:
         st.warning("No portfolio data available.")
 
     # Helper: unify trade history from portfolio_mgr + trade_log.csv
@@ -1385,7 +1423,6 @@ def render_multi_strategy():
                         del st.session_state['ms_selected_trade']
                         st.rerun()
             
-            else:
                 st.info(" Select a signal above to execute a trade")
             
             # -------------------------------------------------
@@ -1407,7 +1444,6 @@ def render_multi_strategy():
             with stats_col4:
                 st.metric("SELL Signals", sell_signals)
         
-        else:
             st.warning(" No strong signals found with current confidence threshold")
             st.info(" Try lowering the minimum confidence or scanning more pairs")
         
@@ -1415,7 +1451,6 @@ def render_multi_strategy():
         if st.session_state['ms_last_scan_time']:
             st.caption(f"Last scan: {st.session_state['ms_last_scan_time'].strftime('%H:%M:%S')}")
     
-    else:
         # No signals yet (never scanned)
         st.info(" Click 'Scan All Pairs' to analyze trading opportunities")
         st.subheader(" Pairs to be scanned:")
@@ -1584,149 +1619,171 @@ def render_manual_trader():
     st.caption("Execute individual trades with custom parameters")
     
     # Symbol selection
-    all_pairs = COMPONENTS["market_analyzer"].get_trading_pairs()
-    symbol = st.selectbox("Trading Pair", all_pairs, key="manual_symbol")
-    
-    # Current price info
-    try:
-        current_price = COMPONENTS["market_analyzer"].get_price(symbol)
-        rsi = COMPONENTS["market_analyzer"].get_latest_rsi(symbol)
-        momentum = COMPONENTS["market_analyzer"].get_latest_momentum(symbol)
-    except Exception as e:
-        current_price = 0.0
-        rsi = 50.0
-        momentum = 0.0
-        _log_append(f"Price fetch error: {e}")
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Current Price", f"${current_price:.4f}")
-    with col2:
-        st.metric("RSI", f"{rsi:.1f}")
-    with col3:
-        st.metric("Momentum", f"{momentum:.2f}%")
-    
-    st.markdown("---")
-    
-    # Trade parameters
-    trade_col1, trade_col2 = st.columns(2)
-    
-    with trade_col1:
-        st.subheader(" Trade Parameters")
-        
-        trade_type = st.radio("Trade Type", ["Market Order", "Limit Order"], horizontal=True, key="manual_trade_type")
-        side = st.radio("Side", ["BUY", "SELL"], horizontal=True, key="manual_side")
-        
-        # Quantity input
-        qty_method = st.radio("Quantity Method", ["By Amount (USD)", "By Quantity"], horizontal=True, key="manual_qty_method")
-        
-        if qty_method == "By Amount (USD)":
-            trade_amount_usd = st.number_input("Trade Amount (USD)", min_value=1.0, max_value=10000.0, value=50.0, step=5.0, key="manual_amount")
-            if current_price > 0:
-                calculated_qty = trade_amount_usd / current_price
-                st.info(f"Calculated Quantity: {calculated_qty:.8f} {symbol.replace('USDT', '')}")
-            else:
-                calculated_qty = 0
+all_pairs = COMPONENTS["market_analyzer"].get_trading_pairs()
+symbol = st.selectbox("Trading Pair", all_pairs, key="manual_symbol")
+
+# Current price info
+try:
+    current_price = COMPONENTS["market_analyzer"].get_price(symbol)
+    rsi = COMPONENTS["market_analyzer"].get_latest_rsi(symbol)
+    momentum = COMPONENTS["market_analyzer"].get_latest_momentum(symbol)
+except Exception as e:
+    current_price = 0.0
+    rsi = 50.0
+    momentum = 0.0
+    _log_append(f"Price fetch error: {e}")
+
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.metric("Current Price", f"${current_price:.4f}")
+with col2:
+    st.metric("RSI", f"{rsi:.1f}")
+with col3:
+    st.metric("Momentum", f"{momentum:.2f}%")
+
+st.markdown("---")
+
+# Trade parameters
+trade_col1, trade_col2 = st.columns(2)
+
+with trade_col1:
+    st.subheader(" Trade Parameters")
+
+    trade_type = st.radio("Trade Type", ["Market Order", "Limit Order"], horizontal=True, key="manual_trade_type")
+    side = st.radio("Side", ["BUY", "SELL"], horizontal=True, key="manual_side")
+
+    # Quantity input
+    qty_method = st.radio("Quantity Method", ["By Amount (USD)", "By Quantity"], horizontal=True, key="manual_qty_method")
+
+    # Initialize variables
+    calculated_qty = 0.0
+    trade_amount_usd = 0.0
+
+    if qty_method == "By Amount (USD)":
+        trade_amount_usd = st.number_input(
+            "Trade Amount (USD)", 
+            min_value=1.0, max_value=10000.0, 
+            value=50.0, step=5.0, key="manual_amount"
+        )
+        if current_price > 0:
+            calculated_qty = trade_amount_usd / current_price
+
+            # ✅ Adjust quantity for Binance precision
+            if BINANCE_CLIENT:
+                calculated_qty = adjust_quantity(symbol, calculated_qty, BINANCE_CLIENT)
+
+            st.info(f"Calculated Quantity: {calculated_qty:.8f} {symbol.replace('USDT', '')}")
         else:
-            calculated_qty = st.number_input("Quantity", min_value=0.000001, step=0.000001, format="%.8f", key="manual_qty")
-            trade_amount_usd = calculated_qty * current_price
-            st.info(f"Trade Value: ${trade_amount_usd:.2f}")
-        
-        # Limit price (if limit order)
-        if trade_type == "Limit Order":
-            limit_price = st.number_input("Limit Price", min_value=0.0001, value=current_price, step=0.0001, format="%.4f", key="manual_limit_price")
+            calculated_qty = 0
+    else:
+        calculated_qty = st.number_input(
+            "Quantity", 
+            min_value=0.000001, step=0.000001, format="%.8f", key="manual_qty"
+        )
+
+        # ✅ Adjust quantity for Binance precision
+        if BINANCE_CLIENT:
+            calculated_qty = adjust_quantity(symbol, calculated_qty, BINANCE_CLIENT)
+
+        trade_amount_usd = calculated_qty * current_price
+        st.info(f"Trade Value: ${trade_amount_usd:.2f}")
+
+    # ✅ Limit price block inside trade_col1
+    if trade_type == "Limit Order":
+        limit_price = st.number_input("Limit Price", min_value=0.0001, value=current_price, step=0.0001, format="%.4f", key="manual_limit_price")
+    else:
+        limit_price = current_price
+
+with trade_col2:
+    st.subheader(" Risk Management")
+
+    use_sl_tp = st.checkbox("Use Stop Loss / Take Profit", value=True, key="manual_use_sl_tp")
+
+    if use_sl_tp:
+        sl_mult = st.number_input("Stop Loss Multiplier", min_value=0.5, max_value=10.0, value=st.session_state["sl_mult"], step=0.1, key="manual_sl_mult")
+        tp_mult = st.number_input("Take Profit Multiplier", min_value=1.0, max_value=20.0, value=st.session_state["tp_mult"], step=0.5, key="manual_tp_mult")
+
+        if side == "BUY":
+            sl_price = current_price * (1 - (sl_mult * 0.01))
+            tp_price = current_price * (1 + (tp_mult * 0.01))
         else:
-            limit_price = current_price
-    
-    with trade_col2:
-        st.subheader(" Risk Management")
-        
-        use_sl_tp = st.checkbox("Use Stop Loss / Take Profit", value=True, key="manual_use_sl_tp")
-        
-        if use_sl_tp:
-            sl_mult = st.number_input("Stop Loss Multiplier", min_value=0.5, max_value=10.0, value=st.session_state["sl_mult"], step=0.1, key="manual_sl_mult")
-            tp_mult = st.number_input("Take Profit Multiplier", min_value=1.0, max_value=20.0, value=st.session_state["tp_mult"], step=0.5, key="manual_tp_mult")
-            
-            if side == "BUY":
-                sl_price = current_price * (1 - (sl_mult * 0.01))
-                tp_price = current_price * (1 + (tp_mult * 0.01))
+            sl_price = current_price * (1 + (sl_mult * 0.01))
+            tp_price = current_price * (1 - (tp_mult * 0.01))
+
+        st.info(f"Stop Loss: ${sl_price:.4f}")
+        st.info(f"Take Profit: ${tp_price:.4f}")
+
+    # Risk assessment
+    portfolio_value = COMPONENTS["portfolio_mgr"].total_value()
+    risk_percentage = (trade_amount_usd / portfolio_value * 100) if portfolio_value > 0 else 0
+    st.metric("Risk %", f"{risk_percentage:.2f}%")
+
+st.markdown("---")
+
+# Trade execution
+st.subheader(" Execute Trade")
+
+summary_col1, summary_col2, summary_col3 = st.columns(3)
+with summary_col1:
+    st.info(f"**Symbol:** {symbol}")
+    st.info(f"**Side:** {side}")
+with summary_col2:
+    st.info(f"**Type:** {trade_type}")
+    st.info(f"**Quantity:** {calculated_qty:.8f}")
+with summary_col3:
+    st.info(f"**Price:** ${limit_price:.4f}")
+    st.info(f"**Value:** ${trade_amount_usd:.2f}")
+
+if st.button(" Execute Trade", type="primary", key="manual_execute", disabled=(calculated_qty <= 0)):
+    if calculated_qty > 0:
+        try:
+            # Execute via trade executor
+            result = COMPONENTS["trade_exec"].manual_trade(
+                symbol, 
+                calculated_qty, 
+                sl_mult if use_sl_tp else 1.5, 
+                tp_mult if use_sl_tp else 3.0,
+                trade_amount_usd=trade_amount_usd
+            )
+
+            record_trade(symbol=symbol, side=side, qty=calculated_qty, price=limit_price, usd=trade_amount_usd, source="manual")
+
+            st.success("... Trade executed successfully!")
+            if isinstance(result, dict):
+                st.json(result)
             else:
-                sl_price = current_price * (1 + (sl_mult * 0.01))
-                tp_price = current_price * (1 - (tp_mult * 0.01))
-            
-            st.info(f"Stop Loss: ${sl_price:.4f}")
-            st.info(f"Take Profit: ${tp_price:.4f}")
-        
-        # Risk assessment
-        portfolio_value = COMPONENTS["portfolio_mgr"].total_value()
-        risk_percentage = (trade_amount_usd / portfolio_value * 100) if portfolio_value > 0 else 0
-        
-        risk_color = "" if risk_percentage > 5 else "" if risk_percentage > 2 else ""
-        st.metric("Risk %", f"{risk_color} {risk_percentage:.2f}%")
-    
-    st.markdown("---")
-    
-    # Trade execution
-    st.subheader(" Execute Trade")
-    
-    # Trade summary
-    summary_col1, summary_col2, summary_col3 = st.columns(3)
-    with summary_col1:
-        st.info(f"**Symbol:** {symbol}")
-        st.info(f"**Side:** {side}")
-    with summary_col2:
-        st.info(f"**Type:** {trade_type}")
-        st.info(f"**Quantity:** {calculated_qty:.8f}")
-    with summary_col3:
-        st.info(f"**Price:** ${limit_price:.4f}")
-        st.info(f"**Value:** ${trade_amount_usd:.2f}")
-    
-    # Execute button
-    if st.button(" Execute Trade", type="primary", key="manual_execute", disabled=(calculated_qty <= 0)):
-        if calculated_qty > 0:
+                st.write(result)
+
+            _log_append(f"Manual trade executed: {side} {calculated_qty:.8f} {symbol} @ ${limit_price:.4f}")
+
+            # Notify
             try:
-                # Execute via trade executor
-                result = COMPONENTS["trade_exec"].manual_trade(
-                    symbol, 
-                    calculated_qty, 
-                    sl_mult if use_sl_tp else 1.5, 
-                    tp_mult if use_sl_tp else 3.0,
-                    trade_amount_usd=trade_amount_usd
-                )
-                
-                # Record the trade
-                record_trade(
-                    symbol=symbol,
-                    side=side,
-                    qty=calculated_qty,
-                    price=limit_price,
-                    usd=trade_amount_usd,
-                    source="manual"
-                )
-                
-                st.success(f"... Trade executed successfully!")
-                if isinstance(result, dict):
-                    st.json(result)
-                else:
-                    st.write(result)
-                
-                # Log the execution
-                _log_append(f"Manual trade executed: {side} {calculated_qty:.8f} {symbol} @ ${limit_price:.4f}")
-                
-                # Notify
-                try:
-                    notify_trade({
-                        'symbol': symbol,
-                        'side': side,
-                        'quantity': calculated_qty,
-                        'price': limit_price,
-                        'value': trade_amount_usd,
-                        'timestamp': datetime.utcnow().isoformat(),
-                        'execution_type': 'manual'
-                    })
-                except Exception:
-                    pass
-                
+                notify_trade({
+                    'symbol': symbol,
+                    'side': side,
+                    'quantity': calculated_qty,
+                    'price': limit_price,
+                    'value': trade_amount_usd,
+                    'timestamp': datetime.utcnow().isoformat(),
+                    'execution_type': 'manual'
+                })
+            except Exception:
+                pass
+
+        except Exception as e:
+            st.error(f" Trade execution failed: {e}")
+            _log_append(f"Manual trade failed: {e}")
+
+            try:
+                notify_error("Manual Trade Execution", str(e), {
+                    'symbol': symbol,
+                    'side': side,
+                    'quantity': calculated_qty
+                })
+            except Exception:
+                pass
+    else:
+        st.error(" Invalid quantity")
             except Exception as e:
                 st.error(f" Trade execution failed: {e}")
                 _log_append(f"Manual trade failed: {e}")
@@ -2067,28 +2124,6 @@ def render_settings():
 
 
 # ---- LOGS --------------------------------------------------------------------
-
-def _display_logs(limit=50):
-    """Display recent logs with optional filtering"""
-    logs = st.session_state.get("logs", [])
-    if not logs:
-        st.info("No logs available yet.")
-        return
-    
-    # Show most recent logs first
-    recent_logs = logs[-limit:] if limit else logs
-    recent_logs.reverse()
-    
-    for log in recent_logs:
-        if "ERROR" in log or "FAIL" in log:
-            st.error(log)
-        elif "WARNING" in log or "" in log:
-            st.warning(log)
-        elif "SUCCESS" in log or "..." in log:
-            st.success(log)
-        else:
-            st.text(log)
-
 
 def render_logs():
     st.header(" System Logs")
@@ -2624,9 +2659,7 @@ def main():
 
 if __name__ == "__main__":
     main()
-#   D e p l o y   t r i g g e r   -   0 7 / 2 2 / 2 0 2 5   1 7 : 2 5 : 4 1 
  
  
-
 
 
