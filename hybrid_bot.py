@@ -777,7 +777,7 @@ with col1:
     st.metric(" Portfolio Value (USD)", f"${total_usd:,.2f}" if "total_usd" in locals() else "$0.00")
 
 with col2:
-    st.metric(" Portfolio Value (GBP)", f"total_gbp:,.2f}" if "total_gbp" in locals() else ".00")
+    st.metric(" Portfolio Value (GBP)", f"(GBP){total_gbp:,.2f}" if "total_gbp" in locals() else "GBP 0.00")
 
 with col3:
     st.metric(" Total Assets", asset_count if "asset_count" in locals() else 0)
