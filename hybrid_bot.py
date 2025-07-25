@@ -1,25 +1,25 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Hybrid Quantum Crypto Trading Bot (Final)
 =======================================
-Consolidated, deployment¡šÂ¬friendly Streamlit application that brings together:
+Consolidated, deploymentfriendly Streamlit application that brings together:
 
-¡š Authentication gate (env¡šÂ¬driven password)
-¡š Portfolio + trade history + GBP conversions
-¡š Performance analytics (last 100 trades, PnL)
-¡š Multi¡šÂ¬Strategy market scanner (Quantum + ML + Technical)
-¡š Auto¡šÂ¬Trader controls + background scanner thread
-¡š Manual Trade ticket
-¡š Historical Backtesting (w/ ccxt, 1y cache) ¡šÂ¬*no weight¡šÂ¬apply buttons*
-¡š System Health dashboard (CPU/Mem/Threads)
-¡š Settings (risk, strategy, notifications, etc.)
-¡š Live log view
+ Authentication gate (envdriven password)
+ Portfolio + trade history + GBP conversions
+ Performance analytics (last 100 trades, PnL)
+ MultiStrategy market scanner (Quantum + ML + Technical)
+ AutoTrader controls + background scanner thread
+ Manual Trade ticket
+ Historical Backtesting (w/ ccxt, 1y cache) *no weightapply buttons*
+ System Health dashboard (CPU/Mem/Threads)
+ Settings (risk, strategy, notifications, etc.)
+ Live log view
 
 Robust import/fallback pattern lets the app run even when some modules or API
-keys are missing. Designed to operate on Railway (or local) ¡šÂ¬ handles the $PORT
-injection that Railway provides and prevents the Streamlit auto¡šÂ¬port error.
+keys are missing. Designed to operate on Railway (or local)  handles the $PORT
+injection that Railway provides and prevents the Streamlit autoport error.
 
 ***IMPORTANT***
 - Requires Python 3.9+ (3.12 OK) and Streamlit 1.32+.
@@ -56,7 +56,7 @@ def _display_logs(limit=15, log_file="logs.txt", refresh_interval=10):
     Display recent logs in the Streamlit dashboard.
     Auto-refreshes every `refresh_interval` seconds.
     """
-    st.subheader("“Å“ Recent Logs")
+    st.subheader(" Recent Logs")
     
     # Check if log file exists
     if not os.path.exists(log_file):
@@ -84,7 +84,7 @@ from quantum_trader import quantum_trader
 # ------------------------------------------------------------------
 st.set_page_config(
     page_title="Hybrid Quantum Trading Bot",
-    page_icon="‚Â¸šš",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -114,18 +114,18 @@ def require_authentication() -> bool:
 
     pw_env = os.getenv("DASHBOARD_PASSWORD", "")
     if pw_env == "":
-        # No password configured ¡šÂ¬ authenticate automatically (dev mode)
+        # No password configured  authenticate automatically (dev mode)
         st.session_state.authenticated = True
         return True
 
-    st.warning("‚Â¸šÂ¬š Enter dashboard password to continue.")
+    st.warning(" Enter dashboard password to continue.")
     pw = st.text_input("Password", type="password", key="_auth_pw")
     if st.button("Login", key="_auth_btn"):
         if pw == pw_env:
             st.session_state.authenticated = True
             st.rerun()
         else:
-            st.error("š¢€â„¢ Incorrect password.")
+            st.error(" Incorrect password.")
     st.stop()  # Halt until authenticated
 
 
@@ -216,7 +216,7 @@ for mod_path, cls_name in IMPORT_TARGETS:
         MODULES[cls_name] = getattr(mod, cls_name)
     except Exception as e:  # noqa: BLE001
         MODULES[cls_name] = None
-        print(f"‚Â¡ššš Optional module {cls_name} not available: {e}")
+        print(f" Optional module {cls_name} not available: {e}")
         if cls_name == "QuantumTrader" and isinstance(e, ImportError):
             QT_IMPORT_ERROR = str(e)
 
@@ -268,7 +268,7 @@ class FallbackPortfolioManager:
         return False
 
     def get_connection_status(self):  # noqa: D401
-        return "š¢€â„¢ Using demo data - Portfolio Manager not available"
+        return " Using demo data - Portfolio Manager not available"
 
     def get_trade_history(self, symbol=None, limit=10):  # noqa: ARG002,D401
         return [
@@ -398,7 +398,7 @@ class FallbackQuantumTrader:
         return {"status": "DISABLED", "reason": "Quantum Trader unavailable", "signal": signal}
 
     def get_connection_status(self):  # noqa: D401
-        return "š¢€â„¢ Quantum Trader disabled (missing Qiskit)"
+        return " Quantum Trader disabled (missing Qiskit)"
 
 
 # ------------------------------------------------------------------
@@ -407,12 +407,12 @@ class FallbackQuantumTrader:
 
 def setup_binance_client():
     if Client is None:
-        return None, "š¢€â„¢ Binance client library not installed"
+        return None, " Binance client library not installed"
 
     api_key = os.getenv("BINANCE_API_KEY")
     api_secret = os.getenv("BINANCE_API_SECRET")
     if not api_key or not api_secret:
-        return None, "‚Â¡ššš API keys not configured - demo mode"
+        return None, " API keys not configured - demo mode"
 
     try:
         client = Client(api_key, api_secret)
@@ -420,10 +420,10 @@ def setup_binance_client():
         if os.getenv("USE_TESTNET", "false").lower() == "true":
             client.API_URL = "https://testnet.binance.vision/api"
         client.get_server_time()  # sanity call
-        mode = "‚Â¸šš TESTNET" if os.getenv("USE_TESTNET", "false").lower() == "true" else "‚Â¸‚Â¡¡ LIVE"
-        return client, f"¢€Å“... Connected to Binance {mode}"
+        mode = " TESTNET" if os.getenv("USE_TESTNET", "false").lower() == "true" else " LIVE"
+        return client, f"... Connected to Binance {mode}"
     except Exception as e:  # noqa: BLE001
-        return None, f"š¢€â„¢ Connection failed: {e}"
+        return None, f" Connection failed: {e}"
 
 
 # ------------------------------------------------------------------
@@ -499,16 +499,16 @@ def initialize_components():
     if MODULES.get("QuantumTrader") and client:
         try:
             comps["quantum_trader"] = MODULES["QuantumTrader"](client)
-            QT_STATUS = "¢€Å“... Quantum Trader active"
+            QT_STATUS = "... Quantum Trader active"
         except Exception as e:  # noqa: BLE001
             print(f"QuantumTrader failed: {e}")
-            QT_STATUS = f"š¢€â„¢ Quantum Trader error: {e}"
+            QT_STATUS = f" Quantum Trader error: {e}"
             comps["quantum_trader"] = FallbackQuantumTrader(client)
     else:
         if QT_IMPORT_ERROR:
-            QT_STATUS = f"š¢€â„¢ Quantum Trader disabled - {QT_IMPORT_ERROR}"
+            QT_STATUS = f" Quantum Trader disabled - {QT_IMPORT_ERROR}"
         else:
-            QT_STATUS = "š¢€â„¢ Quantum Trader unavailable"
+            QT_STATUS = " Quantum Trader unavailable"
         comps["quantum_trader"] = FallbackQuantumTrader(client)
 
     # Ensemble Engine --------------------------------------------
@@ -545,7 +545,7 @@ _init_logs()
 # Global component initialization (only once) --------------------------------
 # ------------------------------------------------------------------
 if "_components_initialized" not in st.session_state:
-    _log_append("Initializing components¡š")
+    _log_append("Initializing components")
     COMPONENTS, BINANCE_CLIENT, CLIENT_STATUS = initialize_components()
     st.session_state["_components_initialized"] = True
     st.session_state["_client_status"] = CLIENT_STATUS
@@ -758,10 +758,10 @@ def compute_realized_pnl(df: pd.DataFrame) -> pd.DataFrame:
 # ---- DASHBOARD ---------------------------------------------------------------
 
 def render_dashboard():
-    st.header("‚Â¸šš Hybrid Quantum Crypto Trading Bot Dashboard")
+    st.header(" Hybrid Quantum Crypto Trading Bot Dashboard")
     st.info(st.session_state.get("_client_status", ""))
     qt_msg = st.session_state.get("_qt_status", "")
-    if qt_msg and qt_msg.startswith("š¢€â„¢"):
+    if qt_msg and qt_msg.startswith(""):
         st.warning(qt_msg)
 
    # Quick Stats row
@@ -772,7 +772,7 @@ try:
 except Exception:
     tv = 0.0
 
-# … Portfolio Metrics with Unicode Emojis (Cross-Platform Safe)
+#  Portfolio Metrics with Unicode Emojis (Cross-Platform Safe)
 with col1:
     st.metric("\U0001F4B5 Portfolio Value (USD)", f"${total_usd:,.2f}" if "total_usd" in locals() else "$0.00")
 
@@ -798,14 +798,14 @@ with col4:
 # ---- PORTFOLIO ---------------------------------------------------------------
 
 def render_portfolio():
-    st.header("‚Â¸šÂ¬žÂ¢š Portfolio Overview")
+    st.header(" Portfolio Overview")
     pm = COMPONENTS["portfolio_mgr"]
     col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
         st.info(pm.get_connection_status())
     with col2:
-        if st.button("‚Â¸šÂ¬šÂ¬ Refresh Portfolio", key="pf_refresh"):
-            with st.spinner("Refreshing¡š"):
+        if st.button(" Refresh Portfolio", key="pf_refresh"):
+            with st.spinner("Refreshing"):
                 try:
                     pm.refresh_portfolio()
                 except Exception as e:  # noqa: BLE001
@@ -830,11 +830,11 @@ def render_portfolio():
         with col1:
             st.metric("Total Value (USD)", total_usd, total_gbp, asset_count = get_unified_portfolio_value(portfolio))
         with col2:
-            st.metric("Trading Mode", "‚Â¸šš TESTNET" if os.getenv("USE_TESTNET", "false").lower() == "true" else "‚Â¸‚Â¡¡ LIVE")
+            st.metric("Trading Mode", " TESTNET" if os.getenv("USE_TESTNET", "false").lower() == "true" else " LIVE")
 
             st.metric("Active Assets", sum(1 for k, v in port.items() if v.get("balance", 0) > 0))
         with col4:
-            live_status = "‚Â¸‚Â¸š Live" if getattr(pm, "is_live", lambda: False)() else "‚Â¸šÂ¬š Demo"
+            live_status = " Live" if getattr(pm, "is_live", lambda: False)() else " Demo"
             st.metric("Data Source", live_status)
 
         rows = []
@@ -875,7 +875,7 @@ def render_portfolio():
         st.warning("No portfolio data available.")
 
     st.markdown("---")
-    st.subheader("‚Â¸šÂ¬ƒâ€¹  Recent Trade History (last 100)")
+    st.subheader(" Recent Trade History (last 100)")
     trade_df = _get_recent_trades(limit=100)
     if trade_df.empty:
         st.info("No trades found.")
@@ -918,7 +918,7 @@ def _get_recent_trades(limit=100) -> pd.DataFrame:
 # ---- PERFORMANCE -------------------------------------------------------------
 
 def render_performance():
-    st.header("‚Â¸šÂ¬ƒâ€¹  Performance")
+    st.header(" Performance")
     df = load_trade_log(limit=1000)  # load bigger then trim after grouping
     if df.empty:
         st.info("No trade data yet. Execute some trades.")
@@ -953,8 +953,8 @@ def render_performance():
     fig.update_layout(height=300, margin=dict(l=0, r=0, t=30, b=0))
     st.plotly_chart(fig, use_container_width=True)
 
-# ---- MULTI¡šÂ¬STRATEGY ----------------------------------------------------------
-# Re¡šÂ¬key all widgets with "ms_" prefix to avoid collisions.
+# ---- MULTISTRATEGY ----------------------------------------------------------
+# Rekey all widgets with "ms_" prefix to avoid collisions.
 
 MS_DEFAULTS = {
     "ms_weight_quantum": 30,
@@ -973,10 +973,10 @@ for _k, _v in MS_DEFAULTS.items():
 
 
 def render_multi_strategy():
-    st.header("‚Â¡šÂ¬ Multi-Strategy Market Scanner")
+    st.header(" Multi-Strategy Market Scanner")
     st.caption("Quantum + ML + Technical Analysis across selected pairs.")
     qt_msg = st.session_state.get("_qt_status", "")
-    if qt_msg and qt_msg.startswith("š¢€â„¢"):
+    if qt_msg and qt_msg.startswith(""):
         st.warning(qt_msg)
 
     # -------------------------------------------------
@@ -1033,22 +1033,22 @@ def render_multi_strategy():
         # Presets
         preset_col1, preset_col2, preset_col3, preset_col4 = st.columns(4)
         with preset_col1:
-            if st.button("‚Â¡šÂ¬šš Quantum Focus", key="ms_preset_quantum"):
+            if st.button(" Quantum Focus", key="ms_preset_quantum"):
                 st.session_state['ms_weight_quantum'] = 60
                 st.session_state['ms_weight_ml'] = 20
                 st.session_state['ms_weight_technical'] = 20
         with preset_col2:
-            if st.button("‚Â¸ššÂ¬“ ML Focus", key="ms_preset_ml"):
+            if st.button(" ML Focus", key="ms_preset_ml"):
                 st.session_state['ms_weight_quantum'] = 20
                 st.session_state['ms_weight_ml'] = 60
                 st.session_state['ms_weight_technical'] = 20
         with preset_col3:
-            if st.button("‚Â¸šÂ¬ƒ… Technical Focus", key="ms_preset_technical"):
+            if st.button(" Technical Focus", key="ms_preset_technical"):
                 st.session_state['ms_weight_quantum'] = 20
                 st.session_state['ms_weight_ml'] = 20
                 st.session_state['ms_weight_technical'] = 60
         with preset_col4:
-            if st.button("‚Â¡šÂ¬“šš Balanced", key="ms_preset_balanced"):
+            if st.button(" Balanced", key="ms_preset_balanced"):
                 st.session_state['ms_weight_quantum'] = 33
                 st.session_state['ms_weight_ml'] = 33
                 st.session_state['ms_weight_technical'] = 34
@@ -1108,10 +1108,10 @@ def render_multi_strategy():
     # -------------------------------------------------
     scan_col1, scan_col2, scan_col3 = st.columns(3)
     with scan_col1:
-        if st.button("‚Â¸šÂ¬š Scan All Pairs", type="primary", key="ms_scan_button"):
+        if st.button(" Scan All Pairs", type="primary", key="ms_scan_button"):
             st.session_state['ms_manual_scan_requested'] = True
     with scan_col2:
-        if st.button("‚Â¸šÂ¬šÂ¬ Refresh Signals", key="ms_refresh_button"):
+        if st.button(" Refresh Signals", key="ms_refresh_button"):
             st.session_state['ms_manual_scan_requested'] = True
     with scan_col3:
         st.session_state['ms_show_only_signals'] = st.checkbox(
@@ -1231,7 +1231,7 @@ def render_multi_strategy():
             filtered_signals = signals_data
         
         if filtered_signals:
-            st.subheader(f"‚Â¸šÂ¬ƒ… Analysis Results ({len(filtered_signals)} pairs)")
+            st.subheader(f" Analysis Results ({len(filtered_signals)} pairs)")
             
             # DataFrame
             signals_df = []
@@ -1264,7 +1264,7 @@ def render_multi_strategy():
             # -------------------------------------------------
             # Quick Trading Interface
             # -------------------------------------------------
-            st.subheader("‚Â¡š Quick Trading Interface")
+            st.subheader(" Quick Trading Interface")
             
             import hashlib
             def create_unique_button_key(action, symbol, index):
@@ -1279,7 +1279,7 @@ def render_multi_strategy():
                 
                 with trade_col1:
                     if strong_buy_signals:
-                        st.write("**‚Â¸‚Â¸š Strong BUY Signals:**")
+                        st.write("** Strong BUY Signals:**")
                         for i, sig in enumerate(strong_buy_signals[:5]):
                             _sym = sig['symbol']
                             _conf = sig['final']['confidence']
@@ -1289,7 +1289,7 @@ def render_multi_strategy():
                                 with sc1:
                                     st.write(f"**{_sym}** - ${_price:.4f} (Conf: {_conf:.3f})")
                                 with sc2:
-                                    if st.button("‚Â¸‚Â¡¡ Buy", key=create_unique_button_key("ms_buy", _sym, i)):
+                                    if st.button(" Buy", key=create_unique_button_key("ms_buy", _sym, i)):
                                         st.session_state['ms_selected_trade'] = {
                                             'symbol': _sym,
                                             'action': 'BUY',
@@ -1303,7 +1303,7 @@ def render_multi_strategy():
                 
                 with trade_col2:
                     if strong_sell_signals:
-                        st.write("**‚Â¸šÂ¬š Strong SELL Signals:**")
+                        st.write("** Strong SELL Signals:**")
                         for i, sig in enumerate(strong_sell_signals[:5]):
                             _sym = sig['symbol']
                             _conf = sig['final']['confidence']
@@ -1313,7 +1313,7 @@ def render_multi_strategy():
                                 with sc1:
                                     st.write(f"**{_sym}** - ${_price:.4f} (Conf: {_conf:.3f})")
                                 with sc2:
-                                    if st.button("‚Â¸šÂ¬ƒÂ¢šÂ¬ Sell", key=create_unique_button_key("ms_sell", _sym, i)):
+                                    if st.button(" Sell", key=create_unique_button_key("ms_sell", _sym, i)):
                                         st.session_state['ms_selected_trade'] = {
                                             'symbol': _sym,
                                             'action': 'SELL',
@@ -1334,7 +1334,7 @@ def render_multi_strategy():
             ):
                 trade = st.session_state['ms_selected_trade']
                 st.divider()
-                st.subheader(f"‚Â¸‚Â½š Execute Trade: {trade['action']} {trade['symbol']}")
+                st.subheader(f" Execute Trade: {trade['action']} {trade['symbol']}")
                 
                 exec_col1, exec_col2, exec_col3 = st.columns(3)
                 with exec_col1:
@@ -1358,14 +1358,14 @@ def render_multi_strategy():
                         st.caption(f"Est. Fee: ${est_fee:.2f}")
                 
                 with exec_col3:
-                    if st.button("‚Â¸‚Â½š Execute Trade", type="primary", key="ms_strategy_execute"):
+                    if st.button(" Execute Trade", type="primary", key="ms_strategy_execute"):
                         if quantity > 0:
                             try:
                                 result = COMPONENTS['trade_exec'].manual_trade(
                                     trade['symbol'], quantity,
                                     st.session_state["sl_mult"], st.session_state["tp_mult"]
                                 )
-                                st.success(f"¢€Å“... Trade Executed: {result}")
+                                st.success(f"... Trade Executed: {result}")
                                 
                                 # Log the trade
                                 _record_trade(
@@ -1405,7 +1405,7 @@ def render_multi_strategy():
                                 st.rerun()
                             
                             except Exception as e:
-                                st.error(f"š¢€â„¢ Trade execution failed: {e}")
+                                st.error(f" Trade execution failed: {e}")
                                 try:
                                     notify_error(
                                         "Multi-Strategy Trade Execution", str(e),
@@ -1418,19 +1418,19 @@ def render_multi_strategy():
                                 except Exception:
                                     pass
                         else:
-                            st.error("š¢€â„¢ Invalid quantity")
+                            st.error(" Invalid quantity")
                     
-                    if st.button("š¢€â„¢ Cancel Trade", key="ms_strategy_cancel"):
+                    if st.button(" Cancel Trade", key="ms_strategy_cancel"):
                         del st.session_state['ms_selected_trade']
                         st.rerun()
             
             else:
-                st.info("‚Â¸šÂ¬žÂ¢š Select a signal above to execute a trade")
+                st.info(" Select a signal above to execute a trade")
             
             # -------------------------------------------------
             # Signal Statistics
             # -------------------------------------------------
-            st.subheader("‚Â¸šÂ¬ƒâ€¹  Signal Statistics")
+            st.subheader(" Signal Statistics")
             total_scanned = len(signals_data)
             strong_signals = len(filtered_signals)
             buy_signals = len([s for s in filtered_signals if s['final']['decision'] == 'BUY'])
@@ -1447,8 +1447,8 @@ def render_multi_strategy():
                 st.metric("SELL Signals", sell_signals)
         
         else:
-            st.warning("‚Â¡ššš No strong signals found with current confidence threshold")
-            st.info("‚Â¸šÂ¬žÂ¢š Try lowering the minimum confidence or scanning more pairs")
+            st.warning(" No strong signals found with current confidence threshold")
+            st.info(" Try lowering the minimum confidence or scanning more pairs")
         
         # Last scan info
         if st.session_state['ms_last_scan_time']:
@@ -1456,18 +1456,18 @@ def render_multi_strategy():
     
     else:
         # No signals yet (never scanned)
-        st.info("‚Â¸šÂ¬š Click 'Scan All Pairs' to analyze trading opportunities")
-        st.subheader("‚Â¸šÂ¬ƒÂ¢šÂ¬ Pairs to be scanned:")
+        st.info(" Click 'Scan All Pairs' to analyze trading opportunities")
+        st.subheader(" Pairs to be scanned:")
         if trading_pairs:
             pairs_cols = st.columns(4)
             for i, pair in enumerate(trading_pairs[:20]):
-                pairs_cols[i % 4].write(f"¡š {pair}")
+                pairs_cols[i % 4].write(f" {pair}")
             if len(trading_pairs) > 20:
                 st.caption(f"... and {len(trading_pairs) - 20} more pairs")
 # ---- AUTO-TRADER -------------------------------------------------------------
 
 def render_auto_trader():
-    st.header("‚Â¸ššÂ¬“ Auto-Trader Control")
+    st.header(" Auto-Trader Control")
     st.caption("Background scanner with automated signal detection")
     
     auto_scanner = st.session_state["auto_scanner"]
@@ -1475,10 +1475,10 @@ def render_auto_trader():
     # Scanner Status and Controls
     col1, col2 = st.columns(2)
     with col1:
-        status = "‚Â¸‚Â¸š Running" if auto_scanner.is_running() else "‚Â¸šÂ¬š Stopped"
+        status = " Running" if auto_scanner.is_running() else " Stopped"
         st.metric("Scanner Status", status)
         
-        if st.button("šÂ¬“š Start Auto-Scanner" if not auto_scanner.is_running() else "šš Stop Auto-Scanner", 
+        if st.button(" Start Auto-Scanner" if not auto_scanner.is_running() else " Stop Auto-Scanner", 
                      type="primary", key="auto_scanner_toggle"):
             if auto_scanner.is_running():
                 auto_scanner.stop_scanning()
@@ -1497,7 +1497,7 @@ def render_auto_trader():
     st.markdown("---")
     
     # Last Scan Results
-    st.subheader("‚Â¸šÂ¬ƒ… Last Scan Results")
+    st.subheader(" Last Scan Results")
     results = auto_scanner.get_latest_results()
     
     if results:
@@ -1516,7 +1516,7 @@ def render_auto_trader():
         # Strong signals details
         strong_signals = results.get('strong_signals', {})
         if strong_signals:
-            st.subheader("‚Â¸‚Â½š Strong Signals Detected")
+            st.subheader(" Strong Signals Detected")
             
             signal_rows = []
             for symbol, signal_data in strong_signals.items():
@@ -1543,19 +1543,19 @@ def render_auto_trader():
                 st.dataframe(styled_signals, use_container_width=True)
                 
                 # Auto-execute options (if enabled)
-                st.subheader("‚Â¸‚Â¡¡ Auto-Execute Options")
+                st.subheader(" Auto-Execute Options")
                 auto_execute_enabled = st.checkbox("Enable Auto-Execute", value=False, key="auto_execute_enabled")
                 
                 if auto_execute_enabled:
-                    st.warning("‚Â¡ššš Auto-execute enabled - trades will be executed automatically!")
+                    st.warning(" Auto-execute enabled - trades will be executed automatically!")
                     min_auto_confidence = st.slider("Min Confidence for Auto-Execute", 0.7, 1.0, 0.8, 0.01, key="auto_min_conf")
                     
                     # Show which signals would auto-execute
                     auto_signals = [row for row in signal_rows if float(row['Confidence']) >= min_auto_confidence]
                     if auto_signals:
-                        st.info(f"‚Â¸‚Â½š {len(auto_signals)} signals above threshold would auto-execute")
+                        st.info(f" {len(auto_signals)} signals above threshold would auto-execute")
                         for sig in auto_signals[:3]:  # Show top 3
-                            st.write(f"¡š {sig['Symbol']}: {sig['Signal']} (Conf: {sig['Confidence']})")
+                            st.write(f" {sig['Symbol']}: {sig['Signal']} (Conf: {sig['Confidence']})")
                 else:
                     st.info("Auto-execute disabled - manual review required")
         else:
@@ -1566,7 +1566,7 @@ def render_auto_trader():
     st.markdown("---")
     
     # Scanner Configuration
-    st.subheader("‚Â¡¾šš Scanner Configuration")
+    st.subheader(" Scanner Configuration")
     
     config_col1, config_col2 = st.columns(2)
     with config_col1:
@@ -1588,12 +1588,12 @@ def render_auto_trader():
     with config_col2:
         # Scanner health info
         if auto_scanner.is_running():
-            st.success("¢€Å“... Scanner thread active")
+            st.success("... Scanner thread active")
         else:
-            st.warning("‚Â¡ššš Scanner thread inactive")
+            st.warning(" Scanner thread inactive")
         
         # Manual trigger
-        if st.button("‚Â¸šÂ¬š Manual Scan Now", key="manual_scan_trigger"):
+        if st.button(" Manual Scan Now", key="manual_scan_trigger"):
             if hasattr(auto_scanner.market_analyzer, 'analyze_market_signals'):
                 with st.spinner("Running manual scan..."):
                     try:
@@ -1619,7 +1619,7 @@ def render_auto_trader():
 # ---- MANUAL TRADER -----------------------------------------------------------
 
 def render_manual_trader():
-    st.header("¢€Å“šÂ¬ Manual Trade Execution")
+    st.header(" Manual Trade Execution")
     st.caption("Execute individual trades with custom parameters")
     
     # Symbol selection
@@ -1651,7 +1651,7 @@ def render_manual_trader():
     trade_col1, trade_col2 = st.columns(2)
     
     with trade_col1:
-        st.subheader("‚Â¸‚Â½š Trade Parameters")
+        st.subheader(" Trade Parameters")
         
         trade_type = st.radio("Trade Type", ["Market Order", "Limit Order"], horizontal=True, key="manual_trade_type")
         side = st.radio("Side", ["BUY", "SELL"], horizontal=True, key="manual_side")
@@ -1678,7 +1678,7 @@ def render_manual_trader():
             limit_price = current_price
     
     with trade_col2:
-        st.subheader("‚Â¡¾šš Risk Management")
+        st.subheader(" Risk Management")
         
         use_sl_tp = st.checkbox("Use Stop Loss / Take Profit", value=True, key="manual_use_sl_tp")
         
@@ -1700,13 +1700,13 @@ def render_manual_trader():
         portfolio_value = COMPONENTS["portfolio_mgr"].total_value()
         risk_percentage = (trade_amount_usd / portfolio_value * 100) if portfolio_value > 0 else 0
         
-        risk_color = "‚Â¸šÂ¬š" if risk_percentage > 5 else "‚Â¸‚Â¸š" if risk_percentage > 2 else "‚Â¸‚Â¸š"
+        risk_color = "" if risk_percentage > 5 else "" if risk_percentage > 2 else ""
         st.metric("Risk %", f"{risk_color} {risk_percentage:.2f}%")
     
     st.markdown("---")
     
     # Trade execution
-    st.subheader("‚Â¸‚Â¡¡ Execute Trade")
+    st.subheader(" Execute Trade")
     
     # Trade summary
     summary_col1, summary_col2, summary_col3 = st.columns(3)
@@ -1721,7 +1721,7 @@ def render_manual_trader():
         st.info(f"**Value:** ${trade_amount_usd:.2f}")
     
     # Execute button
-    if st.button("‚Â¸‚Â½š Execute Trade", type="primary", key="manual_execute", disabled=(calculated_qty <= 0)):
+    if st.button(" Execute Trade", type="primary", key="manual_execute", disabled=(calculated_qty <= 0)):
         if calculated_qty > 0:
             try:
                 # Execute via trade executor
@@ -1743,7 +1743,7 @@ def render_manual_trader():
                     source="manual"
                 )
                 
-                st.success(f"¢€Å“... Trade executed successfully!")
+                st.success(f"... Trade executed successfully!")
                 if isinstance(result, dict):
                     st.json(result)
                 else:
@@ -1767,7 +1767,7 @@ def render_manual_trader():
                     pass
                 
             except Exception as e:
-                st.error(f"š¢€â„¢ Trade execution failed: {e}")
+                st.error(f" Trade execution failed: {e}")
                 _log_append(f"Manual trade failed: {e}")
                 try:
                     notify_error("Manual Trade Execution", str(e), {
@@ -1778,13 +1778,13 @@ def render_manual_trader():
                 except Exception:
                     pass
         else:
-            st.error("š¢€â„¢ Invalid quantity")
+            st.error(" Invalid quantity")
 
 
 # ---- BACKTESTING -------------------------------------------------------------
 
 def render_backtesting():
-    st.header("‚Â¸šÂ¬š Backtesting")
+    st.header(" Backtesting")
     if BACKTESTING_AVAILABLE and BacktestingIntegration is not None:
         try:
             bt = BacktestingIntegration()
@@ -1799,17 +1799,17 @@ def render_backtesting():
 # ---- SYSTEM HEALTH -----------------------------------------------------------
 
 def render_system_health():
-    st.header("‚Â¸šš System Health Monitor")
+    st.header(" System Health Monitor")
     st.caption("Detailed system monitoring and component diagnostics")
     
     # System metrics (more detailed than sidebar)
-    st.subheader("‚Â¸šÂ¬ƒ… Detailed System Metrics")
+    st.subheader(" Detailed System Metrics")
     health = get_system_health()
     
     col1, col2, col3 = st.columns(3)
     with col1:
         cpu_pct = float(health["CPU"].replace('%', ''))
-        color = "‚Â¸šÂ¬š" if cpu_pct > 80 else "‚Â¸‚Â¸š" if cpu_pct > 60 else "‚Â¸‚Â¸š"
+        color = "" if cpu_pct > 80 else "" if cpu_pct > 60 else ""
         st.metric("CPU Usage", f"{color} {health['CPU']}")
         
         # CPU usage chart (if you want to add historical data)
@@ -1818,7 +1818,7 @@ def render_system_health():
         
     with col2:
         mem_pct = float(health["Memory"].replace('%', ''))
-        color = "‚Â¸šÂ¬š" if mem_pct > 80 else "‚Â¸‚Â¸š" if mem_pct > 60 else "‚Â¸‚Â¸š"
+        color = "" if mem_pct > 80 else "" if mem_pct > 60 else ""
         st.metric("Memory Usage", f"{color} {health['Memory']}")
         
         if mem_pct > 0:
@@ -1826,25 +1826,25 @@ def render_system_health():
         
     with col3:
         thread_count = health["Threads"]
-        color = "‚Â¸šÂ¬š" if thread_count > 20 else "‚Â¸‚Â¸š" if thread_count > 10 else "‚Â¸‚Â¸š"
+        color = "" if thread_count > 20 else "" if thread_count > 10 else ""
         st.metric("Active Threads", f"{color} {thread_count}")
     
     st.markdown("---")
     
     # Component status (keep this - it's useful for debugging)
-    st.subheader("‚Â¸šÂ¬š Component Status")
+    st.subheader(" Component Status")
     
     component_status = []
     for comp_name, comp_obj in COMPONENTS.items():
         if comp_obj is not None:
-            status = "¢€Å“... Active"
+            status = "... Active"
             if hasattr(comp_obj, 'get_connection_status'):
                 try:
                     status = comp_obj.get_connection_status()
                 except:
-                    status = "¢€Å“... Active (no status method)"
+                    status = "... Active (no status method)"
         else:
-            status = "š¢€â„¢ Not Available"
+            status = " Not Available"
         
         component_status.append({
             "Component": comp_name.replace('_', ' ').title(),
@@ -1858,7 +1858,7 @@ def render_system_health():
     st.markdown("---")
     
     # Process Information (more detailed than sidebar)
-    st.subheader("‚Â¡¾šš Process Details")
+    st.subheader(" Process Details")
     
     try:
         import psutil
@@ -1883,7 +1883,7 @@ def render_system_health():
     st.markdown("---")
     
     # Refresh button
-    if st.button("‚Â¸šÂ¬šÂ¬ Refresh Health Check", key="system_health_refresh"):
+    if st.button(" Refresh Health Check", key="system_health_refresh"):
         st.rerun()
 
 
@@ -1903,19 +1903,19 @@ if binance_client:
     try:
         server_time = binance_client.get_server_time()
         server_datetime = datetime.fromtimestamp(server_time['serverTime'] / 1000)
-        st.success(f"¢€Å“... Binance API connected - Server time: {server_datetime.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+        st.success(f"... Binance API connected - Server time: {server_datetime.strftime('%Y-%m-%d %H:%M:%S UTC')}")
         
         # Test account info
         try:
             account_info = binance_client.get_account()
             st.info(f"Account permissions: {', '.join(account_info.get('permissions', []))}")
         except Exception as e:
-            st.warning(f"‚Â¡ššš Account info failed: {e}")
+            st.warning(f" Account info failed: {e}")
             
     except Exception as e:
-        st.error(f"š¢€â„¢ Binance API connection failed: {e}")
+        st.error(f" Binance API connection failed: {e}")
 else:
-    st.warning("‚Â¡ššš No Binance client available - running in demo mode")
+    st.warning(" No Binance client available - running in demo mode")
     
     st.markdown("---")
     
@@ -1923,7 +1923,7 @@ else:
 # ---- SETTINGS ----------------------------------------------------------------
 
 def render_settings():
-    st.header("‚Â¡¾šš Trading Settings & Configuration")
+    st.header(" Trading Settings & Configuration")
     st.caption("Configure risk management, notifications, and system preferences")
     
     # Create main layout
@@ -1933,11 +1933,11 @@ def render_settings():
     # LEFT COLUMN - Risk Management
     # ================================
     with settings_col1:
-        st.subheader("‚Â¡ššš Risk Management")
+        st.subheader(" Risk Management")
         
         # Stop Loss Multiplier
         st.session_state["sl_mult"] = st.slider(
-            "‚Â¸šÂ¬šÂ¬ Stop Loss Multiplier", 
+            " Stop Loss Multiplier", 
             min_value=0.5, 
             max_value=5.0, 
             value=st.session_state["sl_mult"], 
@@ -1948,7 +1948,7 @@ def render_settings():
         
         # Take Profit Multiplier
         st.session_state["tp_mult"] = st.slider(
-            "‚Â¸‚Â½š Take Profit Multiplier", 
+            " Take Profit Multiplier", 
             min_value=1.0, 
             max_value=10.0, 
             value=st.session_state["tp_mult"], 
@@ -1959,7 +1959,7 @@ def render_settings():
         
         # Risk per Trade
         st.session_state["risk_pct"] = st.slider(
-            "‚Â¸šÂ¬žÂ¢š Risk per Trade (%)", 
+            " Risk per Trade (%)", 
             min_value=0.1, 
             max_value=5.0, 
             value=st.session_state["risk_pct"], 
@@ -1970,7 +1970,7 @@ def render_settings():
         
         # Max Positions
         st.session_state["max_positions"] = st.slider(
-            "‚Â¸šÂ¬ƒ… Maximum Positions", 
+            " Maximum Positions", 
             min_value=1, 
             max_value=10, 
             value=st.session_state["max_positions"],
@@ -1979,14 +1979,14 @@ def render_settings():
         )
         
         # Risk Level Indicator
-        risk_level = "‚Â¸šÂ¬š HIGH" if st.session_state["risk_pct"] > 3.0 else "‚Â¸‚Â¸š MEDIUM" if st.session_state["risk_pct"] > 1.5 else "‚Â¸‚Â¸š LOW"
+        risk_level = " HIGH" if st.session_state["risk_pct"] > 3.0 else " MEDIUM" if st.session_state["risk_pct"] > 1.5 else " LOW"
         st.info(f"**Current Risk Level:** {risk_level}")
     
     # ================================
     # RIGHT COLUMN - Strategy Settings
     # ================================
     with settings_col2:
-        st.subheader("‚Â¡¾šš Strategy Settings")
+        st.subheader(" Strategy Settings")
         
         # Add scan_interval default if missing
         st.session_state.setdefault("scan_interval", 300)
@@ -1994,7 +1994,7 @@ def render_settings():
         # Minimum Confidence
         st.session_state.setdefault("min_confidence", 0.65)
         st.session_state["min_confidence"] = st.slider(
-            "‚Â¸‚Â½š Minimum Signal Confidence", 
+            " Minimum Signal Confidence", 
             min_value=0.5, 
             max_value=1.0, 
             value=st.session_state["min_confidence"], 
@@ -2005,7 +2005,7 @@ def render_settings():
         
         # Scan Interval
         st.session_state["scan_interval"] = st.slider(
-            "šššš Scan Interval (seconds)", 
+            " Scan Interval (seconds)", 
             min_value=60, 
             max_value=600, 
             value=st.session_state["scan_interval"], 
@@ -2017,22 +2017,22 @@ def render_settings():
         # Auto-trading toggle
         st.session_state.setdefault("auto_trade_enabled", False)
         st.session_state["auto_trade_enabled"] = st.checkbox(
-            "‚Â¸ššÂ¬“ Enable Auto-Trading", 
+            " Enable Auto-Trading", 
             value=st.session_state["auto_trade_enabled"],
             help="Allow bot to execute trades automatically",
             key="settings_auto_trade"
         )
         
         if st.session_state["auto_trade_enabled"]:
-            st.warning("‚Â¡ššš **Auto-trading ENABLED!** Monitor the bot closely.")
+            st.warning(" **Auto-trading ENABLED!** Monitor the bot closely.")
         else:
-            st.info("šÂ¬ššš Auto-trading disabled. Manual approval required.")
+            st.info(" Auto-trading disabled. Manual approval required.")
     
     # ================================
     # EMAIL NOTIFICATION SYSTEM
     # ================================
     st.markdown("---")
-    st.subheader("‚Â¸šÂ¬ƒâ€š Email Notification System")
+    st.subheader(" Email Notification System")
     
     # Get notification status
     notification_status = get_notification_status()
@@ -2040,27 +2040,27 @@ def render_settings():
     notification_col1, notification_col2 = st.columns(2)
     
     with notification_col1:
-        st.metric("Email System", "¢€Å“... Enabled" if notification_status['enabled'] else "š¢€â„¢ Disabled")
-        st.metric("Configuration", "¢€Å“... Ready" if notification_status['configured'] else "‚Â¡ššš Incomplete")
+        st.metric("Email System", "... Enabled" if notification_status['enabled'] else " Disabled")
+        st.metric("Configuration", "... Ready" if notification_status['configured'] else " Incomplete")
         
         # Test email button
-        if st.button("‚Â¸šÂ¬ƒâ€š Send Test Email", key="settings_test_email"):
+        if st.button(" Send Test Email", key="settings_test_email"):
             with st.spinner("Sending test email..."):
                 try:
                     success = send_test_notification()
                     if success:
-                        st.success("¢€Å“... Test email sent successfully!")
+                        st.success("... Test email sent successfully!")
                     else:
-                        st.error("š¢€â„¢ Failed to send test email.")
+                        st.error(" Failed to send test email.")
                 except Exception as e:
-                    st.error(f"š¢€â„¢ Email test failed: {e}")
+                    st.error(f" Email test failed: {e}")
     
     with notification_col2:
         st.metric("Emails Sent (Hour)", notification_status.get('emails_sent_hour', 0))
         st.metric("Queue Size", notification_status.get('queue_size', 0))
         
         if notification_status.get('enabled') and notification_status.get('to_emails'):
-            st.info(f"‚Â¸šÂ¬ƒâ€š **Recipients:** {', '.join(notification_status['to_emails'])}")
+            st.info(f" **Recipients:** {', '.join(notification_status['to_emails'])}")
     
     # ================================
     # ACTION BUTTONS
@@ -2069,13 +2069,13 @@ def render_settings():
     button_col1, button_col2, button_col3 = st.columns(3)
     
     with button_col1:
-        if st.button("‚Â¸šÂ¬žÂ¢š Save Settings", type="primary", key="save_settings"):
+        if st.button(" Save Settings", type="primary", key="save_settings"):
             # Update session with current values
             _log_append("Settings saved successfully")
-            st.success("¢€Å“... Settings saved!")
+            st.success("... Settings saved!")
     
     with button_col2:
-        if st.button("‚Â¸šÂ¬šÂ¬ Reset to Defaults", key="reset_settings"):
+        if st.button(" Reset to Defaults", key="reset_settings"):
             st.session_state.update({
                 "sl_mult": 1.5,
                 "tp_mult": 3.0,
@@ -2085,24 +2085,24 @@ def render_settings():
                 "scan_interval": 300,
                 "auto_trade_enabled": False
             })
-            st.success("‚Â¸šÂ¬šÂ¬ Settings reset to defaults")
+            st.success(" Settings reset to defaults")
             st.rerun()
     
     with button_col3:
-        if st.button("‚Â¸šš Test Configuration", key="test_settings"):
+        if st.button(" Test Configuration", key="test_settings"):
             # Validate settings
             issues = []
             if st.session_state["risk_pct"] > 5.0:
-                issues.append("š¢€â„¢ Risk per trade is very high (>5%)")
+                issues.append(" Risk per trade is very high (>5%)")
             if st.session_state["sl_mult"] < 1.0:
-                issues.append("š¢€â„¢ Stop loss multiplier is too low")
+                issues.append(" Stop loss multiplier is too low")
             
             if issues:
                 st.error("Configuration issues found:")
                 for issue in issues:
                     st.write(issue)
             else:
-                st.success("¢€Å“... Configuration looks good!")
+                st.success("... Configuration looks good!")
 
 
 # ---- LOGS --------------------------------------------------------------------
@@ -2121,16 +2121,16 @@ def _display_logs(limit=50):
     for log in recent_logs:
         if "ERROR" in log or "FAIL" in log:
             st.error(log)
-        elif "WARNING" in log or "‚Â¡ššš" in log:
+        elif "WARNING" in log or "" in log:
             st.warning(log)
-        elif "SUCCESS" in log or "¢€Å“..." in log:
+        elif "SUCCESS" in log or "..." in log:
             st.success(log)
         else:
             st.text(log)
 
 
 def render_logs():
-    st.header("‚Â¸šÂ¬ƒ…“ System Logs")
+    st.header(" System Logs")
     st.caption("Real-time activity, error logs, and module status")
     
     # Log controls
@@ -2141,11 +2141,11 @@ def render_logs():
         limit = None if log_limit == "All" else int(log_limit)
     
     with log_col2:
-        if st.button("‚Â¸šÂ¬šÂ¬ Refresh", key="logs_refresh"):
+        if st.button(" Refresh", key="logs_refresh"):
             st.rerun()
     
     with log_col3:
-        if st.button("‚Â¸šÂ¬šÂ¬šš Clear Logs", key="clear_logs"):
+        if st.button(" Clear Logs", key="clear_logs"):
             st.session_state["logs"] = []
             st.success("Logs cleared")
             st.rerun()
@@ -2155,7 +2155,7 @@ def render_logs():
     if logs:
         log_text = "\n".join(logs)
         st.download_button(
-            label="‚Â¸šÂ¬ƒâ€š Download Logs",
+            label=" Download Logs",
             data=log_text,
             file_name=f"trading_logs_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.txt",
             mime="text/plain",
@@ -2167,7 +2167,7 @@ def render_logs():
     # ================================
     # MODULE STATUS SECTION (NEW)
     # ================================
-    st.subheader("‚Â¸šÂ¬š Module Status & Controls")
+    st.subheader(" Module Status & Controls")
     st.caption("Monitor and control all trading bot modules")
     
     # Initialize demo mode states if not exists
@@ -2270,21 +2270,21 @@ def render_logs():
             is_demo_forced = st.session_state['module_demo_modes'].get(module_key, False)
             
             if is_demo_forced:
-                status = "‚Â¸‚Â¸š DEMO MODE"
+                status = " DEMO MODE"
                 status_text = "Forced Demo"
                 can_toggle = True
             elif component is not None and component is not False:
                 # Check if it's a fallback component
                 component_type = type(component).__name__
                 if 'Fallback' in component_type:
-                    status = "‚Â¸‚Â¸š FALLBACK"
+                    status = " FALLBACK"
                     status_text = "Using Fallback"
                 else:
-                    status = "‚Â¸‚Â¸š ACTIVE"
+                    status = " ACTIVE"
                     status_text = "Live Connection"
                 can_toggle = True
             else:
-                status = "‚Â¸šÂ¬š OFFLINE"
+                status = " OFFLINE"
                 status_text = "Not Available"
                 can_toggle = module_info['fallback_available']
             
@@ -2322,36 +2322,36 @@ def render_logs():
                 # Control buttons
                 if can_toggle:
                     if is_demo_forced:
-                        if st.button("‚Â¸‚Â¸š Enable Live", key=f"enable_{module_key}"):
+                        if st.button(" Enable Live", key=f"enable_{module_key}"):
                             st.session_state['module_demo_modes'][module_key] = False
                             _log_append(f"Module {module_info['name']} switched to LIVE mode")
                             st.success(f"{module_info['name']} enabled for live mode")
                             st.rerun()
                     else:
-                        if st.button("‚Â¸‚Â¸š Force Demo", key=f"demo_{module_key}"):
+                        if st.button(" Force Demo", key=f"demo_{module_key}"):
                             st.session_state['module_demo_modes'][module_key] = True
                             _log_append(f"Module {module_info['name']} forced to DEMO mode")
                             st.warning(f"{module_info['name']} forced to demo mode")
                             st.rerun()
                 else:
-                    st.write("š¢€â„¢ No fallback")
+                    st.write(" No fallback")
             
             st.divider()
     
     # Global module controls
-    st.subheader("‚Â¸‚Â½šÂ¬šš Global Module Controls")
+    st.subheader(" Global Module Controls")
     
     global_col1, global_col2, global_col3 = st.columns(3)
     
     with global_col1:
-        if st.button("‚Â¸‚Â¸š Enable All Live", key="enable_all_modules"):
+        if st.button(" Enable All Live", key="enable_all_modules"):
             st.session_state['module_demo_modes'] = {}
             _log_append("All modules enabled for live mode")
             st.success("All compatible modules enabled for live mode")
             st.rerun()
     
     with global_col2:
-        if st.button("‚Â¸‚Â¸š Force All Demo", key="demo_all_modules"):
+        if st.button(" Force All Demo", key="demo_all_modules"):
             demo_modes = {}
             for module_key, module_info in all_modules.items():
                 if module_info['fallback_available']:
@@ -2362,7 +2362,7 @@ def render_logs():
             st.rerun()
     
     with global_col3:
-        if st.button("‚Â¸šÂ¬šÂ¬ Refresh Modules", key="refresh_all_modules"):
+        if st.button(" Refresh Modules", key="refresh_all_modules"):
             # Force re-initialization of components
             try:
                 # Re-initialize components and update global reference
@@ -2382,7 +2382,7 @@ def render_logs():
     st.markdown("---")
     
     # Display logs
-    st.subheader(f"‚Â¸šÂ¬ƒÂ¢šÂ¬ Recent Activity ({len(logs)} total)")
+    st.subheader(f" Recent Activity ({len(logs)} total)")
     _display_logs(limit)
 
 
@@ -2392,16 +2392,16 @@ def render_logs():
 
 # Tab selection
 TABS = [
-    "‚Â¸šš Dashboard",
-    "‚Â¸šÂ¬žÂ¢š Portfolio", 
-    "‚Â¸šÂ¬ƒâ€¹  Performance",
-    "‚Â¡šÂ¬ Multi-Strategy",
-    "‚Â¸ššÂ¬“ Auto-Trader",
-    "¢€Å“šÂ¬ Manual Trader",
-    "‚Â¸šÂ¬š Backtesting",
-    "‚Â¸šš System Health",
-    "‚Â¡¾šš Settings",
-    "‚Â¸šÂ¬ƒ…“ Logs",
+    " Dashboard",
+    " Portfolio", 
+    " Performance",
+    " Multi-Strategy",
+    " Auto-Trader",
+    " Manual Trader",
+    " Backtesting",
+    " System Health",
+    " Settings",
+    " Logs",
 ]
 
 # ------------------------------------------------------------------
@@ -2414,7 +2414,7 @@ with st.sidebar:
         <div style='text-align: center; margin-bottom: 20px;'>
             <img src='https://static.wixstatic.com/media/80aa29_3bdfcbab4dd34671915e3b66b0b596e4~mv2.jpeg/v1/fill/w_146,h_104,al_c,q_80,usm_0.66_1.00_0.01,enc_avif,quality_auto/LRC_1719585575250.jpeg' 
                  width='120' style='border-radius: 8px; margin-bottom: 10px;'/>
-            <h3 style='margin: 10px 0; color: #333;'>‚Â¸šš Hybrid Quantum Trading Bot</h3>
+            <h3 style='margin: 10px 0; color: #333;'> Hybrid Quantum Trading Bot</h3>
             <p style='margin: 5px 0; color: #666; font-size: 14px;'>
                 <strong>Rondanini Publishing Ltd.</strong>
             </p>
@@ -2431,7 +2431,7 @@ with st.sidebar:
     st.markdown("---")
     
     # API Connection Status
-    st.subheader("‚Â¸¢€â„¢š API Connection")
+    st.subheader(" API Connection")
     try:
         # Get client from components or try to create one
         binance_client = None
@@ -2442,7 +2442,7 @@ with st.sidebar:
             client_status = "No Binance client available - running in demo mode"
         
         if binance_client:
-            st.success("¢€Å“... Connected")
+            st.success("... Connected")
             try:
                 server_time = binance_client.get_server_time()
                 server_datetime = datetime.fromtimestamp(server_time['serverTime'] / 1000)
@@ -2450,16 +2450,16 @@ with st.sidebar:
             except:
                 st.caption("Connection established")
         else:
-            st.warning("‚Â¡ššš Demo Mode")
+            st.warning(" Demo Mode")
             st.caption("API keys not configured")
     except Exception as e:
-        st.error("š¢€â„¢ Connection Failed")
+        st.error(" Connection Failed")
         st.caption(str(e)[:50])
     
     st.markdown("---")
     
     # Portfolio Value
-    st.subheader("‚Â¸šÂ¬žÂ¢š Portfolio")
+    st.subheader(" Portfolio")
     try:
         portfolio_value = COMPONENTS['portfolio_mgr'].total_value()
         st.metric("Total Value", f"${portfolio_value:,.2f}")
@@ -2467,7 +2467,7 @@ with st.sidebar:
         # Add GBP equivalent
         gbp_rate = get_usd_to_gbp_rate()
         gbp_value = portfolio_value * gbp_rate
-        st.caption(f"šÂ¬¹  GBP {gbp_value:,.2f} GBP")
+        st.caption(f" GBP {gbp_value:,.2f} GBP")
     except Exception as e:
         st.metric("Total Value", "N/A")
         st.caption("Portfolio unavailable")
@@ -2475,13 +2475,13 @@ with st.sidebar:
     st.markdown("---")
     
     # Scanner Status
-    st.subheader("‚Â¸ššÂ¬“ Auto Scanner")
+    st.subheader(" Auto Scanner")
     scanner = st.session_state.get('auto_scanner')
     if scanner and scanner.is_running():
-        st.success("‚Â¸‚Â¸š Running")
+        st.success(" Running")
         st.caption(f"Scan #{scanner.scan_count}")
     else:
-        st.warning("‚Â¸šÂ¬š Stopped")
+        st.warning(" Stopped")
         st.caption("Click to start scanning")
     
     # Toggle Scanner button
@@ -2501,10 +2501,10 @@ with st.sidebar:
     st.markdown("---")
     
     # Environment Information
-    st.subheader("‚Â¸¢€â„¢š System Info")
+    st.subheader(" System Info")
     
     # Trading mode with color coding
-    mode = "‚Â¸šš TESTNET" if os.getenv("USE_TESTNET", "false").lower() == "true" else "‚Â¸‚Â¡¡ LIVE"
+    mode = " TESTNET" if os.getenv("USE_TESTNET", "false").lower() == "true" else " LIVE"
     if "TESTNET" in mode:
         st.info(f"**Mode:** {mode}")
     else:
@@ -2517,8 +2517,8 @@ with st.sidebar:
         mem_pct = float(health["Memory"].replace('%', ''))
         
         # Color code based on usage
-        cpu_color = "‚Â¸šÂ¬š" if cpu_pct > 80 else "‚Â¸‚Â¸š" if cpu_pct > 60 else "‚Â¸‚Â¸š"
-        mem_color = "‚Â¸šÂ¬š" if mem_pct > 80 else "‚Â¸‚Â¸š" if mem_pct > 60 else "‚Â¸‚Â¸š"
+        cpu_color = "" if cpu_pct > 80 else "" if cpu_pct > 60 else ""
+        mem_color = "" if mem_pct > 80 else "" if mem_pct > 60 else ""
         
         st.text(f"CPU: {cpu_color} {health['CPU']}")
         st.text(f"Memory: {mem_color} {health['Memory']}")
@@ -2529,7 +2529,7 @@ with st.sidebar:
         st.text("Threads: --")
     
     # Environment details (collapsed by default)
-    with st.expander("‚Â¸šÂ¬ƒÂ¢šÂ¬ Environment Details"):
+    with st.expander(" Environment Details"):
         st.text(f"Python: {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
         st.text(f"Streamlit: {st.__version__}")
         st.text(f"Platform: {sys.platform}")
@@ -2545,7 +2545,7 @@ with st.sidebar:
     st.markdown(
         """
         <div style='text-align: center; font-size: 11px; color: #888;'>
-            ¡š 2025 All Rights Reserved<br>
+             2025 All Rights Reserved<br>
             <em>Advanced Quantum Trading Solutions</em>
         </div>
         """, 
@@ -2591,7 +2591,7 @@ with tabs[9]:  # Logs
 # STATUS BAR
 # ------------------------------------------------------------------
 st.markdown("---")
-st.subheader("‚Â¸šÂ¬š System Status")
+st.subheader(" System Status")
 
 status_col1, status_col2, status_col3, status_col4 = st.columns(4)
 
@@ -2606,26 +2606,26 @@ with status_col1:
         client_available = False
         
     if client_available:
-        st.success("‚Â¸‚Â¸š API Connected")
+        st.success(" API Connected")
     else:
-        st.error("‚Â¸šÂ¬š Demo Mode")
+        st.error(" Demo Mode")
 
 with status_col2:
     scanner = st.session_state.get("auto_scanner")
     if scanner and scanner.is_running():
-        st.success("‚Â¸‚Â¸š Scanner Active")
+        st.success(" Scanner Active")
     else:
-        st.warning("‚Â¸‚Â¸š Scanner Stopped")
+        st.warning(" Scanner Stopped")
 
 with status_col3:
     auto_trade = st.session_state.get("auto_trade_enabled", False)
     if auto_trade:
-        st.success("‚Â¸‚Â¸š Auto-Trade ON")
+        st.success(" Auto-Trade ON")
     else:
-        st.info("‚Â¸šÂ¬š Manual Mode")
+        st.info(" Manual Mode")
 
 with status_col4:
-    mode = "‚Â¸šš TESTNET" if os.getenv("USE_TESTNET", "false").lower() == "true" else "‚Â¸‚Â¡¡ LIVE"
+    mode = " TESTNET" if os.getenv("USE_TESTNET", "false").lower() == "true" else " LIVE"
     if "TESTNET" in mode:
         st.info(mode)
     else:
@@ -2639,13 +2639,13 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; padding: 20px;'>
-        <h4>‚Â¸šš Hybrid Quantum Crypto Trading Bot</h4>
-        <p>‚Â¡šÂ¬šš Quantum Analytics | ‚Â¸ššÂ¬“ AI Trading | ‚Â¸šÂ¬ƒ… Advanced Analytics</p>
+        <h4> Hybrid Quantum Crypto Trading Bot</h4>
+        <p> Quantum Analytics |  AI Trading |  Advanced Analytics</p>
         <p style='color: #666; font-size: 14px;'>
-            <strong>Rondanini Publishing Ltd.</strong> | ¡š 2025 All Rights Reserved
+            <strong>Rondanini Publishing Ltd.</strong> |  2025 All Rights Reserved
         </p>
         <p style='color: #888; font-size: 12px;'>
-            ‚Â¡ššš <strong>Risk Warning:</strong> Trading involves substantial risk. Past performance does not guarantee future results.
+             <strong>Risk Warning:</strong> Trading involves substantial risk. Past performance does not guarantee future results.
         </p>
     </div>
     """,
@@ -2666,4 +2666,5 @@ if __name__ == "__main__":
 #   D e p l o y   t r i g g e r   -   0 7 / 2 2 / 2 0 2 5   1 7 : 2 5 : 4 1 
  
  
+
 
