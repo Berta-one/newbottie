@@ -1745,15 +1745,12 @@ if st.button(" Execute Trade", type="primary", key="manual_execute", disabled=(c
                 tp_mult if use_sl_tp else 3.0,
                 trade_amount_usd=trade_amount_usd
             )
-
             record_trade(symbol=symbol, side=side, qty=calculated_qty, price=limit_price, usd=trade_amount_usd, source="manual")
-
             st.success("... Trade executed successfully!")
             if isinstance(result, dict):
                 st.json(result)
             else:
                 st.write(result)
-
             _log_append(f"Manual trade executed: {side} {calculated_qty:.8f} {symbol} @ ${limit_price:.4f}")
 
             # Notify
@@ -1773,7 +1770,6 @@ if st.button(" Execute Trade", type="primary", key="manual_execute", disabled=(c
         except Exception as e:
             st.error(f" Trade execution failed: {e}")
             _log_append(f"Manual trade failed: {e}")
-
             try:
                 notify_error("Manual Trade Execution", str(e), {
                     'symbol': symbol,
