@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -774,17 +774,17 @@ except Exception:
 
 #  Portfolio Metrics with Unicode Emojis (Cross-Platform Safe)
 with col1:
-    st.metric("\U0001F4B5 Portfolio Value (USD)", f"${total_usd:,.2f}" if "total_usd" in locals() else "$0.00")
+    st.metric(" Portfolio Value (USD)", f"${total_usd:,.2f}" if "total_usd" in locals() else "$0.00")
 
 with col2:
-    st.metric("\U0001F4B7 Portfolio Value (GBP)", f"total_gbp:,.2f}" if "total_gbp" in locals() else ".00")
+    st.metric(" Portfolio Value (GBP)", f"total_gbp:,.2f}" if "total_gbp" in locals() else ".00")
 
 with col3:
-    st.metric("\U0001F4CA Total Assets", asset_count if "asset_count" in locals() else 0)
+    st.metric(" Total Assets", asset_count if "asset_count" in locals() else 0)
 
 with col4:
     health = get_system_health() if "get_system_health" in globals() else {"CPU": "N/A"}
-    st.metric("\U0001F5A5 CPU Usage", health.get("CPU", "N/A"))
+    st.metric(" CPU Usage", health.get("CPU", "N/A"))
 
 
 
@@ -2666,5 +2666,6 @@ if __name__ == "__main__":
 #   D e p l o y   t r i g g e r   -   0 7 / 2 2 / 2 0 2 5   1 7 : 2 5 : 4 1 
  
  
+
 
 
