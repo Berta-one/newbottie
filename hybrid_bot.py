@@ -764,115 +764,72 @@ def render_dashboard():
     if qt_msg and qt_msg.startswith(""):
         st.warning(qt_msg)
 
-   # Quick Stats row
-col1, col2, col3, col4 = st.columns(4)
+    # Quick Stats row
+    col1, col2, col3, col4 = st.columns(4)
 
-try:
-    tv = COMPONENTS["portfolio_mgr"].total_value()
-except Exception:
-    tv = 0.0
+    # Get portfolio values safely
+    try:
+        portfolio = COMPONENTS["portfolio_mgr"].get_portfolio()
+        total_usd, total_gbp, asset_count = get_unified_portfolio_value(portfolio)
+    except Exception:
+        total_usd, total_gbp, asset_count = 0.0, 0.0, 0
 
-#  Portfolio Metrics with Unicode Emojis (Cross-Platform Safe)
-with col1:
-    st.metric(" Portfolio Value (USD)", f"${total_usd:,.2f}" if "total_usd" in locals() else "$0.00")
-
-with col2:
-    st.metric(" Portfolio Value (GBP)", f"(GBP){total_gbp:,.2f}" if "total_gbp" in locals() else "GBP 0.00")
-
-with col3:
-    st.metric(" Total Assets", asset_count if "asset_count" in locals() else 0)
-
-with col4:
-    health = get_system_health() if "get_system_health" in globals() else {"CPU": "N/A"}
-    st.metric(" CPU Usage", health.get("CPU", "N/A"))
-
-
-
+    with col1:
+        st.metric(" Portfolio Value (USD)", f"${total_usd:,.2f}")
+    with col2:
+        st.metric(" Portfolio Value (GBP)", f"£{total_gbp:,.2f}")
+    with col3:
+        st.metric(" Total Assets", asset_count)
+    with col4:
+        health = get_system_health()
+        st.metric(" CPU Usage", health.get("CPU", "N/A"))
 
     st.markdown("---")
     st.subheader("Recent Log Activity")
     _display_logs(limit=15, log_file="logs.txt", refresh_interval=15)
-
-
 
 # ---- PORTFOLIO ---------------------------------------------------------------
 
 def render_portfolio():
     st.header(" Portfolio Overview")
     pm = COMPONENTS["portfolio_mgr"]
-    portfolio = pm.get_portfolio()
-    total_usd, total_gbp, asset_count = get_unified_portfolio_value(portfolio)
-    col1, col2, col3 = st.columns([2, 1, 1])
-    with col1:
-        st.info(pm.get_connection_status())
-    with col2:
-        if st.button(" Refresh Portfolio", key="pf_refresh"):
-            with st.spinner("Refreshing"):
-                try:
-                    pm.refresh_portfolio()
-                except Exception as e:  # noqa: BLE001
-                    st.error(f"Error: {e}")
-            st.rerun()
-    with col3:
-        st.caption(f"Last updated: {pm.last_updated()}")
-
-    # Portfolio table ------------------------------------------------------
     try:
-        port = pm.get_portfolio() or {}
-    except Exception as e:  # noqa: BLE001
-        st.error(f"Portfolio fetch error: {e}")
-        port = {}
+        portfolio = pm.get_portfolio()
+    except Exception:
+        portfolio = {}
 
-    if port:
+    if portfolio:
         total_usd, total_gbp, asset_count = get_unified_portfolio_value(portfolio)
-        if total_usd <= 0:
-            total_usd = pm.total_value() if hasattr(pm, "total_value") else 0
-
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3 = st.columns([2, 1, 1])
         with col1:
-            st.metric("Total Value (USD)", total_usd, total_gbp, asset_count = get_unified_portfolio_value(portfolio))
+            st.metric("Total Value (USD)", f"${total_usd:,.2f}")
         with col2:
-            st.metric("Trading Mode", " TESTNET" if os.getenv("USE_TESTNET", "false").lower() == "true" else " LIVE")
-
-            st.metric("Active Assets", sum(1 for k, v in port.items() if v.get("balance", 0) > 0))
-        with col4:
-            live_status = " Live" if getattr(pm, "is_live", lambda: False)() else " Demo"
-            st.metric("Data Source", live_status)
-
-        rows = []
-        for asset, data in port.items():
-            rows.append({
-                "Asset": asset,
-                "Balance": data.get("balance", 0.0),
-                "Free": data.get("free", data.get("balance", 0.0)),
-                "Locked": data.get("locked", 0.0),
-                "Price (USD)": data.get("price", 0.0),
-                "Value (USD)": data.get("value", 0.0),
-                "24h Change %": data.get("change_24h", data.get("change", 0.0)),
-            })
-        df = pd.DataFrame(rows)
-        if not df.empty:
-            df_display = df.copy()
-            df_display["Balance"] = df_display["Balance"].map(lambda x: f"{x:.8f}".rstrip("0").rstrip("."))
-            df_display["Free"] = df_display["Free"].map(lambda x: f"{x:.8f}".rstrip("0").rstrip("."))
-            df_display["Locked"] = df_display["Locked"].map(lambda x: f"{x:.8f}".rstrip("0").rstrip("."))
-            df_display["Price (USD)"] = df_display["Price (USD)"].map(lambda x: f"${x:,.4f}")
-            df_display["Value (USD)"] = df_display["Value (USD)"].map(lambda x: f"${x:,.2f}")
-            df_display["24h Change %"] = df_display["24h Change %"].map(lambda x: f"{x:.2f}%")
-            st.dataframe(df_display, use_container_width=True)
+            st.metric("Total Value (GBP)", f"£{total_gbp:,.2f}")
+        with col3:
+            st.metric("Total Assets", asset_count)
+        with col1:
+            st.info(pm.get_connection_status())
+        with col2:
+            if st.button(" Refresh Portfolio", key="pf_refresh"):
+                with st.spinner("Refreshing"):
+                    try:
+                        pm.refresh_portfolio()
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+                st.rerun()
+        with col3:
+            st.caption(f"Last updated: {pm.last_updated()}")
 
         # Allocation pie (significant assets)
-        sig = {k: v for k, v in port.items() if v.get("value", 0) > 1.0}
+        sig = {k: v for k, v in portfolio.items() if v.get("value", 0) > 1.0}
         if len(sig) > 1:
             import plotly.express as px  # local import
-
             fig = px.pie(
                 values=[d["value"] for d in sig.values()],
                 names=list(sig.keys()),
                 title="Portfolio Allocation (Assets > $1)",
             )
             st.plotly_chart(fig, use_container_width=True)
-
     else:
         st.warning("No portfolio data available.")
 
@@ -888,8 +845,10 @@ def render_portfolio():
         trade_df["timestamp"] = pd.to_datetime(trade_df["timestamp"]).dt.tz_localize(None)
         st.dataframe(trade_df, use_container_width=True)
 
+    else:
+        st.warning("No portfolio data available.")
 
-# Helper: unify trade history from portfolio_mgr + trade_log.csv
+    # Helper: unify trade history from portfolio_mgr + trade_log.csv
 
 def _get_recent_trades(limit=100) -> pd.DataFrame:
     # From trade_log.csv
