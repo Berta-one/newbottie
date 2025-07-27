@@ -3,7 +3,7 @@ name: Unzip Bot Package
 on:
   push:
     paths:
-      - 'trading_bot_final_complete.zip'
+      - '*.zip'
     branches:
       - main
 
@@ -21,10 +21,10 @@ jobs:
 
       - name: Extract ZIP
         run: |
-          unzip -o trading_bot_final_complete.zip -d extracted
-          # Move files from the inner folder (trading_bot_final_complete) to repo root
-          mv extracted/trading_bot_final_complete/* .
-          rm -rf extracted trading_bot_final_complete.zip
+          unzip -o *.zip -d extracted
+          shopt -s dotglob
+          mv extracted/* .
+          rm -rf extracted *.zip
 
       - name: Commit and Push
         env:
@@ -33,5 +33,5 @@ jobs:
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
           git add .
-          git commit -m "Extracted full trading bot package (all files)"
+          git commit -m "Extracted bot files" || echo "No changes to commit"
           git push origin main
