@@ -1,0 +1,12 @@
+
+ccxt
+websocket-client
+pandas
+numpy
+tensorflow
+torch
+xgboost
+streamlit
+plotly
+requests
+scikit-learn
