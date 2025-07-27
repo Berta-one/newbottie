@@ -13,25 +13,37 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: List files to confirm ZIP presence
+        run: ls -al
 
       - name: Install unzip
         run: sudo apt-get update && sudo apt-get install -y unzip
 
-      - name: Extract ZIP
+      - name: Extract ZIP if found
         run: |
-          unzip -o *.zip -d extracted
-          shopt -s dotglob
-          mv extracted/* .
-          rm -rf extracted *.zip
+          ZIP_FILE=$(ls *.zip | head -n 1)
+          if [ -f "$ZIP_FILE" ]; then
+            echo "Found ZIP: $ZIP_FILE"
+            unzip -o "$ZIP_FILE" -d extracted
+            shopt -s dotglob
+            mv extracted/* .
+            rm -rf extracted "$ZIP_FILE"
+          else
+            echo "No ZIP file found in repo" && exit 1
+          fi
 
-      - name: Commit and Push
+      - name: Commit and Push changes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
           git add .
-          git commit -m "Extracted bot files" || echo "No changes to commit"
+          git commit -m "Extracted bot files from ZIP" || echo "No changes to commit"
           git push origin main
