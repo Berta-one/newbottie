@@ -2,8 +2,6 @@ name: Unzip Bot Package
 
 on:
   push:
-    paths:
-      - '*.zip'
     branches:
       - main
 
