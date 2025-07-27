@@ -1,0 +1,32 @@
+name: Unzip Bot Package
+
+on:
+  push:
+    paths:
+      - 'trading_bot_final_complete.zip'
+    branches:
+      - main
+
+jobs:
+  unzip:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Install unzip
+        run: sudo apt-get update && sudo apt-get install -y unzip
+
+      - name: Extract ZIP
+        run: |
+          unzip -o trading_bot_final_complete.zip -d extracted
+          cp -r extracted/* .
+          rm -rf extracted trading_bot_final_complete.zip
+
+      - name: Commit and Push
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
+          git add .
+          git commit -m "Extracted trading bot package"
+          git push
