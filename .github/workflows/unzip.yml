@@ -25,8 +25,13 @@ jobs:
           if [ -f "$ZIP_FILE" ]; then
             echo "Found ZIP: $ZIP_FILE"
             unzip -o "$ZIP_FILE" -d extracted
-            # Merge extracted files into repo without deleting existing files
-            rsync -av extracted/* ./
+            if [ -d "extracted/trading_bot_final_complete" ]; then
+              echo "Nested folder detected"
+              rsync -av extracted/trading_bot_final_complete/ ./
+            else
+              echo "No nested folder, copying directly"
+              rsync -av extracted/ ./
+            fi
             rm -rf extracted "$ZIP_FILE"
           else
             echo "No ZIP file found in repo"
@@ -39,5 +44,5 @@ jobs:
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
           git add .
-          git commit -m "Merged bot files from ZIP" || echo "No changes to commit"
+          git commit -m "Merged bot files from ZIP (nested folder handled)" || echo "No changes to commit"
           git push origin main
