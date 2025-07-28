@@ -1,0 +1,15 @@
+credentials:
+  usernames:
+    luigi:
+      email: luigi.rondanini@gmail.com
+      name: Luigi Rondanini
+      password: "$2b$12$EXAMPLE_HASHED_PASSWORD"
+
+cookie:
+  name: bottie_auth
+  key: "secure_random_cookie_key"
+  expiry_days: 1
+
+preauthorized:
+  emails:
+    - luigi.rondanini@gmail.com
