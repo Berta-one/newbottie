@@ -1,25 +1,58 @@
 # quantum/portfolio_optimizer.py
 
-from qiskit_optimization.applications import PortfolioOptimization
+import numpy as np
+from qiskit_optimization import QuadraticProgram
 from qiskit_optimization.algorithms import MinimumEigenOptimizer
 from qiskit.algorithms import QAOA
-from qiskit import Aer
-import numpy as np
+from qiskit.utils import algorithm_globals
+from qiskit_aer.primitives import Sampler
+from quantum.backends import get_ibmq_provider
 
 class QuantumPortfolioOptimizer:
-    def __init__(self, budget=3, risk_factor=0.1):
-        self.backend = Aer.get_backend("qasm_simulator")
-        self.budget = budget
-        self.risk_factor = risk_factor
+    def __init__(self, num_assets: int, budget: int = None, risk_aversion: float = 0.1):
+        self.num_assets = num_assets
+        self.budget = budget if budget is not None else num_assets
+        self.risk_aversion = risk_aversion
+        algorithm_globals.random_seed = 42
+        self.provider = get_ibmq_provider()
+        self.backend = self.provider.get_backend('ibmq_qasm_simulator')  # Replace with real backend if needed
+        self.sampler = Sampler()  # For QAOA
+        self.qaoa = QAOA(sampler=self.sampler, reps=1)
 
-    def optimize(self, returns, covariances):
-        num_assets = len(returns)
-        portfolio = PortfolioOptimization(expected_returns=returns,
-                                          covariances=covariances,
-                                          risk_factor=self.risk_factor,
-                                          budget=self.budget)
-        q_problem = portfolio.to_quadratic_program()
-        qaoa = QAOA(quantum_instance=self.backend)
-        optimizer = MinimumEigenOptimizer(qaoa)
-        result = optimizer.solve(q_problem)
-        return result.x
+    def build_problem(self, expected_returns, cov_matrix):
+        """
+        Construct the portfolio optimization problem as a Quadratic Program.
+        Maximize return - λ * risk, subject to budget.
+        """
+        qp = QuadraticProgram()
+        for i in range(self.num_assets):
+            qp.binary_var(name=f"x{i}")
+
+        linear = {f"x{i}": -expected_returns[i] for i in range(self.num_assets)}
+        quadratic = {
+            (f"x{i}", f"x{j}"): self.risk_aversion * cov_matrix[i][j]
+            for i in range(self.num_assets) for j in range(self.num_assets)
+        }
+
+        qp.minimize(linear=linear, quadratic=quadratic)
+
+        # Budget constraint: sum x_i == budget
+        constraint = {f"x{i}": 1 for i in range(self.num_assets)}
+        qp.linear_constraint(linear=constraint, sense='==', rhs=self.budget, name='budget')
+
+        return qp
+
+    def optimize(self, expected_returns, cov_matrix):
+        """
+        Solve the optimization problem using QAOA and return selected asset indices.
+        """
+        problem = self.build_problem(expected_returns, cov_matrix)
+        optimizer = MinimumEigenOptimizer(self.qaoa)
+        try:
+            result = optimizer.solve(problem)
+            selected_assets = [i for i, x in enumerate(result.x) if x > 0.5]
+            print(f"✅ Quantum Optimizer selected assets: {selected_assets}")
+            return selected_assets
+        except Exception as e:
+            print(f"❌ Quantum Optimization failed: {e}")
+            return []
