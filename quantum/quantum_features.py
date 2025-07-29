@@ -1,7 +1,28 @@
 # quantum/quantum_features.py
 
-from qiskit.circuit import QuantumCircuit
-from qiskit.circuit.library import ZZFeatureMap
+from __future__ import annotations
+
+# Optional Qiskit import ----------------------------------------------------
+try:
+    from qiskit.circuit import QuantumCircuit  # type: ignore
+    from qiskit.circuit.library import ZZFeatureMap  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover – allow running without Qiskit
+    # Create lightweight stubs so the rest of the codebase (and tests) can load
+    # in environments where Qiskit is not installed.
+    class QuantumCircuit:  # noqa: D101 – stub
+        num_qubits: int = 0
+
+        def draw(self, *_, **__):
+            return "<QuantumCircuit stub>"
+
+
+    class ZZFeatureMap:  # noqa: D101 – stub
+        def __init__(self, feature_dimension: int, reps: int, entanglement: str):
+            self.num_qubits = feature_dimension
+
+        def assign_parameters(self, theta):  # noqa: D401 – stub method
+            return self
+
 import numpy as np
 
 

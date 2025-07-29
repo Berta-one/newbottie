@@ -5,10 +5,12 @@ from scipy.optimize import minimize
 class ClassicalPortfolioOptimizer:
     """Mean-variance (Markowitz) classical portfolio optimiser.
 
-    Acts as a fallback when quantum optimisation fails or is unavailable.
+    The constructor now mirrors the parameters of :pyclass:`HybridPortfolioManager`
+    for smoother dependency injection, but additional arguments are currently
+    ignored because the classical optimiser itself does not require them.
     """
 
-    def __init__(self, risk_aversion: float = 0.5):
+    def __init__(self, num_assets: int | None = None, initial_capital: float | None = None, risk_aversion: float = 0.5):
         self.risk_aversion = risk_aversion
 
     def optimize(self, expected_returns, covariance_matrix, budget: float = 1.0):
