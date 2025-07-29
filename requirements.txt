@@ -15,3 +15,4 @@ qiskit-machine-learning
 qiskit-optimization
 qiskit_ibm_provider
 scipy
+plotly
