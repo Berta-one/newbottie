@@ -1,0 +1,29 @@
+name: Quantum Backend Check
+
+on: [push]
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    env:
+      IBM_QUANTUM_TOKEN: ${{ secrets.IBM_QUANTUM_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install Qiskit
+        run: pip install qiskit
+
+      - name: Verify IBMQ Access
+        run: |
+          python -c "
+          from qiskit import IBMQ;
+          IBMQ.save_account('${{ secrets.IBM_QUANTUM_TOKEN }}', overwrite=True);
+          IBMQ.load_account();
+          print(IBMQ.providers());
+          "
