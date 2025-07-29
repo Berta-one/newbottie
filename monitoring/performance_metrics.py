@@ -1,19 +1,25 @@
+# monitoring/performance_metrics.py
+
+import time
 import numpy as np
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
-def sharpe_ratio(returns, risk_free=0.0):
-    excess = np.array(returns) - risk_free
-    return np.mean(excess) / (np.std(excess) + 1e-9)
+class PerformanceTracker:
+    def __init__(self, model_name):
+        self.model_name = model_name
+        self.logs = []
 
-def sortino_ratio(returns, target=0.0):
-    downside = np.std([r for r in returns if r < target]) + 1e-9
-    return (np.mean(returns) - target) / downside
+    def track(self, y_true, y_pred, start_time, end_time):
+        metrics = {
+            "model": self.model_name,
+            "accuracy": accuracy_score(y_true, y_pred),
+            "precision": precision_score(y_true, y_pred, zero_division=0),
+            "recall": recall_score(y_true, y_pred, zero_division=0),
+            "f1": f1_score(y_true, y_pred, zero_division=0),
+            "latency": round(end_time - start_time, 3)
+        }
+        self.logs.append(metrics)
+        return metrics
 
-def max_drawdown(equity_curve):
-    peak = equity_curve[0]
-    max_dd = 0
-    for x in equity_curve:
-        if x > peak:
-            peak = x
-        dd = (peak - x) / peak
-        max_dd = max(max_dd, dd)
-    return max_dd
+    def summary(self):
+        return self.logs
