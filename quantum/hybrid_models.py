@@ -24,3 +24,7 @@ class HybridQuantumEnsemble:
             self.quantum.predict(X)
         ])
         return np.average(preds, axis=0, weights=self.weights)
+
+    def train(self, X, y):
+        """Alias for fit to maintain compatibility with scripts expecting `train`."""
+        return self.fit(X, y)

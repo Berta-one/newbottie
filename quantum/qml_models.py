@@ -34,3 +34,7 @@ class QuantumPricePredictor:
     def predict(self, X):
         X_scaled = self.scaler.transform(X)
         return self.vqc.predict(X_scaled)
+
+    def train(self, X, y):
+        """Alias for fit to keep backward-compatibility with legacy scripts."""
+        return self.fit(X, y)
