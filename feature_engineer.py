@@ -9,3 +9,9 @@ def engineer_features(df):
     df['atr'] = df['high'] - df['low']
     df = df.dropna()
     return df
+
+
+def extract_features(market_row: pd.Series):
+    """Convert a single market data row into feature vector expected by models."""
+    feature_cols = ["open", "high", "low", "close", "volume"]
+    return market_row[feature_cols].values.astype(float)
