@@ -1,23 +1,39 @@
 # dashboard/pages/quantum_metrics.py
 
 import streamlit as st
+from quantum.backends import get_active_backend
+from engine.portfolio_manager import HybridPortfolioManager
 import pandas as pd
 
-def show_quantum_metrics(data):
-    st.title("🧠 Quantum Metrics Dashboard")
-    
-    st.metric("Quantum Backend", data.get("backend", "Unavailable"))
-    st.metric("Quantum Queue Time", f"{data.get('queue_time', 0)} sec")
-    st.metric("Quantum Advantage", f"{data.get('quantum_advantage', 0):.2f}%")
-    
-    st.subheader("Prediction Confidence")
-    st.bar_chart(pd.DataFrame(data.get("confidence", {"Classical": 0.6, "Quantum": 0.4})))
+st.title("🧠 Quantum Metrics & Portfolio Optimization")
 
-    st.subheader("Circuit Stats")
-    st.json(data.get("circuit_info", {"depth": 10, "qubits": 4}))
+# Active backend
+backend_name, backend_type = get_active_backend(return_type=True)
+st.success(f"✅ Active Quantum Backend: `{backend_name}` ({backend_type})")
 
-    st.subheader("Fallback Status")
-    if data.get("fallback_used", False):
-        st.error("⚠️ Classical fallback active")
-    else:
-        st.success("✅ Quantum active")
+# Display fallback status
+if backend_type == "classical":
+    st.warning("⚠️ Quantum backend unavailable — using classical fallback.")
+
+# Show example portfolio optimization result
+st.subheader("📈 Optimized Portfolio Weights (Sample)")
+
+# Simulate input (replace with live data in production)
+example_returns = [0.03, 0.06, 0.02]
+example_cov = [
+    [0.001, 0.0002, 0.0001],
+    [0.0002, 0.002, 0.0003],
+    [0.0001, 0.0003, 0.0015]
+]
+
+optimizer = HybridPortfolioManager(num_assets=3)
+weights = optimizer.rebalance(example_returns, example_cov)
+
+# Render results
+df = pd.DataFrame({
+    "Asset": [f"Asset {i+1}" for i in range(len(weights))],
+    "Weight": weights
+})
+st.dataframe(df.set_index("Asset"), use_container_width=True)
+
+st.caption("🎛️ This panel simulates optimization results for test purposes.")
