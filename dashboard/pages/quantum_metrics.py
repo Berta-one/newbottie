@@ -1,39 +1,40 @@
 # dashboard/pages/quantum_metrics.py
 
 import streamlit as st
-from quantum.backends import get_active_backend
-from engine.portfolio_manager import HybridPortfolioManager
 import pandas as pd
+from monitoring.performance_metrics import PerformanceTracker
+from quantum.hybrid_models import HybridQuantumEnsemble
+from ml.lstm_model import LSTMModel
+from ml.xgb_model import XGBModel
+import numpy as np
+import time
 
-st.title("🧠 Quantum Metrics & Portfolio Optimization")
+st.title("🧠 Quantum vs Classical Model Metrics")
 
-# Active backend
-backend_name, backend_type = get_active_backend(return_type=True)
-st.success(f"✅ Active Quantum Backend: `{backend_name}` ({backend_type})")
+# Mock sample data
+X_sample = np.random.rand(50, 4)
+y_sample = np.random.randint(0, 2, 50)
 
-# Display fallback status
-if backend_type == "classical":
-    st.warning("⚠️ Quantum backend unavailable — using classical fallback.")
+models = {
+    "LSTM": LSTMModel(),
+    "XGB": XGBModel(),
+    "HybridQuantum": HybridQuantumEnsemble()
+}
 
-# Show example portfolio optimization result
-st.subheader("📈 Optimized Portfolio Weights (Sample)")
+results = []
 
-# Simulate input (replace with live data in production)
-example_returns = [0.03, 0.06, 0.02]
-example_cov = [
-    [0.001, 0.0002, 0.0001],
-    [0.0002, 0.002, 0.0003],
-    [0.0001, 0.0003, 0.0015]
-]
+for name, model in models.items():
+    tracker = PerformanceTracker(name)
 
-optimizer = HybridPortfolioManager(num_assets=3)
-weights = optimizer.rebalance(example_returns, example_cov)
+    start = time.time()
+    model.fit(X_sample, y_sample)
+    preds = model.predict(X_sample)
+    end = time.time()
 
-# Render results
-df = pd.DataFrame({
-    "Asset": [f"Asset {i+1}" for i in range(len(weights))],
-    "Weight": weights
-})
-st.dataframe(df.set_index("Asset"), use_container_width=True)
+    metrics = tracker.track(y_sample, preds, start, end)
+    results.append(metrics)
 
-st.caption("🎛️ This panel simulates optimization results for test purposes.")
+df = pd.DataFrame(results).set_index("model")
+st.dataframe(df.style.highlight_max(axis=0))
+st.bar_chart(df[["accuracy", "precision", "recall", "f1"]])
+st.caption("Latency measured in seconds (lower is better)")
