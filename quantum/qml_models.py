@@ -7,6 +7,7 @@ from qiskit_machine_learning.utils.loss_functions import CrossEntropyLoss
 from sklearn.preprocessing import MinMaxScaler
 from quantum.backends import get_quantum_instance
 from quantum.quantum_features import QuantumFeatureEncoder
+import pickle
 
 
 class QuantumPricePredictor:
@@ -31,6 +32,20 @@ class QuantumPricePredictor:
             optimizer='SPSA',
             quantum_instance=self.quantum_instance,
         )
+
+    # ------------------------------------------------------------------
+    # Persistence helpers
+    # ------------------------------------------------------------------
+    def save(self, path: str = "models/quantum_model.pkl"):
+        """Serialize the trained predictor to *path* using pickle."""
+        with open(path, "wb") as f:
+            pickle.dump(self, f)
+
+    @staticmethod
+    def load(path: str = "models/quantum_model.pkl") -> "QuantumPricePredictor":
+        """Deserialize a predictor from *path*."""
+        with open(path, "rb") as f:
+            return pickle.load(f)
 
     # ------------------------------------------------------------------
     # Public API
