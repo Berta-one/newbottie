@@ -1,40 +1,50 @@
 # quantum/qml_models.py
 
-from qiskit_machine_learning.algorithms import VQC
-from qiskit_machine_learning.kernels import QuantumKernel
-from qiskit.circuit.library import RealAmplitudes
-from qiskit.utils import algorithm_globals
-from qiskit import Aer
-from sklearn.preprocessing import MinMaxScaler
 import numpy as np
+from qiskit.circuit.library import RealAmplitudes
+from qiskit_machine_learning.algorithms import VQC
+from qiskit_machine_learning.utils.loss_functions import CrossEntropyLoss
+from sklearn.preprocessing import MinMaxScaler
+from quantum.backends import get_quantum_instance
+from quantum.quantum_features import QuantumFeatureEncoder
+
 
 class QuantumPricePredictor:
-    def __init__(self, num_qubits=4, layers=2, seed=42):
-        self.num_qubits = num_qubits
-        self.layers = layers
-        self.seed = seed
-        algorithm_globals.random_seed = seed
-        self.scaler = MinMaxScaler()
-        self._build_vqc()
+    """Variational Quantum Classifier wrapper for price direction prediction."""
 
+    def __init__(self, num_qubits: int = 4):
+        self.scaler = MinMaxScaler()
+        self.encoder = QuantumFeatureEncoder(feature_dim=num_qubits)
+        self.quantum_instance = get_quantum_instance()
+        self.vqc = None
+
+    # ------------------------------------------------------------------
+    # Private helpers
+    # ------------------------------------------------------------------
     def _build_vqc(self):
-        self.feature_map = RealAmplitudes(self.num_qubits, reps=self.layers)
-        self.ansatz = RealAmplitudes(self.num_qubits, reps=self.layers)
-        self.vqc = VQC(
-            feature_map=self.feature_map,
-            ansatz=self.ansatz,
-            optimizer='COBYLA',
-            quantum_instance=Aer.get_backend('aer_simulator')
+        feature_map = self.encoder.map
+        ansatz = RealAmplitudes(num_qubits=self.encoder.feature_dim, reps=1)
+        return VQC(
+            feature_map=feature_map,
+            ansatz=ansatz,
+            loss=CrossEntropyLoss(),
+            optimizer='SPSA',
+            quantum_instance=self.quantum_instance,
         )
 
-    def fit(self, X, y):
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+    def train(self, X: np.ndarray, y: np.ndarray):
+        """Fit the VQC on scaled data."""
         X_scaled = self.scaler.fit_transform(X)
+        self.vqc = self._build_vqc()
         self.vqc.fit(X_scaled, y)
 
-    def predict(self, X):
+    def predict(self, X: np.ndarray):
+        if self.vqc is None:
+            raise ValueError("Model not trained")
         X_scaled = self.scaler.transform(X)
-        return self.vqc.predict(X_scaled)
-
-    def train(self, X, y):
-        """Alias for fit to keep backward-compatibility with legacy scripts."""
-        return self.fit(X, y)
+        prediction = self.vqc.predict(X_scaled)
+        # VQC returns array-like; convert first element to float
+        return float(prediction[0])

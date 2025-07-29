@@ -14,3 +14,14 @@ class LSTMWrapper:
 
 def load_lstm_model():
     return LSTMWrapper()
+
+
+# 🔗 Alias for compatibility with HybridQuantumEnsemble
+class LSTMPricePredictor(LSTMWrapper):
+    """Thin wrapper alias to maintain backward-compatibility.
+
+    Hybrid ensembles expect a ``LSTMPricePredictor`` class exposing a
+    ``predict`` method returning the probability of a price increase.
+    This alias simply inherits from the existing ``LSTMWrapper``.
+    """
+    pass
