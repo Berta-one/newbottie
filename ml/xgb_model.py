@@ -15,3 +15,9 @@ class XGBWrapper:
 
 def load_xgb_model():
     return XGBWrapper()
+
+
+# 🔗 Alias for compatibility with HybridQuantumEnsemble
+class XGBoostPricePredictor(XGBWrapper):
+    """Alias wrapper for backward-compatibility with ensemble imports."""
+    pass

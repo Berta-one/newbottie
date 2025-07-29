@@ -10,3 +10,8 @@ requests
 python-dotenv
 websocket-client
 aiohttp
+qiskit
+qiskit-machine-learning
+qiskit-optimization
+qiskit_ibm_provider
+scipy

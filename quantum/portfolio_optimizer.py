@@ -1,58 +1,66 @@
 # quantum/portfolio_optimizer.py
 
 import numpy as np
+from qiskit_optimization.applications.ising import portfolio
 from qiskit_optimization import QuadraticProgram
 from qiskit_optimization.algorithms import MinimumEigenOptimizer
 from qiskit.algorithms import QAOA
-from qiskit.utils import algorithm_globals
-from qiskit_aer.primitives import Sampler
-from quantum.backends import get_ibmq_provider
+from quantum.backends import get_quantum_instance
+
 
 class QuantumPortfolioOptimizer:
-    def __init__(self, num_assets: int, budget: int = None, risk_aversion: float = 0.1):
-        self.num_assets = num_assets
-        self.budget = budget if budget is not None else num_assets
-        self.risk_aversion = risk_aversion
-        algorithm_globals.random_seed = 42
-        self.provider = get_ibmq_provider()
-        self.backend = self.provider.get_backend('ibmq_qasm_simulator')  # Replace with real backend if needed
-        self.sampler = Sampler()  # For QAOA
-        self.qaoa = QAOA(sampler=self.sampler, reps=1)
+    """Optimize asset selection using the Quantum Approximate Optimization Algorithm."""
 
-    def build_problem(self, expected_returns, cov_matrix):
+    def __init__(self, risk_aversion: float = 0.1, budget: int | None = None):
+        self.risk_aversion = risk_aversion
+        self.budget = budget  # Number of assets to select (optional)
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+    def optimize(self, expected_returns: list[float], covariance_matrix: list[list[float]]):
+        """Return a binary list indicating selected assets.
+
+        Parameters
+        ----------
+        expected_returns : list[float]
+            Expected return for each asset.
+        covariance_matrix : list[list[float]]
+            Covariance matrix between asset returns.
         """
-        Construct the portfolio optimization problem as a Quadratic Program.
-        Maximize return - λ * risk, subject to budget.
-        """
+        num_assets = len(expected_returns)
+
+        mu = np.array(expected_returns)
+        sigma = np.array(covariance_matrix)
+
+        # Build a QuadraticProgram representing the mean-variance objective
         qp = QuadraticProgram()
-        for i in range(self.num_assets):
+        for i in range(num_assets):
             qp.binary_var(name=f"x{i}")
 
-        linear = {f"x{i}": -expected_returns[i] for i in range(self.num_assets)}
-        quadratic = {
-            (f"x{i}", f"x{j}"): self.risk_aversion * cov_matrix[i][j]
-            for i in range(self.num_assets) for j in range(self.num_assets)
+        # Objective: minimise -(returns) + risk_aversion * variance
+        objective_linear = {f"x{i}": -mu[i] for i in range(num_assets)}
+        objective_quadratic = {
+            (f"x{i}", f"x{j}"): self.risk_aversion * sigma[i][j]
+            for i in range(num_assets)
+            for j in range(num_assets)
         }
+        qp.minimize(linear=objective_linear, quadratic=objective_quadratic)
 
-        qp.minimize(linear=linear, quadratic=quadratic)
+        if self.budget is not None:
+            # Constraint: exactly *budget* assets selected
+            qp.linear_constraint(
+                linear={f"x{i}": 1 for i in range(num_assets)},
+                sense="==",
+                rhs=self.budget,
+                name="budget_constraint",
+            )
 
-        # Budget constraint: sum x_i == budget
-        constraint = {f"x{i}": 1 for i in range(self.num_assets)}
-        qp.linear_constraint(linear=constraint, sense='==', rhs=self.budget, name='budget')
+        # Solve using QAOA
+        quantum_instance = get_quantum_instance()
+        qaoa = QAOA(quantum_instance=quantum_instance)
+        optimizer = MinimumEigenOptimizer(qaoa)
+        result = optimizer.solve(qp)
 
-        return qp
-
-    def optimize(self, expected_returns, cov_matrix):
-        """
-        Solve the optimization problem using QAOA and return selected asset indices.
-        """
-        problem = self.build_problem(expected_returns, cov_matrix)
-        optimizer = MinimumEigenOptimizer(self.qaoa)
-        try:
-            result = optimizer.solve(problem)
-            selected_assets = [i for i, x in enumerate(result.x) if x > 0.5]
-            print(f"✅ Quantum Optimizer selected assets: {selected_assets}")
-            return selected_assets
-        except Exception as e:
-            print(f"❌ Quantum Optimization failed: {e}")
-            return []
+        selected_assets = [int(var.value) for var in result.variables]
+        return selected_assets
