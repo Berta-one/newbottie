@@ -1,12 +1,15 @@
-class RiskManager:
-    def __init__(self, max_drawdown=0.2):
-        self.max_drawdown = max_drawdown
-        self.equity_peak = 100000
-        self.equity = 100000
+# engine/risk_manager.py
 
-    def check_risk(self, pnl):
-        self.equity += pnl
-        if self.equity > self.equity_peak:
-            self.equity_peak = self.equity
-        drawdown = 1 - self.equity / self.equity_peak
-        return drawdown < self.max_drawdown
+import time
+
+class RiskManager:
+    def __init__(self, cooldown_period=300):
+        self.last_trade_time = 0
+        self.cooldown_period = cooldown_period
+
+    def should_trade(self) -> bool:
+        now = time.time()
+        if now - self.last_trade_time > self.cooldown_period:
+            self.last_trade_time = now
+            return True
+        return False
