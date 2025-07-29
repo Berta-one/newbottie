@@ -8,3 +8,5 @@ tensorflow
 matplotlib
 requests
 python-dotenv
+websocket-client
+aiohttp
