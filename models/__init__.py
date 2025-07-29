@@ -1,2 +1,2 @@
 # models/__init__.py
-# Just a placeholder to make this directory importable
+# Makes this directory importable as a package
