@@ -1,31 +1,29 @@
 # engine/execution_manager.py
 
+import numpy as np
+from engine.portfolio_manager import HybridPortfolioManager
+from engine.signal_generator import SignalGenerator
+from engine.trade_executor import TradeExecutor  # hypothetical module
 import logging
 
 class ExecutionManager:
-    def __init__(self, mode='paper'):
-        self.mode = mode
-        self.logger = logging.getLogger(__name__)
-        self.executed_orders = []
+    def __init__(self, num_assets):
+        self.signal_generator = SignalGenerator()
+        self.portfolio_manager = HybridPortfolioManager(num_assets)
+        self.trade_executor = TradeExecutor()
+        self.logger = logging.getLogger("ExecutionManager")
 
-    def execute_orders(self, positions, prices):
+    def run_cycle(self, market_data):
         """
-        positions: dict of asset -> amount
-        prices: dict of asset -> current price
+        Single trading cycle — extract features, generate signals, rebalance, and execute.
         """
-        for asset, qty in positions.items():
-            price = prices.get(asset)
-            if price:
-                trade_value = qty * price
-                order = {
-                    'asset': asset,
-                    'qty': qty,
-                    'price': price,
-                    'value': trade_value,
-                    'type': 'market',
-                    'mode': self.mode
-                }
-                self.logger.info(f"Executed {self.mode} trade: {order}")
-                self.executed_orders.append(order)
-            else:
-                self.logger.warning(f"No price for {asset}, skipping execution.")
+        self.logger.info("🔁 Running trading cycle")
+
+        # 1. Generate signals (or scores)
+        expected_returns, cov_matrix = self.signal_generator.analyze(market_data)
+
+        # 2. Portfolio optimization (Quantum or Classical fallback)
+        selected_assets = self.portfolio_manager.rebalance(expected_returns, cov_matrix)
+
+        # 3. Execute trades
+        self.trade_executor.execute(selected_assets)
