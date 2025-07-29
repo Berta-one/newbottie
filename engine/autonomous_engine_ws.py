@@ -1,44 +1,29 @@
 # engine/autonomous_engine_ws.py
 
+from engine.execution_manager import ExecutionManager
+from utils import get_live_market_data
 import asyncio
-import json
-import websockets
-from engine.trading_core import TradingEngine
-from utils.logger import get_logger
+import logging
 
-logger = get_logger(__name__)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("AutonomousWS")
 
-BINANCE_WS_URL = "wss://stream.binance.com:9443/ws/btcusdt@kline_1m"
+class AutonomousEngine:
+    def __init__(self, num_assets):
+        self.manager = ExecutionManager(num_assets)
 
-class WebSocketEngine:
-    def __init__(self, symbol="BTCUSDT", interval="1m"):
-        self.symbol = symbol.lower()
-        self.interval = interval
-        self.engine = TradingEngine()
+    async def run(self):
+        logger.info("🚀 Autonomous Engine (WebSocket) starting...")
 
-    async def listen(self):
-        ws_url = f"wss://stream.binance.com:9443/ws/{self.symbol}@kline_{self.interval}"
-        async with websockets.connect(ws_url) as websocket:
-            logger.info("WebSocket connected.")
-            while True:
-                try:
-                    data = await websocket.recv()
-                    kline = json.loads(data).get("k")
-                    if kline and kline['x']:  # Candle is closed
-                        price_info = {
-                            'timestamp': kline['t'],
-                            'open': float(kline['o']),
-                            'high': float(kline['h']),
-                            'low': float(kline['l']),
-                            'close': float(kline['c']),
-                            'volume': float(kline['v']),
-                        }
-                        logger.info(f"Received closed candle: {price_info}")
-                        self.engine.process_price(price_info)
-                except Exception as e:
-                    logger.error(f"WebSocket error: {e}")
-                    await asyncio.sleep(5)
+        while True:
+            try:
+                market_data = await get_live_market_data()
+                self.manager.run_cycle(market_data)
+            except Exception as e:
+                logger.error(f"💥 Error in run loop: {e}")
+            await asyncio.sleep(60)  # Run cycle every minute
 
+# Entry point
 if __name__ == "__main__":
-    ws = WebSocketEngine()
-    asyncio.run(ws.listen())
+    ae = AutonomousEngine(num_assets=3)
+    asyncio.run(ae.run())
