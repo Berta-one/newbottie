@@ -1,26 +1,17 @@
-# quantum/backends.py
+import os
+from qiskit import IBMQ
 
-from qiskit import Aer, IBMQ
-import logging
+def get_ibmq_provider():
+    """Initializes IBMQ and returns a provider instance."""
+    ibm_token = os.getenv("IBM_QUANTUM_TOKEN")
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+    if not ibm_token:
+        raise ValueError("❌ Environment variable IBM_QUANTUM_TOKEN not found.")
 
-BACKEND_PRIORITY = [
-    'ibmq_qasm_simulator',
-    'aer_simulator',
-    'classical_fallback'
-]
-
-def get_best_backend():
     try:
+        IBMQ.save_account(ibm_token, overwrite=True)
         IBMQ.load_account()
         provider = IBMQ.get_provider(hub='ibm-q')
-        for name in BACKEND_PRIORITY:
-            if name in provider.backends():
-                return provider.get_backend(name)
+        return provider
     except Exception as e:
-        logger.warning(f"Falling back to Aer due to error: {e}")
-        return Aer.get_backend('aer_simulator')
-
-    return 'classical_fallback'
+        raise RuntimeError(f"❌ Failed to load IBMQ provider: {e}")
