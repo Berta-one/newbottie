@@ -32,6 +32,17 @@ class HybridPortfolioManager:
 
         except Exception as e:
             self.logger.warning(f"⚠️ Quantum failed. Falling back to classical optimizer: {e}")
-            selected_assets = self.classical_optimizer.optimize(expected_returns, cov_matrix)
+            classical_result = self.classical_optimizer.optimize(expected_returns, cov_matrix)
+
+            # The classical optimiser returns a rich dictionary containing the
+            # weight vector under the ``solution`` key.  For API consistency we
+            # expose the weight vector directly to callers so that both the
+            # quantum and classical branches yield a simple ``list``.
+            selected_assets = (
+                classical_result["solution"]
+                if isinstance(classical_result, dict) and "solution" in classical_result
+                else classical_result
+            )
+
             self.logger.info(f"✅ Classical fallback selected: {selected_assets}")
             return selected_assets

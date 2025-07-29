@@ -24,7 +24,11 @@ class TestPortfolioOptimizer(unittest.TestCase):
         cov = np.identity(3).tolist()
         hp = HybridPortfolioManager(num_assets=3)
         weights = hp.rebalance(returns, cov)
+
+        # Rebalance should yield a weight vector (list of length == num_assets)
         self.assertEqual(len(weights), 3)
+
+        # Ensure the portfolio is fully invested (weights sum to ~1)
         self.assertAlmostEqual(sum(weights), 1.0, delta=0.1)
 
 if __name__ == "__main__":

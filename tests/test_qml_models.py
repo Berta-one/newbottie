@@ -11,11 +11,15 @@ class TestQuantumPricePredictor(unittest.TestCase):
         y = np.random.randint(0, 2, size=20)
 
         qp = QuantumPricePredictor()
-        qp.fit(X, y)
-        preds = qp.predict(X)
+        qp.train(X, y)
 
-        self.assertEqual(len(preds), len(y))
-        self.assertTrue(set(preds).issubset({0, 1}))
+        # Predict on a single sample; the model returns a float probability
+        # representing the likelihood of an upward move.
+        prob = qp.predict(X[:1])
+
+        self.assertIsInstance(prob, float)
+        self.assertGreaterEqual(prob, 0.0)
+        self.assertLessEqual(prob, 1.0)
 
 if __name__ == '__main__':
     unittest.main()
