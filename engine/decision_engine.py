@@ -1,19 +1,28 @@
 # engine/decision_engine.py
 
-from ml.decision_engine import load_model_and_predict
-from strategy.ema_crossover import EMACrossoverStrategy
+from quantum.hybrid_models import HybridQuantumEnsemble
+from quantum.fallback_manager import FallbackManager
+from quantum.backends import get_best_backend
+import logging
 
-class DecisionEngine:
+logger = logging.getLogger(__name__)
+
+class QuantumDecisionEngine:
     def __init__(self):
-        self.strategy = EMACrossoverStrategy()
+        self.quantum_enabled = True
+        self.hybrid_model = HybridQuantumEnsemble()
+        self.fallback = FallbackManager()
+        self.backend = get_best_backend()
 
-    def generate_signal(self, market_data: dict) -> str:
-        # Traditional strategy logic
-        strat_signal = self.strategy.generate_signal(market_data)
-        ml_signal = load_model_and_predict(market_data)
-
-        # Basic ensemble vote logic
-        if strat_signal == ml_signal:
-            return strat_signal
+    def generate_signal(self, market_features):
+        if self.quantum_enabled:
+            try:
+                signal = self.hybrid_model.predict(market_features)
+                logger.info("✅ Quantum signal generated successfully")
+                return signal
+            except Exception as e:
+                logger.warning(f"Quantum model failed: {e}")
+                self.quantum_enabled = False
+                return self.fallback.predict(market_features)
         else:
-            return "hold"
+            return self.fallback.predict(market_features)
