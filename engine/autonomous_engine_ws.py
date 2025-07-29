@@ -1,61 +1,42 @@
-# Autonomous engine full logic placeholder
 # engine/autonomous_engine_ws.py
 
 import asyncio
 import json
-import websockets
-import time
-import logging
-
 from engine.decision_engine import DecisionEngine
 from engine.executor import TradeExecutor
 from engine.risk_manager import RiskManager
-from ml.decision_engine import load_model_and_predict
+from ccxt.async_support import binance
 
-BINANCE_WS_URL = "wss://stream.binance.com:9443/ws/btcusdt@miniTicker"
+class AutonomousEngine:
+    def __init__(self, api_key, secret, symbol="BTC/USDT"):
+        self.exchange = binance({
+            "apiKey": api_key,
+            "secret": secret,
+            "enableRateLimit": True
+        })
+        self.symbol = symbol
+        self.engine = DecisionEngine()
+        self.executor = TradeExecutor()
+        self.risk_manager = RiskManager()
 
-class AutonomousTradingEngine:
-    def __init__(self, mode="paper"):
-        self.executor = TradeExecutor(mode=mode)
-        self.decision_engine = DecisionEngine()
-        self.risk_manager = RiskManager(max_drawdown=0.1)
-        self.price = None
-        self.trade_cooldown = 60  # seconds between trades
-        self.last_trade_time = 0
+    async def fetch_data(self):
+        ohlcv = await self.exchange.fetch_ohlcv(self.symbol, timeframe="1m", limit=100)
+        closes = [x[4] for x in ohlcv]
+        return closes
 
-    async def listen(self):
-        async with websockets.connect(BINANCE_WS_URL) as ws:
-            print("[Live] Connected to Binance WebSocket")
-            async for message in ws:
-                await self.process_message(message)
+    async def run(self):
+        while True:
+            data = await self.fetch_data()
+            market_data = {
+                "price": data[-1],
+                "return_1h": (data[-1] - data[-60]) / data[-60],
+                "return_24h": (data[-1] - data[0]) / data[0],
+                "volatility": max(data[-10:]) - min(data[-10:]),
+                "rsi": 50,  # TODO: plug real RSI
+                "sentiment": 0.1  # TODO: plug real sentiment
+            }
 
-    async def process_message(self, message):
-        data = json.loads(message)
-        self.price = float(data["c"])
-
-        # Logging price for debugging
-        logging.info(f"Price Update: {self.price}")
-
-        if time.time() - self.last_trade_time < self.trade_cooldown:
-            return  # Cooldown active
-
-        market_features = {
-            "price": self.price,
-            "volatility": 0.03,  # Placeholder, should come from indicator engine
-            "rsi": 45,
-            "return_1h": 0.005,
-            "return_24h": 0.04,
-        }
-
-        signal = self.decision_engine.generate_signal(market_features)
-        if signal == "buy" or signal == "sell":
-            if self.risk_manager.check_risk(signal):
-                self.executor.execute_trade(signal, amount=0.01)
-                self.last_trade_time = time.time()
-                logging.info(f"Executed {signal} at {self.price}")
-
-    def start(self):
-        try:
-            asyncio.run(self.listen())
-        except KeyboardInterrupt:
-            print("[Live] Terminated by user")
+            signal = self.engine.generate_signal(market_data)
+            if self.risk_manager.should_trade():
+                self.executor.execute(signal, self.symbol, market_data["price"])
+            await asyncio.sleep(60)
