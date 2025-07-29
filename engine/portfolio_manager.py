@@ -11,7 +11,7 @@ class HybridPortfolioManager:
         self.initial_capital = initial_capital
         self.risk_aversion = risk_aversion
         self.budget = budget if budget is not None else num_assets
-        self.quantum_optimizer = QuantumPortfolioOptimizer(num_assets, budget=self.budget, risk_aversion=risk_aversion)
+        self.quantum_optimizer = QuantumPortfolioOptimizer(risk_aversion=risk_aversion, budget=self.budget)
         self.classical_optimizer = ClassicalPortfolioOptimizer(num_assets, initial_capital)
         self.logger = logging.getLogger("PortfolioManager")
 
