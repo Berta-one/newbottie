@@ -2,7 +2,7 @@
 
 import numpy as np
 from quantum.portfolio_optimizer import QuantumPortfolioOptimizer
-from engine.classical_portfolio import ClassicalPortfolioOptimizer  # assume this is your classical fallback
+from engine.classical_optimizer import ClassicalPortfolioOptimizer  # classical fallback
 import logging
 
 class HybridPortfolioManager:
