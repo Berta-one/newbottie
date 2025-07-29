@@ -1,6 +1,13 @@
+# engine/executor.py
+
 class TradeExecutor:
     def __init__(self, mode="paper"):
         self.mode = mode
 
-    def execute(self, symbol, signal, size):
-        print(f"[EXECUTOR] {self.mode.upper()} TRADE -> {signal.upper()} {symbol} with size {size}")
+    def execute(self, signal: str, symbol: str, price: float):
+        if signal == "buy":
+            print(f"🟢 BUY {symbol} at {price}")
+        elif signal == "sell":
+            print(f"🔴 SELL {symbol} at {price}")
+        else:
+            print(f"⚪ HOLD {symbol} at {price}")
