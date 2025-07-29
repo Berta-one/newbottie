@@ -1,58 +1,39 @@
-# Fetches and scores real sentiment from News API
 # sentiment/news_sentiment.py
 
 import requests
-from textblob import TextBlob
-from datetime import datetime, timedelta
+import hashlib
+import time
+import os
 
-class NewsSentimentAnalyzer:
-    def __init__(self, api_key: str):
-        self.api_key = api_key
-        self.endpoint = "https://newsapi.org/v2/everything"
-        self.positive_threshold = 0.1
-        self.negative_threshold = -0.1
+NEWS_API_KEY = os.getenv("NEWS_API_KEY")
+CACHE_TTL = 3600  # 1 hour
+CACHE = {}
 
-    def fetch_news(self, query="crypto OR bitcoin OR ethereum", from_date=None, to_date=None, max_results=10):
-        if not from_date:
-            from_date = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
-        if not to_date:
-            to_date = datetime.utcnow().strftime("%Y-%m-%d")
+def fetch_cached_sentiment(query):
+    key = hashlib.md5(query.encode()).hexdigest()
+    now = time.time()
 
-        params = {
-            "q": query,
-            "from": from_date,
-            "to": to_date,
-            "language": "en",
-            "sortBy": "relevancy",
-            "pageSize": max_results,
-            "apiKey": self.api_key,
-        }
+    # Return cached if fresh
+    if key in CACHE and now - CACHE[key]["time"] < CACHE_TTL:
+        return CACHE[key]["score"]
 
-        response = requests.get(self.endpoint, params=params)
-        if response.status_code != 200:
-            print(f"[Error] News API failed: {response.status_code} - {response.text}")
-            return []
+    url = (
+        f"https://newsapi.org/v2/everything?q={query}&language=en&sortBy=publishedAt"
+        f"&apiKey={NEWS_API_KEY}"
+    )
+    response = requests.get(url)
+    if response.status_code != 200:
+        return 0.0
 
-        return response.json().get("articles", [])
+    articles = response.json().get("articles", [])[:10]
+    text = " ".join([a["title"] + " " + a.get("description", "") for a in articles])
+    score = sentiment_score(text)
 
-    def analyze_sentiment(self, articles):
-        sentiment_score = 0
-        count = 0
+    # Cache result
+    CACHE[key] = {"score": score, "time": now}
+    return score
 
-        for article in articles:
-            title = article.get("title", "")
-            description = article.get("description", "")
-            content = f"{title} {description}"
-            analysis = TextBlob(content)
-            sentiment_score += analysis.sentiment.polarity
-            count += 1
-
-        if count == 0:
-            return 0.0
-
-        return sentiment_score / count
-
-    def get_sentiment_score(self):
-        articles = self.fetch_news()
-        score = self.analyze_sentiment(articles)
-        return round(score, 3)
+def sentiment_score(text):
+    from textblob import TextBlob
+    blob = TextBlob(text)
+    return round(blob.sentiment.polarity, 4)
