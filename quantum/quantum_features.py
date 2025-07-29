@@ -1,15 +1,28 @@
 # quantum/quantum_features.py
 
+from qiskit.circuit.library import ZZFeatureMap, PauliFeatureMap
+from qiskit.utils import algorithm_globals
 import numpy as np
-from sklearn.preprocessing import StandardScaler
 
 class QuantumFeatureEncoder:
-    def __init__(self):
-        self.scaler = StandardScaler()
+    def __init__(self, feature_dim=4, reps=2, encoding_type="ZZ"):
+        self.feature_dim = feature_dim
+        self.reps = reps
+        self.encoding_type = encoding_type
+        self.map = self._create_feature_map()
 
-    def encode(self, X):
-        X_scaled = self.scaler.fit_transform(X)
-        return np.pi * (X_scaled - X_scaled.min()) / (X_scaled.max() - X_scaled.min() + 1e-8)
+    def _create_feature_map(self):
+        if self.encoding_type == "ZZ":
+            return ZZFeatureMap(feature_dimension=self.feature_dim, reps=self.reps, entanglement='linear')
+        elif self.encoding_type == "Pauli":
+            return PauliFeatureMap(feature_dimension=self.feature_dim, reps=self.reps, paulis=['X', 'Y', 'Z'])
+        else:
+            raise ValueError("Unsupported encoding_type. Use 'ZZ' or 'Pauli'.")
 
-    def quantum_bitstring_encode(self, x, num_qubits=4):
-        return [format(int(val * 15), f'0{num_qubits}b') for val in x]
+    def get_circuit(self, input_vector):
+        if len(input_vector) != self.feature_dim:
+            raise ValueError(f"Input must be of length {self.feature_dim}")
+        return self.map.bind_parameters(input_vector)
+
+    def get_feature_map(self):
+        return self.map
