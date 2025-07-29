@@ -1,19 +1,15 @@
 # quantum/circuit_utils.py
 
-from qiskit.circuit.library import ZZFeatureMap, RealAmplitudes
-from qiskit.visualization import plot_circuit_layout, plot_histogram
-from qiskit import QuantumCircuit
+from qiskit import Aer, transpile
+from qiskit.visualization import plot_bloch_multivector, plot_histogram
 import matplotlib.pyplot as plt
 
-def build_feature_map(num_qubits):
-    return ZZFeatureMap(num_qubits, reps=2)
+def render_circuit(circuit):
+    return circuit.draw(output="mpl")
 
-def build_ansatz(num_qubits):
-    return RealAmplitudes(num_qubits, reps=2)
-
-def visualize_circuit(circuit: QuantumCircuit, filename: str = None):
-    if filename:
-        circuit.draw(output='mpl', filename=filename)
-    else:
-        circuit.draw(output='mpl')
-        plt.show()
+def simulate_circuit(circuit, shots=1024):
+    backend = Aer.get_backend('qasm_simulator')
+    transpiled = transpile(circuit, backend)
+    job = backend.run(transpiled, shots=shots)
+    result = job.result()
+    return result.get_counts()
