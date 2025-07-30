@@ -2,13 +2,14 @@ name: test-backend
 
 on:
   push:
-    paths:
-      - '.github/workflows/test-backend.yml'
-  workflow_dispatch:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   test-backend:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v3
@@ -19,7 +20,8 @@ jobs:
           python-version: "3.11"
 
       - name: Install Qiskit
-        run: pip install qiskit
+        run: |
+          pip install qiskit
 
       - name: Verify IBMQ Access
         run: python scripts/verify_ibmq.py
