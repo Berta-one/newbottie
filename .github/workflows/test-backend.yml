@@ -19,9 +19,10 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install Qiskit
+      - name: Install Qiskit + IBM Provider
         run: |
           pip install qiskit
+          pip install qiskit-ibm-provider
 
       - name: Verify IBMQ Access
         run: python scripts/verify_ibmq.py
