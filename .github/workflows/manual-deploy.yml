@@ -1,0 +1,58 @@
+# .github/workflows/manual-deploy.yml
+# Separate workflow for manual deployment with status check
+
+name: 🔧 Manual Deploy & Status Check
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'deploy'
+        type: choice
+        options:
+        - deploy
+        - status
+        - restart
+        - logs
+
+jobs:
+  manual-action:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 🎯 Perform Action
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: 139.59.133.243
+        username: root
+        key: ${{ secrets.VPS_SSH_KEY }}
+        script: |
+          case "${{ github.event.inputs.action }}" in
+            "status")
+              echo "📊 Bot Status:"
+              systemctl status trading-bot.service --no-pager || echo "Service not found"
+              echo ""
+              echo "💾 Disk Usage:"
+              df -h /root/trading-bot || echo "Directory not found"
+              echo ""
+              echo "📈 Recent Signals:"
+              tail -5 /root/trading-bot/logs/signals.csv 2>/dev/null || echo "No signals yet"
+              ;;
+            "restart")
+              echo "🔄 Restarting bot..."
+              systemctl restart trading-bot.service
+              sleep 3
+              systemctl status trading-bot.service --no-pager
+              ;;
+            "logs")
+              echo "📋 Recent Logs:"
+              journalctl -u trading-bot.service --since "1 hour ago" --no-pager || echo "No recent logs"
+              ;;
+            "deploy")
+              echo "🚀 Running deployment..."
+              cd /root/trading-bot
+              ./deploy.sh
+              ;;
+          esac
