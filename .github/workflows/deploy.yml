@@ -1,0 +1,299 @@
+# .github/workflows/deploy.yml
+# This file will automatically deploy your bot to VPS when you push to main branch
+
+name: 🚀 Auto-Deploy Trading Bot to VPS
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:  # Allows manual trigger from GitHub UI
+
+jobs:
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🔧 Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: 📦 Create deployment package
+      run: |
+        # Create simplified requirements file
+        cat > requirements_simple.txt << EOF
+        ccxt>=4.0.0
+        pandas>=2.0.0
+        numpy>=1.24.0
+        scikit-learn>=1.3.0
+        requests>=2.31.0
+        python-dotenv>=1.0.0
+        EOF
+        
+        # Create headless bot main file
+        cat > headless_bot.py << 'EOF'
+        import time
+        import logging
+        from datetime import datetime, date
+        import os
+        from pathlib import Path
+        
+        # Setup logging
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.FileHandler('logs/bot.log'),
+                logging.StreamHandler()
+            ]
+        )
+        
+        class HeadlessTradingBot:
+            def __init__(self):
+                self.logger = logging.getLogger(__name__)
+                Path("logs").mkdir(exist_ok=True)
+                
+                # Load environment variables
+                from dotenv import load_dotenv
+                load_dotenv()
+                
+                self.api_key = os.getenv('BINANCE_API_KEY')
+                self.mode = os.getenv('MODE', 'paper')
+                
+            def run_trading_cycle(self):
+                """Execute one trading cycle"""
+                try:
+                    self.logger.info("🔄 Running trading cycle...")
+                    
+                    # Your trading logic here
+                    signal_result = {
+                        'signal': 'HOLD',
+                        'price': 50000.0,
+                        'confidence': 0.5,
+                        'timestamp': datetime.now().isoformat()
+                    }
+                    
+                    self.logger.info(f"Signal: {signal_result['signal']} at ${signal_result['price']}")
+                    
+                    # Log to CSV
+                    self.log_signal(signal_result)
+                    
+                    return signal_result
+                    
+                except Exception as e:
+                    self.logger.error(f"Trading cycle failed: {e}")
+                    return None
+            
+            def log_signal(self, signal_result):
+                """Log signal to CSV file"""
+                import csv
+                
+                csv_file = 'logs/signals.csv'
+                file_exists = os.path.isfile(csv_file)
+                
+                with open(csv_file, 'a', newline='') as f:
+                    writer = csv.writer(f)
+                    if not file_exists:
+                        writer.writerow(['timestamp', 'signal', 'price', 'confidence'])
+                    writer.writerow([
+                        signal_result['timestamp'],
+                        signal_result['signal'],
+                        signal_result['price'],
+                        signal_result['confidence']
+                    ])
+            
+            def run(self):
+                """Main execution loop"""
+                self.logger.info(f"🚀 Starting headless trading bot in {self.mode} mode...")
+                
+                while True:
+                    try:
+                        self.run_trading_cycle()
+                        time.sleep(300)  # 5 minutes
+                        
+                    except KeyboardInterrupt:
+                        self.logger.info("🛑 Bot stopped by user")
+                        break
+                    except Exception as e:
+                        self.logger.error(f"Unexpected error: {e}")
+                        time.sleep(60)
+        
+        if __name__ == "__main__":
+            bot = HeadlessTradingBot()
+            bot.run()
+        EOF
+        
+        # Create systemd service file
+        cat > trading-bot.service << EOF
+        [Unit]
+        Description=Headless Trading Bot
+        After=network.target
+        
+        [Service]
+        Type=simple
+        User=root
+        WorkingDirectory=/root/trading-bot
+        Environment=PATH=/root/trading-bot/venv/bin
+        ExecStart=/root/trading-bot/venv/bin/python headless_bot.py
+        Restart=always
+        RestartSec=10
+        StandardOutput=journal
+        StandardError=journal
+        
+        [Install]
+        WantedBy=multi-user.target
+        EOF
+        
+        # Create deployment script
+        cat > deploy.sh << 'EOF'
+        #!/bin/bash
+        set -e
+        
+        echo "🚀 Starting deployment..."
+        
+        # Create project directory
+        mkdir -p /root/trading-bot/logs
+        cd /root/trading-bot
+        
+        # Setup Python virtual environment
+        python3 -m venv venv
+        source venv/bin/activate
+        
+        # Install dependencies
+        pip install --upgrade pip
+        pip install -r requirements_simple.txt
+        
+        # Copy service file
+        cp trading-bot.service /etc/systemd/system/
+        
+        # Reload systemd and restart service
+        systemctl daemon-reload
+        systemctl enable trading-bot.service
+        
+        # Stop existing service if running
+        systemctl stop trading-bot.service || true
+        
+        # Start new service
+        systemctl start trading-bot.service
+        
+        # Check status
+        systemctl status trading-bot.service --no-pager
+        
+        echo "✅ Deployment complete!"
+        echo "📊 Check logs with: journalctl -u trading-bot.service -f"
+        echo "📈 Check signals: tail -f /root/trading-bot/logs/signals.csv"
+        EOF
+        
+        chmod +x deploy.sh
+    
+    - name: 🚀 Deploy to VPS
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: 139.59.133.243
+        username: root
+        key: ${{ secrets.VPS_SSH_KEY }}
+        script: |
+          # Update system
+          apt update -y
+          apt install -y python3 python3-pip python3-venv
+          
+          # Create .env file with secrets
+          mkdir -p /root/trading-bot
+          cat > /root/trading-bot/.env << EOF
+          BINANCE_API_KEY=${{ secrets.BINANCE_API_KEY }}
+          BINANCE_SECRET_KEY=${{ secrets.BINANCE_SECRET_KEY }}
+          MODE=paper
+          
+          BOT_EMAIL=${{ secrets.BOT_EMAIL }}
+          BOT_EMAIL_PASSWORD=${{ secrets.BOT_EMAIL_PASSWORD }}
+          REPORT_RECIPIENT_EMAIL=${{ secrets.REPORT_RECIPIENT_EMAIL }}
+          
+          INITIAL_CAPITAL=10000
+          RISK_PER_TRADE=0.02
+          EOF
+          
+        script_stop: true
+        
+    - name: 📁 Copy files to VPS
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: 139.59.133.243
+        username: root
+        key: ${{ secrets.VPS_SSH_KEY }}
+        source: "headless_bot.py,requirements_simple.txt,deploy.sh,trading-bot.service"
+        target: "/root/trading-bot/"
+        
+    - name: ⚡ Run deployment script
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: 139.59.133.243
+        username: root
+        key: ${{ secrets.VPS_SSH_KEY }}
+        script: |
+          cd /root/trading-bot
+          chmod +x deploy.sh
+          ./deploy.sh
+        script_stop: true
+
+# .github/workflows/manual-deploy.yml
+# Separate workflow for manual deployment with status check
+
+name: 🔧 Manual Deploy & Status Check
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'deploy'
+        type: choice
+        options:
+        - deploy
+        - status
+        - restart
+        - logs
+
+jobs:
+  manual-action:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 🎯 Perform Action
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: 139.59.133.243
+        username: root
+        key: ${{ secrets.VPS_SSH_KEY }}
+        script: |
+          case "${{ github.event.inputs.action }}" in
+            "status")
+              echo "📊 Bot Status:"
+              systemctl status trading-bot.service --no-pager || echo "Service not found"
+              echo ""
+              echo "💾 Disk Usage:"
+              df -h /root/trading-bot || echo "Directory not found"
+              echo ""
+              echo "📈 Recent Signals:"
+              tail -5 /root/trading-bot/logs/signals.csv 2>/dev/null || echo "No signals yet"
+              ;;
+            "restart")
+              echo "🔄 Restarting bot..."
+              systemctl restart trading-bot.service
+              sleep 3
+              systemctl status trading-bot.service --no-pager
+              ;;
+            "logs")
+              echo "📋 Recent Logs:"
+              journalctl -u trading-bot.service --since "1 hour ago" --no-pager || echo "No recent logs"
+              ;;
+            "deploy")
+              echo "🚀 Running deployment..."
+              cd /root/trading-bot
+              ./deploy.sh
+              ;;
+          esac
