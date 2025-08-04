@@ -1,0 +1,127 @@
+name: Deploy Trading Bot
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Create bot files
+      run: |
+        # Create simplified headless bot
+        cat > headless_bot.py << 'HEREDOC'
+        import time
+        import logging
+        import os
+        from pathlib import Path
+        from datetime import datetime
+        
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.FileHandler('logs/bot.log'),
+                logging.StreamHandler()
+            ]
+        )
+        
+        class HeadlessTradingBot:
+            def __init__(self):
+                self.logger = logging.getLogger(__name__)
+                Path("logs").mkdir(exist_ok=True)
+                
+            def run_trading_cycle(self):
+                try:
+                    self.logger.info("Running trading cycle...")
+                    signal_result = {
+                        'signal': 'HOLD',
+                        'price': 50000.0,
+                        'timestamp': datetime.now().isoformat()
+                    }
+                    self.logger.info(f"Signal: {signal_result['signal']} at ${signal_result['price']}")
+                    return signal_result
+                except Exception as e:
+                    self.logger.error(f"Error: {e}")
+                    return None
+            
+            def run(self):
+                self.logger.info("Starting bot...")
+                while True:
+                    try:
+                        self.run_trading_cycle()
+                        time.sleep(300)
+                    except KeyboardInterrupt:
+                        self.logger.info("Bot stopped")
+                        break
+                    except Exception as e:
+                        self.logger.error(f"Error: {e}")
+                        time.sleep(60)
+        
+        if __name__ == "__main__":
+            bot = HeadlessTradingBot()
+            bot.run()
+        HEREDOC
+        
+        # Create requirements
+        cat > requirements.txt << 'HEREDOC'
+        ccxt>=4.0.0
+        pandas>=2.0.0
+        numpy>=1.24.0
+        requests>=2.31.0
+        python-dotenv>=1.0.0
+        HEREDOC
+        
+        # Create startup script
+        cat > start_bot.sh << 'HEREDOC'
+        #!/bin/bash
+        cd /root/trading-bot
+        python3 -m venv venv
+        source venv/bin/activate
+        pip install -r requirements.txt
+        pkill -f headless_bot.py || true
+        nohup python3 headless_bot.py > bot.log 2>&1 &
+        echo "Bot started successfully"
+        HEREDOC
+        
+        chmod +x start_bot.sh
+    
+    - name: Setup VPS
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: 139.59.133.243
+        username: root
+        key: ${{ secrets.VPS_SSH_KEY }}
+        script: |
+          apt update -y
+          apt install -y python3 python3-pip python3-venv
+          mkdir -p /root/trading-bot/logs
+        
+    - name: Copy files to VPS
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: 139.59.133.243
+        username: root
+        key: ${{ secrets.VPS_SSH_KEY }}
+        source: "headless_bot.py,requirements.txt,start_bot.sh"
+        target: "/root/trading-bot/"
+        
+    - name: Start bot
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: 139.59.133.243
+        username: root
+        key: ${{ secrets.VPS_SSH_KEY }}
+        script: |
+          cd /root/trading-bot
+          chmod +x start_bot.sh
+          ./start_bot.sh
+          sleep 3
+          ps aux | grep headless_bot.py | grep -v grep
+          echo "Deployment complete"
