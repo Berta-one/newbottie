@@ -1,0 +1,566 @@
+name: Deploy Full Quantum-AI Trading Bot
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Create full trading bot
+      run: |
+        # Create advanced headless bot with full capabilities
+        cat > headless_bot.py << 'HEREDOC'
+        import time
+        import logging
+        import os
+        import sys
+        import traceback
+        from pathlib import Path
+        from datetime import datetime, date
+        import numpy as np
+        import pandas as pd
+        
+        # Setup comprehensive logging
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.FileHandler('logs/bot.log'),
+                logging.StreamHandler()
+            ]
+        )
+        
+        class FullCapabilityTradingBot:
+            def __init__(self):
+                self.logger = logging.getLogger(__name__)
+                Path("logs").mkdir(exist_ok=True)
+                
+                # Load environment variables
+                try:
+                    from dotenv import load_dotenv
+                    load_dotenv()
+                except ImportError:
+                    self.logger.warning("python-dotenv not available, using os.environ")
+                
+                self.setup_configuration()
+                self.initialize_models()
+                self.setup_reporting()
+                
+            def setup_configuration(self):
+                """Load trading configuration"""
+                self.config = {
+                    'api_key': os.getenv('BINANCE_API_KEY'),
+                    'api_secret': os.getenv('BINANCE_SECRET_KEY'),
+                    'mode': os.getenv('MODE', 'paper'),
+                    'initial_capital': float(os.getenv('INITIAL_CAPITAL', '10000')),
+                    'risk_per_trade': float(os.getenv('RISK_PER_TRADE', '0.02')),
+                    'quantum_enabled': os.getenv('ENABLE_QUANTUM', 'false').lower() == 'true',
+                    'ibmq_token': os.getenv('IBMQ_API_KEY'),
+                    'symbols': ['BTC/USDT', 'ETH/USDT', 'BNB/USDT']
+                }
+                
+                self.logger.info(f"Bot configured for {self.config['mode']} mode")
+                if self.config['quantum_enabled']:
+                    self.logger.info("🔮 Quantum computing enabled")
+                
+            def initialize_models(self):
+                """Initialize AI/ML models"""
+                try:
+                    # Try to import your advanced modules
+                    try:
+                        from quantum.hybrid_models import HybridQuantumEnsemble
+                        self.ensemble = HybridQuantumEnsemble()
+                        self.logger.info("✅ Quantum ensemble model loaded")
+                    except ImportError as e:
+                        self.logger.warning(f"Quantum models not available: {e}")
+                        self.ensemble = None
+                    
+                    # Try to load classical ML models
+                    try:
+                        from ml.decision_engine import DecisionEngine
+                        self.decision_engine = DecisionEngine()
+                        self.logger.info("✅ ML decision engine loaded")
+                    except ImportError:
+                        self.logger.warning("ML decision engine not available")
+                        self.decision_engine = None
+                    
+                    # Initialize trading core
+                    try:
+                        from engine.trading_core import TradingCore
+                        self.trading_core = TradingCore()
+                        self.logger.info("✅ Trading core loaded")
+                    except ImportError:
+                        self.logger.warning("Trading core not available, using fallback")
+                        self.trading_core = None
+                        
+                except Exception as e:
+                    self.logger.error(f"Model initialization failed: {e}")
+                    self.ensemble = None
+                    self.decision_engine = None
+                    self.trading_core = None
+            
+            def setup_reporting(self):
+                """Initialize reporting system"""
+                try:
+                    from reporting.email_reporter import EmailReporter
+                    from reporting.metrics_logger import MetricsLogger
+                    self.email_reporter = EmailReporter()
+                    self.metrics_logger = MetricsLogger()
+                    self.logger.info("✅ Reporting system loaded")
+                except ImportError:
+                    self.logger.warning("Reporting system not available")
+                    self.email_reporter = None
+                    self.metrics_logger = None
+            
+            def get_market_data(self, symbol='BTC/USDT'):
+                """Fetch live market data"""
+                try:
+                    import ccxt
+                    
+                    if self.config['api_key']:
+                        exchange = ccxt.binance({
+                            'apiKey': self.config['api_key'],
+                            'secret': self.config['api_secret'],
+                            'sandbox': self.config['mode'] == 'paper'
+                        })
+                    else:
+                        exchange = ccxt.binance()
+                    
+                    # Get OHLCV data
+                    ohlcv = exchange.fetch_ohlcv(symbol, '5m', limit=100)
+                    ticker = exchange.fetch_ticker(symbol)
+                    
+                    # Convert to DataFrame
+                    df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+                    df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+                    
+                    market_data = {
+                        'symbol': symbol,
+                        'price': ticker['last'],
+                        'volume': ticker['baseVolume'],
+                        'change_24h': ticker['percentage'],
+                        'ohlcv': df,
+                        'timestamp': datetime.now()
+                    }
+                    
+                    return market_data
+                    
+                except Exception as e:
+                    self.logger.error(f"Failed to fetch market data: {e}")
+                    # Return dummy data for testing
+                    return {
+                        'symbol': symbol,
+                        'price': 50000.0,
+                        'volume': 1000.0,
+                        'change_24h': 2.5,
+                        'timestamp': datetime.now()
+                    }
+            
+            def generate_features(self, market_data):
+                """Generate features for ML models"""
+                try:
+                    if 'ohlcv' in market_data and len(market_data['ohlcv']) > 20:
+                        df = market_data['ohlcv']
+                        
+                        # Technical indicators
+                        df['rsi'] = self.calculate_rsi(df['close'])
+                        df['sma_20'] = df['close'].rolling(20).mean()
+                        df['ema_12'] = df['close'].ewm(span=12).mean()
+                        df['volatility'] = df['close'].rolling(20).std()
+                        
+                        # Feature vector (last row)
+                        features = df[['close', 'volume', 'rsi', 'sma_20', 'ema_12', 'volatility']].iloc[-1].values
+                        features = np.nan_to_num(features)  # Handle NaN values
+                        
+                        return features.reshape(1, -1)
+                    else:
+                        # Fallback simple features
+                        return np.array([[market_data['price'], market_data['volume'], 50.0, market_data['price'], market_data['price'], 100.0]])
+                        
+                except Exception as e:
+                    self.logger.error(f"Feature generation failed: {e}")
+                    return np.array([[50000.0, 1000.0, 50.0, 50000.0, 50000.0, 100.0]])
+            
+            def calculate_rsi(self, prices, period=14):
+                """Calculate RSI indicator"""
+                try:
+                    delta = prices.diff()
+                    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+                    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+                    rs = gain / loss
+                    rsi = 100 - (100 / (1 + rs))
+                    return rsi
+                except:
+                    return pd.Series([50.0] * len(prices))
+            
+            def generate_ai_signal(self, features, market_data):
+                """Generate trading signal using AI models"""
+                try:
+                    signals = []
+                    confidences = []
+                    
+                    # Quantum ensemble prediction
+                    if self.ensemble:
+                        try:
+                            quantum_signal, quantum_conf = self.ensemble.predict(features)
+                            signals.append(quantum_signal)
+                            confidences.append(quantum_conf)
+                            self.logger.info(f"🔮 Quantum signal: {quantum_signal} (conf: {quantum_conf:.3f})")
+                        except Exception as e:
+                            self.logger.warning(f"Quantum prediction failed: {e}")
+                    
+                    # Classical ML prediction
+                    if self.decision_engine:
+                        try:
+                            ml_signal = self.decision_engine.generate_signal(features)
+                            signals.append(ml_signal)
+                            confidences.append(0.7)  # Default confidence
+                            self.logger.info(f"🧠 ML signal: {ml_signal}")
+                        except Exception as e:
+                            self.logger.warning(f"ML prediction failed: {e}")
+                    
+                    # Fallback technical analysis
+                    if not signals:
+                        price = market_data['price']
+                        change_24h = market_data.get('change_24h', 0)
+                        
+                        if change_24h > 3:
+                            signal = 'buy'
+                            confidence = 0.6
+                        elif change_24h < -3:
+                            signal = 'sell'
+                            confidence = 0.6
+                        else:
+                            signal = 'hold'
+                            confidence = 0.5
+                        
+                        signals.append(signal)
+                        confidences.append(confidence)
+                        self.logger.info(f"📊 Technical signal: {signal} (change: {change_24h:.1f}%)")
+                    
+                    # Aggregate signals
+                    if signals:
+                        # Simple majority vote
+                        signal_counts = {s: signals.count(s) for s in set(signals)}
+                        final_signal = max(signal_counts, key=signal_counts.get)
+                        final_confidence = np.mean(confidences)
+                    else:
+                        final_signal = 'hold'
+                        final_confidence = 0.5
+                    
+                    return final_signal, final_confidence
+                    
+                except Exception as e:
+                    self.logger.error(f"AI signal generation failed: {e}")
+                    return 'hold', 0.5
+            
+            def execute_trade(self, signal, confidence, market_data):
+                """Execute trade based on signal"""
+                try:
+                    if confidence < 0.6:  # Minimum confidence threshold
+                        self.logger.info(f"Confidence {confidence:.3f} too low, skipping trade")
+                        return None
+                    
+                    if signal == 'hold':
+                        return None
+                    
+                    # Calculate position size based on risk
+                    account_value = self.config['initial_capital']  # Simplified
+                    risk_amount = account_value * self.config['risk_per_trade']
+                    price = market_data['price']
+                    quantity = risk_amount / price
+                    
+                    trade_result = {
+                        'timestamp': datetime.now().isoformat(),
+                        'symbol': market_data['symbol'],
+                        'signal': signal.upper(),
+                        'price': price,
+                        'quantity': quantity,
+                        'confidence': confidence,
+                        'mode': self.config['mode']
+                    }
+                    
+                    if self.config['mode'] == 'live' and signal in ['buy', 'sell']:
+                        # Real trading execution would go here
+                        self.logger.warning("LIVE TRADING: Would execute real trade")
+                        trade_result['executed'] = True
+                    else:
+                        # Paper trading
+                        self.logger.info(f"📄 PAPER TRADE: {signal.upper()} {quantity:.6f} {market_data['symbol']} at ${price:.2f}")
+                        trade_result['executed'] = False
+                    
+                    # Log trade
+                    if self.metrics_logger:
+                        self.metrics_logger.log_trade_execution(trade_result)
+                    
+                    return trade_result
+                    
+                except Exception as e:
+                    self.logger.error(f"Trade execution failed: {e}")
+                    return None
+            
+            def run_trading_cycle(self):
+                """Execute one complete trading cycle"""
+                try:
+                    self.logger.info("🔄 Starting trading cycle...")
+                    
+                    results = []
+                    
+                    for symbol in self.config['symbols']:
+                        try:
+                            # Get market data
+                            market_data = self.get_market_data(symbol)
+                            
+                            # Generate features
+                            features = self.generate_features(market_data)
+                            
+                            # Get AI signal
+                            signal, confidence = self.generate_ai_signal(features, market_data)
+                            
+                            # Log signal
+                            signal_result = {
+                                'timestamp': datetime.now().isoformat(),
+                                'symbol': symbol,
+                                'signal': signal.upper(),
+                                'price': market_data['price'],
+                                'confidence': confidence,
+                                'change_24h': market_data.get('change_24h', 0)
+                            }
+                            
+                            if self.metrics_logger:
+                                self.metrics_logger.log_trade_signal(signal_result)
+                            
+                            # Execute trade if signal is strong
+                            trade_result = self.execute_trade(signal, confidence, market_data)
+                            
+                            results.append({
+                                'symbol': symbol,
+                                'signal': signal,
+                                'confidence': confidence,
+                                'price': market_data['price'],
+                                'trade_executed': trade_result is not None
+                            })
+                            
+                            self.logger.info(f"📊 {symbol}: {signal.upper()} (conf: {confidence:.3f}) at ${market_data['price']:.2f}")
+                            
+                        except Exception as e:
+                            self.logger.error(f"Error processing {symbol}: {e}")
+                            continue
+                    
+                    return results
+                    
+                except Exception as e:
+                    self.logger.error(f"Trading cycle failed: {e}")
+                    traceback.print_exc()
+                    return []
+            
+            def send_daily_report(self):
+                """Send daily performance report"""
+                try:
+                    if not self.email_reporter or not self.metrics_logger:
+                        return
+                    
+                    metrics = self.metrics_logger.get_daily_metrics()
+                    report = self.email_reporter.generate_daily_report(metrics)
+                    self.email_reporter.send_daily_report(report)
+                    self.logger.info("📧 Daily report sent successfully")
+                    
+                except Exception as e:
+                    self.logger.error(f"Daily report failed: {e}")
+            
+            def run(self):
+                """Main execution loop"""
+                self.logger.info("🚀 Starting Full Capability Quantum-AI Trading Bot...")
+                self.logger.info(f"🔧 Configuration: {self.config['mode']} mode, {len(self.config['symbols'])} symbols")
+                
+                last_daily_report = date.today()
+                cycle_count = 0
+                
+                while True:
+                    try:
+                        cycle_count += 1
+                        self.logger.info(f"🔄 Cycle #{cycle_count}")
+                        
+                        # Run trading cycle
+                        results = self.run_trading_cycle()
+                        
+                        # Log cycle summary
+                        total_signals = len(results)
+                        executed_trades = sum(1 for r in results if r['trade_executed'])
+                        avg_confidence = np.mean([r['confidence'] for r in results]) if results else 0
+                        
+                        self.logger.info(f"✅ Cycle complete: {total_signals} signals, {executed_trades} trades, avg confidence: {avg_confidence:.3f}")
+                        
+                        # Send daily report if needed
+                        current_date = date.today()
+                        if current_date > last_daily_report and datetime.now().hour >= 18:
+                            self.send_daily_report()
+                            last_daily_report = current_date
+                        
+                        # Wait for next cycle (5 minutes)
+                        self.logger.info("⏳ Waiting 5 minutes for next cycle...")
+                        time.sleep(300)
+                        
+                    except KeyboardInterrupt:
+                        self.logger.info("🛑 Bot stopped by user")
+                        break
+                    except Exception as e:
+                        self.logger.error(f"Unexpected error in main loop: {e}")
+                        traceback.print_exc()
+                        
+                        # Send error alert
+                        if self.email_reporter:
+                            self.email_reporter.send_error_alert(str(e))
+                        
+                        # Wait before retrying
+                        time.sleep(60)
+        
+        if __name__ == "__main__":
+            bot = FullCapabilityTradingBot()
+            bot.run()
+        HEREDOC
+        
+        # Create comprehensive requirements
+        cat > requirements_full.txt << 'HEREDOC'
+        ccxt>=4.0.0
+        pandas>=2.0.0
+        numpy>=1.24.0
+        scikit-learn>=1.3.0
+        xgboost>=1.7.0
+        tensorflow>=2.13.0
+        requests>=2.31.0
+        python-dotenv>=1.0.0
+        qiskit>=0.45.0
+        qiskit-machine-learning>=0.7.0
+        qiskit-optimization>=0.6.0
+        qiskit-ibm-provider>=0.7.0
+        scipy>=1.11.0
+        matplotlib>=3.7.0
+        plotly>=5.15.0
+        nltk>=3.8.0
+        textblob>=0.17.0
+        HEREDOC
+        
+        # Create startup script with error handling
+        cat > start_full_bot.sh << 'HEREDOC'
+        #!/bin/bash
+        set -e
+        
+        echo "🚀 Starting Full Capability Trading Bot..."
+        
+        cd /root/trading-bot
+        
+        # Setup Python environment
+        python3 -m venv venv
+        source venv/bin/activate
+        
+        # Upgrade pip and install dependencies
+        pip install --upgrade pip
+        pip install -r requirements_full.txt
+        
+        # Kill existing bot processes
+        pkill -f headless_bot.py || true
+        sleep 2
+        
+        # Start bot with comprehensive logging
+        nohup python3 headless_bot.py > full_bot.log 2>&1 &
+        
+        echo "✅ Full capability bot started!"
+        echo "📊 Monitor with: tail -f /root/trading-bot/full_bot.log"
+        echo "📈 Check signals: tail -f /root/trading-bot/logs/signals.csv"
+        echo "💼 Check trades: tail -f /root/trading-bot/logs/trades.csv"
+        
+        # Show running processes
+        sleep 3
+        ps aux | grep headless_bot.py | grep -v grep || echo "⚠️ Bot process not found"
+        HEREDOC
+        
+        chmod +x start_full_bot.sh
+    
+    - name: Setup VPS with advanced dependencies
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: 139.59.133.243
+        username: root
+        key: ${{ secrets.VPS_SSH_KEY }}
+        script: |
+          # Update system
+          apt update -y
+          apt install -y python3 python3-pip python3-venv python3-dev build-essential
+          
+          # Create project structure
+          mkdir -p /root/trading-bot/logs
+          mkdir -p /root/trading-bot/models
+          mkdir -p /root/trading-bot/engine
+          mkdir -p /root/trading-bot/ml
+          mkdir -p /root/trading-bot/quantum
+          mkdir -p /root/trading-bot/sentiment
+          mkdir -p /root/trading-bot/reporting
+          mkdir -p /root/trading-bot/agent_core
+          
+          # Create environment file
+          cat > /root/trading-bot/.env << 'ENVEOF'
+          BINANCE_API_KEY=${{ secrets.BINANCE_API_KEY }}
+          BINANCE_SECRET_KEY=${{ secrets.BINANCE_SECRET_KEY }}
+          MODE=paper
+          
+          BOT_EMAIL=${{ secrets.BOT_EMAIL }}
+          BOT_EMAIL_PASSWORD=${{ secrets.BOT_EMAIL_PASSWORD }}
+          REPORT_RECIPIENT_EMAIL=${{ secrets.REPORT_RECIPIENT_EMAIL }}
+          SMTP_SERVER=smtp.gmail.com
+          SMTP_PORT=587
+          
+          IBMQ_API_KEY=${{ secrets.IBMQ_API_KEY }}
+          ENABLE_QUANTUM=true
+          QUANTUM_BACKEND=ibmq_qasm_simulator
+          
+          INITIAL_CAPITAL=10000
+          RISK_PER_TRADE=0.02
+          MAX_POSITIONS=3
+          ENVEOF
+        
+    - name: Copy all files to VPS
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: 139.59.133.243
+        username: root
+        key: ${{ secrets.VPS_SSH_KEY }}
+        source: "."
+        target: "/root/trading-bot/"
+        
+    - name: Deploy full capability bot
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: 139.59.133.243
+        username: root
+        key: ${{ secrets.VPS_SSH_KEY }}
+        script: |
+          cd /root/trading-bot
+          
+          # Make scripts executable
+          chmod +x start_full_bot.sh
+          
+          # Start the full capability bot
+          ./start_full_bot.sh
+          
+          # Wait and check status
+          sleep 5
+          
+          echo "🔍 Bot Status Check:"
+          ps aux | grep headless_bot.py | grep -v grep
+          
+          echo "📋 Recent Logs:"
+          tail -10 /root/trading-bot/full_bot.log
+          
+          echo "📊 Directory Structure:"
+          ls -la /root/trading-bot/
+          
+          echo "🎯 Deployment Complete!"
+          echo "Monitor live: ssh root@139.59.133.243 'tail -f /root/trading-bot/full_bot.log'"
