@@ -203,6 +203,129 @@ jobs:
           
           # Create .env file with secrets
           mkdir -p /root/trading-bot
+          cat > /root/trading-bot/.env << 'ENVEOF'
+          BINANCE_API_KEY=${{ secrets.BINANCE_API_KEY }}
+          BINANCE_SECRET_KEY=${{ secrets.BINANCE_SECRET_KEY }}
+          MODE=paper
+          
+          BOT_EMAIL=${{ secrets.BOT_EMAIL }}
+          BOT_EMAIL_PASSWORD=${{ secrets.BOT_EMAIL_PASSWORD }}
+          REPORT_RECIPIENT_EMAIL=${{ secrets.REPORT_RECIPIENT_EMAIL }}
+          
+          INITIAL_CAPITAL=10000
+          RISK_PER_TRADE=0.02
+          ENVEOF
+        
+    - name: 📁 Copy files to VPS
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: 139.59.133.243
+        username: root
+        key: ${{ secrets.VPS_SSH_KEY }}
+        source: "headless_bot.py,requirements_simple.txt,deploy.sh,trading-bot.service"
+        target: "/root/trading-bot/"
+        
+    - name: ⚡ Run deployment script
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: 139.59.133.243
+        username: root
+        key: ${{ secrets.VPS_SSH_KEY }}
+        script: |
+          cd /root/trading-bot
+          chmod +x deploy.sh
+          ./deploy.sh
+        script_stop: true                        self.run_trading_cycle()
+                        time.sleep(300)  # 5 minutes
+                        
+                    except KeyboardInterrupt:
+                        self.logger.info("🛑 Bot stopped by user")
+                        break
+                    except Exception as e:
+                        self.logger.error(f"Unexpected error: {e}")
+                        time.sleep(60)
+        
+        if __name__ == "__main__":
+            bot = HeadlessTradingBot()
+            bot.run()
+        EOF
+        
+        # Create systemd service file
+        cat > trading-bot.service << EOF
+        [Unit]
+        Description=Headless Trading Bot
+        After=network.target
+        
+        [Service]
+        Type=simple
+        User=root
+        WorkingDirectory=/root/trading-bot
+        Environment=PATH=/root/trading-bot/venv/bin
+        ExecStart=/root/trading-bot/venv/bin/python headless_bot.py
+        Restart=always
+        RestartSec=10
+        StandardOutput=journal
+        StandardError=journal
+        
+        [Install]
+        WantedBy=multi-user.target
+        EOF
+        
+        # Create deployment script
+        cat > deploy.sh << 'EOF'
+        #!/bin/bash
+        set -e
+        
+        echo "🚀 Starting deployment..."
+        
+        # Create project directory
+        mkdir -p /root/trading-bot/logs
+        cd /root/trading-bot
+        
+        # Setup Python virtual environment
+        python3 -m venv venv
+        source venv/bin/activate
+        
+        # Install dependencies
+        pip install --upgrade pip
+        pip install -r requirements_simple.txt
+        
+        # Copy service file
+        cp trading-bot.service /etc/systemd/system/
+        
+        # Reload systemd and restart service
+        systemctl daemon-reload
+        systemctl enable trading-bot.service
+        
+        # Stop existing service if running
+        systemctl stop trading-bot.service || true
+        
+        # Start new service
+        systemctl start trading-bot.service
+        
+        # Check status
+        systemctl status trading-bot.service --no-pager
+        
+        echo "✅ Deployment complete!"
+        echo "📊 Check logs with: journalctl -u trading-bot.service -f"
+        echo "📈 Check signals: tail -f /root/trading-bot/logs/signals.csv"
+        EOF
+        
+        chmod +x deploy.sh
+    
+    - name: 🚀 Deploy to VPS
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: 139.59.133.243
+        username: root
+        key: ${{ secrets.VPS_SSH_KEY }}
+        script: |
+          # Update system
+          apt update -y
+          apt install -y python3 python3-pip python3-venv
+          
+          # Create .env file with secrets
+          mkdir -p /root/trading-bot
           cat > /root/trading-bot/.env << EOF
           BINANCE_API_KEY=${{ secrets.BINANCE_API_KEY }}
           BINANCE_SECRET_KEY=${{ secrets.BINANCE_SECRET_KEY }}
