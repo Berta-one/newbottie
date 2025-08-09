@@ -13,6 +13,7 @@ aiohttp
 qiskit
 qiskit-machine-learning
 qiskit-optimization
-qiskit_ibm_provider
+qiskit-ibm-provider
 scipy
 plotly
+tensorflow==2.15 
