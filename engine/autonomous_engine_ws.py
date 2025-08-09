@@ -23,7 +23,12 @@ class AutonomousEngine:
                 logger.error(f"💥 Error in run loop: {e}")
             await asyncio.sleep(60)  # Run cycle every minute
 
-# Entry point
+# Replace the existing if __name__ == "__main__": section with:
 if __name__ == "__main__":
-    ae = AutonomousEngine(num_assets=3)
-    asyncio.run(ae.run())
+    from integrated_portfolio_engine import IntegratedPortfolioEngine
+    
+    async def run_autonomous():
+        engine = IntegratedPortfolioEngine()
+        await engine.start()
+    
+    asyncio.run(run_autonomous())
