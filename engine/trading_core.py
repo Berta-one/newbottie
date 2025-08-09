@@ -30,3 +30,12 @@ class TradingCore:
             "confidence": conf,
             "price": price,
         }
+# Add this method to your existing TradingCore class
+async def start_with_portfolio_scanning(self):
+    """Start trading core with dynamic portfolio scanning"""
+    from integrated_portfolio_engine import IntegratedPortfolioEngine
+    
+    engine = IntegratedPortfolioEngine()
+    # Override the trading core with this instance
+    engine.trading_core = self
+    await engine.start()
