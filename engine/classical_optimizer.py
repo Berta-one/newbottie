@@ -1,40 +1,39 @@
-import numpy as np
-from scipy.optimize import minimize
+# engine/classical_optimizer.py
+from __future__ import annotations
+
+import logging
+from typing import Dict, Tuple
+
+logger = logging.getLogger("ClassicalOptimizer")
 
 
 class ClassicalPortfolioOptimizer:
-    """Mean-variance (Markowitz) classical portfolio optimiser.
-
-    The constructor now mirrors the parameters of :pyclass:`HybridPortfolioManager`
-    for smoother dependency injection, but additional arguments are currently
-    ignored because the classical optimiser itself does not require them.
+    """
+    Simple mapping from signals to target weights, confidence‑scaled and normalized.
+    BUY -> +conf
+    SELL -> -conf
+    HOLD ->  0
+    Then L1‑normalize if needed to keep total exposure <= 1.0.
     """
 
-    def __init__(self, num_assets: int | None = None, initial_capital: float | None = None, risk_aversion: float = 0.5):
-        self.risk_aversion = risk_aversion
+    def __init__(self, num_assets: int, initial_capital: float = 10_000.0):
+        self.num_assets = num_assets
+        self.initial_capital = initial_capital
 
-    def optimize(self, expected_returns, covariance_matrix, budget: float = 1.0):
-        n_assets = len(expected_returns)
-        mu = np.array(expected_returns, dtype=float)
-        sigma = np.array(covariance_matrix, dtype=float)
+    def optimize(self, signals: Dict[str, Tuple[str, float]]) -> Dict[str, float]:
+        raw: Dict[str, float] = {}
+        for sym, (sig, conf) in signals.items():
+            sig = (sig or "HOLD").upper()
+            c = float(conf)
+            if sig == "BUY":
+                raw[sym] = +c
+            elif sig == "SELL":
+                raw[sym] = -c
+            else:
+                raw[sym] = 0.0
 
-        # Initial guess: equal weights
-        x0 = np.full(n_assets, 1.0 / n_assets)
-
-        # Objective: maximise return − λ * risk (we minimise its negative)
-        def objective(weights):
-            ret = np.dot(weights, mu)
-            risk = weights.T @ sigma @ weights
-            return -(ret - self.risk_aversion * risk)
-
-        # Constraints: fully invested and long-only
-        constraints = ({'type': 'eq', 'fun': lambda w: np.sum(w) - budget})
-        bounds = tuple((0.0, 1.0) for _ in range(n_assets))
-
-        res = minimize(objective, x0, bounds=bounds, constraints=constraints)
-
-        return {
-            'solution': res.x.tolist(),
-            'objective_value': -res.fun,
-            'status': res.message,
-        }
+        # L1 normalization: keep total absolute exposure <= 1.0
+        l1 = sum(abs(v) for v in raw.values())
+        if l1 > 1.0:
+            raw = {k: v / l1 for k, v in raw.items()}
+        return raw
