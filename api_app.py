@@ -8,7 +8,19 @@ from typing import Dict, Any, List
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from status_store import STATUS
+# near top of api_app.py
+try:
+    from quantum.backends import get_backend
+    _qb = get_backend()
+    QUANTUM_KIND = _qb.kind
+    QUANTUM_BACKEND_NAME = getattr(_qb.backend, "name", lambda: "unknown")()
+except Exception:
+    QUANTUM_KIND, QUANTUM_BACKEND_NAME = "none", "none"
 
+# in /health or /status response
+# e.g., inside /health:
+return {"ok": True, "service": "bottie", "time": time.time(),
+        "quantum": {"kind": QUANTUM_KIND, "backend": QUANTUM_BACKEND_NAME}}
 # import your engine
 from engine.integrated_portfolio_engine import IntegratedPortfolioEngine
 
