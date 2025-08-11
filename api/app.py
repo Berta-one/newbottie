@@ -51,7 +51,21 @@ def add_log(msg: str):
     if len(_logs) > 1000:
         del _logs[:-1000]
     log.info(msg)
-
+# --- quick live check: fetch balances NOW (no cached data) ---
+@app.get("/status_live_now")
+def status_live_now():
+    import math
+    assert _exchange is not None, "Exchange not init"
+    bal = _exchange.fetch_balance(params={})
+    assets = _nonzero_assets_from_balance(bal)
+    equity, positions = _value_portfolio(assets)
+    return {
+        "mode": "live-spot-now",
+        "time": int(time.time()),
+        "equity": float(equity),
+        "positions": positions,
+        "assets_raw": {k: float(v) for k, v in assets.items()},
+    }
 # --- binance LIVE spot
 _exchange: Optional[ccxt.binance] = None
 def _init_binance() -> ccxt.binance:
