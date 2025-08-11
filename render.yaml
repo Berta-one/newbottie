@@ -2,7 +2,7 @@ services:
   - type: web
     name: bottie-api
     runtime: python
-    plan: starter          # 24/7; you can test on free but it sleeps
+    plan: starter
     region: oregon
     autoDeploy: true
     buildCommand: |
@@ -12,31 +12,3 @@ services:
     envVars:
       - key: PORT
         value: "10000"
-      - key: BOT_MODE
-        value: paper
-      - key: EQUITY_START
-        value: "10000"
-      - key: SYMBOLS
-        value: BTC/USDT,ETH/USDT
-      - key: LOOP_SLEEP_S
-        value: "1.0"
-      - key: LOG_LEVEL
-        value: INFO
-
-      # ===== Live trading keys (set in Render UI before switching to live) =====
-      - key: BINANCE_API_KEY
-        sync: false
-      - key: BINANCE_API_SECRET
-        sync: false
-
-      # ===== Quantum (IBM Runtime token preferred) =====
-      - key: QISKIT_RUNTIME_TOKEN
-        sync: false     # paste CR-... in Render UI Secrets
-
-      # Optional: force backend selection
-      - key: QUANTUM_BACKEND
-        value: aer_simulator         # change to ibm_quantum:ibm-q/open/main/<backend> or a public device name
-      - key: QUANTUM_SHOTS
-        value: "2048"
-      - key: QUANTUM_TIMEOUT_S
-        value: "30"
