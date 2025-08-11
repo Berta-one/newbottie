@@ -1,63 +1,72 @@
 #!/usr/bin/env python3
 """
-Enhanced Headless Trading Bot with Integrated Portfolio Engine
-Now includes dynamic portfolio scanning + quantum/AI models
+Headless runner for Bottie.
+- No UI, no exchange needed to start.
+- Feeds synthetic bars into the engine so the bot wiring can be validated.
+- When you’re ready, replace the synthetic loop with your real WS/market feed.
 """
 
-import asyncio
-import logging
 import os
-import sys
-from pathlib import Path
+import time
+import logging
+from typing import Dict, Any, List
 
-# Add project directories to path
-sys.path.append('.')
-sys.path.append('./engine')
-sys.path.append('./ml')
-sys.path.append('./quantum')
-
-# Import the new integrated engine
+# Import your engine
 from engine.integrated_portfolio_engine import IntegratedPortfolioEngine
 
-# Setup logging
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('logs/headless_bot.log'),
-        logging.StreamHandler()
-    ]
+    level=LOG_LEVEL,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s"
 )
+log = logging.getLogger("HeadlessRunner")
 
-logger = logging.getLogger(__name__)
 
-class EnhancedHeadlessBot:
-    """Enhanced bot that combines portfolio scanning with AI trading"""
-    
-    def __init__(self):
-        # Create logs directory
-        Path("logs").mkdir(exist_ok=True)
-        
-        # Initialize the integrated engine
-        self.engine = IntegratedPortfolioEngine()
-        
-        logger.info("🚀 Enhanced Headless Trading Bot initialized")
-    
-    async def run(self):
-        """Run the enhanced bot"""
-        try:
-            logger.info("Starting enhanced headless bot with integrated portfolio engine...")
-            await self.engine.start()
-        except KeyboardInterrupt:
-            logger.info("Bot stopped by user")
-        except Exception as e:
-            logger.error(f"Bot error: {e}")
-            raise
+def generate_synthetic_bars(symbols: List[str], px: Dict[str, float]) -> List[Dict[str, Any]]:
+    """Create a tiny set of synthetic bars for each symbol."""
+    bars = []
+    for s in symbols:
+        drift = 0.0005 if (time.time() % 9) < 4.5 else -0.0004
+        px[s] *= (1.0 + drift)
+        close = px[s]
+        bars.append({
+            "symbol": s,
+            "close": close,
+            "high": close * 1.001,
+            "low": close * 0.999,
+            "volume": 10_000
+        })
+    return bars
 
-async def main():
-    """Main entry point"""
-    bot = EnhancedHeadlessBot()
-    await bot.run()
+
+def main():
+    # Symbols to run (comma-separated env, default two majors)
+    symbols = os.getenv("SYMBOLS", "BTC/USDT,ETH/USDT").split(",")
+    symbols = [s.strip() for s in symbols if s.strip()]
+    if not symbols:
+        symbols = ["BTC/USDT", "ETH/USDT"]
+
+    initial_capital = float(os.getenv("EQUITY_START", "10000"))
+    loop_sleep_s = float(os.getenv("LOOP_SLEEP_S", "1.0"))
+
+    # Seed synthetic prices
+    px = {s: (50000.0 if "BTC" in s.upper() else 3000.0) for s in symbols}
+
+    log.info("Starting headless Bottie | symbols=%s | capital=%.2f", symbols, initial_capital)
+    engine = IntegratedPortfolioEngine(symbols=symbols, initial_capital=initial_capital)
+
+    try:
+        while True:
+            bars = generate_synthetic_bars(symbols, px)
+            for b in bars:
+                engine.on_bar(b)
+            time.sleep(loop_sleep_s)
+    except KeyboardInterrupt:
+        log.info("Stopped by user")
+    except Exception as exc:
+        log.exception("Headless bot crashed: %s", exc)
+        raise
+
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
