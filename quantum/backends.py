@@ -1,90 +1,70 @@
 # quantum/backends.py
-
+import os
 import logging
+from typing import Optional, Tuple
 
-BACKEND_PRIORITY = [
-    'ibmq_montreal',
-    'ibmq_qasm_simulator',
-    'aer_simulator',
-    'classical_fallback'
-]
+from qiskit import qasm3
+from qiskit_aer import Aer
+from qiskit.providers.backend import BackendV2
 
-class BackendManager:
-    def __init__(self, prefer_simulator=True):
-        self.active_backend = None
-        self.prefer_simulator = prefer_simulator
+# IBM Provider (account-managed, not runtime primitives)
+from qiskit_ibm_provider import IBMProvider
 
-    def select_backend(self):
-        if self.prefer_simulator:
-            self.active_backend = 'aer_simulator'
-        else:
-            self.active_backend = 'ibmq_qasm_simulator'
-        logging.info(f"[Quantum] Selected backend: {self.active_backend}")
-        return self.active_backend
-
-    def log_fallback(self, reason):
-        logging.warning(f"[Quantum] Fallback triggered: {reason}")
-
-# ---------------------------------------------------------------------------
-# Dynamic QuantumInstance factory
-# ---------------------------------------------------------------------------
-# Optional Qiskit imports ----------------------------------------------------
-try:
-    from qiskit import Aer  # type: ignore
-    from qiskit.utils import QuantumInstance  # type: ignore
-
-    try:
-        # Qiskit >= 0.45 uses the external provider package
-        from qiskit_ibm_provider import IBMProvider  # type: ignore
-    except ImportError:  # pragma: no cover – provider package optional
-        IBMProvider = None  # pyright: ignore
-
-except ModuleNotFoundError:  # pragma: no cover – allow running w/o Qiskit
-    # Provide lightweight shims so other modules can reference the names.
-    class _Shim:
-        """Minimal dummy class used as a stand-in for missing Qiskit objects."""
-
-        def __init__(self, *_, **__):
-            pass
-
-        def __getattr__(self, _):
-            return self
-
-        def __call__(self, *_, **__):  # noqa: D401 – dummy callable
-            return self
-
-    Aer = _Shim()  # type: ignore
-    QuantumInstance = _Shim  # type: ignore
-    IBMProvider = None  # type: ignore
+log = logging.getLogger("QuantumBackends")
 
 
-def get_quantum_instance(preferred_backend: str = "ibmq_qasm_simulator", shots: int = 1024) -> QuantumInstance:
-    """Return a QuantumInstance, preferring IBM Cloud backends when available.
+class QuantumBackend:
+    """Container for a chosen backend and kind label."""
+    def __init__(self, backend: BackendV2, kind: str):
+        self.backend = backend
+        self.kind = kind  # "ibm" or "aer"
 
-    The helper first tries to instantiate an ``IBMProvider`` (modern API).  If
-    that fails (e.g., missing package or no credentials), it falls back to the
-    local Aer simulator bundled with Qiskit.  This ensures the rest of the
-    codebase can run in CI environments that lack IBM Quantum credentials.
+
+def _resolve_backend_name(env_val: Optional[str]) -> Optional[str]:
+    if not env_val:
+        return None
+    v = env_val.strip()
+    return v or None
+
+
+def get_backend() -> QuantumBackend:
     """
+    Try IBM backends using IBMProvider (token via env), else fall back to Aer.
+    Env:
+      - QISKIT_RUNTIME_TOKEN (preferred, but we also use it for IBMProvider)
+      - QUANTUM_BACKEND (e.g., 'ibmq_qasm_simulator' or 'aer_simulator')
+    """
+    desired = _resolve_backend_name(os.getenv("QUANTUM_BACKEND"))
+    token = os.getenv("QISKIT_RUNTIME_TOKEN") or os.getenv("IBMQ_API_KEY") or os.getenv("IBMQ_TOKEN")
+
+    # 1) IBMProvider path
+    if token:
+        try:
+            # Save and load account
+            provider = IBMProvider(token=token)
+            backends = provider.backends()
+            log.info("IBMProvider available: %d backends", len(backends))
+            chosen = None
+            if desired and desired != "aer_simulator":
+                # If user specified a device name
+                try:
+                    chosen = provider.get_backend(desired)
+                except Exception as e:
+                    log.warning("Requested IBM backend '%s' not found: %s; picking a simulator.", desired, e)
+            if chosen is None:
+                # Prefer an IBM simulator if available
+                sims = [b for b in backends if "simulator" in b.name.lower()]
+                chosen = sims[0] if sims else backends[0]
+            log.info("Using IBM backend: %s", chosen.name)
+            return QuantumBackend(backend=chosen, kind="ibm")
+        except Exception as e:
+            log.warning("IBMProvider init failed (%s). Falling back to Aer.", e)
+
+    # 2) Aer fallback
     try:
-        if IBMProvider is not None:
-            try:
-                provider = IBMProvider()  # credentials sourced from env if configured
-                backend = provider.get_backend(preferred_backend)
-            except Exception as exc:  # noqa: BLE001 – broad for robustness
-                logging.warning(f"[QuantumBackend] Falling back to local simulator: {exc}")
-                backend = Aer.get_backend("aer_simulator")
-        else:
-            backend = Aer.get_backend("aer_simulator")
-
-        return QuantumInstance(backend=backend, shots=shots)
-
-    except Exception:  # pragma: no cover – running with stubbed qiskit
-        # When Qiskit is not available we return a dummy object implementing
-        # the bare minimum API surface expected by callers.
-
-        class _DummyInstance:  # noqa: D401 – stub
-            def __init__(self, *_, **__):
-                pass
-
-        return _DummyInstance()
+        aer_backend = Aer.get_backend("aer_simulator")
+        log.info("Using Aer simulator backend.")
+        return QuantumBackend(backend=aer_backend, kind="aer")
+    except Exception as e:
+        log.error("Failed to get Aer simulator: %s", e)
+        raise
