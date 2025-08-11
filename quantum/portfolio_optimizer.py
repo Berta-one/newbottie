@@ -1,92 +1,100 @@
 # quantum/portfolio_optimizer.py
-
+import os
+import logging
+from typing import List, Tuple
 import numpy as np
 
-# Heavy Qiskit imports are optional; defer errors until runtime when we can
-# fall back to a classical approximation.
-try:
-    from qiskit_optimization.applications.ising import portfolio  # noqa: F401
-    from qiskit_optimization import QuadraticProgram  # type: ignore
-    from qiskit_optimization.algorithms import MinimumEigenOptimizer  # type: ignore
-    from qiskit.algorithms import QAOA  # type: ignore
-    from quantum.backends import get_quantum_instance
-    _QISKIT_AVAILABLE = True
-except ModuleNotFoundError:  # pragma: no cover – allow running without Qiskit
-    _QISKIT_AVAILABLE = False
+from qiskit_optimization import QuadraticProgram
+from qiskit_optimization.algorithms import MinimumEigenOptimizer
+from qiskit_algorithms import QAOA
+from qiskit.primitives import Sampler
+from qiskit.circuit.library import TwoLocal
 
-    # Provide minimal placeholders so the rest of the file type-checks.
-    QuadraticProgram = object  # type: ignore
-    MinimumEigenOptimizer = object  # type: ignore
-    QAOA = object  # type: ignore
+from .backends import get_backend
 
-    def get_quantum_instance(*_, **__):  # type: ignore
-        return None
+log = logging.getLogger("QuantumPortfolio")
+
+
+def _build_mv_qubo(mu: np.ndarray, cov: np.ndarray, lambda_risk: float, budget: int) -> QuadraticProgram:
+    """
+    Build a binary mean-variance QUBO:
+      maximize: mu^T x - lambda * x^T cov x
+      subject to sum(x_i) == budget, x_i in {0,1}
+    """
+    n = len(mu)
+    qp = QuadraticProgram("mean_variance")
+    for i in range(n):
+        qp.binary_var(name=f"x_{i}")
+
+    # Objective: we convert to *minimize*, so negate the maximization
+    Q = (-lambda_risk) * cov
+    c = -mu
+    const = 0.0
+    qp.minimize(constant=const, linear=c, quadratic=Q)
+
+    # Budget (exactly choose 'budget' assets)
+    lin = np.ones(n)
+    qp.linear_constraint(linear=lin, sense="==", rhs=budget, name="budget")
+
+    return qp
+
+
+def _bitstring_to_weights(bits: List[int]) -> np.ndarray:
+    """Map selection bits to equal weights over selected assets."""
+    bits = np.array(bits, dtype=float)
+    cnt = bits.sum()
+    if cnt <= 0:
+        # No selection, fallback to uniform tiny distribution
+        return np.full_like(bits, 1.0 / len(bits))
+    w = bits / cnt
+    return w
 
 
 class QuantumPortfolioOptimizer:
-    """Optimize asset selection using the Quantum Approximate Optimization Algorithm."""
+    """
+    QAOA-based mean-variance optimizer with safe fallbacks.
+    Env:
+      - QUANTUM_SHOTS (int)
+      - QUANTUM_TIMEOUT_S (int)
+    """
+    def __init__(self, lambda_risk: float = 0.1, budget: int = None):
+        self.lambda_risk = float(lambda_risk)
+        self.budget = budget  # if None -> choose ~n/3
+        self.backend = get_backend()  # IBM or Aer
+        shots = int(os.getenv("QUANTUM_SHOTS", "2048"))
+        self.sampler = Sampler(options={"shots": shots}, backend=self.backend.backend)
 
-    def __init__(self, num_assets: int | None = None, risk_aversion: float = 0.1, budget: int | None = None):
-        # ``num_assets`` is accepted for backward-compatibility with earlier
-        # API versions but not required by the quantum optimiser itself.
-        self.risk_aversion = risk_aversion
-        self.budget = budget  # Number of assets to select (optional)
+        # Simple ansatz; you can tune entanglement later
+        self.ansatz = TwoLocal(rotation_blocks="ry", entanglement_blocks="cz", reps=2, entanglement="linear")
 
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-    def optimize(self, expected_returns: list[float], covariance_matrix: list[list[float]]):
-        """Return a binary list indicating selected assets.
-
-        Parameters
-        ----------
-        expected_returns : list[float]
-            Expected return for each asset.
-        covariance_matrix : list[list[float]]
-            Covariance matrix between asset returns.
+    def optimize(self, mu: np.ndarray, cov: np.ndarray) -> np.ndarray:
         """
-        num_assets = len(expected_returns)
+        mu: expected returns (shape [n])
+        cov: covariance matrix (shape [n,n])
+        returns: weights in [0,1], sum to 1
+        """
+        n = len(mu)
+        if self.budget is None:
+            budget = max(1, n // 3)
+        else:
+            budget = max(1, min(self.budget, n))
 
-        # ------------------------------------------------------------------
-        # Attempt quantum optimisation; gracefully degrade if dependencies
-        # are missing (e.g. in lightweight CI containers).
-        # ------------------------------------------------------------------
+        qp = _build_mv_qubo(mu=np.array(mu, dtype=float),
+                            cov=np.array(cov, dtype=float),
+                            lambda_risk=self.lambda_risk,
+                            budget=budget)
+
+        qaoa = QAOA(sampler=self.sampler, ansatz=self.ansatz)
+        optimizer = MinimumEigenOptimizer(qaoa)
+
+        log.info("QAOA start | assets=%d budget=%d backend=%s", n, budget, self.backend.kind)
         try:
-            mu = np.array(expected_returns)
-            sigma = np.array(covariance_matrix)
-
-            # Build a QuadraticProgram representing the mean-variance objective
-            qp = QuadraticProgram()
-            for i in range(num_assets):
-                qp.binary_var(name=f"x{i}")
-
-            # Objective: minimise −returns + λ·risk
-            objective_linear = {f"x{i}": -mu[i] for i in range(num_assets)}
-            objective_quadratic = {
-                (f"x{i}", f"x{j}"): self.risk_aversion * sigma[i][j]
-                for i in range(num_assets)
-                for j in range(num_assets)
-            }
-            qp.minimize(linear=objective_linear, quadratic=objective_quadratic)
-
-            if self.budget is not None:
-                qp.linear_constraint(
-                    linear={f"x{i}": 1 for i in range(num_assets)},
-                    sense="==",
-                    rhs=self.budget,
-                    name="budget_constraint",
-                )
-
-            quantum_instance = get_quantum_instance()
-            qaoa = QAOA(quantum_instance=quantum_instance)
-            optimizer = MinimumEigenOptimizer(qaoa)
             result = optimizer.solve(qp)
-
-            selected_assets = [int(var.value) for var in result.variables]
-            return selected_assets
-
-        except Exception:
-            # Qiskit or its optimisation sub-modules are unavailable.  Return a
-            # simple equal-weight allocation so that downstream code and unit
-            # tests can proceed without a hard dependency on the quantum stack.
-            return [1 / num_assets] * num_assets
+            # result.x is binary selection
+            bits = [int(round(v)) for v in result.x]
+            w = _bitstring_to_weights(bits)
+            log.info("QAOA done | selection=%s", bits)
+            return w
+        except Exception as e:
+            log.warning("QAOA failed (%s). Falling back to uniform weights.", e)
+            return np.full(n, 1.0 / n, dtype=float)
