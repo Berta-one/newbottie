@@ -5,4 +5,4 @@ app = FastAPI()
 
 @app.get("/health")
 def health():
-    return {"ok": True, "service": "bottie", "time": time.time()}
+    return {"status": "ok"}  # instead of the current {"ok": true, "service": ..., "time": ...}
