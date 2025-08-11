@@ -2,7 +2,7 @@ services:
   - type: web
     name: bottie-api
     runtime: python
-    plan: starter          # $7/mo for 24/7
+    plan: starter          # 24/7; you can test on free but it sleeps
     region: oregon
     autoDeploy: true
     buildCommand: |
@@ -22,63 +22,21 @@ services:
         value: "1.0"
       - key: LOG_LEVEL
         value: INFO
-      # Secrets set in the Render UI when you go live:
+
+      # ===== Live trading keys (set in Render UI before switching to live) =====
       - key: BINANCE_API_KEY
         sync: false
       - key: BINANCE_API_SECRET
         sync: false
+
+      # ===== Quantum (IBM Runtime token preferred) =====
       - key: QISKIT_RUNTIME_TOKEN
-        sync: false
-# render.yaml
-services:
-  - type: worker
-    name: bottie-bot
-    runtime: python
-    plan: starter           # use "starter" ($7/mo) for 24/7; "free" sleeps -> not good for a bot
-    region: oregon          # pick closest: oregon, frankfurt, singapore, etc.
-    autoDeploy: true
-    buildCommand: |
-      python -m pip install --upgrade pip
-      pip install --no-cache-dir -r requirements.txt
-    startCommand: python headless_bot.py
-    envVars:
-      # --- runtime knobs (safe defaults) ---
-      - key: BOT_MODE
-        value: paper          # change to "live" when you're ready
-      - key: EQUITY_START
-        value: "10000"
-      - key: MIN_TRADE_CONF
-        value: "0.15"
-      - key: TRADE_COOLDOWN_S
+        sync: false     # paste CR-... in Render UI Secrets
+
+      # Optional: force backend selection
+      - key: QUANTUM_BACKEND
+        value: aer_simulator         # change to ibm_quantum:ibm-q/open/main/<backend> or a public device name
+      - key: QUANTUM_SHOTS
+        value: "2048"
+      - key: QUANTUM_TIMEOUT_S
         value: "30"
-      - key: MAX_POS_PCT
-        value: "0.5"
-      - key: SYMBOLS
-        value: BTC/USDT,ETH/USDT
-      - key: LOG_LEVEL
-        value: INFO
-
-      # --- secrets (set values in Render UI; do NOT commit real keys) ---
-      - key: BINANCE_API_KEY
-        sync: false
-      - key: BINANCE_API_SECRET
-        sync: false
-
-      # Optional quantum (only if you actually use it now)
-      - key: QISKIT_RUNTIME_TOKEN
-        sync: false
-
-# Optional: a simple web service if you later add a small status API or dashboard.
-#  - type: web
-#    name: bottie-api
-#    runtime: python
-#    plan: starter
-#    region: oregon
-#    autoDeploy: true
-#    buildCommand: |
-#      python -m pip install --upgrade pip
-#      pip install --no-cache-dir -r requirements.txt
-#    startCommand: python api.py
-#    envVars:
-#      - key: BOT_SERVICE_URL
-#        value: http://bottie-bot:10000  # if you wire internal comms
