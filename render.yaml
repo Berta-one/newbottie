@@ -1,3 +1,34 @@
+services:
+  - type: web
+    name: bottie-api
+    runtime: python
+    plan: starter          # $7/mo for 24/7
+    region: oregon
+    autoDeploy: true
+    buildCommand: |
+      python -m pip install --upgrade pip
+      pip install --no-cache-dir -r requirements.txt
+    startCommand: uvicorn api_app:app --host 0.0.0.0 --port 10000
+    envVars:
+      - key: PORT
+        value: "10000"
+      - key: BOT_MODE
+        value: paper
+      - key: EQUITY_START
+        value: "10000"
+      - key: SYMBOLS
+        value: BTC/USDT,ETH/USDT
+      - key: LOOP_SLEEP_S
+        value: "1.0"
+      - key: LOG_LEVEL
+        value: INFO
+      # Secrets set in the Render UI when you go live:
+      - key: BINANCE_API_KEY
+        sync: false
+      - key: BINANCE_API_SECRET
+        sync: false
+      - key: QISKIT_RUNTIME_TOKEN
+        sync: false
 # render.yaml
 services:
   - type: worker
