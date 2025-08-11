@@ -3,52 +3,17 @@ import os
 import time
 import asyncio
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Shared runtime state for the UI
-# (you should already have this file from earlier steps)
+# ---- Dependencies
 try:
-    from status_store import STATUS  # singleton with set_equity(), upsert_position(), add_signal(), add_log(), snapshot()
+    import ccxt
 except Exception as e:
-    raise RuntimeError(f"status_store.py is missing: {e}")
+    raise RuntimeError(f"ccxt not installed. Add to requirements.txt: {e}")
 
-# Your trading engine (light orchestrator that owns an ExecutionManager)
-try:
-    from engine.integrated_portfolio_engine import IntegratedPortfolioEngine
-except Exception as e:
-    raise RuntimeError(f"engine.integrated_portfolio_engine import failed: {e}")
-
-log = logging.getLogger("BottieAPI")
-logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper(),
-                    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
-
-app = FastAPI(title="Bottie API", version="1.0.0")
-
-# ---- CORS (Netlify front-end) ----
-NETLIFY_URL = os.getenv("NETLIFY_URL", "*")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[NETLIFY_URL] if NETLIFY_URL != "*" else ["*"],
-    allow_credentials=False,
-    allow_methods=["GET", "OPTIONS"],
-    allow_headers=["*"],
-)
-
-# ---- Config knobs (via Render env vars) ----
-SYMBOLS = [s.strip() for s in os.getenv("SYMBOLS", "BTC/USDT,ETH/USDT").split(",") if s.strip()]
-EQUITY_START = float(os.getenv("EQUITY_START", "10000"))
-LOOP_SLEEP_S = float(os.getenv("LOOP_SLEEP_S", "1.0"))
-USE_SYNTHETIC = os.getenv("USE_SYNTHETIC", "1") not in ("0", "false", "False")
-QUANTUM_BACKEND_ENV = os.getenv("QUANTUM_BACKEND", "disabled")
-
-# Engine instance + control flag
-_engine: IntegratedPortfolioEngine | None = None
-_run = True
-
-# Try to report quantum backend (safe)
 def _detect_quantum() -> Dict[str, str]:
     try:
         from quantum.backends import get_backend  # optional
@@ -57,149 +22,236 @@ def _detect_quantum() -> Dict[str, str]:
         name = name() if callable(name) else (name or "unknown")
         return {"kind": qb.kind, "backend": name}
     except Exception:
-        return {"kind": "none", "backend": "disabled"}
+        return {"kind": "none", "backend": os.getenv("QUANTUM_BACKEND", "disabled")}
 
-QUANTUM_INFO = _detect_quantum()
+# -----------------------------------------------------------------------------
+# Config (Render → Environment)
+# -----------------------------------------------------------------------------
+NETLIFY_URL   = os.getenv("NETLIFY_URL", "*")  # e.g., https://your-site.netlify.app
+BINANCE_API_KEY    = os.getenv("BINANCE_API_KEY", "")
+BINANCE_API_SECRET = os.getenv("BINANCE_API_SECRET", "")
+PRIMARY_QUOTE = os.getenv("PRIMARY_QUOTE", "USDT")   # valuation currency
+LOOP_SLEEP_S  = float(os.getenv("LOOP_SLEEP_S", "5.0"))
+LOG_LEVEL     = os.getenv("LOG_LEVEL", "INFO").upper()
 
+# -----------------------------------------------------------------------------
+# App + CORS
+# -----------------------------------------------------------------------------
+log = logging.getLogger("BottieAPI")
+logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
 
-# -------- Helpers to read engine state safely --------
-def _read_equity_positions_from_engine() -> tuple[float | None, Dict[str, Dict[str, float]]]:
-    """
-    We don't assume a strict schema; read common fields with getattr().
-    Expected: engine.exec_manager.equity (float), engine.exec_manager.positions (dict)
-    """
-    if not _engine:
-        return None, {}
-    exec_mgr = getattr(_engine, "exec_manager", None)
-    if not exec_mgr:
-        return None, {}
-    equity = getattr(exec_mgr, "equity", None)
-    positions = getattr(exec_mgr, "positions", {}) or {}
-    # Normalize positions shape to {sym: {"qty": float, "avg_px": float}}
-    norm: Dict[str, Dict[str, float]] = {}
-    for sym, val in positions.items():
-        if isinstance(val, dict):
-            qty = float(val.get("qty", val.get("quantity", 0.0)) or 0.0)
-            avg = float(val.get("avg_px", val.get("avg_price", 0.0)) or 0.0)
-        elif isinstance(val, (list, tuple)) and len(val) >= 2:
-            qty, avg = float(val[0]), float(val[1])
-        else:
-            qty, avg = 0.0, 0.0
-        norm[str(sym)] = {"qty": qty, "avg_px": avg}
-    return (float(equity) if equity is not None else None), norm
+app = FastAPI(title="Bottie API", version="1.0.0")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[NETLIFY_URL] if NETLIFY_URL != "*" else ["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "OPTIONS"],
+    allow_headers=["*"],
+)
 
-def _read_signals_from_engine() -> List[Dict[str, Any]]:
-    """
-    If your engine/executor records signals, surface them.
-    We look for engine.exec_manager.last_signals or engine.last_signals.
-    """
-    if not _engine:
-        return []
-    for path in ("exec_manager.last_signals", "last_signals"):
+# -----------------------------------------------------------------------------
+# In-memory state for UI
+# -----------------------------------------------------------------------------
+_started = time.time()
+_equity_series: List[Dict[str, Any]] = []   # [{"t": ts, "v": float}]
+_positions: Dict[str, Dict[str, float]] = {}  # { "ADA/USDT": {"qty":..., "avg_px":..., "last_px":...}, ... }
+_signals: List[Dict[str, Any]] = []  # optional; empty unless your engine fills it
+_logs: List[str] = []
+
+def add_log(msg: str):
+    msg = msg.strip()
+    _logs.append(msg)
+    if len(_logs) > 1000:
+        del _logs[:-1000]
+    log.info(msg)
+
+# -----------------------------------------------------------------------------
+# Binance client (FORCED LIVE SPOT)
+# -----------------------------------------------------------------------------
+_exchange: Optional[ccxt.binance] = None
+
+def _init_binance() -> ccxt.binance:
+    if not BINANCE_API_KEY or not BINANCE_API_SECRET:
+        raise RuntimeError("BINANCE_API_KEY / BINANCE_API_SECRET missing.")
+    ex = ccxt.binance({
+        "apiKey": BINANCE_API_KEY,
+        "secret": BINANCE_API_SECRET,
+        "enableRateLimit": True,
+        "options": {"defaultType": "spot"},
+    })
+    # IMPORTANT: no sandbox, no testnet. Live spot only.
+    add_log("Binance initialized (LIVE spot)")
+    return ex
+
+async def _ensure_exchange():
+    global _exchange
+    if _exchange is None:
+        _exchange = _init_binance()
+        await _load_markets()
+
+async def _load_markets():
+    assert _exchange is not None
+    try:
+        _exchange.load_markets()
+        add_log(f"Loaded {len(_exchange.markets)} markets")
+    except Exception as e:
+        add_log(f"ERROR load_markets: {e}")
+
+# -----------------------------------------------------------------------------
+# Portfolio valuation helpers
+# -----------------------------------------------------------------------------
+def _nonzero_assets_from_balance(balance: Dict[str, Any]) -> Dict[str, float]:
+    assets: Dict[str, float] = {}
+    for asset, entry in (balance.get("total") or {}).items():
         try:
-            obj = _engine
-            for part in path.split("."):
-                obj = getattr(obj, part)
-            if isinstance(obj, list):
-                return obj[-100:]
+            qty = float(entry or 0.0)
         except Exception:
+            qty = 0.0
+        if qty > 0:
+            assets[asset] = qty
+    return assets
+
+def _symbol_exists(base: str, quote: str) -> bool:
+    assert _exchange is not None
+    return f"{base}/{quote}" in _exchange.markets
+
+def _best_symbol_for_asset(asset: str, preferred_quotes: List[str]) -> Optional[str]:
+    for q in preferred_quotes:
+        if _symbol_exists(asset, q):
+            return f"{asset}/{q}"
+    return None
+
+def _quote_priority() -> List[str]:
+    tail = ["USD", "BUSD", "USDC", "BTC", "ETH", "EUR", "TRY"]
+    return [PRIMARY_QUOTE] + [x for x in tail if x != PRIMARY_QUOTE]
+
+def _fetch_tickers(symbols: List[str]) -> Dict[str, Any]:
+    assert _exchange is not None
+    if not symbols:
+        return {}
+    try:
+        return _exchange.fetch_tickers(symbols) or {}
+    except Exception as e:
+        add_log(f"ERROR fetch_tickers: {e}")
+        return {}
+
+def _value_portfolio(assets: Dict[str, float]) -> Tuple[float, Dict[str, Dict[str, float]]]:
+    preferred_quotes = _quote_priority()
+    symbols: List[str] = []
+    asset_symbol: Dict[str, str] = {}
+
+    for asset, qty in assets.items():
+        if asset.upper() == PRIMARY_QUOTE.upper():
+            asset_symbol[asset] = f"{asset}/{PRIMARY_QUOTE}"  # pseudo
             continue
-    return []
+        sym = _best_symbol_for_asset(asset, preferred_quotes)
+        if sym:
+            asset_symbol[asset] = sym
+            symbols.append(sym)
 
+    tick = _fetch_tickers(symbols)
 
-# -------- Synthetic bars (fallback) --------
-def _synthetic_bars(prices: Dict[str, float]) -> List[Dict[str, Any]]:
-    bars = []
-    t = time.time()
-    for s, px in prices.items():
-        drift = 0.0006 if int(t) % 7 < 3 else -0.0005
-        new_px = px * (1.0 + drift)
-        prices[s] = new_px
-        bars.append({
-            "symbol": s,
-            "close": new_px,
-            "high": new_px * 1.0015,
-            "low": new_px * 0.9985,
-            "volume": 12000.0
-        })
-    return bars
+    equity = 0.0
+    positions: Dict[str, Dict[str, float]] = {}
 
+    for asset, qty in assets.items():
+        if qty <= 0:
+            continue
 
-# -------- Background loop --------
-async def bot_loop():
-    global _engine
-    STATUS.add_log(f"API starting; symbols={SYMBOLS}, equity_start={EQUITY_START}")
-    STATUS.set_symbols(SYMBOLS)
+        if asset.upper() == PRIMARY_QUOTE.upper():
+            symbol = f"{asset}/{PRIMARY_QUOTE}"
+            last_px = 1.0
+        else:
+            sym = asset_symbol.get(asset)
+            if not sym:
+                add_log(f"Skip valuation for {asset} (no direct market to {PRIMARY_QUOTE} or alternatives)")
+                continue
+            symbol = sym
+            info = tick.get(sym) or {}
+            last_px = float(info.get("last") or info.get("close") or 0.0)
+            if last_px <= 0.0:
+                add_log(f"Missing price for {sym}, skipping")
+                continue
 
-    _engine = IntegratedPortfolioEngine(symbols=SYMBOLS, initial_capital=EQUITY_START)
-    STATUS.add_log("Engine initialized")
+        equity += qty * last_px
+        positions[symbol] = {
+            "qty": float(qty),
+            "avg_px": float(last_px),   # valuation proxy; true avg requires trade-history calc
+            "last_px": float(last_px)
+        }
 
-    # If your engine has its own async start (e.g., websockets), call it:
-    # if hasattr(_engine, "start_async"):
-    #     await _engine.start_async()
+    return equity, positions
 
-    prices = {s: (50000.0 if "BTC" in s.upper() else 3000.0) for s in SYMBOLS}
+# -----------------------------------------------------------------------------
+# Background loop: refresh balances & equity periodically (LIVE)
+# -----------------------------------------------------------------------------
+async def portfolio_loop():
+    await _ensure_exchange()
+    add_log(f"Portfolio loop started | primary_quote={PRIMARY_QUOTE} | LIVE spot")
 
-    while _run:
+    while True:
         try:
-            # Feed the engine either with real data (plug WS/candles here) or synthetic fallback
-            bars = _synthetic_bars(prices) if USE_SYNTHETIC else []
-            for bar in bars:
-                _engine.on_bar(bar)
+            assert _exchange is not None
+            balance = _exchange.fetch_balance(params={})  # live spot
+            assets = _nonzero_assets_from_balance(balance)
 
-            # Read state from engine and mirror to STATUS for the UI
-            equity, positions = _read_equity_positions_from_engine()
-            if equity is not None:
-                STATUS.set_equity(equity)
-            for sym, p in positions.items():
-                STATUS.upsert_position(sym, p["qty"], p["avg_px"])
+            equity, positions = _value_portfolio(assets)
 
-            # If your engine collects signals, surface them
-            for sig in _read_signals_from_engine():
-                STATUS.add_signal(
-                    symbol=sig.get("symbol"),
-                    signal=str(sig.get("signal", "")).upper(),
-                    conf=float(sig.get("conf", sig.get("confidence", 0.0)) or 0.0),
-                    probs=sig.get("probs") or sig.get("p")
-                )
+            now = int(time.time())
+            _equity_series.append({"t": now, "v": float(equity)})
+            if len(_equity_series) > 2000:
+                del _equity_series[:-1000]
 
-            await asyncio.sleep(LOOP_SLEEP_S)
+            _positions.clear()
+            _positions.update(positions)
+
+            add_log(f"snapshot | equity={equity:.2f} positions={len(_positions)}")
+
         except Exception as e:
-            log.exception("bot_loop error: %s", e)
-            STATUS.add_log(f"ERROR: {e}")
-            await asyncio.sleep(1.0)
+            add_log(f"ERROR portfolio_loop: {e}")
 
+        await asyncio.sleep(LOOP_SLEEP_S)
 
+# -----------------------------------------------------------------------------
+# FastAPI lifecycle
+# -----------------------------------------------------------------------------
 @app.on_event("startup")
 async def _on_startup():
-    # Launch the bot loop
-    asyncio.create_task(bot_loop())
+    asyncio.create_task(portfolio_loop())
 
-
-# ----------------- API ENDPOINTS -----------------
+# -----------------------------------------------------------------------------
+# Endpoints for Netlify UI
+# -----------------------------------------------------------------------------
 @app.get("/")
 def root():
     return {"ok": True, "service": "bottie", "time": time.time()}
 
-
 @app.get("/health")
 def health():
+    last_eq = _equity_series[-1]["v"] if _equity_series else None
     return {
         "status": "UP",
         "ok": True,
         "service": "bottie",
         "time": int(time.time()),
-        "quantum": QUANTUM_INFO or {"kind": "none", "backend": QUANTUM_BACKEND_ENV},
+        "quantum": _detect_quantum(),
+        "primary_quote": PRIMARY_QUOTE,
+        "live_spot": True,
+        "equity": last_eq,
     }
-
 
 @app.get("/status")
 def status():
-    # StatusStore snapshot is what the Netlify UI consumes
-    return STATUS.snapshot()
-
+    last_eq = _equity_series[-1]["v"] if _equity_series else None
+    return {
+        "started_at": _started,
+        "equity": last_eq,
+        "equity_series": _equity_series[-300:],
+        "positions": _positions,
+        "last_signals": _signals[-100:],  # fill from your engine if needed
+    }
 
 @app.get("/logs/last")
 def logs_last():
-    return {"logs": STATUS.snapshot().get("logs", [])[-300:]}
+    return {"logs": _logs[-300:]}
