@@ -9,7 +9,8 @@ python-dotenv
 requests
 websocket-client
 aiohttp
-
+fastapi
+uvicorn[standard]
 # optional UI (remove if headless only)
 # streamlit
 # matplotlib
