@@ -1,2 +1,5 @@
+
+ccxt
 fastapi
 uvicorn[standard]
+python-dotenv
