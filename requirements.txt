@@ -1,19 +1,22 @@
-streamlit
+# core runtime
 ccxt
 pandas
-numpy==2.2.6
-scikit-learn
-xgboost
-tensorflow
-matplotlib
-requests
+numpy==1.26.4
+scikit-learn==1.4.2
+xgboost==1.7.6
+joblib
 python-dotenv
+requests
 websocket-client
 aiohttp
-qiskit
-qiskit-machine-learning
-qiskit-optimization
-qiskit-ibm-provider
-scipy
-plotly
-tensorflow==2.15 
+
+# optional UI (remove if headless only)
+# streamlit
+# matplotlib
+# plotly
+
+# optional quantum (add only if you’ll actually use it now)
+# qiskit==1.2.4
+# qiskit-ibm-provider==0.10.0
+# qiskit-machine-learning==0.7.2
+# qiskit-optimization==0.6.1
