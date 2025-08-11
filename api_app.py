@@ -82,3 +82,10 @@ def status():
 @app.get("/logs/last")
 def logs_last():
     return {"logs": _logs[-300:]}
+
+@app.on_event("startup")
+async def _on_startup():
+    # Raise loudly if keys are missing
+    if not BINANCE_API_KEY or not BINANCE_API_SECRET:
+        raise RuntimeError("Live mode requires BINANCE_API_KEY/SECRET")
+    asyncio.create_task(portfolio_loop())
