@@ -1,14 +1,10 @@
-# api/app.py
-import os
-import time
-import asyncio
-import logging
+# api/app.py  — LIVE BINANCE SPOT (no testnet, no mock data)
+import os, time, asyncio, logging
 from typing import Any, Dict, List, Optional, Tuple
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# ---- Dependencies
+# --- deps
 try:
     import ccxt
 except Exception as e:
@@ -24,24 +20,17 @@ def _detect_quantum() -> Dict[str, str]:
     except Exception:
         return {"kind": "none", "backend": os.getenv("QUANTUM_BACKEND", "disabled")}
 
-# -----------------------------------------------------------------------------
-# Config (Render → Environment)
-# -----------------------------------------------------------------------------
-NETLIFY_URL   = os.getenv("NETLIFY_URL", "*")  # e.g., https://your-site.netlify.app
+NETLIFY_URL   = os.getenv("NETLIFY_URL", "*")
 BINANCE_API_KEY    = os.getenv("BINANCE_API_KEY", "")
 BINANCE_API_SECRET = os.getenv("BINANCE_API_SECRET", "")
-PRIMARY_QUOTE = os.getenv("PRIMARY_QUOTE", "USDT")   # valuation currency
+PRIMARY_QUOTE = os.getenv("PRIMARY_QUOTE", "USDT")
 LOOP_SLEEP_S  = float(os.getenv("LOOP_SLEEP_S", "5.0"))
 LOG_LEVEL     = os.getenv("LOG_LEVEL", "INFO").upper()
 
-# -----------------------------------------------------------------------------
-# App + CORS
-# -----------------------------------------------------------------------------
 log = logging.getLogger("BottieAPI")
 logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
 
 app = FastAPI(title="Bottie API", version="1.0.0")
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[NETLIFY_URL] if NETLIFY_URL != "*" else ["*"],
@@ -50,13 +39,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# -----------------------------------------------------------------------------
-# In-memory state for UI
-# -----------------------------------------------------------------------------
 _started = time.time()
-_equity_series: List[Dict[str, Any]] = []   # [{"t": ts, "v": float}]
-_positions: Dict[str, Dict[str, float]] = {}  # { "ADA/USDT": {"qty":..., "avg_px":..., "last_px":...}, ... }
-_signals: List[Dict[str, Any]] = []  # optional; empty unless your engine fills it
+_equity_series: List[Dict[str, Any]] = []
+_positions: Dict[str, Dict[str, float]] = {}
+_signals: List[Dict[str, Any]] = []
 _logs: List[str] = []
 
 def add_log(msg: str):
@@ -66,11 +52,8 @@ def add_log(msg: str):
         del _logs[:-1000]
     log.info(msg)
 
-# -----------------------------------------------------------------------------
-# Binance client (FORCED LIVE SPOT)
-# -----------------------------------------------------------------------------
+# --- binance LIVE spot
 _exchange: Optional[ccxt.binance] = None
-
 def _init_binance() -> ccxt.binance:
     if not BINANCE_API_KEY or not BINANCE_API_SECRET:
         raise RuntimeError("BINANCE_API_KEY / BINANCE_API_SECRET missing.")
@@ -80,7 +63,6 @@ def _init_binance() -> ccxt.binance:
         "enableRateLimit": True,
         "options": {"defaultType": "spot"},
     })
-    # IMPORTANT: no sandbox, no testnet. Live spot only.
     add_log("Binance initialized (LIVE spot)")
     return ex
 
@@ -88,19 +70,12 @@ async def _ensure_exchange():
     global _exchange
     if _exchange is None:
         _exchange = _init_binance()
-        await _load_markets()
+        try:
+            _exchange.load_markets()
+            add_log(f"Loaded {len(_exchange.markets)} markets")
+        except Exception as e:
+            add_log(f"ERROR load_markets: {e}")
 
-async def _load_markets():
-    assert _exchange is not None
-    try:
-        _exchange.load_markets()
-        add_log(f"Loaded {len(_exchange.markets)} markets")
-    except Exception as e:
-        add_log(f"ERROR load_markets: {e}")
-
-# -----------------------------------------------------------------------------
-# Portfolio valuation helpers
-# -----------------------------------------------------------------------------
 def _nonzero_assets_from_balance(balance: Dict[str, Any]) -> Dict[str, float]:
     assets: Dict[str, float] = {}
     for asset, entry in (balance.get("total") or {}).items():
@@ -116,15 +91,15 @@ def _symbol_exists(base: str, quote: str) -> bool:
     assert _exchange is not None
     return f"{base}/{quote}" in _exchange.markets
 
+def _quote_priority() -> List[str]:
+    tail = ["USD", "BUSD", "USDC", "BTC", "ETH", "EUR", "TRY"]
+    return [PRIMARY_QUOTE] + [x for x in tail if x != PRIMARY_QUOTE]
+
 def _best_symbol_for_asset(asset: str, preferred_quotes: List[str]) -> Optional[str]:
     for q in preferred_quotes:
         if _symbol_exists(asset, q):
             return f"{asset}/{q}"
     return None
-
-def _quote_priority() -> List[str]:
-    tail = ["USD", "BUSD", "USDC", "BTC", "ETH", "EUR", "TRY"]
-    return [PRIMARY_QUOTE] + [x for x in tail if x != PRIMARY_QUOTE]
 
 def _fetch_tickers(symbols: List[str]) -> Dict[str, Any]:
     assert _exchange is not None
@@ -137,35 +112,32 @@ def _fetch_tickers(symbols: List[str]) -> Dict[str, Any]:
         return {}
 
 def _value_portfolio(assets: Dict[str, float]) -> Tuple[float, Dict[str, Dict[str, float]]]:
-    preferred_quotes = _quote_priority()
+    preferred = _quote_priority()
     symbols: List[str] = []
-    asset_symbol: Dict[str, str] = {}
-
+    chosen: Dict[str, str] = {}
     for asset, qty in assets.items():
         if asset.upper() == PRIMARY_QUOTE.upper():
-            asset_symbol[asset] = f"{asset}/{PRIMARY_QUOTE}"  # pseudo
+            chosen[asset] = f"{asset}/{PRIMARY_QUOTE}"
             continue
-        sym = _best_symbol_for_asset(asset, preferred_quotes)
+        sym = _best_symbol_for_asset(asset, preferred)
         if sym:
-            asset_symbol[asset] = sym
+            chosen[asset] = sym
             symbols.append(sym)
 
     tick = _fetch_tickers(symbols)
-
     equity = 0.0
     positions: Dict[str, Dict[str, float]] = {}
 
     for asset, qty in assets.items():
         if qty <= 0:
             continue
-
         if asset.upper() == PRIMARY_QUOTE.upper():
             symbol = f"{asset}/{PRIMARY_QUOTE}"
             last_px = 1.0
         else:
-            sym = asset_symbol.get(asset)
+            sym = chosen.get(asset)
             if not sym:
-                add_log(f"Skip valuation for {asset} (no direct market to {PRIMARY_QUOTE} or alternatives)")
+                add_log(f"Skip valuation for {asset} (no {asset}/{PRIMARY_QUOTE} or alternatives)")
                 continue
             symbol = sym
             info = tick.get(sym) or {}
@@ -173,29 +145,18 @@ def _value_portfolio(assets: Dict[str, float]) -> Tuple[float, Dict[str, Dict[st
             if last_px <= 0.0:
                 add_log(f"Missing price for {sym}, skipping")
                 continue
-
         equity += qty * last_px
-        positions[symbol] = {
-            "qty": float(qty),
-            "avg_px": float(last_px),   # valuation proxy; true avg requires trade-history calc
-            "last_px": float(last_px)
-        }
-
+        positions[symbol] = {"qty": float(qty), "avg_px": float(last_px), "last_px": float(last_px)}
     return equity, positions
 
-# -----------------------------------------------------------------------------
-# Background loop: refresh balances & equity periodically (LIVE)
-# -----------------------------------------------------------------------------
 async def portfolio_loop():
     await _ensure_exchange()
     add_log(f"Portfolio loop started | primary_quote={PRIMARY_QUOTE} | LIVE spot")
-
     while True:
         try:
             assert _exchange is not None
-            balance = _exchange.fetch_balance(params={})  # live spot
+            balance = _exchange.fetch_balance(params={})
             assets = _nonzero_assets_from_balance(balance)
-
             equity, positions = _value_portfolio(assets)
 
             now = int(time.time())
@@ -207,22 +168,14 @@ async def portfolio_loop():
             _positions.update(positions)
 
             add_log(f"snapshot | equity={equity:.2f} positions={len(_positions)}")
-
         except Exception as e:
             add_log(f"ERROR portfolio_loop: {e}")
-
         await asyncio.sleep(LOOP_SLEEP_S)
 
-# -----------------------------------------------------------------------------
-# FastAPI lifecycle
-# -----------------------------------------------------------------------------
 @app.on_event("startup")
 async def _on_startup():
     asyncio.create_task(portfolio_loop())
 
-# -----------------------------------------------------------------------------
-# Endpoints for Netlify UI
-# -----------------------------------------------------------------------------
 @app.get("/")
 def root():
     return {"ok": True, "service": "bottie", "time": time.time()}
@@ -231,13 +184,8 @@ def root():
 def health():
     last_eq = _equity_series[-1]["v"] if _equity_series else None
     return {
-        "status": "UP",
-        "ok": True,
-        "service": "bottie",
-        "time": int(time.time()),
-        "quantum": _detect_quantum(),
-        "primary_quote": PRIMARY_QUOTE,
-        "live_spot": True,
+        "status": "UP", "ok": True, "service": "bottie", "time": int(time.time()),
+        "quantum": _detect_quantum(), "primary_quote": PRIMARY_QUOTE, "live_spot": True,
         "equity": last_eq,
     }
 
@@ -245,11 +193,9 @@ def health():
 def status():
     last_eq = _equity_series[-1]["v"] if _equity_series else None
     return {
-        "started_at": _started,
-        "equity": last_eq,
-        "equity_series": _equity_series[-300:],
-        "positions": _positions,
-        "last_signals": _signals[-100:],  # fill from your engine if needed
+        "started_at": _started, "equity": last_eq,
+        "equity_series": _equity_series[-300:], "positions": _positions,
+        "last_signals": _signals[-100:],
     }
 
 @app.get("/logs/last")
