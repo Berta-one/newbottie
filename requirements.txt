@@ -1,20 +1,2 @@
-# web/api
 fastapi
 uvicorn[standard]
-
-# core runtime
-ccxt
-pandas
-numpy==1.26.4
-scikit-learn==1.4.2
-xgboost==1.7.6
-joblib
-python-dotenv
-requests
-websocket-client
-aiohttp
-
-# quantum (Qiskit core + IBM provider + optimization)
-qiskit==1.2.4
-qiskit-ibm-provider==0.10.0
-qiskit-optimization==0.6.1
