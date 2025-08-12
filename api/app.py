@@ -1,9 +1,15 @@
 # api/app.py
 import os, time, asyncio, logging, math, json, hashlib
 from typing import Any, Dict, List, Optional, Tuple, Set
+from datetime import datetime, timedelta
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+
+# Authentication imports
+import jwt
+from passlib.context import CryptContext
+from pydantic import BaseModel
 
 # deps
 try:
@@ -38,13 +44,36 @@ except Exception:
 # online learner
 from ml.online_learner import OnlineLearner
 
-# ───────────────────────────────── FIXED: boolean parsing helper
+# ───────────────────────────────── Authentication Models
+class User(BaseModel):
+    username: str
+    password: str
+
+class UserInDB(BaseModel):
+    username: str
+    hashed_password: str
+    role: str
+    created_at: datetime
+    last_login: Optional[datetime] = None
+
+class AuditLog(BaseModel):
+    username: str
+    action: str
+    endpoint: str
+    timestamp: datetime
+    ip_address: str
+    details: Optional[str] = None
+
+# ───────────────────────────────── Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# ───────────────────────────────── Boolean parsing helper
 def parse_bool(v: str, default=False) -> bool:
     if v is None:
         return default
     return str(v).strip().lower() in ("1","true","yes","on")
 
-# ───────────────────────────────── env (FIXED: consistent boolean parsing)
+# ───────────────────────────────── Environment Variables
 LOG_LEVEL         = os.getenv("LOG_LEVEL", "INFO").upper()
 NETLIFY_URL       = os.getenv("NETLIFY_URL", "*")
 
@@ -104,12 +133,98 @@ ONLINE_LABEL_HORIZON   = int(os.getenv("ONLINE_LABEL_HORIZON","1"))  # label nex
 QUANTUM_ENABLED    = parse_bool(os.getenv("QUANTUM_ENABLED","0"))
 QUANTUM_BACKEND    = os.getenv("QUANTUM_BACKEND","aer_simulator")
 
-# FIXED: sentiment config for /health reporting
+# sentiment config for /health reporting
 SENTIMENT_ENABLED  = parse_bool(os.getenv("SENTIMENT_ENABLED", "1"))
 SENTIMENT_SOURCE   = (os.getenv("SENTIMENT_SOURCE", "finnhub") or "finnhub").lower()
 SENTIMENT_WINDOW_S = int(os.getenv("SENTIMENT_WINDOW_S", "900"))
 
-# ───────────────────────────────── app
+# JWT Authentication
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-super-secret-jwt-key-change-this-in-production")
+JWT_ALGORITHM = "HS256"
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES = 480  # 8 hours
+
+# ───────────────────────────────── In-memory storage for users and audit
+USERS_DB = {
+    "superuser": {
+        "username": "superuser",
+        "hashed_password": pwd_context.hash("change-this-super-password"),  # CHANGE THIS!
+        "role": "superuser",
+        "created_at": datetime.now(),
+        "last_login": None
+    },
+    "admin": {
+        "username": "admin", 
+        "hashed_password": pwd_context.hash("change-this-admin-password"),  # CHANGE THIS!
+        "role": "admin",
+        "created_at": datetime.now(),
+        "last_login": None
+    }
+}
+
+AUDIT_LOGS = []
+
+# ───────────────────────────────── Authentication Functions
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
+def authenticate_user(username: str, password: str):
+    user = USERS_DB.get(username)
+    if not user:
+        return False
+    if not verify_password(password, user["hashed_password"]):
+        return False
+    # Update last login
+    USERS_DB[username]["last_login"] = datetime.now()
+    return user
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+    return encoded_jwt
+
+def decode_token(token: str):
+    try:
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        username: str = payload.get("sub")
+        return username if username else None
+    except jwt.PyJWTError:
+        return None
+
+def log_audit(username: str, action: str, endpoint: str, ip_address: str, details: str = None):
+    AUDIT_LOGS.append({
+        "username": username,
+        "action": action,
+        "endpoint": endpoint,
+        "timestamp": datetime.now(),
+        "ip_address": ip_address,
+        "details": details
+    })
+    # Keep only last 1000 audit logs
+    if len(AUDIT_LOGS) > 1000:
+        AUDIT_LOGS.pop(0)
+
+def get_current_user(request: Request):
+    """Extract user from JWT token in Authorization header"""
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return None
+    
+    token = auth_header.split(" ")[1]
+    username = decode_token(token)
+    if not username:
+        return None
+        
+    return USERS_DB.get(username)
+
+# ───────────────────────────────── FastAPI App Setup
 logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
 log = logging.getLogger("BottieAPI")
 
@@ -122,7 +237,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ───────────────────────────────── state
+# ───────────────────────────────── Application State
 _started = time.time()
 _equity_series: List[Dict[str, Any]] = []
 _positions: Dict[str, Dict[str, float]] = {}
@@ -145,13 +260,16 @@ _last_exec = 0.0
 _open_spend: Dict[str, float] = {}  # per-symbol committed quote
 _trade_log: List[Dict[str, Any]] = []
 
+# execution runtime switch
+EXECUTION_RUNTIME_ENABLED = False  # default off at boot
+
 def add_log(msg: str):
     _logs.append(msg)
     if len(_logs) > 1500:
         del _logs[:-1000]
     log.info(msg)
 
-# ───────────────────────────────── exchange
+# ───────────────────────────────── Exchange Setup
 _exchange: Optional[ccxt.Exchange] = None
 
 def _init_exchange() -> ccxt.Exchange:
@@ -181,7 +299,7 @@ def _symbol_exists(sym: str) -> bool:
     assert _exchange is not None
     return sym in _exchange.markets
 
-# ───────────────────────────────── helpers
+# ───────────────────────────────── Helper Functions
 def _nonzero_assets_from_balance(balance: Dict[str, Any]) -> Dict[str, float]:
     out: Dict[str, float] = {}
     for a, v in (balance.get("total") or {}).items():
@@ -221,7 +339,7 @@ def _fetch_tickers(symbols: List[str]) -> Dict[str, Any]:
 def _ms_since(days: int) -> int:
     return int((time.time() - days * 86400) * 1000)
 
-# ───────────────────────────────── cost basis (WAC)
+# ───────────────────────────────── Cost Basis (WAC)
 def _compute_cost_basis_for_symbol(symbol: str) -> Optional[Tuple[float, float]]:
     assert _exchange is not None
     if not (API_KEY and API_SECRET):
@@ -277,7 +395,6 @@ def _compute_cost_basis_for_symbol(symbol: str) -> Optional[Tuple[float, float]]
         return (0.0, 0.0)
     return (net_qty, cost / net_qty)
 
-_cost_basis_cache: Dict[str, Dict[str, float]] = {}
 def _get_cost_basis(symbol: str) -> Optional[Tuple[float, float]]:
     now = time.time()
     entry = _cost_basis_cache.get(symbol)
@@ -289,7 +406,7 @@ def _get_cost_basis(symbol: str) -> Optional[Tuple[float, float]]:
         _cost_basis_cache[symbol] = {"ts": now, "qty": qty, "avg_px": avg}
     return res
 
-# ───────────────────────────────── valuation loop
+# ───────────────────────────────── Portfolio Valuation
 def _value_portfolio(assets: Dict[str, float]) -> Tuple[float, Dict[str, Dict[str, float]]]:
     preferred = _quote_priority()
     assert _exchange is not None
@@ -352,7 +469,7 @@ async def portfolio_loop():
             add_log(f"ERROR portfolio_loop: {e}")
         await asyncio.sleep(LOOP_SLEEP_S)
 
-# ───────────────────────────────── features & signals
+# ───────────────────────────────── Features & Signals
 def _ema(arr: np.ndarray, span: int) -> np.ndarray:
     if len(arr) < span + 2:
         return np.full_like(arr, np.nan, dtype=float)
@@ -604,7 +721,7 @@ async def signals_loop():
             add_log(f"ERROR signals_loop: {e}")
         await asyncio.sleep(max(0.25, SIGNAL_INTERVAL_S - (time.time() - t0)))
 
-# ───────────────────────────────── online learning labeler
+# ───────────────────────────────── Online Learning Labeler
 async def online_label_loop():
     """
     When the next bar arrives, label the buffered features: y=1 if close_t+1>close_t else 0.
@@ -649,7 +766,7 @@ async def online_label_loop():
         # run roughly once per bar
         await asyncio.sleep(max(15.0, SIGNAL_INTERVAL_S))
 
-# ───────────────────────────────── execution
+# ───────────────────────────────── Execution
 def _position_qty(sym: str) -> float:
     p = _positions.get(sym)
     return float(p.get("qty", 0.0)) if p else 0.0
@@ -695,7 +812,7 @@ async def execution_loop():
                 await asyncio.sleep(1.0); continue
             _last_exec = now
 
-            # FIXED: Check runtime kill switch
+            # Check runtime kill switch
             if not EXECUTION_RUNTIME_ENABLED:
                 await asyncio.sleep(1.0); continue
 
@@ -770,7 +887,7 @@ async def execution_loop():
 
         await asyncio.sleep(1.0)
 
-# ───────────────────────────────── startup
+# ───────────────────────────────── Startup
 @app.on_event("startup")
 async def _on_startup():
     asyncio.create_task(portfolio_loop())
@@ -778,21 +895,7 @@ async def _on_startup():
     asyncio.create_task(online_label_loop())
     asyncio.create_task(execution_loop())
 
-# ───────────────────────────────── execution runtime switch
-EXECUTION_RUNTIME_ENABLED = False  # default off at boot
-ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "").strip()
-
-def _auth_ok(request):
-    # optional: if ADMIN_TOKEN is set, require it
-    if not ADMIN_TOKEN:
-        return True
-    try:
-        token = request.headers.get("X-Admin-Token", "")
-        return token == ADMIN_TOKEN
-    except Exception:
-        return False
-
-# ───────────────────────────────── endpoints
+# ───────────────────────────────── Detection Functions
 def _detect_quantum() -> Dict[str, Any]:
     if not QUANTUM_ENABLED:
         return {"enabled": False, "backend": "disabled"}
@@ -800,11 +903,102 @@ def _detect_quantum() -> Dict[str, Any]:
         return {"enabled": True, "backend": "pseudo (no qiskit-aer)"}
     return {"enabled": True, "backend": QUANTUM_BACKEND or "aer_simulator"}
 
+# ───────────────────────────────── Authentication Endpoints
+@app.post("/auth/login")
+async def login(user: User, request: Request):
+    """Login endpoint"""
+    client_ip = request.client.host if hasattr(request, 'client') else "unknown"
+    
+    authenticated_user = authenticate_user(user.username, user.password)
+    if not authenticated_user:
+        log_audit(user.username, "LOGIN_FAILED", "/auth/login", client_ip)
+        raise HTTPException(status_code=401, detail="Incorrect username or password")
+    
+    access_token_expires = timedelta(minutes=JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": authenticated_user["username"], "role": authenticated_user["role"]},
+        expires_delta=access_token_expires
+    )
+    
+    log_audit(authenticated_user["username"], "LOGIN_SUCCESS", "/auth/login", client_ip)
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "expires_in": JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        "user": {
+            "username": authenticated_user["username"],
+            "role": authenticated_user["role"]
+        }
+    }
+
+@app.post("/auth/logout")
+async def logout(request: Request):
+    """Logout endpoint"""
+    user = get_current_user(request)
+    if user:
+        client_ip = request.client.host if hasattr(request, 'client') else "unknown"
+        log_audit(user["username"], "LOGOUT", "/auth/logout", client_ip)
+    
+    return {"message": "Logged out successfully"}
+
+@app.get("/auth/me")
+async def get_current_user_info(request: Request):
+    """Get current user info"""
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    return {
+        "username": user["username"],
+        "role": user["role"],
+        "last_login": user["last_login"],
+        "created_at": user["created_at"]
+    }
+
+# ───────────────────────────────── Audit Trail Endpoints
+@app.get("/audit/logs")
+async def get_audit_logs(request: Request, limit: int = 100):
+    """Get audit logs (superuser only)"""
+    user = get_current_user(request)
+    if not user or user["role"] != "superuser":
+        raise HTTPException(status_code=403, detail="Superuser access required")
+    
+    client_ip = request.client.host if hasattr(request, 'client') else "unknown"
+    log_audit(user["username"], "VIEW_AUDIT_LOGS", "/audit/logs", client_ip)
+    
+    # Return most recent logs first
+    recent_logs = AUDIT_LOGS[-limit:] if len(AUDIT_LOGS) > limit else AUDIT_LOGS
+    recent_logs.reverse()
+    
+    return {
+        "logs": recent_logs,
+        "total": len(AUDIT_LOGS)
+    }
+
+@app.get("/users")
+async def get_users(request: Request):
+    """Get all users (superuser only)"""
+    user = get_current_user(request)
+    if not user or user["role"] != "superuser":
+        raise HTTPException(status_code=403, detail="Superuser access required")
+    
+    users_info = []
+    for username, user_data in USERS_DB.items():
+        users_info.append({
+            "username": user_data["username"],
+            "role": user_data["role"],
+            "created_at": user_data["created_at"],
+            "last_login": user_data["last_login"]
+        })
+    
+    return {"users": users_info}
+
+# ───────────────────────────────── Main API Endpoints
 @app.get("/")
 def root():
     return {"ok": True, "service": "bottie", "time": time.time()}
 
-# FIXED: Complete /health endpoint with all required objects
 @app.get("/health")
 def health():
     last_eq = _equity_series[-1]["v"] if _equity_series else None
@@ -812,11 +1006,12 @@ def health():
     # Quantum - use existing _detect_quantum() 
     quantum_obj = _detect_quantum()
 
-    # ML block – keys exactly as frontend expects
+    # ML block – keys exactly as frontend expects with both model checks
     ml_obj = {
         "enabled": bool(ML_ENABLED or ONLINE_LEARN),
-        "loaded": bool(_ML_MODEL is not None),  # joblib model loaded
-        "model_path": MODEL_XGB_PATH if _ML_MODEL is not None else (ONLINE_MODEL_PATH if ONLINE_LEARN else None),
+        "loaded": bool(_ML_MODEL is not None or _OL is not None),  # Check BOTH models
+        "model_path": (MODEL_XGB_PATH if _ML_MODEL is not None else 
+                      (ONLINE_MODEL_PATH if _OL is not None else None)),
     }
 
     # Sentiment block – get tracked bases from latest sentiment data
@@ -875,7 +1070,6 @@ def costbasis():
         out[sym] = {"qty": entry["qty"], "avg_px": entry["avg_px"], "age_sec": time.time() - entry["ts"]}
     return out
 
-# FIXED: Complete sentiment endpoint
 @app.get("/sentiment")
 def sentiment():
     if not (SENTIMENT_ENABLED and SENTIMENT_WIRED):
@@ -914,42 +1108,6 @@ def ml_status():
         "features": _OL.feature_names() if _OL else ["close","rsi14","ret1","ema_fast","ema_slow","vol"]
     }
 
-# FIXED: Single /exec/status endpoint (removed duplicate)
-@app.get("/exec/status")
-def exec_status():
-    return {
-        "enabled_env": bool(TRADE_ENABLED),
-        "enabled_runtime": bool(EXECUTION_RUNTIME_ENABLED),
-        "per_symbol_spend": _open_spend,
-        "last_exec": _last_exec,
-        "recent_trades": _trade_log[-50:]
-    }
-
-@app.post("/exec/enable")
-async def exec_enable(request: Request):
-    if not _auth_ok(request):
-        raise HTTPException(status_code=401, detail="X-Admin-Token required")
-    global EXECUTION_RUNTIME_ENABLED
-    EXECUTION_RUNTIME_ENABLED = True
-    return {"ok": True, "enabled": EXECUTION_RUNTIME_ENABLED}
-
-@app.post("/exec/disable")
-async def exec_disable(request: Request):
-    if not _auth_ok(request):
-        raise HTTPException(status_code=401, detail="X-Admin-Token required")
-    global EXECUTION_RUNTIME_ENABLED
-    EXECUTION_RUNTIME_ENABLED = False
-    return {"ok": True, "enabled": EXECUTION_RUNTIME_ENABLED}
-
-@app.post("/exec/toggle")
-async def exec_toggle(request: Request):
-    if not _auth_ok(request):
-        raise HTTPException(status_code=401, detail="X-Admin-Token required")
-    global EXECUTION_RUNTIME_ENABLED
-    EXECUTION_RUNTIME_ENABLED = not EXECUTION_RUNTIME_ENABLED
-    return {"ok": True, "enabled": EXECUTION_RUNTIME_ENABLED}
-
-# ADDED: /trades endpoint for frontend
 @app.get("/trades")
 def trades():
     """Return all trade log entries with P&L calculation"""
@@ -985,3 +1143,57 @@ def trades():
         trades_with_pnl.append(trade_out)
     
     return trades_with_pnl
+
+# ───────────────────────────────── Protected Execution Endpoints
+@app.get("/exec/status")
+def exec_status():
+    return {
+        "enabled_env": bool(TRADE_ENABLED),
+        "enabled_runtime": bool(EXECUTION_RUNTIME_ENABLED),
+        "per_symbol_spend": _open_spend,
+        "last_exec": _last_exec,
+        "recent_trades": _trade_log[-50:]
+    }
+
+@app.post("/exec/enable")
+async def exec_enable(request: Request):
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    global EXECUTION_RUNTIME_ENABLED
+    EXECUTION_RUNTIME_ENABLED = True
+    
+    client_ip = request.client.host if hasattr(request, 'client') else "unknown"
+    log_audit(user["username"], "EXEC_ENABLE", "/exec/enable", client_ip)
+    
+    return {"ok": True, "enabled": EXECUTION_RUNTIME_ENABLED}
+
+@app.post("/exec/disable")
+async def exec_disable(request: Request):
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    global EXECUTION_RUNTIME_ENABLED
+    EXECUTION_RUNTIME_ENABLED = False
+    
+    client_ip = request.client.host if hasattr(request, 'client') else "unknown"
+    log_audit(user["username"], "EXEC_DISABLE", "/exec/disable", client_ip)
+    
+    return {"ok": True, "enabled": EXECUTION_RUNTIME_ENABLED}
+
+@app.post("/exec/toggle")
+async def exec_toggle(request: Request):
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    global EXECUTION_RUNTIME_ENABLED
+    EXECUTION_RUNTIME_ENABLED = not EXECUTION_RUNTIME_ENABLED
+    
+    client_ip = request.client.host if hasattr(request, 'client') else "unknown"
+    log_audit(user["username"], "EXEC_TOGGLE", "/exec/toggle", client_ip, 
+             f"Toggled to: {'enabled' if EXECUTION_RUNTIME_ENABLED else 'disabled'}")
+    
+    return {"ok": True, "enabled": EXECUTION_RUNTIME_ENABLED}
