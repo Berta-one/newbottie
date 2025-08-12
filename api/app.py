@@ -1,4 +1,4 @@
-# api/app.py — LIVE spot portfolio + true cost-basis (WAC) + signals (EMA + optional quantum)
+# api/app.py — LIVE spot (Binance), true WAC cost-basis, signals (EMA+quantum), execution with guards
 import os
 import time
 import math
@@ -17,7 +17,7 @@ try:
 except Exception as e:
     raise RuntimeError(f"ccxt not installed. Add to requirements.txt: {e}")
 
-# Optional quantum libs will be used indirectly (via qiskit-aer) if present
+# Optional quantum libs (signals only). If missing, signals fall back to EMA.
 try:
     import qiskit  # noqa: F401
     _HAS_QISKIT = True
@@ -25,15 +25,17 @@ except Exception:
     _HAS_QISKIT = False
 
 # ---------------------------------------------------------------------------------------
-# Config (Render/Heroku/DO → Environment)
+# Config (Render/Heroku/… → Environment)
 # ---------------------------------------------------------------------------------------
 NETLIFY_URL       = os.getenv("NETLIFY_URL", "*")
 
 EXCHANGE_ID       = os.getenv("EXCHANGE_ID", "binance").lower()
 API_KEY           = os.getenv("API_KEY", os.getenv("BINANCE_API_KEY", ""))
 API_SECRET        = os.getenv("API_SECRET", os.getenv("BINANCE_API_SECRET", ""))
-API_PASSPHRASE    = os.getenv("API_PASSPHRASE", "")  # coinbaseadvanced only
-API_UID           = os.getenv("API_UID", "")          # bitstamp only
+
+# You said Binance only; the following are unused but kept for compatibility
+API_PASSPHRASE    = os.getenv("API_PASSPHRASE", "")
+API_UID           = os.getenv("API_UID", "")
 
 PRIMARY_QUOTE     = os.getenv("PRIMARY_QUOTE", "USDT")
 LOOP_SLEEP_S      = float(os.getenv("LOOP_SLEEP_S", "7.0"))
@@ -59,13 +61,22 @@ EMA_WEIGHT             = float(os.getenv("EMA_WEIGHT", "0.65"))
 WATCHLIST_ENV          = os.getenv("TRADE_SYMBOLS", "").strip()
 WATCHLIST              = [s.strip() for s in WATCHLIST_ENV.split(",") if s.strip()]
 
+# Execution / risk
+TRADE_ENABLED          = os.getenv("TRADE_ENABLED", "0").lower() not in ("0", "false", "")
+TRADE_MIN_CONF         = float(os.getenv("TRADE_MIN_CONF", "0.55"))           # require this confidence to act
+TRADE_QUOTE_PER_ORDER  = float(os.getenv("TRADE_QUOTE_PER_ORDER", "100"))     # spend per BUY (in PRIMARY_QUOTE)
+MAX_SPEND_PER_SYMBOL   = float(os.getenv("MAX_SPEND_PER_SYMBOL", "1000"))     # cap total notional per symbol
+MAX_OPEN_POSITIONS     = int(os.getenv("MAX_OPEN_POSITIONS", "10"))           # across all symbols
+SELL_FRACTION          = float(os.getenv("SELL_FRACTION", "1.0"))             # fraction to sell on SELL signal (1.0 = all)
+EXECUTION_INTERVAL_S   = float(os.getenv("EXECUTION_INTERVAL_S", "20"))       # execution loop pace
+
 # ---------------------------------------------------------------------------------------
 # App + CORS
 # ---------------------------------------------------------------------------------------
 log = logging.getLogger("BottieAPI")
 logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
 
-app = FastAPI(title="Bottie API", version="1.2.0")
+app = FastAPI(title="Bottie API", version="1.3.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -82,10 +93,10 @@ _started = time.time()
 _equity_series: List[Dict[str, Any]] = []                  # [{"t": ts, "v": float}]
 _positions: Dict[str, Dict[str, float]] = {}               # {"SYM/QUOTE": {"qty":..., "avg_px":..., "last_px":...}}
 _signals: List[Dict[str, Any]] = []                        # [{"symbol":..., "signal":..., "confidence":..., "t":...}]
+_orders: List[Dict[str, Any]] = []                         # basic order log
 _logs: List[str] = []                                      # recent log lines
-
-# cost-basis cache: symbol -> {"ts": last_calc, "qty": float, "avg_px": float}
-_cost_basis_cache: Dict[str, Dict[str, float]] = {}
+_cost_basis_cache: Dict[str, Dict[str, float]] = {}        # symbol -> {"ts":..., "qty":..., "avg_px":...}
+_trade_enabled_flag: bool = bool(TRADE_ENABLED)            # runtime kill-switch (toggle via endpoints)
 
 def add_log(msg: str):
     msg = msg.strip()
@@ -94,6 +105,27 @@ def add_log(msg: str):
         del _logs[:-1000]
     log.info(msg)
 
+def _push_order(rec: Dict[str, Any]):
+    _orders.append(rec)
+    if len(_orders) > 500:
+        del _orders[:-300]
+
+def _get_positions_copy() -> Dict[str, Dict[str, float]]:
+    return dict(_positions)
+
+def _push_signal(sig: Dict[str, Any]):
+    existing_idx = None
+    for i in range(len(_signals) - 1, -1, -1):
+        if _signals[i].get("symbol") == sig.get("symbol"):
+            existing_idx = i
+            break
+    if existing_idx is not None:
+        _signals[existing_idx] = sig
+    else:
+        _signals.append(sig)
+    if len(_signals) > 500:
+        del _signals[:-300]
+
 # ---------------------------------------------------------------------------------------
 # Optional quantum detection info (for /health cosmetics)
 # ---------------------------------------------------------------------------------------
@@ -101,7 +133,6 @@ def _detect_quantum() -> Dict[str, str]:
     if not QUANTUM_ENABLED:
         return {"kind": "disabled", "backend": "n/a"}
     if _HAS_QISKIT:
-        # minimal disclosure; exact backend name would require full backend setup
         return {"kind": "qiskit", "backend": os.getenv("QUANTUM_BACKEND", "aer_simulator")}
     return {"kind": "unavailable", "backend": "none"}
 
@@ -113,17 +144,13 @@ _exchange: Optional[ccxt.Exchange] = None
 def _init_exchange() -> ccxt.Exchange:
     if not API_KEY or not API_SECRET:
         raise RuntimeError("API_KEY / API_SECRET missing.")
-    if EXCHANGE_ID not in ccxt.exchanges:
-        raise RuntimeError(f"Exchange '{EXCHANGE_ID}' not supported by CCXT.")
+    if EXCHANGE_ID != "binance":
+        raise RuntimeError("This deployment is locked to Binance spot.")
 
     klass = getattr(ccxt, EXCHANGE_ID)
     params = {"apiKey": API_KEY, "secret": API_SECRET, "enableRateLimit": True}
-    if EXCHANGE_ID == "coinbaseadvanced" and API_PASSPHRASE:
-        params["password"] = API_PASSPHRASE
-    if EXCHANGE_ID == "bitstamp" and API_UID:
-        params["uid"] = API_UID
-
     ex = klass(params)
+    # Force spot
     if hasattr(ex, "options"):
         ex.options = {**getattr(ex, "options", {}), **{"defaultType": "spot"}}
     add_log(f"Exchange initialized: {EXCHANGE_ID} (LIVE)")
@@ -184,16 +211,12 @@ def _fetch_tickers(symbols: List[str]) -> Dict[str, Any]:
         return {}
 
 # ---------------------------------------------------------------------------------------
-# Cost-basis (true avg entry) via WAC from trade history
+# Cost-basis (true avg entry) via WAC
 # ---------------------------------------------------------------------------------------
 def _ms_since(days: int) -> int:
     return int((time.time() - days * 86400) * 1000)
 
 def _compute_cost_basis_for_symbol(symbol: str) -> Optional[Tuple[float, float]]:
-    """
-    Returns (net_qty, avg_px) for current position using Weighted Average Cost (WAC).
-    Processes trades chronologically within lookback; includes fees if configured.
-    """
     assert _exchange is not None
     since = _ms_since(COST_LOOKBACK_DAYS)
     limit = MAX_TRADES_PER_SYMBOL
@@ -214,26 +237,22 @@ def _compute_cost_basis_for_symbol(symbol: str) -> Optional[Tuple[float, float]]
     if not trades:
         return None
 
-    # Sort by time
     trades.sort(key=lambda t: t.get("timestamp") or 0)
 
-    net_qty = 0.0     # base units
-    cost    = 0.0     # in quote currency
-
+    net_qty = 0.0
+    cost    = 0.0
     base_ccy, quote_ccy = symbol.split("/")[0].upper(), symbol.split("/")[1].upper()
 
     for t in trades:
-        side   = (t.get("side") or "").lower()      # "buy" / "sell"
-        amount = float(t.get("amount") or 0.0)      # base units
-        price  = float(t.get("price") or 0.0)       # quote per base
+        side   = (t.get("side") or "").lower()
+        amount = float(t.get("amount") or 0.0)
+        price  = float(t.get("price") or 0.0)
         fee    = t.get("fee") or {}
         fee_cost = float(fee.get("cost") or 0.0)
         fee_ccy  = (fee.get("currency") or "").upper()
-
         if amount <= 0 or price <= 0:
             continue
 
-        # Include fee if configured:
         eff_amount = amount
         eff_cost_add = 0.0
         if FEE_IN_COST_BASIS and fee_cost:
@@ -332,7 +351,6 @@ async def portfolio_loop():
             assert _exchange is not None
             balance = _exchange.fetch_balance(params={})
             assets = _nonzero_assets_from_balance(balance)
-
             equity, positions = _value_portfolio(assets)
 
             now = int(time.time())
@@ -389,12 +407,11 @@ def _quantum_feature_vector(closes: List[float]) -> List[float]:
     vec = [mom1, mom2, mom3, volw]
     out: List[float] = []
     for v in vec:
-        v = max(min(v, 0.1), -0.1)  # cap extremes
-        out.append(v / 0.1)         # scale to [-1,1]
+        v = max(min(v, 0.1), -0.1)
+        out.append(v / 0.1)  # [-1,1]
     return out
 
 def _quantum_score(features: List[float]) -> float:
-    """Return score in [-1,1]; 0 if quantum disabled/unavailable."""
     if not QUANTUM_ENABLED or not _HAS_QISKIT:
         return 0.0
     try:
@@ -432,23 +449,6 @@ def _blend_scores(ema_score: float, q_score: float) -> float:
     total = wq + we
     return (wq * q_score + we * ema_score) / total
 
-def _get_positions_copy() -> Dict[str, Dict[str, float]]:
-    return dict(_positions)
-
-def _push_signal(sig: Dict[str, Any]):
-    # keep only last one per symbol
-    existing_idx = None
-    for i in range(len(_signals) - 1, -1, -1):
-        if _signals[i].get("symbol") == sig.get("symbol"):
-            existing_idx = i
-            break
-    if existing_idx is not None:
-        _signals[existing_idx] = sig
-    else:
-        _signals.append(sig)
-    if len(_signals) > 500:
-        del _signals[:-300]
-
 async def signals_loop():
     await _ensure_exchange()
     assert _exchange is not None
@@ -459,16 +459,15 @@ async def signals_loop():
     )
     while True:
         try:
-            # Universe = anything we hold + optional watchlist
             uni = set(WATCHLIST)
             for sym in _get_positions_copy().keys():
                 uni.add(sym)
             uni = [s for s in uni if s]
 
-            batch: List[Dict[str, Any]] = []
             for symbol in uni:
                 try:
-                    ohlcv = _exchange.fetch_ohlcv(symbol, timeframe=TRADE_TIMEFRAME, limit=max(TRADE_LOOKBACK_BARS, min_bars_ok))
+                    ohlcv = _exchange.fetch_ohlcv(symbol, timeframe=TRADE_TIMEFRAME,
+                                                  limit=max(TRADE_LOOKBACK_BARS, min_bars_ok))
                 except Exception as e:
                     add_log(f"fetch_ohlcv fail {symbol}: {e}")
                     continue
@@ -478,12 +477,11 @@ async def signals_loop():
                 closes = [float(x[4]) for x in ohlcv]
                 fema = _ema(closes, TRADE_FAST_EMA)
                 sema = _ema(closes, TRADE_SLOW_EMA)
-                fval = fema[-1]
-                sval = sema[-1]
+                fval = fema[-1]; sval = sema[-1]
 
                 spread = (fval - sval) / sval if sval else 0.0
-                spread = max(min(spread, 0.02), -0.02)   # clip ±2%
-                ema_score = spread / 0.02                # map to [-1,1]
+                spread = max(min(spread, 0.02), -0.02)
+                ema_score = spread / 0.02
 
                 q_score = _quantum_score(_quantum_feature_vector(closes))
                 final = _blend_scores(ema_score, q_score)
@@ -496,7 +494,7 @@ async def signals_loop():
                     sig = "HOLD"
 
                 conf = min(0.99, max(0.0, abs(final)))
-                r = {
+                _push_signal({
                     "symbol": symbol,
                     "signal": sig,
                     "confidence": conf,
@@ -504,16 +502,211 @@ async def signals_loop():
                     "q_score": round(q_score, 4),
                     "final": round(final, 4),
                     "t": int(time.time()),
-                }
-                _push_signal(r)
+                })
 
-                batch.append(r)
-
-            add_log(f"signals | n={len(batch)} universe={len(uni)}")
+            add_log(f"signals | n={len(uni)} scanned")
         except Exception as e:
             add_log(f"ERROR signal loop: {e}")
 
         await asyncio.sleep(SIGNAL_INTERVAL_S)
+
+# ---------------------------------------------------------------------------------------
+# Execution helpers (Binance constraints)
+# ---------------------------------------------------------------------------------------
+def _round_step(value: float, step: Optional[float], precision: Optional[int]) -> float:
+    if step and step > 0:
+        return math.floor(value / step) * step
+    if precision is not None:
+        p = max(0, int(precision))
+        return float(f"{value:.{p}f}")
+    return value
+
+def _binance_amount_limit(symbol: str) -> Tuple[Optional[float], Optional[float], Optional[int]]:
+    """Return (min_amount_step, min_amount, amount_precision_decimals)"""
+    assert _exchange is not None
+    m = _exchange.markets.get(symbol, {})
+    step = None
+    min_amt = None
+    prec = None
+    try:
+        prec = m.get("precision", {}).get("amount")
+    except Exception:
+        prec = None
+    try:
+        min_amt = m.get("limits", {}).get("amount", {}).get("min")
+    except Exception:
+        min_amt = None
+    try:
+        # Try to read raw filters for finer control
+        info = m.get("info", {})
+        for f in info.get("filters", []):
+            if f.get("filterType") == "LOT_SIZE":
+                step = float(f.get("stepSize"))
+                if "minQty" in f:
+                    min_amt = max(float(f["minQty"]), float(min_amt or 0))
+                break
+    except Exception:
+        step = step or None
+    return step, min_amt, prec
+
+def _binance_cost_min(symbol: str) -> Optional[float]:
+    """Return min notional (quote) if known."""
+    assert _exchange is not None
+    m = _exchange.markets.get(symbol, {})
+    try:
+        # ccxt normalized
+        cost_min = m.get("limits", {}).get("cost", {}).get("min")
+        if cost_min:
+            return float(cost_min)
+        # raw filter fallback
+        info = m.get("info", {})
+        for f in info.get("filters", []):
+            if f.get("filterType") in ("MIN_NOTIONAL", "NOTIONAL"):
+                if "minNotional" in f:
+                    return float(f["minNotional"])
+                if "minNotional" in f.get("applyMinToMarket", {}):
+                    return float(f["applyMinToMarket"]["minNotional"])
+    except Exception:
+        pass
+    return None
+
+def _latest_signal_for(symbol: str) -> Optional[Dict[str, Any]]:
+    for s in reversed(_signals):
+        if s.get("symbol") == symbol:
+            return s
+    return None
+
+# ---------------------------------------------------------------------------------------
+# Execution loop (market orders with guards)
+# ---------------------------------------------------------------------------------------
+async def execution_loop():
+    await _ensure_exchange()
+    assert _exchange is not None
+    add_log("Execution loop started")
+
+    while True:
+        try:
+            if not _trade_enabled_flag:
+                await asyncio.sleep(EXECUTION_INTERVAL_S)
+                continue
+
+            # current valuation snapshot
+            # (positions already refreshed by portfolio_loop)
+            open_syms = [sym for sym, pos in _positions.items() if pos.get("qty", 0.0) > 0]
+            if len(open_syms) >= MAX_OPEN_POSITIONS:
+                add_log("execution: max open positions reached; skipping buys")
+                # Selling still allowed
+
+            # consider universe = held symbols + watchlist
+            uni = set(WATCHLIST)
+            uni.update(_positions.keys())
+
+            for symbol in list(uni):
+                sig = _latest_signal_for(symbol)
+                if not sig:
+                    continue
+                side = sig["signal"]
+                conf = float(sig.get("confidence", 0.0))
+                if conf < TRADE_MIN_CONF:
+                    continue
+
+                # need price & market info
+                ticker = _exchange.fetch_ticker(symbol) or {}
+                price = float(ticker.get("last") or ticker.get("close") or 0.0)
+                if price <= 0:
+                    continue
+
+                # compute current notional exposure on this symbol
+                pos = _positions.get(symbol, {})
+                cur_qty = float(pos.get("qty", 0.0))
+                cur_value = cur_qty * price
+
+                cost_min = _binance_cost_min(symbol) or 0.0
+                step, min_amt, prec = _binance_amount_limit(symbol)
+
+                # BUY logic
+                if side == "BUY":
+                    if len(open_syms) >= MAX_OPEN_POSITIONS and cur_qty <= 0:
+                        continue  # can't open new
+                    # respect per-symbol cap
+                    remaining_cap = max(0.0, MAX_SPEND_PER_SYMBOL - cur_value)
+                    budget_quote = min(TRADE_QUOTE_PER_ORDER, remaining_cap)
+                    # also respect free quote balance
+                    try:
+                        bal = _exchange.fetch_balance() or {}
+                        free_quote = float((bal.get("free") or {}).get(PRIMARY_QUOTE, 0.0))
+                        budget_quote = min(budget_quote, free_quote)
+                    except Exception:
+                        pass
+
+                    if budget_quote <= 0.0:
+                        continue
+                    if cost_min and budget_quote < cost_min:
+                        # if budget below min notional, try to bump up to min if we have free quote
+                        try:
+                            bal = _exchange.fetch_balance() or {}
+                            free_quote = float((bal.get("free") or {}).get(PRIMARY_QUOTE, 0.0))
+                        except Exception:
+                            free_quote = 0.0
+                        if free_quote >= cost_min:
+                            budget_quote = cost_min
+                        else:
+                            continue
+
+                    amount = budget_quote / price
+                    # apply amount constraints
+                    amount = _round_step(amount, step, prec)
+                    if min_amt and amount < min_amt:
+                        # try snap to min
+                        amount = min_amt
+                    if amount <= 0:
+                        continue
+
+                    # place market buy
+                    try:
+                        order = _exchange.create_order(symbol, "market", "buy", amount)
+                        _push_order({
+                            "symbol": symbol, "side": "buy", "amount": amount, "px": price,
+                            "t": int(time.time()), "order": order
+                        })
+                        add_log(f"BUY {symbol} amount={amount} ~{budget_quote:.2f} {PRIMARY_QUOTE}")
+                        if symbol not in open_syms:
+                            open_syms.append(symbol)
+                    except Exception as e:
+                        add_log(f"ORDER BUY FAIL {symbol}: {e}")
+
+                # SELL logic
+                elif side == "SELL":
+                    if cur_qty <= 0:
+                        continue
+                    sell_amt = max(0.0, min(cur_qty, cur_qty * SELL_FRACTION))
+                    sell_amt = _round_step(sell_amt, step, prec)
+                    if min_amt and sell_amt < min_amt:
+                        # if position is smaller than min, try to close all if allowed
+                        if cur_qty >= min_amt:
+                            sell_amt = cur_qty  # dump all
+                        else:
+                            continue
+                    if sell_amt <= 0:
+                        continue
+                    try:
+                        order = _exchange.create_order(symbol, "market", "sell", sell_amt)
+                        _push_order({
+                            "symbol": symbol, "side": "sell", "amount": sell_amt, "px": price,
+                            "t": int(time.time()), "order": order
+                        })
+                        add_log(f"SELL {symbol} amount={sell_amt} ~{sell_amt*price:.2f} {PRIMARY_QUOTE}")
+                        if sell_amt >= cur_qty and symbol in open_syms:
+                            open_syms.remove(symbol)
+                    except Exception as e:
+                        add_log(f"ORDER SELL FAIL {symbol}: {e}")
+
+                # HOLD → no action
+
+        except Exception as e:
+            add_log(f"ERROR execution loop: {e}")
+
+        await asyncio.sleep(EXECUTION_INTERVAL_S)
 
 # ---------------------------------------------------------------------------------------
 # Startup
@@ -523,6 +716,8 @@ async def _on_startup():
     asyncio.create_task(portfolio_loop())
     if TRADE_SIGNALS_ENABLED:
         asyncio.create_task(signals_loop())
+    if _trade_enabled_flag:
+        asyncio.create_task(execution_loop())
 
 # ---------------------------------------------------------------------------------------
 # Endpoints
@@ -543,6 +738,7 @@ def health():
         "exchange": EXCHANGE_ID,
         "primary_quote": PRIMARY_QUOTE,
         "equity": last_eq,
+        "trading": {"enabled": _trade_enabled_flag},
     }
 
 @app.get("/status")
@@ -554,11 +750,11 @@ def status():
         "equity_series": _equity_series[-300:],
         "positions": _positions,
         "last_signals": _signals[-100:],
+        "orders_count": len(_orders),
     }
 
 @app.get("/signals")
 def signals():
-    # Return the most recent signal per symbol
     latest: Dict[str, Dict[str, Any]] = {}
     for s in _signals:
         sym = s.get("symbol")
@@ -567,6 +763,10 @@ def signals():
         if sym not in latest or s.get("t", 0) >= latest[sym].get("t", 0):
             latest[sym] = s
     return {"signals": list(latest.values())}
+
+@app.get("/orders")
+def orders():
+    return {"orders": _orders[-200:]}
 
 @app.get("/logs/last")
 def logs_last():
@@ -582,3 +782,22 @@ def costbasis():
             "age_sec": round(time.time() - entry["ts"], 1),
         }
     return out
+
+# Kill-switch controls
+@app.get("/trade/status")
+def trade_status():
+    return {"enabled": _trade_enabled_flag}
+
+@app.get("/trade/enable")
+def trade_enable():
+    global _trade_enabled_flag
+    _trade_enabled_flag = True
+    # start loop if not already running (best-effort)
+    asyncio.create_task(execution_loop())
+    return {"enabled": True}
+
+@app.get("/trade/disable")
+def trade_disable():
+    global _trade_enabled_flag
+    _trade_enabled_flag = False
+    return {"enabled": False}
