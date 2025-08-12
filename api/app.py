@@ -189,20 +189,13 @@ def add_log(msg: str):
         del _logs[:-1000]
     log.info(msg)
 
-# ───────────────────────────────── User-friendly password management
-def get_user_password_hash(env_var: str, default_password: str) -> str:
-    """Get password from environment and hash it consistently"""
-    password = os.getenv(env_var, default_password)
-    # Simple consistent hash using a fixed salt
-    salt_rounds = 4  # Lower rounds for faster hashing, but still secure
-    return pwd_context.using(rounds=salt_rounds).hash(password + "bottie-salt-2024")
-
 # ───────────────────────────────── In-memory storage for users and audit
-# Get passwords from environment
+# ───────────────────────────────── Simple User Management
+# Get passwords from environment with defaults
 SUPERUSER_PASSWORD = os.getenv("SUPERUSER_PASSWORD", "SuperSecret123!")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "AdminPass456!")
 
-# Hash them once at startup
+# Create users with simple password hashing
 USERS_DB = {
     "superuser": {
         "username": "superuser",
@@ -219,6 +212,10 @@ USERS_DB = {
         "last_login": None
     }
 }
+
+# Temporary debug (REMOVE after testing)
+add_log(f"Superuser will use password: {SUPERUSER_PASSWORD}")
+add_log(f"Admin will use password: {ADMIN_PASSWORD}")
 
 # Debug what we're using (REMOVE THIS AFTER TESTING)
 print(f"Superuser password: {SUPERUSER_PASSWORD}")
