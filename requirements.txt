@@ -1,4 +1,5 @@
-
+qiskit
+qiskit-aer
 ccxt
 fastapi
 uvicorn[standard]
