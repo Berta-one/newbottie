@@ -1,10 +1,11 @@
 # api/app.py
-import os, time, asyncio, logging, math, json, hashlib, random
+import os, time, asyncio, logging, math, json, hashlib
 from typing import Any, Dict, List, Optional, Tuple, Set
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+# ───────────────────────────── deps checks
 try:
     import ccxt
 except Exception as e:
@@ -29,58 +30,60 @@ except Exception:
     QuantumCircuit = None
     Aer = None
 
-# Sentiment module (we provide this file)
-from sentiment.sentiment_analysis import SentimentService
+# Finnhub/VADER sentiment service (our implementation)
+# NOTE: this is the correct module we created earlier.
+try:
+    from sentiment.sentiment_service import snapshot as sentiment_snapshot, latest_probs as sentiment_latest_probs
+    SENTIMENT_WIRED = True
+except Exception:
+    SENTIMENT_WIRED = False
 
-# ──────────────────────────────────────────────────────────────────────────────
-# ENV
-# ──────────────────────────────────────────────────────────────────────────────
-LOG_LEVEL               = os.getenv("LOG_LEVEL", "INFO").upper()
-NETLIFY_URL             = os.getenv("NETLIFY_URL", "*")
+# ───────────────────────────── ENV
+LOG_LEVEL         = os.getenv("LOG_LEVEL", "INFO").upper()
+NETLIFY_URL       = os.getenv("NETLIFY_URL", "*")
 
-EXCHANGE_ID             = os.getenv("EXCHANGE_ID", "binance").lower()
-API_KEY                 = os.getenv("BINANCE_API_KEY", os.getenv("API_KEY", "")).strip()
-API_SECRET              = os.getenv("BINANCE_API_SECRET", os.getenv("API_SECRET", "")).strip()
-API_PASSPHRASE          = os.getenv("API_PASSPHRASE", "").strip()
-API_UID                 = os.getenv("API_UID", "").strip()
+EXCHANGE_ID       = os.getenv("EXCHANGE_ID", "binance").lower()
+API_KEY           = os.getenv("BINANCE_API_KEY", os.getenv("API_KEY", "")).strip()
+API_SECRET        = os.getenv("BINANCE_API_SECRET", os.getenv("API_SECRET", "")).strip()
+API_PASSPHRASE    = os.getenv("API_PASSPHRASE", "").strip()  # coinbaseadvanced
+API_UID           = os.getenv("API_UID", "").strip()          # bitstamp
 
-PRIMARY_QUOTE           = os.getenv("PRIMARY_QUOTE", "USDT").upper()
-LOOP_SLEEP_S            = float(os.getenv("LOOP_SLEEP_S", "6"))
-SIGNAL_INTERVAL_S       = float(os.getenv("SIGNAL_INTERVAL_S", "30"))
+PRIMARY_QUOTE     = os.getenv("PRIMARY_QUOTE", "USDT").upper()
+LOOP_SLEEP_S      = float(os.getenv("LOOP_SLEEP_S", "6"))
+SIGNAL_INTERVAL_S = float(os.getenv("SIGNAL_INTERVAL_S", "30"))
 
-COST_LOOKBACK_DAYS      = int(os.getenv("COST_BASIS_LOOKBACK_DAYS", "120"))
-MAX_TRADES_PER_SYMBOL   = int(os.getenv("MAX_TRADES_PER_SYMBOL", "1000"))
-FEE_IN_COST_BASIS       = os.getenv("FEE_IN_COST_BASIS", "1").lower() in ("1","true","yes")
-COST_CACHE_TTL_SEC      = int(os.getenv("COST_CACHE_TTL_SEC", "600"))
+COST_LOOKBACK_DAYS    = int(os.getenv("COST_BASIS_LOOKBACK_DAYS", "120"))
+MAX_TRADES_PER_SYMBOL = int(os.getenv("MAX_TRADES_PER_SYMBOL", "1000"))
+FEE_IN_COST_BASIS     = os.getenv("FEE_IN_COST_BASIS", "1").lower() in ("1","true","yes")
+COST_CACHE_TTL_SEC    = int(os.getenv("COST_CACHE_TTL_SEC", "600"))
 
-TRADE_TIMEFRAME         = os.getenv("TRADE_TIMEFRAME", "1h")
-TRADE_LOOKBACK_BARS     = int(os.getenv("TRADE_LOOKBACK_BARS", "300"))
-TRADE_FAST_EMA          = int(os.getenv("TRADE_FAST_EMA", "12"))
-TRADE_SLOW_EMA          = int(os.getenv("TRADE_SLOW_EMA", "26"))
-TRADE_MIN_CONF          = float(os.getenv("TRADE_MIN_CONF", "0.55"))
-TRADE_SYMBOLS_ENV       = os.getenv("TRADE_SYMBOLS", "")
+TRADE_TIMEFRAME     = os.getenv("TRADE_TIMEFRAME", "1h")
+TRADE_LOOKBACK_BARS = int(os.getenv("TRADE_LOOKBACK_BARS", "300"))
+TRADE_FAST_EMA      = int(os.getenv("TRADE_FAST_EMA", "12"))
+TRADE_SLOW_EMA      = int(os.getenv("TRADE_SLOW_EMA", "26"))
+TRADE_MIN_CONF      = float(os.getenv("TRADE_MIN_CONF", "0.55"))
+TRADE_SYMBOLS_ENV   = os.getenv("TRADE_SYMBOLS", "")
 
-EMA_WEIGHT              = float(os.getenv("EMA_WEIGHT", "0.65"))
-ML_WEIGHT               = float(os.getenv("ML_WEIGHT", "0.25"))
-QUANTUM_WEIGHT          = float(os.getenv("QUANTUM_WEIGHT", "0.35"))
-SENTIMENT_WEIGHT        = float(os.getenv("SENTIMENT_WEIGHT", "0.20"))  # NEW
+# weights (they’ll be normalized when combining)
+EMA_WEIGHT       = float(os.getenv("EMA_WEIGHT", "0.65"))
+ML_WEIGHT        = float(os.getenv("ML_WEIGHT", "0.25"))
+QUANTUM_WEIGHT   = float(os.getenv("QUANTUM_WEIGHT", "0.35"))
+SENTIMENT_WEIGHT = float(os.getenv("SENTIMENT_WEIGHT", "0.20"))
 
-ML_ENABLED              = os.getenv("ML_ENABLED", "1").lower() in ("1","true","yes")
-MODEL_XGB_PATH          = os.getenv("MODEL_XGB_PATH", "models/xgb_model.pkl")
-MODEL_META_PATH         = os.getenv("MODEL_META_PATH", "models/xgb_meta.json")
+ML_ENABLED       = os.getenv("ML_ENABLED", "1").lower() in ("1","true","yes")
+MODEL_XGB_PATH   = os.getenv("MODEL_XGB_PATH", "models/xgb_model.pkl")
+MODEL_META_PATH  = os.getenv("MODEL_META_PATH", "models/xgb_meta.json")
 
-QUANTUM_ENABLED         = os.getenv("QUANTUM_ENABLED", "0").lower() in ("1","true","yes")
-QUANTUM_BACKEND         = os.getenv("QUANTUM_BACKEND", "aer_simulator")
+QUANTUM_ENABLED  = os.getenv("QUANTUM_ENABLED", "0").lower() in ("1","true","yes")
+QUANTUM_BACKEND  = os.getenv("QUANTUM_BACKEND", "aer_simulator")
 
-SENTIMENT_ENABLED       = os.getenv("SENTIMENT_ENABLED", "1").lower() in ("1","true","yes")
+SENTIMENT_ENABLED = os.getenv("SENTIMENT_ENABLED", "1").lower() in ("1","true","yes")
 
-# ──────────────────────────────────────────────────────────────────────────────
-# App
-# ──────────────────────────────────────────────────────────────────────────────
+# ───────────────────────────── App
 logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
 log = logging.getLogger("BottieAPI")
 
-app = FastAPI(title="Bottie API", version="1.3.0")
+app = FastAPI(title="Bottie API", version="1.4.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[NETLIFY_URL] if NETLIFY_URL != "*" else ["*"],
@@ -89,9 +92,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ──────────────────────────────────────────────────────────────────────────────
-# State
-# ──────────────────────────────────────────────────────────────────────────────
+# ───────────────────────────── State
 _started = time.time()
 _equity_series: List[Dict[str, Any]] = []
 _positions: Dict[str, Dict[str, float]] = {}
@@ -105,13 +106,7 @@ def add_log(msg: str):
         del _logs[:-1000]
     log.info(msg)
 
-# sentiment runtime
-_sent = SentimentService()
-_sent_last: Dict[str, Dict[str, float]] = {}  # base -> {"score": float, "n": int}
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Exchange
-# ──────────────────────────────────────────────────────────────────────────────
+# ───────────────────────────── Exchange
 _exchange: Optional[ccxt.Exchange] = None
 
 def _init_exchange() -> ccxt.Exchange:
@@ -145,9 +140,7 @@ def _symbol_exists(base: str, quote: str) -> bool:
     assert _exchange is not None
     return f"{base}/{quote}" in _exchange.markets
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Helpers
-# ──────────────────────────────────────────────────────────────────────────────
+# ───────────────────────────── Helpers
 def _nonzero_assets_from_balance(balance: Dict[str, Any]) -> Dict[str, float]:
     out: Dict[str, float] = {}
     for a, v in (balance.get("total") or {}).items():
@@ -175,7 +168,7 @@ def _best_symbol_for_asset(asset: str, preferred_quotes: List[str]) -> Optional[
 
 def _fetch_tickers(symbols: List[str]) -> Dict[str, Any]:
     assert _exchange is not None
-    syms = [s for s in symbols if s != f"{PRIMARY_QUOTE}/{PRIMARY_QUOTE}"]
+    syms = [s for s in symbols if not s.startswith(f"{PRIMARY_QUOTE}/") and s != f"{PRIMARY_QUOTE}/{PRIMARY_QUOTE}"]
     if not syms:
         return {}
     try:
@@ -187,9 +180,7 @@ def _fetch_tickers(symbols: List[str]) -> Dict[str, Any]:
 def _ms_since(days: int) -> int:
     return int((time.time() - days * 86400) * 1000)
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Cost basis via WAC
-# ──────────────────────────────────────────────────────────────────────────────
+# ───────────────────────────── Cost basis (WAC)
 def _compute_cost_basis_for_symbol(symbol: str) -> Optional[Tuple[float, float]]:
     assert _exchange is not None
     if not (API_KEY and API_SECRET):
@@ -256,9 +247,7 @@ def _get_cost_basis(symbol: str) -> Optional[Tuple[float, float]]:
         _cost_basis_cache[symbol] = {"ts": now, "qty": qty, "avg_px": avg}
     return res
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Portfolio loop
-# ──────────────────────────────────────────────────────────────────────────────
+# ───────────────────────────── Portfolio loop
 def _value_portfolio(assets: Dict[str, float]) -> Tuple[float, Dict[str, Dict[str, float]]]:
     preferred = _quote_priority()
     assert _exchange is not None
@@ -321,9 +310,7 @@ async def portfolio_loop():
             add_log(f"ERROR portfolio_loop: {e}")
         await asyncio.sleep(LOOP_SLEEP_S)
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Features & Signals
-# ──────────────────────────────────────────────────────────────────────────────
+# ───────────────────────────── Features & Signals
 def _ema(arr: np.ndarray, span: int) -> np.ndarray:
     if len(arr) < span + 2:
         return np.full_like(arr, np.nan, dtype=float)
@@ -416,6 +403,7 @@ def _quantum_prob(symbol: str, feats: Dict[str, Any]) -> Optional[float]:
     if not QUANTUM_ENABLED:
         return None
     if QuantumCircuit is None or Aer is None:
+        # deterministic pseudo prob fallback
         h = hashlib.sha256(f"{symbol}:{feats['close'][-1]:.8f}".encode()).hexdigest()
         return (int(h[:8], 16) % 1000) / 1000.0
     try:
@@ -424,7 +412,7 @@ def _quantum_prob(symbol: str, feats: Dict[str, Any]) -> Optional[float]:
         qc = QuantumCircuit(1, 1)
         qc.ry(theta, 0)
         qc.measure(0, 0)
-        backend = Aer.get_backend("aer_simulator")
+        backend = Aer.get_backend(QUANTUM_BACKEND or "aer_simulator")
         shots = 512
         res = backend.run(qc, shots=shots).result()
         counts = res.get_counts()
@@ -433,32 +421,34 @@ def _quantum_prob(symbol: str, feats: Dict[str, Any]) -> Optional[float]:
         add_log(f"Quantum score error: {e}")
         return None
 
-# Sentiment → map from base to prob in [0,1]
+# Sentiment prob for symbol
 def _sentiment_prob(symbol: str) -> Optional[float]:
-    if not SENTIMENT_ENABLED:
+    if not (SENTIMENT_ENABLED and SENTIMENT_WIRED):
         return None
     try:
         base = symbol.split("/")[0].upper()
-        d = _sent_last.get(base)
-        if not d:
-            return 0.5  # neutral until we have data
-        # VADER compound ∈ [-1,1] → map to 0..1
-        return 0.5 + 0.5 * max(-1.0, min(1.0, float(d["score"])))
+        probs = sentiment_latest_probs()  # {BASE: prob 0..1}
+        return float(probs.get(base, 0.5))
     except Exception:
         return None
 
 def _symbols_to_scan() -> List[str]:
     assert _exchange is not None
     syms: Set[str] = set()
+    # from positions
     for sym in _positions.keys():
         if sym.endswith(f"/{PRIMARY_QUOTE}") and not sym.startswith(f"{PRIMARY_QUOTE}/"):
-            syms.add(sym)
+            if sym in _exchange.markets:
+                syms.add(sym)
+    # manually forced via env
     if TRADE_SYMBOLS_ENV.strip():
         for s in TRADE_SYMBOLS_ENV.split(","):
             s = s.strip().upper()
             if s and s in _exchange.markets:
                 syms.add(s)
-    return sorted({s for s in syms if s != f"{PRIMARY_QUOTE}/{PRIMARY_QUOTE}"})
+    # never include cash/cash
+    syms.discard(f"{PRIMARY_QUOTE}/{PRIMARY_QUOTE}")
+    return sorted(syms)
 
 def _push_signal(sig: Dict[str, Any]):
     for i in range(len(_signals)-1, -1, -1):
@@ -473,7 +463,7 @@ def _push_signal(sig: Dict[str, Any]):
 async def signals_loop():
     await _ensure_exchange()
     _load_ml()
-    add_log(f"Signal loop started | TF={TRADE_TIMEFRAME} | Q={QUANTUM_ENABLED} | ML={ML_ENABLED} | SENT={SENTIMENT_ENABLED}")
+    add_log(f"Signal loop started | TF={TRADE_TIMEFRAME} | Q={QUANTUM_ENABLED} | ML={ML_ENABLED} | SENT={SENTIMENT_ENABLED and SENTIMENT_WIRED}")
     assert _exchange is not None
 
     while True:
@@ -502,9 +492,10 @@ async def signals_loop():
                 s_prob  = _sentiment_prob(sym)
 
                 parts, weights = [ema_prob], [EMA_WEIGHT]
-                if ml_prob is not None: parts.append(ml_prob); weights.append(ML_WEIGHT)
-                if q_prob  is not None: parts.append(q_prob);  weights.append(QUANTUM_WEIGHT)
-                if s_prob  is not None: parts.append(s_prob);  weights.append(SENTIMENT_WEIGHT)
+                labels = ["ema"]
+                if ml_prob is not None: parts.append(ml_prob); weights.append(ML_WEIGHT); labels.append("ml")
+                if q_prob  is not None: parts.append(q_prob);  weights.append(QUANTUM_WEIGHT); labels.append("q")
+                if s_prob  is not None: parts.append(s_prob);  weights.append(SENTIMENT_WEIGHT); labels.append("sent")
 
                 if sum(weights) <= 0:
                     final_prob = float(ema_prob)
@@ -513,12 +504,7 @@ async def signals_loop():
                     w = np.array(weights, dtype=float)
                     w = w / np.sum(w)
                     final_prob = float(np.sum(w * np.array(parts, dtype=float)))
-                    # report normalized weights
-                    idx = 0
-                    w_norm = {"ema": float(w[idx])}; idx += 1
-                    if ml_prob is not None: w_norm["ml"] = float(w[idx]); idx += 1
-                    if q_prob  is not None: w_norm["q"]  = float(w[idx]); idx += 1
-                    if s_prob  is not None: w_norm["sent"] = float(w[idx]); idx += 1
+                    w_norm = {lab: float(w[i]) for i, lab in enumerate(labels)}
 
                 thr_buy  = 0.5 + 0.5 * TRADE_MIN_CONF
                 thr_sell = 0.5 - 0.5 * TRADE_MIN_CONF
@@ -550,60 +536,13 @@ async def signals_loop():
             add_log(f"ERROR signals_loop: {e}")
         await asyncio.sleep(max(0.25, SIGNAL_INTERVAL_S - (time.time() - t0)))
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Sentiment loop
-# ──────────────────────────────────────────────────────────────────────────────
-async def sentiment_loop():
-    if not SENTIMENT_ENABLED:
-        add_log("Sentiment loop disabled by env.")
-        return
-    add_log("Sentiment loop started.")
-    # Seed keywords from live positions as they appear
-    while True:
-        try:
-            # seed bases from current positions & TRADE_SYMBOLS
-            bases: Set[str] = set()
-            for sym in list(_positions.keys()):
-                try:
-                    b = sym.split("/")[0].upper()
-                    bases.add(b)
-                except Exception:
-                    pass
-            if TRADE_SYMBOLS_ENV.strip():
-                for s in TRADE_SYMBOLS_ENV.split(","):
-                    s = s.strip().upper()
-                    if "/" in s:
-                        bases.add(s.split("/")[0])
-            # ensure we at least track BTC/ETH if nothing else
-            if not bases:
-                bases.update({"BTC", "ETH"})
-            # ensure keywords exist
-            for b in bases:
-                _sent.set_keywords(b, [b])
-
-            await _sent.fetch_all()
-            global _sent_last
-            _sent_last = _sent.aggregate()
-            # summarize briefly
-            if _sent_last:
-                m = ", ".join(f"{k}:{v['score']:+.2f}({v['n']})" for k, v in list(_sent_last.items())[:6])
-                add_log(f"sentiment | {m}")
-        except Exception as e:
-            add_log(f"ERROR sentiment_loop: {e}")
-        await asyncio.sleep(60)  # pull every minute (per-base throttling handled inside)
-        
-# ──────────────────────────────────────────────────────────────────────────────
-# Startup
-# ──────────────────────────────────────────────────────────────────────────────
+# ───────────────────────────── Startup
 @app.on_event("startup")
 async def _on_startup():
     asyncio.create_task(portfolio_loop())
     asyncio.create_task(signals_loop())
-    asyncio.create_task(sentiment_loop())
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Endpoints
-# ──────────────────────────────────────────────────────────────────────────────
+# ───────────────────────────── Endpoints
 def _detect_quantum() -> Dict[str, Any]:
     if not QUANTUM_ENABLED:
         return {"enabled": False, "backend": "disabled"}
@@ -628,7 +567,7 @@ def health():
         "equity": last_eq,
         "quantum": _detect_quantum(),
         "ml": {"enabled": ML_ENABLED, "loaded": bool(_ML_MODEL), "model_path": MODEL_XGB_PATH if _ML_MODEL else None},
-        "sentiment": {"enabled": SENTIMENT_ENABLED, "bases": list(_sent_last.keys())}
+        "sentiment": {"enabled": SENTIMENT_ENABLED and SENTIMENT_WIRED}
     }
 
 @app.get("/status")
@@ -659,4 +598,6 @@ def costbasis():
 
 @app.get("/sentiment")
 def sentiment():
-    return {"window_sec": int(os.getenv("SENTIMENT_WINDOW_S", "900")), "scores": _sent_last}
+    if not (SENTIMENT_ENABLED and SENTIMENT_WIRED):
+        return {"enabled": False, "scores": {}}
+    return sentiment_snapshot()
