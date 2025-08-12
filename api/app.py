@@ -83,7 +83,8 @@ app.add_middleware(
     allow_methods=["GET", "OPTIONS"],
     allow_headers=["*"],
 )
-
+from api.admin import router as admin_router
+app.include_router(admin_router)
 # -----------------------------------------------------------------------------
 # In-memory state
 # -----------------------------------------------------------------------------
