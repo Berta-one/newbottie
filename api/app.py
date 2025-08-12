@@ -28,7 +28,12 @@ except Exception:
 # Optional: Quantum
 _Q_ENABLED = os.getenv("QUANTUM_ENABLED", "0") not in ("0", "false", "False")
 _QUANTUM_BACKEND_ENV = os.getenv("QUANTUM_BACKEND", "disabled")
+from api.admin import router as admin_router, wire_admin_startup
+app.include_router(admin_router)
 
+@app.on_event("startup")
+async def _admin_bg():
+    wire_admin_startup(app)
 # -----------------------------------------------------------------------------
 # Config (Render → Environment)
 # -----------------------------------------------------------------------------
