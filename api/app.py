@@ -816,7 +816,8 @@ async def exec_toggle(request: "Request"):
         raise HTTPException(status_code=401, detail="X-Admin-Token required")
     global EXECUTION_RUNTIME_ENABLED
     EXECUTION_RUNTIME_ENABLED = not EXECUTION_RUNTIME_ENABLED
-    return {"ok": True, "enabled": EXECUTION_RUNTIME_ENABLED} ───────────────────────────────── endpoints
+    return {"ok": True, "enabled": EXECUTION_RUNTIME_ENABLED} 
+# ───────────────────────────────── endpoints
 def _detect_quantum() -> Dict[str, Any]:
     if not QUANTUM_ENABLED:
         return {"enabled": False, "backend": "disabled"}
