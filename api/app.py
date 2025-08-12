@@ -116,11 +116,6 @@ ML_WEIGHT          = float(os.getenv("ML_WEIGHT",  "0.30"))
 QUANTUM_WEIGHT     = float(os.getenv("QUANTUM_WEIGHT","0.20"))
 SENTIMENT_WEIGHT   = float(os.getenv("SENTIMENT_WEIGHT","0.10"))
 
-# quantum shadow mode
-QUANTUM_MODE       = (os.getenv("QUANTUM_MODE", "shadow") or "shadow").lower()
-WEIGHTS_AUTO       = parse_bool(os.getenv("WEIGHTS_AUTO", "1"))
-WEIGHTS_LOOKBACK   = int(os.getenv("WEIGHTS_LOOKBACK_SIGNALS", "500"))
-
 # ML persistence (joblib model is optional; online learner always exists)
 ML_ENABLED         = parse_bool(os.getenv("ML_ENABLED", "1"))
 MODEL_XGB_PATH     = os.getenv("MODEL_XGB_PATH", "models/xgb_model.pkl")
@@ -187,79 +182,12 @@ _trade_log: List[Dict[str, Any]] = []
 # execution runtime switch
 EXECUTION_RUNTIME_ENABLED = False
 
-# component performance tracking
-_weights_perf = {"ema": [], "ml": [], "q": [], "sent": []}
-
 # ───────────────────────────────── Define add_log function FIRST
 def add_log(msg: str):
     _logs.append(msg)
     if len(_logs) > 1500:
         del _logs[:-1000]
     log.info(msg)
-
-# ───────────────────────────────── Component Performance Tracking
-def _brier(p, y): 
-    """Brier score: (prediction - actual)^2. Lower = better."""
-    return (float(p) - float(y))**2
-
-def _update_component_perf(y_true, ema_p=None, ml_p=None, q_p=None, s_p=None):
-    """Update rolling performance for each component."""
-    if ema_p is not None: _weights_perf["ema"].append(_brier(ema_p, y_true))
-    if ml_p  is not None: _weights_perf["ml"].append(_brier(ml_p,  y_true))
-    if q_p   is not None: _weights_perf["q"].append(_brier(q_p,   y_true))
-    if s_p   is not None: _weights_perf["sent"].append(_brier(s_p, y_true))
-    
-    # Cap length to lookback window
-    for k in _weights_perf: 
-        if len(_weights_perf[k]) > WEIGHTS_LOOKBACK: 
-            _weights_perf[k] = _weights_perf[k][-WEIGHTS_LOOKBACK:]
-
-def _parse_bounds(env_name):
-    """Parse 'ema:0.30,ml:0.20' format from env."""
-    raw = os.getenv(env_name, "")
-    out = {}
-    for token in raw.split(","):
-        if ":" in token:
-            k, v = token.split(":", 1)
-            try: 
-                out[k.strip()] = float(v.strip())
-            except: 
-                pass
-    return out
-
-def _auto_weights():
-    """Compute adaptive weights based on recent performance."""
-    if not WEIGHTS_AUTO:
-        return None
-    
-    import numpy as np
-    eps = 1e-6
-    scores = {}
-    
-    # Lower Brier loss = better performance → higher score
-    for k, losses in _weights_perf.items():
-        if losses:
-            avg_loss = float(np.mean(losses))
-            scores[k] = 1.0 / (eps + avg_loss)
-    
-    if not scores:
-        return None
-    
-    # Normalize to sum=1
-    total = sum(scores.values())
-    w = {k: v/total for k, v in scores.items()}
-    
-    # Apply min/max bounds
-    wmin = _parse_bounds("WEIGHTS_MIN")
-    wmax = _parse_bounds("WEIGHTS_MAX")
-    
-    for k in list(w.keys()):
-        if k in wmin: w[k] = max(wmin[k], w[k])
-        if k in wmax: w[k] = min(wmax[k], w[k])
-    
-    # Re-normalize after clamping
-    total_clamped = sum(w.values()) or 1.0
-    return {k: v/total_clamped for k, v in w.items()}
 
 # ───────────────────────────────── Simple User Management
 # Get passwords from environment with defaults
@@ -635,10 +563,14 @@ def _load_ml():
             add_log(f"ML joblib load error: {e}")
 
 def _ml_prob_from_models(feats: Dict[str, Any]) -> Optional[float]:
-    # online learner first
+    # online learner first (now with quantum features)
     if _OL is not None:
         try:
-            X = _OL.vectorize(feats)
+            # Add quantum probability to features for prediction
+            feats_with_quantum = feats.copy()
+            feats_with_quantum["quantum_prob"] = feats.get("quantum_prob", 0.5)
+            
+            X = _OL.vectorize(feats_with_quantum)
             return float(_OL.predict_proba(X))
         except Exception as e:
             add_log(f"OnlineLearner predict error: {e}")
@@ -727,6 +659,7 @@ def _push_signal(sig: Dict[str, Any]):
 def _adaptive_thresholds() -> Tuple[float, float]:
     """
     Dynamic buy/sell thresholds around 0.5 based on recent ensemble dispersion.
+    Simpler: we'll scale base confidence slightly with recent avg |prob-0.5|.
     """
     window = _signals[-50:]
     if not window:
@@ -734,7 +667,9 @@ def _adaptive_thresholds() -> Tuple[float, float]:
     else:
         diffs = [abs(s.get("final_prob",0.5) - 0.5) for s in window]
         avg_d = float(np.mean(diffs)) if diffs else 0.05
+        # push threshold up if signals are noisy/low; down if strong
         c = np.clip(TRADE_BASE_MIN_CONF - (avg_d - 0.10)*0.3, TRADE_CONF_FLOOR-0.5, TRADE_CONF_CEIL-0.5)
+        # map back to 0..1 margin (we use 0.5±c)
         c = float(np.clip(c, 0.0, 0.49))
     thr_buy  = 0.5 + (c if TRADE_CONF_ADAPT else TRADE_BASE_MIN_CONF/2.0)
     thr_sell = 0.5 - (c if TRADE_CONF_ADAPT else TRADE_BASE_MIN_CONF/2.0)
@@ -771,44 +706,24 @@ async def signals_loop():
                 ema_s   = _ema_score(feats)
                 ema_prob= 0.5 + 0.5 * np.clip(ema_s, -1, 1)
 
+                # Pass quantum probability to ML models for learning
+                feats["quantum_prob"] = None  # Will be set after q_prob calculation
+
                 ml_prob = _ml_prob_from_models(feats)
                 q_prob  = _quantum_prob(sym, feats)
+                
+                # Update features with quantum probability for ML learning
+                feats["quantum_prob"] = q_prob if q_prob is not None else 0.5
+                
                 s_prob  = _sentiment_prob(sym)
 
-                # Build components list
                 parts, weights, labels = [ema_prob], [EMA_WEIGHT], ["ema"]
                 if ml_prob is not None: parts.append(ml_prob); weights.append(ML_WEIGHT); labels.append("ml")
                 if q_prob  is not None: parts.append(q_prob);  weights.append(QUANTUM_WEIGHT); labels.append("q")
                 if s_prob  is not None: parts.append(s_prob);  weights.append(SENTIMENT_WEIGHT); labels.append("sent")
 
-                # Apply quantum shadow mode and auto-weights
-                use_quantum_live = (QUANTUM_MODE == "live")
-                auto_w = _auto_weights()
-                if auto_w:
-                    # Use adaptive weights for available components
-                    w = []
-                    for lab in labels:
-                        weight = auto_w.get(lab, 0.0)
-                        # Force quantum to 0 if in shadow mode
-                        if lab == "q" and not use_quantum_live:
-                            weight = 0.0
-                        w.append(weight)
-                    w = np.array(w, dtype=float)
-                    if w.sum() > 0:
-                        w = w / w.sum()
-                    w_source = "auto"
-                else:
-                    # Use manual weights
-                    w = np.array(weights, dtype=float)
-                    # Force quantum to 0 if in shadow mode
-                    if "q" in labels and not use_quantum_live:
-                        q_idx = labels.index("q")
-                        w[q_idx] = 0.0
-                    if w.sum() > 0:
-                        w = w / w.sum()
-                    w_source = "manual"
-
-                # Compute final probability
+                w = np.array(weights, dtype=float)
+                w = w / np.sum(w) if np.sum(w) > 0 else w
                 final_prob = float(np.sum(w * np.array(parts, dtype=float)))
                 w_norm = {lab: float(w[i]) for i, lab in enumerate(labels)}
 
@@ -819,13 +734,6 @@ async def signals_loop():
                     signal, conf = "SELL", 1.0 - final_prob
                 else:
                     signal, conf = "HOLD", abs(final_prob - 0.5) * 2.0
-
-                # Enhanced logging with component attribution
-                add_log(
-                    f"sig {sym} | {signal} p={final_prob:.3f} conf={conf:.3f} | "
-                    f"[ema={ema_prob:.3f} ml={ml_prob or 'na'} q={q_prob or 'na'} sent={s_prob or 'na'}] | "
-                    f"w={w_source} {w_norm} | mode={QUANTUM_MODE}"
-                )
 
                 out = {
                     "symbol": sym,
@@ -839,8 +747,6 @@ async def signals_loop():
                     "thr_buy": round(float(thr_buy), 4),
                     "thr_sell": round(float(thr_sell), 4),
                     "weights": w_norm,
-                    "weight_source": w_source,
-                    "quantum_mode": QUANTUM_MODE,
                     "t": int(time.time())
                 }
                 _push_signal(out)
@@ -849,7 +755,11 @@ async def signals_loop():
                 # 4) buffer features for online labels later
                 if ONLINE_LEARN and _OL is not None:
                     try:
-                        X = _OL.vectorize(feats)
+                        # Add quantum probability to features for ML learning
+                        feats_with_quantum = feats.copy()
+                        feats_with_quantum["quantum_prob"] = q_prob if q_prob is not None else 0.5
+                        
+                        X = _OL.vectorize(feats_with_quantum)
                         prev_close = float(feats["close"][-1])
                         _prev_feature[sym] = {
                             "X": X, 
@@ -889,19 +799,8 @@ async def online_label_loop():
                     continue
                 if not data or len(data) < 2:
                     continue
-                
                 latest_close = float(data[-1][4])
                 y = int(latest_close > float(pack["prev_close"]))
-                
-                # Update component performance if we have the previous signal components
-                if "signal_components" in pack:
-                    sc = pack["signal_components"]
-                    _update_component_perf(
-                        y_true=y,
-                        ema_p=sc.get("ema"), ml_p=sc.get("ml"), 
-                        q_p=sc.get("q"), s_p=sc.get("sent")
-                    )
-                
                 _pending_X.append(pack["X"])
                 _pending_y.append(y)
                 # remove once labeled
@@ -1249,7 +1148,7 @@ def sentiment():
 
 @app.get("/ml/status")
 def ml_status():
-    return {
+    stats = {
         "online": ONLINE_LEARN,
         "model_path": ONLINE_MODEL_PATH if ONLINE_LEARN else MODEL_XGB_PATH,
         "pending_batch": len(_pending_y),
@@ -1257,6 +1156,22 @@ def ml_status():
         "joblib_loaded": bool(_ML_MODEL),
         "features": _OL.feature_names() if _OL else ["close","rsi14","ret1","ema_fast","ema_slow","vol"]
     }
+    
+    # Add quantum-enhanced ML stats if available
+    if _OL is not None:
+        try:
+            ol_stats = _OL.get_model_stats()
+            stats.update({
+                "quantum_features_enabled": ol_stats.get("include_quantum", False),
+                "feature_count": ol_stats.get("feature_count", len(stats["features"])),
+                "feature_importance": ol_stats.get("feature_importance", {}),
+                "quantum_importance": ol_stats.get("quantum_importance"),
+                "quantum_feature_rank": ol_stats.get("quantum_feature_rank"),
+            })
+        except Exception as e:
+            add_log(f"Error getting OL stats: {e}")
+    
+    return stats
 
 @app.get("/trades")
 def trades():
@@ -1293,42 +1208,6 @@ def trades():
         trades_with_pnl.append(trade_out)
     
     return trades_with_pnl
-
-@app.get("/metrics/components")
-def metrics_components():
-    """Component performance and adaptive weight metrics."""
-    import numpy as np
-    
-    def safe_avg(arr): 
-        return None if not arr else float(np.mean(arr))
-    
-    def safe_count(arr):
-        return len(arr) if arr else 0
-    
-    # Current performance scores
-    brier_scores = {k: safe_avg(v) for k, v in _weights_perf.items()}
-    sample_counts = {k: safe_count(v) for k, v in _weights_perf.items()}
-    
-    # Auto weights (if enabled)
-    auto_w = _auto_weights()
-    
-    # Manual weights for comparison
-    manual_w = {"ema": EMA_WEIGHT, "ml": ML_WEIGHT, "q": QUANTUM_WEIGHT, "sent": SENTIMENT_WEIGHT}
-    total_manual = sum(manual_w.values()) or 1.0
-    manual_w = {k: v/total_manual for k, v in manual_w.items()}
-    
-    return {
-        "quantum_mode": QUANTUM_MODE,
-        "weights_auto_enabled": WEIGHTS_AUTO,
-        "lookback_signals": WEIGHTS_LOOKBACK,
-        "performance": {"brier_loss": brier_scores, "sample_counts": sample_counts},
-        "weights": {
-            "current": auto_w if auto_w else manual_w,
-            "source": "auto" if auto_w else "manual",
-            "manual_baseline": manual_w, "auto_computed": auto_w
-        },
-        "bounds": {"min": _parse_bounds("WEIGHTS_MIN"), "max": _parse_bounds("WEIGHTS_MAX")}
-    }
 
 # ───────────────────────────────── Protected Execution Endpoints
 @app.get("/exec/status")
