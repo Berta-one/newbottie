@@ -193,33 +193,50 @@ def add_log(msg: str):
 def get_user_password_hash(env_var: str, default_password: str) -> str:
     """Get password from environment and hash it consistently"""
     password = os.getenv(env_var, default_password)
-    # Create a consistent hash based on password + a fixed salt
-    import hashlib
-    salt = "bottie-fixed-salt-2024"  # Fixed salt for consistency
-    password_with_salt = f"{password}:{salt}"
-    # Use SHA256 of password+salt as seed for consistent hashing
-    seed = hashlib.sha256(password_with_salt.encode()).hexdigest()[:16]
-    # This ensures same password always produces same hash
-    return pwd_context.hash(password + seed)
+    # Simple consistent hash using a fixed salt
+    salt_rounds = 4  # Lower rounds for faster hashing, but still secure
+    return pwd_context.using(rounds=salt_rounds).hash(password + "bottie-salt-2024")
 
 # ───────────────────────────────── In-memory storage for users and audit
+# Get passwords from environment
+SUPERUSER_PASSWORD = os.getenv("SUPERUSER_PASSWORD", "SuperSecret123!")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "AdminPass456!")
+
+# Hash them once at startup
 USERS_DB = {
     "superuser": {
         "username": "superuser",
-        "hashed_password": get_user_password_hash("SUPERUSER_PASSWORD", "SuperSecret123!"),
+        "hashed_password": pwd_context.hash(SUPERUSER_PASSWORD),
         "role": "superuser",
         "created_at": datetime.now(),
         "last_login": None
     },
     "admin": {
         "username": "admin",
-        "hashed_password": get_user_password_hash("ADMIN_PASSWORD", "AdminPass456!"),
+        "hashed_password": pwd_context.hash(ADMIN_PASSWORD),
         "role": "admin",
         "created_at": datetime.now(),
         "last_login": None
     }
 }
 
+# Debug what we're using (REMOVE THIS AFTER TESTING)
+print(f"Superuser password: {SUPERUSER_PASSWORD}")
+print(f"Admin password: {ADMIN_PASSWORD}")
+
+# Add this TEMPORARILY after the USERS_DB definition (around line 120):
+print("=== DEBUG PASSWORD INFO ===")
+print(f"SUPERUSER_PASSWORD env var: {os.getenv('SUPERUSER_PASSWORD', 'NOT SET')}")
+print(f"ADMIN_PASSWORD env var: {os.getenv('ADMIN_PASSWORD', 'NOT SET')}")
+print(f"Superuser hash starts with: {USERS_DB['superuser']['hashed_password'][:20]}...")
+print(f"Admin hash starts with: {USERS_DB['admin']['hashed_password'][:20]}...")
+print("=========================")
+
+# Add this TEMPORARILY for testing:
+test_password = "TestPass123"
+test_hash = get_user_password_hash("NON_EXISTENT_VAR", test_password)
+test_verify = pwd_context.verify(test_password + hashlib.sha256(f"{test_password}:bottie-fixed-salt-2024".encode()).hexdigest()[:16], test_hash)
+print(f"Password test - Hash: {test_hash[:30]}... Verify: {test_verify}")
 AUDIT_LOGS = []
 
 # ───────────────────────────────── Execution State Persistence
