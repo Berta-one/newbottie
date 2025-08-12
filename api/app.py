@@ -1,12 +1,11 @@
 # api/app.py
-import os, time, asyncio, logging, math, json, hashlib, traceback
+import os, time, asyncio, logging, math, json, hashlib
 from typing import Any, Dict, List, Optional, Tuple, Set
-from collections import deque
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# ───────────────────────────── deps checks
+# ────────────── deps
 try:
     import ccxt
 except Exception as e:
@@ -23,7 +22,7 @@ try:
 except Exception:
     joblib = None
 
-# Quantum optional
+# Quantum (optional)
 try:
     from qiskit import QuantumCircuit
     from qiskit_aer import Aer
@@ -31,14 +30,14 @@ except Exception:
     QuantumCircuit = None
     Aer = None
 
-# Sentiment (Finnhub + VADER)
+# Sentiment (Finnhub + VADER) — our module
 try:
     from sentiment.sentiment_service import snapshot as sentiment_snapshot, latest_probs as sentiment_latest_probs
     SENTIMENT_WIRED = True
 except Exception:
     SENTIMENT_WIRED = False
 
-# ───────────────────────────── ENV
+# ────────────── ENV
 LOG_LEVEL         = os.getenv("LOG_LEVEL", "INFO").upper()
 NETLIFY_URL       = os.getenv("NETLIFY_URL", "*")
 
@@ -57,48 +56,58 @@ MAX_TRADES_PER_SYMBOL = int(os.getenv("MAX_TRADES_PER_SYMBOL", "1000"))
 FEE_IN_COST_BASIS     = os.getenv("FEE_IN_COST_BASIS", "1").lower() in ("1","true","yes")
 COST_CACHE_TTL_SEC    = int(os.getenv("COST_CACHE_TTL_SEC", "600"))
 
-TRADE_TIMEFRAME     = os.getenv("TRADE_TIMEFRAME", "1h")
-TRADE_LOOKBACK_BARS = int(os.getenv("TRADE_LOOKBACK_BARS", "300"))
-TRADE_FAST_EMA      = int(os.getenv("TRADE_FAST_EMA", "12"))
-TRADE_SLOW_EMA      = int(os.getenv("TRADE_SLOW_EMA", "26"))
-TRADE_MIN_CONF      = float(os.getenv("TRADE_MIN_CONF", "0.55"))  # used for bands in /signals view
-TRADE_SYMBOLS_ENV   = os.getenv("TRADE_SYMBOLS", "")
+TRADE_TIMEFRAME       = os.getenv("TRADE_TIMEFRAME", "1h")
+TRADE_LOOKBACK_BARS   = int(os.getenv("TRADE_LOOKBACK_BARS", "300"))
+TRADE_FAST_EMA        = int(os.getenv("TRADE_FAST_EMA", "12"))
+TRADE_SLOW_EMA        = int(os.getenv("TRADE_SLOW_EMA", "26"))
+TRADE_MIN_CONF        = float(os.getenv("TRADE_MIN_CONF", "0.55"))  # used for UI thresholds; sizing uses strength
 
-# weights (normalized at combine-time)
-EMA_WEIGHT       = float(os.getenv("EMA_WEIGHT", "0.65"))
-ML_WEIGHT_BASE   = float(os.getenv("ML_WEIGHT", "0.25"))
-QUANTUM_WEIGHT   = float(os.getenv("QUANTUM_WEIGHT", "0.35"))
-SENTIMENT_WEIGHT = float(os.getenv("SENTIMENT_WEIGHT", "0.20"))
+# dynamic symbol set = all portfolio symbols + optional extra
+TRADE_SYMBOLS_ENV     = os.getenv("TRADE_SYMBOLS", "")
 
-ML_ENABLED       = os.getenv("ML_ENABLED", "1").lower() in ("1","true","yes")
-MODEL_XGB_PATH   = os.getenv("MODEL_XGB_PATH", "models/xgb_model.pkl")
-MODEL_META_PATH  = os.getenv("MODEL_META_PATH", "models/xgb_meta.json")
-AUTO_TRAIN_ON_START = os.getenv("AUTO_TRAIN_ON_START", "0").lower() in ("1","true","yes")
+# weights (normalized in combine)
+EMA_WEIGHT            = float(os.getenv("EMA_WEIGHT", "0.65"))
+ML_WEIGHT             = float(os.getenv("ML_WEIGHT", "0.25"))
+QUANTUM_WEIGHT        = float(os.getenv("QUANTUM_WEIGHT", "0.35"))
+SENTIMENT_WEIGHT      = float(os.getenv("SENTIMENT_WEIGHT", "0.20"))
 
-# online learning
-ONLINE_LEARN        = os.getenv("ONLINE_LEARN", "1").lower() in ("1","true","yes")
-ONLINE_INTERVAL_S   = int(os.getenv("ONLINE_INTERVAL_S", "300"))
-ONLINE_BATCH        = int(os.getenv("ONLINE_BATCH", "256"))
+# ML
+ML_ENABLED            = os.getenv("ML_ENABLED", "1").lower() in ("1","true","yes")
+MODEL_XGB_PATH       = os.getenv("MODEL_XGB_PATH", "models/xgb_model.pkl")
+MODEL_META_PATH      = os.getenv("MODEL_META_PATH", "models/xgb_meta.json")
+AUTO_TRAIN_ON_START  = os.getenv("AUTO_TRAIN_ON_START", "0").lower() in ("1","true","yes")
+TRAIN_SYMBOLS_ENV    = os.getenv("TRAIN_SYMBOLS", "BTC/USDT,ETH/USDT")
+TRAIN_TIMEFRAME      = os.getenv("TRAIN_TIMEFRAME", "1h")
+TRAIN_LIMIT          = int(os.getenv("TRAIN_LIMIT", "600"))
 
-QUANTUM_ENABLED  = os.getenv("QUANTUM_ENABLED", "0").lower() in ("1","true","yes")
-QUANTUM_BACKEND  = os.getenv("QUANTUM_BACKEND", "aer_simulator")
+# Quantum
+QUANTUM_ENABLED       = os.getenv("QUANTUM_ENABLED", "0").lower() in ("1","true","yes")
+QUANTUM_BACKEND       = os.getenv("QUANTUM_BACKEND", "aer_simulator")
 
-SENTIMENT_ENABLED = os.getenv("SENTIMENT_ENABLED", "1").lower() in ("1","true","yes")
+# Sentiment
+SENTIMENT_ENABLED     = os.getenv("SENTIMENT_ENABLED", "1").lower() in ("1","true","yes")
 
-# execution
-TRADE_ENABLED          = os.getenv("TRADE_ENABLED", "0").lower() in ("1","true","yes")
-EXECUTION_INTERVAL_S   = float(os.getenv("EXECUTION_INTERVAL_S", "20"))
-TRADE_QUOTE_PER_ORDER  = float(os.getenv("TRADE_QUOTE_PER_ORDER", "100"))  # base spend unit
-MAX_OPEN_POSITIONS     = int(os.getenv("MAX_OPEN_POSITIONS", "10"))
-MAX_SPEND_PER_SYMBOL   = float(os.getenv("MAX_SPEND_PER_SYMBOL", "1000"))
-# strength-based sizing
-SIZE_ALPHA             = float(os.getenv("SIZE_ALPHA", "1.0"))   # >1 = more convex; <1 = flatter
-BUY_MIN_USDT           = float(os.getenv("BUY_MIN_USDT", "25"))  # guaranteed min spend when BUY triggers
-BUY_MAX_MULTIPLIER     = float(os.getenv("BUY_MAX_MULTIPLIER", "3.0"))  # spend cap vs TRADE_QUOTE_PER_ORDER
-SELL_MIN_FRAC          = float(os.getenv("SELL_MIN_FRAC", "0.15"))
-SELL_MAX_FRAC          = float(os.getenv("SELL_MAX_FRAC", "1.00"))
+# Execution / risk
+TRADE_ENABLED         = os.getenv("TRADE_ENABLED", "0").lower() in ("1","true","yes")
+EXECUTION_INTERVAL_S  = float(os.getenv("EXECUTION_INTERVAL_S", "20"))
 
-# ───────────────────────────── App
+# strength gate + cooldown
+MIN_STRENGTH_TO_TRADE = float(os.getenv("MIN_STRENGTH_TO_TRADE", "0.20"))
+MIN_SECS_BETWEEN_TRADES = float(os.getenv("MIN_SECS_BETWEEN_TRADES", "120"))
+
+# sizing & caps
+TRADE_QUOTE_PER_ORDER = float(os.getenv("TRADE_QUOTE_PER_ORDER", "100"))  # base unit
+SIZE_ALPHA            = float(os.getenv("SIZE_ALPHA", "1.2"))             # convexity for buy unit
+BUY_MAX_MULTIPLIER    = float(os.getenv("BUY_MAX_MULTIPLIER", "2.0"))     # cap * base unit
+BUY_MIN_USDT          = float(os.getenv("BUY_MIN_USDT", "12"))            # ensure > most minNotional
+
+MAX_OPEN_POSITIONS    = int(os.getenv("MAX_OPEN_POSITIONS", "10"))
+MAX_SPEND_PER_SYMBOL  = float(os.getenv("MAX_SPEND_PER_SYMBOL", "1000"))
+
+SELL_MIN_FRAC         = float(os.getenv("SELL_MIN_FRAC", "0.25"))
+SELL_MAX_FRAC         = float(os.getenv("SELL_MAX_FRAC", "1.0"))
+
+# ────────────── App
 logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
 log = logging.getLogger("BottieAPI")
 
@@ -111,24 +120,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ───────────────────────────── State
+# ────────────── State
 _started = time.time()
 _equity_series: List[Dict[str, Any]] = []
-_positions: Dict[str, Dict[str, float]] = {}
+_positions: Dict[str, Dict[str, float]] = {}   # sym -> {qty, avg_px, last_px}
 _signals: List[Dict[str, Any]] = []
 _logs: List[str] = []
 _cost_basis_cache: Dict[str, Dict[str, float]] = {}
 
-# ML live objects
-_ML_MODEL = None
-_ML_META: Dict[str, Any] = {}
-_ml_perf = deque(maxlen=500)          # rolling list of (prob, label) for calibration
-_ml_weight_gain = 1.0                 # adaptive multiplier for ML weight
-
-# Online learning buffer
-_online_X = deque(maxlen=2000)
-_online_y = deque(maxlen=2000)
-_last_seen_close: Dict[str, float] = {}  # for next-bar labels
+# execution state
+_last_trade_ts: Dict[str, float] = {}          # sym -> last order ts
+_market_filters: Dict[str, Dict[str, float]] = {}  # sym -> {"stepSize","minNotional"}
 
 def add_log(msg: str):
     _logs.append(msg)
@@ -136,7 +138,7 @@ def add_log(msg: str):
         del _logs[:-1000]
     log.info(msg)
 
-# ───────────────────────────── Exchange
+# ────────────── Exchange
 _exchange: Optional[ccxt.Exchange] = None
 
 def _init_exchange() -> ccxt.Exchange:
@@ -170,7 +172,7 @@ def _symbol_exists(base: str, quote: str) -> bool:
     assert _exchange is not None
     return f"{base}/{quote}" in _exchange.markets
 
-# ───────────────────────────── Helpers
+# ────────────── Helpers
 def _nonzero_assets_from_balance(balance: Dict[str, Any]) -> Dict[str, float]:
     out: Dict[str, float] = {}
     for a, v in (balance.get("total") or {}).items():
@@ -210,7 +212,46 @@ def _fetch_tickers(symbols: List[str]) -> Dict[str, Any]:
 def _ms_since(days: int) -> int:
     return int((time.time() - days * 86400) * 1000)
 
-# ───────────────────────────── Cost basis (WAC)
+# ────────────── Binance filters
+def _round_step(qty: float, step: float) -> float:
+    if step <= 0:
+        return qty
+    precision = max(0, int(round(-math.log10(step) + 1e-8)))
+    # floor to step
+    return math.floor(qty / step) * step if step >= 1e-12 else float(f"{qty:.{precision}f}")
+
+def _binance_filters(sym: str) -> Dict[str, float]:
+    """Cache stepSize & minNotional from market info."""
+    if sym in _market_filters:
+        return _market_filters[sym]
+    try:
+        m = _exchange.market(sym)  # type: ignore
+        step = 0.0
+        min_not = 10.0
+        info = m.get("info", {})
+        # Extract stepSize
+        try:
+            fl = info.get("filters", [])
+            for f in fl:
+                if f.get("filterType") == "LOT_SIZE":
+                    step = float(f.get("stepSize", "0"))
+                if f.get("filterType") == "NOTIONAL":
+                    min_not = float(f.get("minNotional", "10"))
+        except Exception:
+            pass
+        if step <= 0:
+            step = float(m.get("precision", {}).get("amount", 0)) or 0.00000001
+        _market_filters[sym] = {"stepSize": float(step or 0.00000001), "minNotional": float(min_not or 10.0)}
+    except Exception:
+        _market_filters[sym] = {"stepSize": 0.00000001, "minNotional": 10.0}
+    return _market_filters[sym]
+
+def _can_open_more_positions() -> bool:
+    # count positions with qty > 0 and not the cash/cash
+    n = sum(1 for k, v in _positions.items() if k.endswith(f"/{PRIMARY_QUOTE}") and k != f"{PRIMARY_QUOTE}/{PRIMARY_QUOTE}" and float(v.get("qty", 0)) > 0)
+    return n < MAX_OPEN_POSITIONS
+
+# ────────────── Cost basis (WAC)
 def _compute_cost_basis_for_symbol(symbol: str) -> Optional[Tuple[float, float]]:
     assert _exchange is not None
     if not (API_KEY and API_SECRET):
@@ -277,7 +318,7 @@ def _get_cost_basis(symbol: str) -> Optional[Tuple[float, float]]:
         _cost_basis_cache[symbol] = {"ts": now, "qty": qty, "avg_px": avg}
     return res
 
-# ───────────────────────────── Portfolio loop
+# ────────────── Portfolio loop
 def _value_portfolio(assets: Dict[str, float]) -> Tuple[float, Dict[str, Dict[str, float]]]:
     preferred = _quote_priority()
     assert _exchange is not None
@@ -340,7 +381,7 @@ async def portfolio_loop():
             add_log(f"ERROR portfolio_loop: {e}")
         await asyncio.sleep(LOOP_SLEEP_S)
 
-# ───────────────────────────── Indicators & Features
+# ────────────── Features & Signals
 def _ema(arr: np.ndarray, span: int) -> np.ndarray:
     if len(arr) < span + 2:
         return np.full_like(arr, np.nan, dtype=float)
@@ -369,10 +410,9 @@ def _build_features(ohlcv: List[List[float]]) -> Dict[str, Any]:
     rsi14 = _rsi(close, 14)
     ret1 = np.zeros_like(close)
     ret1[1:] = (close[1:] - close[:-1]) / (close[:-1] + 1e-12)
-    feats = {
+    return {"ok": True, "features": {
         "close": close, "vol": vol, "ema_fast": emaf, "ema_slow": emas, "rsi14": rsi14, "ret1": ret1
-    }
-    return {"ok": True, "features": feats}
+    }}
 
 def _ema_score(feats: Dict[str, Any]) -> float:
     ef, es = feats["ema_fast"][-1], feats["ema_slow"][-1]
@@ -382,7 +422,10 @@ def _ema_score(feats: Dict[str, Any]) -> float:
     diff = (ef - es) / max(1e-8, px)
     return float(max(-1.0, min(1.0, diff * 50.0)))  # [-1,1]
 
-# ───────────────────────────── ML: load, score, online-learn
+# ML
+_ML_MODEL = None
+_ML_META: Dict[str, Any] = {}
+
 def _load_ml():
     global _ML_MODEL, _ML_META
     if not ML_ENABLED or not joblib:
@@ -404,18 +447,15 @@ def _load_ml():
         _ML_MODEL = None
         _ML_META = {}
 
-def _pack_x(feats: Dict[str, Any]) -> np.ndarray:
-    close = feats["close"]; rsi = feats["rsi14"]; ret1 = feats["ret1"]
-    emaf = feats["ema_fast"]; emas = feats["ema_slow"]; vol = feats["vol"]
-    return np.array([[close[-1],
-                      (50.0 if np.isnan(rsi[-1]) else rsi[-1]),
-                      ret1[-1], emaf[-1], emas[-1], vol[-1]]], dtype=float)
-
 def _ml_prob(feats: Dict[str, Any]) -> Optional[float]:
     if not _ML_MODEL:
         return None
     try:
-        x = _pack_x(feats)
+        close = feats["close"]; rsi = feats["rsi14"]; ret1 = feats["ret1"]
+        emaf = feats["ema_fast"]; emas = feats["ema_slow"]; vol = feats["vol"]
+        x = np.array([[close[-1],
+                       (50.0 if np.isnan(rsi[-1]) else rsi[-1]),
+                       ret1[-1], emaf[-1], emas[-1], vol[-1]]], dtype=float)
         if hasattr(_ML_MODEL, "predict_proba"):
             p = _ML_MODEL.predict_proba(x)
             return float(p[0, 1]) if p.shape[1] >= 2 else float(np.mean(p[0]))
@@ -429,9 +469,9 @@ def _ml_prob(feats: Dict[str, Any]) -> Optional[float]:
         add_log(f"ML score error: {e}")
     return None
 
+# Auto-train if missing
 def _fit_simple_model_from_ohlcv(ohlcv: List[List[float]]):
-    import numpy as np, pandas as pd
-    from sklearn.linear_model import SGDClassifier, LogisticRegression
+    from sklearn.linear_model import LogisticRegression
     try:
         import xgboost as xgb
         XGB = xgb.XGBClassifier(
@@ -464,6 +504,7 @@ def _fit_simple_model_from_ohlcv(ohlcv: List[List[float]]):
     ema_f = ema(close, max(2, TRADE_FAST_EMA))
     ema_s = ema(close, max(3, TRADE_SLOW_EMA))
     rsi14 = rsi(close, 14)
+
     ret1 = np.zeros_like(close)
     ret1[1:] = (close[1:] - close[:-1]) / (close[:-1] + 1e-12)
 
@@ -471,40 +512,34 @@ def _fit_simple_model_from_ohlcv(ohlcv: List[List[float]]):
         "close": close, "vol": vol, "ema_fast": ema_f, "ema_slow": ema_s,
         "rsi14": rsi14, "ret1": ret1
     }).replace([np.inf, -np.inf], np.nan).dropna()
-    y = (df["ret1"] > 0).astype(int).values
+
+    y_aligned = (df["ret1"] > 0).astype(int).values
     X = df[["close","rsi14","ret1","ema_fast","ema_slow","vol"]].values
 
-    if XGB is not None:
-        model = XGB
-    else:
-        # SGDClassifier supports partial_fit for true online learning
-        model = SGDClassifier(loss="log_loss", max_iter=1000, tol=1e-3)
-    model.fit(X, y)
+    model = XGB if XGB is not None else LogisticRegression(max_iter=1000)
+    model.fit(X, y_aligned)
     meta = {"features": ["close","rsi14","ret1","ema_fast","ema_slow","vol"]}
     return model, meta
 
 async def _auto_train_if_missing():
     global _ML_MODEL, _ML_META
-    if not ML_ENABLED or _ML_MODEL:
+    if not (ML_ENABLED and AUTO_TRAIN_ON_START):
         return
-    if not AUTO_TRAIN_ON_START:
-        add_log("ML: no model and AUTO_TRAIN_ON_START=0 (skipping boot train).")
+    if _ML_MODEL:
         return
     try:
         assert _exchange is not None
-        syms = [s.strip() for s in os.getenv("TRAIN_SYMBOLS", "BTC/USDT,ETH/USDT").split(",") if s.strip()]
-        tf   = os.getenv("TRAIN_TIMEFRAME", "1h")
-        lim  = int(os.getenv("TRAIN_LIMIT", "600"))
+        syms = [s.strip() for s in TRAIN_SYMBOLS_ENV.split(",") if s.strip()]
         all_ohlcv: List[List[float]] = []
         for s in syms:
             try:
-                data = _exchange.fetch_ohlcv(s, timeframe=tf, limit=lim)
+                data = _exchange.fetch_ohlcv(s, timeframe=TRAIN_TIMEFRAME, limit=TRAIN_LIMIT)
                 if data:
                     all_ohlcv.extend(data)
             except Exception as e:
                 add_log(f"auto-train: fetch_ohlcv fail {s}: {e}")
         if len(all_ohlcv) < 200:
-            add_log("ML: auto-train: not enough data to train")
+            add_log("auto-train: not enough combined data to train; skipping")
             return
         model, meta = _fit_simple_model_from_ohlcv(all_ohlcv)
         if joblib:
@@ -512,59 +547,19 @@ async def _auto_train_if_missing():
             joblib.dump(model, MODEL_XGB_PATH)
             with open(MODEL_META_PATH, "w") as f:
                 json.dump(meta, f, indent=2)
-        _ML_MODEL = model
-        _ML_META  = meta
-        add_log(f"ML: trained and {'saved' if joblib else 'kept in RAM'}")
+            _ML_MODEL = model; _ML_META = meta
+            add_log(f"ML: auto-trained and saved → {MODEL_XGB_PATH}")
+        else:
+            _ML_MODEL = model; _ML_META = meta
+            add_log("ML: auto-trained in memory (joblib not available to persist)")
     except Exception as e:
         add_log(f"auto-train error: {e}")
 
-def _record_calibration(prob: float, label: int):
-    # Store (prob, label) and update ML weight gain via simple 1-Brier
-    try:
-        _ml_perf.append((float(prob), int(label)))
-        if len(_ml_perf) >= 50:
-            # Brier score (lower is better)
-            b = np.mean([(p - y)**2 for p, y in _ml_perf])
-            score = max(0.0, 1.0 - b)  # map to [0,1], higher better
-            # smooth gain toward score
-            global _ml_weight_gain
-            _ml_weight_gain = 0.7 * _ml_weight_gain + 0.3 * (0.5 + 0.5 * score)
-    except Exception:
-        pass
-
-async def _online_trainer_loop():
-    if not (ML_ENABLED and ONLINE_LEARN):
-        add_log("Online learning disabled.")
-        return
-    add_log("Online learning loop started.")
-    while True:
-        try:
-            if _ML_MODEL is None:
-                await asyncio.sleep(ONLINE_INTERVAL_S)
-                continue
-            # Build minibatch
-            if len(_online_X) >= ONLINE_BATCH and hasattr(_ML_MODEL, "partial_fit"):
-                X = np.array(list(_online_X)[-ONLINE_BATCH:], dtype=float)
-                y = np.array(list(_online_y)[-ONLINE_BATCH:], dtype=int)
-                classes = np.array([0, 1])
-                _ML_MODEL.partial_fit(X, y, classes=classes)
-                add_log(f"ML: partial_fit executed on batch={len(X)}")
-                # optional: persist
-                if joblib:
-                    try:
-                        joblib.dump(_ML_MODEL, MODEL_XGB_PATH)
-                    except Exception as e:
-                        add_log(f"ML persist error: {e}")
-        except Exception as e:
-            add_log(f"online-trainer error: {e}")
-        await asyncio.sleep(ONLINE_INTERVAL_S)
-
-# ───────────────────────────── Quantum & Sentiment
+# Quantum score
 def _quantum_prob(symbol: str, feats: Dict[str, Any]) -> Optional[float]:
     if not QUANTUM_ENABLED:
         return None
     if QuantumCircuit is None or Aer is None:
-        # deterministic pseudo prob fallback
         h = hashlib.sha256(f"{symbol}:{feats['close'][-1]:.8f}".encode()).hexdigest()
         return (int(h[:8], 16) % 1000) / 1000.0
     try:
@@ -582,6 +577,7 @@ def _quantum_prob(symbol: str, feats: Dict[str, Any]) -> Optional[float]:
         add_log(f"Quantum score error: {e}")
         return None
 
+# Sentiment prob 0..1
 def _sentiment_prob(symbol: str) -> Optional[float]:
     if not (SENTIMENT_ENABLED and SENTIMENT_WIRED):
         return None
@@ -592,16 +588,13 @@ def _sentiment_prob(symbol: str) -> Optional[float]:
     except Exception:
         return None
 
-# ───────────────────────────── Scan universe
 def _symbols_to_scan() -> List[str]:
     assert _exchange is not None
     syms: Set[str] = set()
-    # existing live positions
     for sym in _positions.keys():
         if sym.endswith(f"/{PRIMARY_QUOTE}") and not sym.startswith(f"{PRIMARY_QUOTE}/"):
             if sym in _exchange.markets:
                 syms.add(sym)
-    # forced via env
     if TRADE_SYMBOLS_ENV.strip():
         for s in TRADE_SYMBOLS_ENV.split(","):
             s = s.strip().upper()
@@ -619,26 +612,6 @@ def _push_signal(sig: Dict[str, Any]):
         _signals.append(sig)
     if len(_signals) > 1000:
         del _signals[:-700]
-
-# ───────────────────────────── Signals + Online labels
-def _combine_probs(ema_prob: float,
-                   ml_prob: Optional[float],
-                   q_prob: Optional[float],
-                   s_prob: Optional[float]) -> Tuple[float, Dict[str,float]]:
-    parts, weights, labels = [ema_prob], [EMA_WEIGHT], ["ema"]
-    # dynamic ML weight via calibration gain
-    ml_w = ML_WEIGHT_BASE * max(0.25, min(2.0, _ml_weight_gain))
-    if ml_prob is not None: parts.append(ml_prob); weights.append(ml_w); labels.append("ml")
-    if q_prob  is not None: parts.append(q_prob);  weights.append(QUANTUM_WEIGHT); labels.append("q")
-    if s_prob  is not None: parts.append(s_prob);  weights.append(SENTIMENT_WEIGHT); labels.append("sent")
-
-    if sum(weights) <= 0:
-        return float(ema_prob), {"ema": 1.0}
-    w = np.array(weights, dtype=float)
-    w = w / np.sum(w)
-    final_prob = float(np.sum(w * np.array(parts, dtype=float)))
-    w_norm = {lab: float(w[i]) for i, lab in enumerate(labels)}
-    return final_prob, w_norm
 
 async def signals_loop():
     await _ensure_exchange()
@@ -664,15 +637,6 @@ async def signals_loop():
                     continue
                 feats = f["features"]
 
-                # create next-bar label for online learn (based on last two closes)
-                close = feats["close"]
-                if len(close) >= 2:
-                    # label = 1 if last close > prev close
-                    label = int(close[-1] > close[-2])
-                else:
-                    label = None
-
-                # EMA → [-1,1] → prob
                 ema_s = _ema_score(feats)
                 ema_prob = 0.5 + 0.5 * np.clip(ema_s, -1, 1)
 
@@ -680,25 +644,34 @@ async def signals_loop():
                 q_prob  = _quantum_prob(sym, feats)
                 s_prob  = _sentiment_prob(sym)
 
-                final_prob, w_norm = _combine_probs(ema_prob, ml_prob, q_prob, s_prob)
+                parts, weights, labs = [ema_prob], [EMA_WEIGHT], ["ema"]
+                if ml_prob is not None: parts.append(ml_prob); weights.append(ML_WEIGHT); labs.append("ml")
+                if q_prob  is not None: parts.append(q_prob);  weights.append(QUANTUM_WEIGHT); labs.append("q")
+                if s_prob  is not None: parts.append(s_prob);  weights.append(SENTIMENT_WEIGHT); labs.append("sent")
 
-                # strength in [0,1]
-                strength = abs(final_prob - 0.5) * 2.0
+                if sum(weights) <= 0:
+                    final_prob = float(ema_prob)
+                    w_norm = {"ema": 1.0}
+                else:
+                    w = np.array(weights, dtype=float)
+                    w = w / np.sum(w)
+                    final_prob = float(np.sum(w * np.array(parts, dtype=float)))
+                    w_norm = {labs[i]: float(w[i]) for i in range(len(labs))}
+
                 thr_buy  = 0.5 + 0.5 * TRADE_MIN_CONF
                 thr_sell = 0.5 - 0.5 * TRADE_MIN_CONF
                 if final_prob >= thr_buy:
-                    signal, conf = "BUY", final_prob
+                    signal = "BUY"
                 elif final_prob <= thr_sell:
-                    signal, conf = "SELL", 1.0 - final_prob
+                    signal = "SELL"
                 else:
-                    signal, conf = "HOLD", strength
+                    signal = "HOLD"
 
-                # push signal for execution loop
+                strength = abs(final_prob - 0.5) * 2.0  # 0..1
                 _push_signal({
                     "symbol": sym,
                     "signal": signal,
-                    "conf": round(float(conf), 4),
-                    "strength": round(float(strength), 4),
+                    "strength": round(float(strength), 4),  # used by execution sizing
                     "ema": round(float(ema_prob), 4),
                     "ml": None if ml_prob is None else round(float(ml_prob), 4),
                     "q": None if q_prob is None else round(float(q_prob), 4),
@@ -711,95 +684,109 @@ async def signals_loop():
                 })
                 n_scanned += 1
 
-                # Online-learn buffer from features and realized label
-                if ONLINE_LEARN and label is not None:
-                    x = _pack_x(feats)[0]
-                    _online_X.append(x)
-                    _online_y.append(label)
-                    # calibration tracking if we had an ML prob
-                    if ml_prob is not None:
-                        _record_calibration(ml_prob, label)
-
             add_log(f"signals | n={n_scanned} scanned")
         except Exception as e:
-            add_log(f"ERROR signals_loop: {e}\n{traceback.format_exc()}")
+            add_log(f"ERROR signals_loop: {e}")
         await asyncio.sleep(max(0.25, SIGNAL_INTERVAL_S - (time.time() - t0)))
 
-# ───────────────────────────── Execution (strength‑sized spot orders)
-def _binance_filters(symbol: str) -> Dict[str, float]:
+# ────────────── Sentiment loop (pulls and scores news)
+async def sentiment_loop():
+    if not (SENTIMENT_ENABLED and SENTIMENT_WIRED):
+        add_log("Sentiment loop disabled or provider not wired.")
+        return
+    add_log("Sentiment loop started.")
+    while True:
+        try:
+            _ = sentiment_snapshot()  # pulls + scores + keeps rolling window inside module
+        except Exception as e:
+            add_log(f"ERROR sentiment_loop: {e}")
+        await asyncio.sleep(60)
+
+# ────────────── Execution
+async def _place_market_order(sym: str, side: str, qty: float) -> Optional[Dict[str, Any]]:
     assert _exchange is not None
-    m = _exchange.market(symbol)
-    info = (m.get("info") or {})
-    filters = info.get("filters") or []
-    out = {"minQty": 0.0, "stepSize": 0.0, "minNotional": 0.0}
-    for f in filters:
-        t = f.get("filterType")
-        if t == "LOT_SIZE":
-            out["minQty"]   = float(f.get("minQty", 0) or 0)
-            out["stepSize"] = float(f.get("stepSize", 0) or 0)
-        elif t in ("NOTIONAL", "MIN_NOTIONAL"):
-            out["minNotional"] = float(f.get("minNotional", 0) or 0)
-    return out
-
-def _round_step(qty: float, step: float) -> float:
-    if step <= 0:
-        return qty
-    return math.floor(qty / step) * step
-
-def _can_open_more_positions() -> bool:
-    n = sum(1 for s, p in _positions.items() if not s.startswith(f"{PRIMARY_QUOTE}/"))
-    return n < MAX_OPEN_POSITIONS
-
-async def _place_market_order(symbol: str, side: str, amount: float) -> Optional[Dict[str, Any]]:
-    assert _exchange is not None
+    if qty <= 0:
+        return None
     try:
-        order = _exchange.create_order(symbol, type="market", side=side.lower(), amount=amount)
-        add_log(f"ORDER {side} {symbol} qty={amount} → id={order.get('id')}")
+        order = _exchange.create_order(symbol=sym, type="market", side=side.lower(), amount=qty)
+        add_log(f"ORDER {side} {sym} qty={qty}")
         return order
     except Exception as e:
-        add_log(f"ORDER ERROR {side} {symbol} qty={amount}: {e}")
+        add_log(f"ERROR order {side} {sym} qty={qty}: {e}")
         return None
 
 async def _execute_signal(sym: str, sig: Dict[str, Any]):
-    if sig.get("signal") not in ("BUY", "SELL"):
+    """Strength‑based sizing, minNotional/step checks, exposure caps, cooldown."""
+    side = sig.get("signal")
+    if side not in ("BUY", "SELL"):
         return
+
+    now = time.time()
+    last_t = _last_trade_ts.get(sym, 0)
+    if now - last_t < MIN_SECS_BETWEEN_TRADES:
+        add_log(f"SKIP {sym}: cooldown {int(now-last_t)}s < {int(MIN_SECS_BETWEEN_TRADES)}")
+        return
+
     pos = _positions.get(sym)  # {"qty","avg_px","last_px"}
     last = (pos or {}).get("last_px") or 0.0
     if last <= 0:
+        add_log(f"SKIP {sym}: no last price")
+        return
+
+    strength = float(sig.get("strength", 0.0))
+    if strength < MIN_STRENGTH_TO_TRADE:
+        add_log(f"SKIP {sym}: strength {strength:.3f} < MIN_STRENGTH_TO_TRADE {MIN_STRENGTH_TO_TRADE:.3f}")
         return
 
     filters = _binance_filters(sym)
     step    = filters["stepSize"]
     min_not = filters["minNotional"]
-    strength = float(sig.get("strength", 0.0))  # [0..1]
 
-    if sig["signal"] == "BUY":
-        if not _can_open_more_positions():
-            return
-        # exposure cap
-        current_expo = 0.0
-        if pos:
-            current_expo = float(pos["qty"]) * last
-        if current_expo >= MAX_SPEND_PER_SYMBOL:
-            return
-        # dynamic spend = scale TRADE_QUOTE_PER_ORDER by strength^alpha, clamp with BUY_MIN and max multiplier
-        dyn_unit = TRADE_QUOTE_PER_ORDER * max(0.1, strength ** SIZE_ALPHA)
-        spend = max(BUY_MIN_USDT, min(dyn_unit, TRADE_QUOTE_PER_ORDER * BUY_MAX_MULTIPLIER,
-                                      MAX_SPEND_PER_SYMBOL - current_expo))
-        qty = _round_step(spend / last, step)
-        if qty <= 0 or last * qty < max(min_not, 10.0):
-            return
-        await _place_market_order(sym, "BUY", qty)
+    def _valid_qty(qty: float) -> float:
+        q = _round_step(qty, step)
+        if q <= 0:
+            return 0.0
+        if last * q < max(min_not, BUY_MIN_USDT):
+            return 0.0
+        return q
 
-    elif sig["signal"] == "SELL":
-        if not pos or pos.get("qty", 0.0) <= 0:
-            return
-        # dynamic fraction between SELL_MIN_FRAC..SELL_MAX_FRAC
-        frac = SELL_MIN_FRAC + (SELL_MAX_FRAC - SELL_MIN_FRAC) * strength
-        qty = _round_step(float(pos["qty"]) * max(0.0, min(1.0, frac)), step)
-        if qty <= 0 or last * qty < max(min_not, 10.0):
-            return
-        await _place_market_order(sym, "SELL", qty)
+    try:
+        if side == "BUY":
+            if not _can_open_more_positions():
+                add_log(f"SKIP BUY {sym}: reached MAX_OPEN_POSITIONS={MAX_OPEN_POSITIONS}")
+                return
+            current_expo = float(pos["qty"]) * last if pos else 0.0
+            if current_expo >= MAX_SPEND_PER_SYMBOL:
+                add_log(f"SKIP BUY {sym}: exposure {current_expo:.2f} ≥ MAX_SPEND_PER_SYMBOL {MAX_SPEND_PER_SYMBOL}")
+                return
+
+            dyn_unit = TRADE_QUOTE_PER_ORDER * max(0.1, strength ** SIZE_ALPHA)
+            spend_cap = min(TRADE_QUOTE_PER_ORDER * BUY_MAX_MULTIPLIER,
+                            MAX_SPEND_PER_SYMBOL - current_expo)
+            spend = max(BUY_MIN_USDT, min(dyn_unit, spend_cap))
+            qty = _valid_qty(spend / last)
+            if qty <= 0:
+                add_log(f"SKIP BUY {sym}: invalid qty (spend={spend:.2f}, step={step}, minNotional={min_not})")
+                return
+            order = await _place_market_order(sym, "BUY", qty)
+            if order:
+                _last_trade_ts[sym] = now
+
+        elif side == "SELL":
+            if not pos or pos.get("qty", 0.0) <= 0:
+                add_log(f"SKIP SELL {sym}: no position to sell")
+                return
+            frac = SELL_MIN_FRAC + (SELL_MAX_FRAC - SELL_MIN_FRAC) * strength
+            qty = _valid_qty(float(pos["qty"]) * max(0.0, min(1.0, frac)))
+            if qty <= 0:
+                add_log(f"SKIP SELL {sym}: invalid qty (pos={pos.get('qty')}, step={step}, minNotional={min_not})")
+                return
+            order = await _place_market_order(sym, "SELL", qty)
+            if order:
+                _last_trade_ts[sym] = now
+
+    except Exception as e:
+        add_log(f"ERROR _execute_signal {sym}: {e}")
 
 async def execution_loop():
     if not TRADE_ENABLED:
@@ -810,7 +797,7 @@ async def execution_loop():
     while True:
         try:
             latest_by_sym: Dict[str, Dict[str, Any]] = {}
-            for s in _signals[-300:]:
+            for s in _signals[-400:]:
                 latest_by_sym[s["symbol"]] = s
             for sym, sig in latest_by_sym.items():
                 if sig["signal"] in ("BUY", "SELL"):
@@ -819,36 +806,17 @@ async def execution_loop():
             add_log(f"ERROR execution_loop: {e}")
         await asyncio.sleep(EXECUTION_INTERVAL_S)
 
-# ───────────────────────────── Sentiment polling
-async def sentiment_loop():
-    if not (SENTIMENT_ENABLED and SENTIMENT_WIRED):
-        add_log("Sentiment loop disabled or not wired.")
-        return
-    add_log("Sentiment loop started.")
-    while True:
-        try:
-            snap = sentiment_snapshot()
-            scores = snap.get("scores", {})
-            if scores:
-                # log a brief summary
-                items = list(scores.items())
-                head = ", ".join(f"{k}:{v.get('score',0):+.2f}({v.get('n',0)})" for k, v in items[:6])
-                add_log(f"sentiment | {head}")
-        except Exception as e:
-            add_log(f"ERROR sentiment_loop: {e}")
-        await asyncio.sleep(60)
-
-# ───────────────────────────── Startup
+# ────────────── Startup
 @app.on_event("startup")
 async def _on_startup():
     asyncio.create_task(portfolio_loop())
     asyncio.create_task(signals_loop())
     asyncio.create_task(sentiment_loop())
     asyncio.create_task(_auto_train_if_missing())
-    asyncio.create_task(_online_trainer_loop())
-    asyncio.create_task(execution_loop())
+    if TRADE_ENABLED:
+        asyncio.create_task(execution_loop())
 
-# ───────────────────────────── Endpoints
+# ────────────── Endpoints
 def _detect_quantum() -> Dict[str, Any]:
     if not QUANTUM_ENABLED:
         return {"enabled": False, "backend": "disabled"}
@@ -907,3 +875,66 @@ def sentiment():
     if not (SENTIMENT_ENABLED and SENTIMENT_WIRED):
         return {"enabled": False, "scores": {}}
     return sentiment_snapshot()
+
+@app.get("/execute/preview")
+def execute_preview():
+    """What the bot would trade now, with reasons."""
+    out = []
+    try:
+        latest_by_sym: Dict[str, Dict[str, Any]] = {}
+        for s in _signals[-400:]:
+            latest_by_sym[s["symbol"]] = s
+
+        for sym, sig in latest_by_sym.items():
+            row = {"symbol": sym, "signal": sig.get("signal"), "strength": sig.get("strength")}
+            reason = None
+            act = None
+            if sig.get("signal") not in ("BUY", "SELL"):
+                reason = "HOLD"
+            else:
+                pos = _positions.get(sym)
+                last = (pos or {}).get("last_px") or 0.0
+                if last <= 0:
+                    reason = "no last price"
+                else:
+                    min_strength = MIN_STRENGTH_TO_TRADE
+                    strength = float(sig.get("strength", 0.0))
+                    if strength < min_strength:
+                        reason = f"strength {strength:.3f} < {min_strength:.3f}"
+                    else:
+                        filters = _binance_filters(sym)
+                        step = filters["stepSize"]; min_not = filters["minNotional"]
+                        if sig["signal"] == "BUY":
+                            if not _can_open_more_positions():
+                                reason = f"MAX_OPEN_POSITIONS={MAX_OPEN_POSITIONS}"
+                            else:
+                                current_expo = float(pos["qty"]) * last if pos else 0.0
+                                if current_expo >= MAX_SPEND_PER_SYMBOL:
+                                    reason = f"exposure {current_expo:.2f} ≥ MAX_SPEND_PER_SYMBOL"
+                                else:
+                                    dyn_unit = TRADE_QUOTE_PER_ORDER * max(0.1, strength ** SIZE_ALPHA)
+                                    spend_cap = min(TRADE_QUOTE_PER_ORDER * BUY_MAX_MULTIPLIER,
+                                                    MAX_SPEND_PER_SYMBOL - current_expo)
+                                    spend = max(BUY_MIN_USDT, min(dyn_unit, spend_cap))
+                                    qty = _round_step(spend / last, step)
+                                    if qty <= 0 or last * qty < max(min_not, BUY_MIN_USDT):
+                                        reason = f"invalid qty (spend={spend:.2f}, step={step}, minNotional={min_not})"
+                                    else:
+                                        act = {"side": "BUY", "qty": qty, "spend": spend}
+                        else:  # SELL
+                            if not pos or pos.get("qty", 0.0) <= 0:
+                                reason = "no position"
+                            else:
+                                frac = SELL_MIN_FRAC + (SELL_MAX_FRAC - SELL_MIN_FRAC) * strength
+                                qty = _round_step(float(pos["qty"]) * max(0.0, min(1.0, frac)), step)
+                                if qty <= 0 or last * qty < max(min_not, BUY_MIN_USDT):
+                                    reason = f"invalid qty (pos={pos.get('qty')}, step={step}, minNotional={min_not})"
+                                else:
+                                    act = {"side": "SELL", "qty": qty, "value": qty * last}
+
+            row["action"] = act
+            row["reason"] = reason
+            out.append(row)
+    except Exception as e:
+        return {"error": str(e)}
+    return {"preview": out}
