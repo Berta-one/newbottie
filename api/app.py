@@ -25,94 +25,7 @@ try:
     import joblib
 except Exception:
     joblib = None
-import json
 
-# File to persist execution state
-EXEC_STATE_FILE = "exec_state.json"
-
-def load_execution_state():
-    """Load execution state from file"""
-    global EXECUTION_RUNTIME_ENABLED
-    try:
-        if os.path.exists(EXEC_STATE_FILE):
-            with open(EXEC_STATE_FILE, 'r') as f:
-                data = json.load(f)
-                EXECUTION_RUNTIME_ENABLED = data.get("enabled", True)  # Default to enabled
-                add_log(f"Loaded execution state: {'enabled' if EXECUTION_RUNTIME_ENABLED else 'disabled'}")
-        else:
-            EXECUTION_RUNTIME_ENABLED = True  # Default to enabled if no file
-            save_execution_state()
-    except Exception as e:
-        add_log(f"Error loading execution state: {e}")
-        EXECUTION_RUNTIME_ENABLED = True
-
-def save_execution_state():
-    """Save execution state to file"""
-    try:
-        with open(EXEC_STATE_FILE, 'w') as f:
-            json.dump({"enabled": EXECUTION_RUNTIME_ENABLED}, f)
-        add_log(f"Saved execution state: {'enabled' if EXECUTION_RUNTIME_ENABLED else 'disabled'}")
-    except Exception as e:
-        add_log(f"Error saving execution state: {e}")
-
-# Replace the current execution variable with:
-EXECUTION_RUNTIME_ENABLED = False  # Will be loaded from file
-
-# Add this in your startup event:
-@app.on_event("startup")
-async def _on_startup():
-    load_execution_state()  # ← Add this line
-    asyncio.create_task(portfolio_loop())
-    asyncio.create_task(signals_loop())
-    asyncio.create_task(online_label_loop())
-    asyncio.create_task(execution_loop())
-
-# Update your exec endpoints to save state:
-@app.post("/exec/enable")
-async def exec_enable(request: Request):
-    user = get_current_user(request)
-    if not user:
-        raise HTTPException(status_code=401, detail="Authentication required")
-    
-    global EXECUTION_RUNTIME_ENABLED
-    EXECUTION_RUNTIME_ENABLED = True
-    save_execution_state()  # ← Add this line
-    
-    client_ip = request.client.host if hasattr(request, 'client') else "unknown"
-    log_audit(user["username"], "EXEC_ENABLE", "/exec/enable", client_ip)
-    
-    return {"ok": True, "enabled": EXECUTION_RUNTIME_ENABLED}
-
-@app.post("/exec/disable")
-async def exec_disable(request: Request):
-    user = get_current_user(request)
-    if not user:
-        raise HTTPException(status_code=401, detail="Authentication required")
-    
-    global EXECUTION_RUNTIME_ENABLED
-    EXECUTION_RUNTIME_ENABLED = False
-    save_execution_state()  # ← Add this line
-    
-    client_ip = request.client.host if hasattr(request, 'client') else "unknown"
-    log_audit(user["username"], "EXEC_DISABLE", "/exec/disable", client_ip)
-    
-    return {"ok": True, "enabled": EXECUTION_RUNTIME_ENABLED}
-
-@app.post("/exec/toggle")
-async def exec_toggle(request: Request):
-    user = get_current_user(request)
-    if not user:
-        raise HTTPException(status_code=401, detail="Authentication required")
-    
-    global EXECUTION_RUNTIME_ENABLED
-    EXECUTION_RUNTIME_ENABLED = not EXECUTION_RUNTIME_ENABLED
-    save_execution_state()  # ← Add this line
-    
-    client_ip = request.client.host if hasattr(request, 'client') else "unknown"
-    log_audit(user["username"], "EXEC_TOGGLE", "/exec/toggle", client_ip, 
-             f"Toggled to: {'enabled' if EXECUTION_RUNTIME_ENABLED else 'disabled'}")
-    
-    return {"ok": True, "enabled": EXECUTION_RUNTIME_ENABLED}
 # quantum optional
 try:
     from qiskit import QuantumCircuit
@@ -184,7 +97,7 @@ TRADE_SLOW_EMA      = int(os.getenv("TRADE_SLOW_EMA", "26"))
 TRADE_SYMBOLS_ENV   = os.getenv("TRADE_SYMBOLS", "")
 
 # dynamic thresholds
-TRADE_BASE_MIN_CONF  = float(os.getenv("TRADE_MIN_CONF", "0.55"))   # base confidence
+TRADE_BASE_MIN_CONF  = float(os.getenv("TRADE_MIN_CONF", "0.55"))
 TRADE_CONF_ADAPT     = parse_bool(os.getenv("TRADE_CONF_ADAPT", "1"))
 TRADE_CONF_FLOOR     = float(os.getenv("TRADE_CONF_FLOOR", "0.50"))
 TRADE_CONF_CEIL      = float(os.getenv("TRADE_CONF_CEIL", "0.80"))
@@ -212,9 +125,9 @@ MODEL_META_PATH    = os.getenv("MODEL_META_PATH","models/xgb_meta.json")
 ONLINE_LEARN           = parse_bool(os.getenv("ONLINE_LEARN","1"))
 ONLINE_MODEL_PATH      = os.getenv("ONLINE_MODEL_PATH","models/online_sgd.pkl")
 ONLINE_META_PATH       = os.getenv("ONLINE_META_PATH", "models/online_sgd_meta.json")
-ONLINE_MINIBATCH       = int(os.getenv("ONLINE_MINIBATCH","32"))  # min items per update
-ONLINE_SAVE_SEC        = int(os.getenv("ONLINE_SAVE_SEC","30"))   # handled in class
-ONLINE_LABEL_HORIZON   = int(os.getenv("ONLINE_LABEL_HORIZON","1"))  # label next-bar up/down
+ONLINE_MINIBATCH       = int(os.getenv("ONLINE_MINIBATCH","32"))
+ONLINE_SAVE_SEC        = int(os.getenv("ONLINE_SAVE_SEC","30"))
+ONLINE_LABEL_HORIZON   = int(os.getenv("ONLINE_LABEL_HORIZON","1"))
 
 # quantum
 QUANTUM_ENABLED    = parse_bool(os.getenv("QUANTUM_ENABLED","0"))
@@ -226,22 +139,81 @@ SENTIMENT_SOURCE   = (os.getenv("SENTIMENT_SOURCE", "finnhub") or "finnhub").low
 SENTIMENT_WINDOW_S = int(os.getenv("SENTIMENT_WINDOW_S", "900"))
 
 # JWT Authentication
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "Superuser123")
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-super-secret-jwt-key-change-this-in-production")
 JWT_ALGORITHM = "HS256"
 JWT_ACCESS_TOKEN_EXPIRE_MINUTES = 480  # 8 hours
+
+# ───────────────────────────────── FastAPI App Setup (Create app early)
+logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
+log = logging.getLogger("BottieAPI")
+
+app = FastAPI(title="Bottie API", version="2.0.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[NETLIFY_URL] if NETLIFY_URL != "*" else ["*"],
+    allow_credentials=False,
+    allow_methods=["GET","POST","OPTIONS","HEAD"],
+    allow_headers=["*"],
+)
+
+# ───────────────────────────────── Application State
+_started = time.time()
+_equity_series: List[Dict[str, Any]] = []
+_positions: Dict[str, Dict[str, float]] = {}
+_signals: List[Dict[str, Any]] = []
+_logs: List[str] = []
+_cost_basis_cache: Dict[str, Dict[str, float]] = {}
+
+# ML pieces
+_ML_MODEL = None
+_ML_META: Dict[str, Any] = {}
+_OL: Optional[OnlineLearner] = None
+
+# buffers for online labels
+_prev_feature: Dict[str, Dict[str, Any]] = {}
+_pending_X: List[np.ndarray] = []
+_pending_y: List[int] = []
+
+# execution throttle + tracking
+_last_exec = 0.0
+_open_spend: Dict[str, float] = {}
+_trade_log: List[Dict[str, Any]] = []
+
+# execution runtime switch
+EXECUTION_RUNTIME_ENABLED = False
+
+# ───────────────────────────────── Define add_log function FIRST
+def add_log(msg: str):
+    _logs.append(msg)
+    if len(_logs) > 1500:
+        del _logs[:-1000]
+    log.info(msg)
+
+# ───────────────────────────────── User-friendly password management
+def get_user_password_hash(env_var: str, default_password: str) -> str:
+    """Get password from environment and hash it consistently"""
+    password = os.getenv(env_var, default_password)
+    # Create a consistent hash based on password + a fixed salt
+    import hashlib
+    salt = "bottie-fixed-salt-2024"  # Fixed salt for consistency
+    password_with_salt = f"{password}:{salt}"
+    # Use SHA256 of password+salt as seed for consistent hashing
+    seed = hashlib.sha256(password_with_salt.encode()).hexdigest()[:16]
+    # This ensures same password always produces same hash
+    return pwd_context.hash(password + seed)
 
 # ───────────────────────────────── In-memory storage for users and audit
 USERS_DB = {
     "superuser": {
         "username": "superuser",
-        "hashed_password": pwd_context.hash("change-this-super-password"),  # CHANGE THIS!
+        "hashed_password": get_user_password_hash("SUPERUSER_PASSWORD", "SuperSecret123!"),
         "role": "superuser",
         "created_at": datetime.now(),
         "last_login": None
     },
     "admin": {
-        "username": "admin", 
-        "hashed_password": pwd_context.hash("change-this-admin-password"),  # CHANGE THIS!
+        "username": "admin",
+        "hashed_password": get_user_password_hash("ADMIN_PASSWORD", "AdminPass456!"),
         "role": "admin",
         "created_at": datetime.now(),
         "last_login": None
@@ -249,6 +221,34 @@ USERS_DB = {
 }
 
 AUDIT_LOGS = []
+
+# ───────────────────────────────── Execution State Persistence
+EXEC_STATE_FILE = "exec_state.json"
+
+def load_execution_state():
+    """Load execution state from file"""
+    global EXECUTION_RUNTIME_ENABLED
+    try:
+        if os.path.exists(EXEC_STATE_FILE):
+            with open(EXEC_STATE_FILE, 'r') as f:
+                data = json.load(f)
+                EXECUTION_RUNTIME_ENABLED = data.get("enabled", True)  # Default to enabled
+                add_log(f"Loaded execution state: {'enabled' if EXECUTION_RUNTIME_ENABLED else 'disabled'}")
+        else:
+            EXECUTION_RUNTIME_ENABLED = True  # Default to enabled if no file
+            save_execution_state()
+    except Exception as e:
+        add_log(f"Error loading execution state: {e}")
+        EXECUTION_RUNTIME_ENABLED = True
+
+def save_execution_state():
+    """Save execution state to file"""
+    try:
+        with open(EXEC_STATE_FILE, 'w') as f:
+            json.dump({"enabled": EXECUTION_RUNTIME_ENABLED}, f)
+        add_log(f"Saved execution state: {'enabled' if EXECUTION_RUNTIME_ENABLED else 'disabled'}")
+    except Exception as e:
+        add_log(f"Error saving execution state: {e}")
 
 # ───────────────────────────────── Authentication Functions
 def verify_password(plain_password, hashed_password):
@@ -310,51 +310,6 @@ def get_current_user(request: Request):
         return None
         
     return USERS_DB.get(username)
-
-# ───────────────────────────────── FastAPI App Setup
-logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
-log = logging.getLogger("BottieAPI")
-
-app = FastAPI(title="Bottie API", version="2.0.0")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[NETLIFY_URL] if NETLIFY_URL != "*" else ["*"],
-    allow_credentials=False,
-    allow_methods=["GET","POST","OPTIONS","HEAD"],
-    allow_headers=["*"],
-)
-
-# ───────────────────────────────── Application State
-_started = time.time()
-_equity_series: List[Dict[str, Any]] = []
-_positions: Dict[str, Dict[str, float]] = {}
-_signals: List[Dict[str, Any]] = []
-_logs: List[str] = []
-_cost_basis_cache: Dict[str, Dict[str, float]] = {}
-
-# ML pieces
-_ML_MODEL = None           # optional joblib model
-_ML_META: Dict[str, Any] = {}
-_OL: Optional[OnlineLearner] = None  # online learner always present if ONLINE_LEARN
-
-# buffers for online labels: {symbol: {"X": np.ndarray, "t": int, "prev_close": float}}
-_prev_feature: Dict[str, Dict[str, Any]] = {}
-_pending_X: List[np.ndarray] = []
-_pending_y: List[int] = []
-
-# execution throttle + tracking
-_last_exec = 0.0
-_open_spend: Dict[str, float] = {}  # per-symbol committed quote
-_trade_log: List[Dict[str, Any]] = []
-
-# execution runtime switch
-EXECUTION_RUNTIME_ENABLED = False  # default off at boot
-
-def add_log(msg: str):
-    _logs.append(msg)
-    if len(_logs) > 1500:
-        del _logs[:-1000]
-    log.info(msg)
 
 # ───────────────────────────────── Exchange Setup
 _exchange: Optional[ccxt.Exchange] = None
@@ -974,14 +929,6 @@ async def execution_loop():
 
         await asyncio.sleep(1.0)
 
-# ───────────────────────────────── Startup
-@app.on_event("startup")
-async def _on_startup():
-    asyncio.create_task(portfolio_loop())
-    asyncio.create_task(signals_loop())
-    asyncio.create_task(online_label_loop())
-    asyncio.create_task(execution_loop())
-
 # ───────────────────────────────── Detection Functions
 def _detect_quantum() -> Dict[str, Any]:
     if not QUANTUM_ENABLED:
@@ -1250,6 +1197,7 @@ async def exec_enable(request: Request):
     
     global EXECUTION_RUNTIME_ENABLED
     EXECUTION_RUNTIME_ENABLED = True
+    save_execution_state()  # Save to file
     
     client_ip = request.client.host if hasattr(request, 'client') else "unknown"
     log_audit(user["username"], "EXEC_ENABLE", "/exec/enable", client_ip)
@@ -1264,6 +1212,7 @@ async def exec_disable(request: Request):
     
     global EXECUTION_RUNTIME_ENABLED
     EXECUTION_RUNTIME_ENABLED = False
+    save_execution_state()  # Save to file
     
     client_ip = request.client.host if hasattr(request, 'client') else "unknown"
     log_audit(user["username"], "EXEC_DISABLE", "/exec/disable", client_ip)
@@ -1278,9 +1227,19 @@ async def exec_toggle(request: Request):
     
     global EXECUTION_RUNTIME_ENABLED
     EXECUTION_RUNTIME_ENABLED = not EXECUTION_RUNTIME_ENABLED
+    save_execution_state()  # Save to file
     
     client_ip = request.client.host if hasattr(request, 'client') else "unknown"
     log_audit(user["username"], "EXEC_TOGGLE", "/exec/toggle", client_ip, 
              f"Toggled to: {'enabled' if EXECUTION_RUNTIME_ENABLED else 'disabled'}")
     
     return {"ok": True, "enabled": EXECUTION_RUNTIME_ENABLED}
+
+# ───────────────────────────────── Startup (AFTER all functions are defined)
+@app.on_event("startup")
+async def _on_startup():
+    load_execution_state()  # Load persistent execution state
+    asyncio.create_task(portfolio_loop())
+    asyncio.create_task(signals_loop())
+    asyncio.create_task(online_label_loop())
+    asyncio.create_task(execution_loop())
