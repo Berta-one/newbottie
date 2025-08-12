@@ -815,7 +815,7 @@ def health():
     # ML block – keys exactly as frontend expects
     ml_obj = {
         "enabled": bool(ML_ENABLED or ONLINE_LEARN),
-        "loaded": bool(_ML_MODEL is not None or _OL is not None),  # <- Check BOTH models
+        "loaded": bool(_ML_MODEL is not None or _OL is not None),  # Check BOTH models
         "model_path": (MODEL_XGB_PATH if _ML_MODEL is not None else 
                       (ONLINE_MODEL_PATH if _OL is not None else None)),
     }
