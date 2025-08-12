@@ -189,7 +189,7 @@ def add_log(msg: str):
         del _logs[:-1000]
     log.info(msg)
 
-# ───────────────────────────────── In-memory storage for users and audit
+
 # ───────────────────────────────── Simple User Management
 # Get passwords from environment with defaults
 SUPERUSER_PASSWORD = os.getenv("SUPERUSER_PASSWORD", "SuperSecret123!")
@@ -198,7 +198,7 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "AdminPass456!")
 # Create users with simple password hashing
 USERS_DB = {
     "superuser": {
-        "username": "superuser",
+        "username": "superuser", 
         "hashed_password": pwd_context.hash(SUPERUSER_PASSWORD),
         "role": "superuser",
         "created_at": datetime.now(),
@@ -206,35 +206,19 @@ USERS_DB = {
     },
     "admin": {
         "username": "admin",
-        "hashed_password": pwd_context.hash(ADMIN_PASSWORD),
+        "hashed_password": pwd_context.hash(ADMIN_PASSWORD), 
         "role": "admin",
         "created_at": datetime.now(),
         "last_login": None
     }
 }
 
-# Temporary debug (REMOVE after testing)
-add_log(f"Superuser will use password: {SUPERUSER_PASSWORD}")
-add_log(f"Admin will use password: {ADMIN_PASSWORD}")
-
-# Debug what we're using (REMOVE THIS AFTER TESTING)
-print(f"Superuser password: {SUPERUSER_PASSWORD}")
-print(f"Admin password: {ADMIN_PASSWORD}")
-
-# Add this TEMPORARILY after the USERS_DB definition (around line 120):
-print("=== DEBUG PASSWORD INFO ===")
-print(f"SUPERUSER_PASSWORD env var: {os.getenv('SUPERUSER_PASSWORD', 'NOT SET')}")
-print(f"ADMIN_PASSWORD env var: {os.getenv('ADMIN_PASSWORD', 'NOT SET')}")
-print(f"Superuser hash starts with: {USERS_DB['superuser']['hashed_password'][:20]}...")
-print(f"Admin hash starts with: {USERS_DB['admin']['hashed_password'][:20]}...")
-print("=========================")
-
-# Add this TEMPORARILY for testing:
-test_password = "TestPass123"
-test_hash = get_user_password_hash("NON_EXISTENT_VAR", test_password)
-test_verify = pwd_context.verify(test_password + hashlib.sha256(f"{test_password}:bottie-fixed-salt-2024".encode()).hexdigest()[:16], test_hash)
-print(f"Password test - Hash: {test_hash[:30]}... Verify: {test_verify}")
 AUDIT_LOGS = []
+
+# TEMPORARY DEBUG - remove after testing
+print(f"Superuser password from env: {SUPERUSER_PASSWORD}")
+print(f"Admin password from env: {ADMIN_PASSWORD}")
+
 
 # ───────────────────────────────── Execution State Persistence
 EXEC_STATE_FILE = "exec_state.json"
