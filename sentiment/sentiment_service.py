@@ -3,6 +3,7 @@ import os
 import time
 import json
 import logging
+import asyncio
 from typing import Dict, List, Any, Iterable, Optional
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
@@ -14,6 +15,7 @@ SENTIMENT_WINDOW_S = int(os.getenv("SENTIMENT_WINDOW_S", "900"))
 SENTIMENT_ASSETS = [a.strip().upper() for a in os.getenv("SENTIMENT_ASSETS", "BTC,ETH,BNB,ADA,XRP,SOL").split(",") if a.strip()]
 SENTIMENT_TOP_N = int(os.getenv("SENTIMENT_TOP_N", "50"))
 SENTIMENT_HISTORY_PATH = os.getenv("SENTIMENT_HISTORY_PATH", "").strip()
+SENTIMENT_POLL_S = int(os.getenv("SENTIMENT_POLL_S", "60"))
 
 log = logging.getLogger("SentimentService")
 _analyzer = SentimentIntensityAnalyzer()
@@ -21,7 +23,7 @@ _analyzer = SentimentIntensityAnalyzer()
 # Rolling window store: { BASE: [(ts, score), ...] }
 _store: Dict[str, List[Any]] = {a: [] for a in SENTIMENT_ASSETS}
 
-# === Load history (best effort) so we have context on startup ===
+# === Load history on boot (best effort) ===
 if SENTIMENT_HISTORY_PATH and os.path.exists(SENTIMENT_HISTORY_PATH):
     try:
         with open(SENTIMENT_HISTORY_PATH, "r") as f:
@@ -42,7 +44,6 @@ def _clip(x: float, lo: float, hi: float) -> float:
     return lo if x < lo else hi if x > hi else x
 
 def _to_prob(vader_compound: float) -> float:
-    # VADER compound [-1,1] -> [0,1]
     return _clip(0.5 + 0.5 * vader_compound, 0.0, 1.0)
 
 def _trim_window(now: float):
@@ -69,7 +70,6 @@ def _fetch_texts(assets: List[str]) -> Dict[str, List[str]]:
     if SENTIMENT_SOURCE == "finnhub":
         from sentiment.providers.finnhub_provider import filter_news_by_assets
         return filter_news_by_assets(assets)
-    # You can add other sources here later (NewsAPI, RSS, etc.)
     return {a: [] for a in assets}
 
 def run_sentiment_cycle() -> Dict[str, Dict[str, float]]:
@@ -116,10 +116,7 @@ def snapshot() -> Dict[str, Any]:
         "scores": snap
     }
 
-# ===== New: History APIs for the backend =====
-
 def list_assets() -> List[str]:
-    """Assets we are tracking (union of configured + seen)."""
     seen = set(_store.keys()) | set(SENTIMENT_ASSETS)
     return sorted(seen)
 
@@ -129,21 +126,16 @@ def history_points(
     until: Optional[float] = None,
     max_points: int = 1000
 ) -> Dict[str, List[Dict[str, float]]]:
-    """
-    Return { ASSET: [{t: <sec>, score: <compound>, prob: <0..1>}, ...] }
-    Merges disk history and in-memory window. Downsamples to <= max_points per asset.
-    """
     assets_u = [a.upper() for a in (assets or list_assets())]
     since = float(since) if since is not None else 0.0
     until = float(until) if until is not None else time.time()
 
-    # Gather from disk (if any)
     by_asset: Dict[str, List[Dict[str, float]]] = {a: [] for a in assets_u}
     if SENTIMENT_HISTORY_PATH and os.path.exists(SENTIMENT_HISTORY_PATH):
         try:
             with open(SENTIMENT_HISTORY_PATH, "r") as f:
                 for line in f:
-                    if not line.strip(): 
+                    if not line.strip():
                         continue
                     rec = json.loads(line)
                     a = (rec.get("asset") or "").upper()
@@ -157,7 +149,6 @@ def history_points(
         except Exception as e:
             log.error(f"Failed reading history file: {e}")
 
-    # Merge in-memory window
     for a in assets_u:
         arr = _store.get(a, [])
         for ts, score in arr:
@@ -165,7 +156,6 @@ def history_points(
                 continue
             by_asset[a].append({"t": ts, "score": score, "prob": _to_prob(score)})
 
-    # Sort + downsample per asset
     for a in assets_u:
         pts = sorted(by_asset[a], key=lambda r: r["t"])
         n = len(pts)
@@ -176,3 +166,36 @@ def history_points(
             by_asset[a] = pts
 
     return by_asset
+
+# ===== Background polling support (so app.py can just call start_background) ====
+_bg_task: Optional[asyncio.Task] = None
+_stop_flag = asyncio.Event()
+
+async def _bg_loop(poll_s: Optional[int] = None):
+    if not SENTIMENT_ENABLED:
+        log.info("Sentiment disabled; background loop idling.")
+        return
+    ps = int(poll_s or SENTIMENT_POLL_S)
+    log.info(f"Sentiment background loop started (poll={ps}s, source={SENTIMENT_SOURCE})")
+    while not _stop_flag.is_set():
+        try:
+            run_sentiment_cycle()
+        except Exception as e:
+            log.error(f"Sentiment cycle error: {e}")
+        try:
+            await asyncio.wait_for(_stop_flag.wait(), timeout=ps)
+        except asyncio.TimeoutError:
+            pass
+    log.info("Sentiment background loop stopped.")
+
+def start_background(poll_s: Optional[int] = None):
+    global _bg_task, _stop_flag
+    if _bg_task and not _bg_task.done():
+        return _bg_task
+    _stop_flag = asyncio.Event()
+    loop = asyncio.get_event_loop()
+    _bg_task = loop.create_task(_bg_loop(poll_s=poll_s))
+    return _bg_task
+
+def stop_background():
+    _stop_flag.set()
