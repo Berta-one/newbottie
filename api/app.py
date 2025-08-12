@@ -2,10 +2,10 @@
 import os, time, asyncio, logging, math, json, hashlib
 from typing import Any, Dict, List, Optional, Tuple, Set
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# ───────────────────────────── dependencies
+# ───────────────────────────── deps checks
 try:
     import ccxt
 except Exception as e:
@@ -30,10 +30,9 @@ except Exception:
     QuantumCircuit = None
     Aer = None
 
-# Finnhub/VADER sentiment service (your module)
+# Sentiment service (Finnhub + VADER)
 try:
-    # must exist: sentiment/sentiment_service.py with Finnhub + VADER
-    from sentiment.sentiment_service import snapshot as sentiment_snapshot, latest_probs as sentiment_latest_probs
+    from sentiment.sentiment_service import run_sentiment_cycle, latest_probs, snapshot as sentiment_snapshot
     SENTIMENT_WIRED = True
 except Exception:
     SENTIMENT_WIRED = False
@@ -61,10 +60,10 @@ TRADE_TIMEFRAME     = os.getenv("TRADE_TIMEFRAME", "1h")
 TRADE_LOOKBACK_BARS = int(os.getenv("TRADE_LOOKBACK_BARS", "300"))
 TRADE_FAST_EMA      = int(os.getenv("TRADE_FAST_EMA", "12"))
 TRADE_SLOW_EMA      = int(os.getenv("TRADE_SLOW_EMA", "26"))
-TRADE_MIN_CONF      = float(os.getenv("TRADE_MIN_CONF", "0.55"))
+TRADE_MIN_CONF      = float(os.getenv("TRADE_MIN_CONF", "0.55"))  # kept for backward‑compat
 TRADE_SYMBOLS_ENV   = os.getenv("TRADE_SYMBOLS", "")
 
-# weights (normalized at combine time)
+# weights (they’ll be normalized when combining)
 EMA_WEIGHT       = float(os.getenv("EMA_WEIGHT", "0.65"))
 ML_WEIGHT        = float(os.getenv("ML_WEIGHT", "0.25"))
 QUANTUM_WEIGHT   = float(os.getenv("QUANTUM_WEIGHT", "0.35"))
@@ -74,23 +73,30 @@ ML_ENABLED       = os.getenv("ML_ENABLED", "1").lower() in ("1","true","yes")
 MODEL_XGB_PATH   = os.getenv("MODEL_XGB_PATH", "models/xgb_model.pkl")
 MODEL_META_PATH  = os.getenv("MODEL_META_PATH", "models/xgb_meta.json")
 
+# Auto-train (optional)
+AUTO_TRAIN_ON_START = os.getenv("AUTO_TRAIN_ON_START", "0").lower() in ("1","true","yes")
+TRAIN_SYMBOLS       = [s.strip() for s in os.getenv("TRAIN_SYMBOLS", "BTC/USDT,ETH/USDT").split(",") if s.strip()]
+TRAIN_TIMEFRAME     = os.getenv("TRAIN_TIMEFRAME", "1h")
+TRAIN_LIMIT         = int(os.getenv("TRAIN_LIMIT", "600"))
+
 QUANTUM_ENABLED  = os.getenv("QUANTUM_ENABLED", "0").lower() in ("1","true","yes")
 QUANTUM_BACKEND  = os.getenv("QUANTUM_BACKEND", "aer_simulator")
 
 SENTIMENT_ENABLED = os.getenv("SENTIMENT_ENABLED", "1").lower() in ("1","true","yes")
 
-# Training admin + defaults
-TRAIN_ADMIN_TOKEN = os.getenv("TRAIN_ADMIN_TOKEN", "").strip()
-TRAIN_SYMBOLS_ENV = os.getenv("TRAIN_SYMBOLS", "BTC/USDT,ETH/USDT,BNB/USDT")
-TRAIN_TIMEFRAME   = os.getenv("TRAIN_TIMEFRAME", "1h")
-TRAIN_LIMIT       = int(os.getenv("TRAIN_LIMIT", "800"))
-AUTO_TRAIN_ON_START = os.getenv("AUTO_TRAIN_ON_START", "0").lower() in ("1","true","yes")
+# Adaptive threshold env (NEW)
+MIN_CONF_BASE  = float(os.getenv("MIN_CONF_BASE", str(TRADE_MIN_CONF)))
+MIN_CONF_FLOOR = float(os.getenv("MIN_CONF_FLOOR", "0.45"))
+MIN_CONF_CEIL  = float(os.getenv("MIN_CONF_CEIL",  "0.70"))
+QUALITY_GAIN   = float(os.getenv("QUALITY_GAIN",   "0.15"))
+VOL_PENALTY    = float(os.getenv("VOL_PENALTY",    "0.20"))
+SENT_MIN_N     = int(os.getenv("SENT_MIN_N",       "10"))
 
 # ───────────────────────────── App
 logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
 log = logging.getLogger("BottieAPI")
 
-app = FastAPI(title="Bottie API", version="1.6.0")
+app = FastAPI(title="Bottie API", version="1.5.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[NETLIFY_URL] if NETLIFY_URL != "*" else ["*"],
@@ -112,6 +118,10 @@ def add_log(msg: str):
     if len(_logs) > 1500:
         del _logs[:-1000]
     log.info(msg)
+
+# sentiment cache (base -> {"score": float, "n": int})
+_sent_last: Dict[str, Dict[str, float]] = {}
+_sent_window_sec = int(os.getenv("SENTIMENT_WINDOW_S", "900"))
 
 # ───────────────────────────── Exchange
 _exchange: Optional[ccxt.Exchange] = None
@@ -214,15 +224,15 @@ def _compute_cost_basis_for_symbol(symbol: str) -> Optional[Tuple[float, float]]
     for t in trades:
         side = (t.get("side") or "").lower()
         amount = float(t.get("amount") or 0.0)
-        price  = float(t.get("price") or 0.0)
+        price = float(t.get("price") or 0.0)
         if amount <= 0 or price <= 0:
             continue
         eff_amount = amount
         eff_cost_add = 0.0
         if FEE_IN_COST_BASIS:
-            fee   = t.get("fee") or {}
+            fee = t.get("fee") or {}
             fcost = float(fee.get("cost") or 0.0)
-            fccy  = (fee.get("currency") or "").upper()
+            fccy = (fee.get("currency") or "").upper()
             if fcost:
                 if fccy == quote:
                     eff_cost_add = fcost
@@ -405,25 +415,30 @@ def _ml_prob(feats: Dict[str, Any]) -> Optional[float]:
         add_log(f"ML score error: {e}")
     return None
 
-# ───────────────────────────── Auto-train (optional on startup)
+# Auto-train (optional, public OHLCV)
 def _fit_simple_model_from_ohlcv(ohlcv: List[List[float]]):
-    """Quick binary classifier: next-bar up/down from EMA/RSI/ret/vol."""
+    """Train a quick binary classifier: next-bar up/down based on EMA/RSI/ret/vol."""
+    import numpy as np, pandas as pd
     from sklearn.linear_model import LogisticRegression
     try:
         import xgboost as xgb
-        XGB = xgb.XGBClassifier(
+        model = xgb.XGBClassifier(
             n_estimators=200, max_depth=4, learning_rate=0.08,
-            subsample=0.8, colsample_bytree=0.8, reg_lambda=1.0, n_jobs=2
+            subsample=0.8, colsample_bytree=0.8, reg_lambda=1.0,
+            n_jobs=2
         )
     except Exception:
-        XGB = None
+        model = LogisticRegression(max_iter=1000)
 
     arr = np.array(ohlcv, dtype=float)
-    close = arr[:, 4]; vol = arr[:, 5]
+    close = arr[:, 4]
+    vol   = arr[:, 5]
     if len(close) < 80:
         raise RuntimeError("Not enough OHLCV to train")
 
-    def ema(a, span): return pd.Series(a).ewm(span=span, adjust=False).mean().values
+    def ema(a, span):
+        return pd.Series(a).ewm(span=span, adjust=False).mean().values
+
     def rsi(a, p=14):
         delta = np.diff(a)
         up = np.where(delta > 0, delta, 0.0)
@@ -431,7 +446,7 @@ def _fit_simple_model_from_ohlcv(ohlcv: List[List[float]]):
         ru = pd.Series(up).rolling(p).mean()
         rd = pd.Series(down).rolling(p).mean()
         rs = ru / (rd + 1e-12)
-        r  = 100.0 - (100.0 / (1.0 + rs))
+        r = 100.0 - (100.0 / (1.0 + rs))
         return np.concatenate([[np.nan], r.values])
 
     ema_f = ema(close, max(2, TRADE_FAST_EMA))
@@ -442,15 +457,15 @@ def _fit_simple_model_from_ohlcv(ohlcv: List[List[float]]):
     ret1[1:] = (close[1:] - close[:-1]) / (close[:-1] + 1e-12)
 
     df = pd.DataFrame({
-        "close": close, "vol": vol, "ema_fast": ema_f, "ema_slow": ema_s, "rsi14": rsi14, "ret1": ret1
+        "close": close, "vol": vol, "ema_fast": ema_f, "ema_slow": ema_s,
+        "rsi14": rsi14, "ret1": ret1
     }).replace([np.inf, -np.inf], np.nan).dropna()
 
-    y = (df["ret1"].shift(-1) > 0).astype(int)[:-1].values
-    X = df[["close","rsi14","ret1","ema_fast","ema_slow","vol"]][:-1].values
+    y = (df["ret1"] > 0).astype(int).values
+    X = df[["close","rsi14","ret1","ema_fast","ema_slow","vol"]].values
 
-    model = XGB if XGB is not None else LogisticRegression(max_iter=1000)
     model.fit(X, y)
-    meta = {"features": ["close","rsi14","ret1","ema_fast","ema_slow","vol"], "rows": int(X.shape[0])}
+    meta = {"features": ["close","rsi14","ret1","ema_fast","ema_slow","vol"]}
     return model, meta
 
 async def _auto_train_if_missing():
@@ -461,13 +476,10 @@ async def _auto_train_if_missing():
         return
     try:
         assert _exchange is not None
-        syms = [s.strip() for s in TRAIN_SYMBOLS_ENV.split(",") if s.strip()]
-        tf   = TRAIN_TIMEFRAME
-        lim  = TRAIN_LIMIT
         all_ohlcv: List[List[float]] = []
-        for s in syms:
+        for s in TRAIN_SYMBOLS:
             try:
-                data = _exchange.fetch_ohlcv(s, timeframe=tf, limit=lim)
+                data = _exchange.fetch_ohlcv(s, timeframe=TRAIN_TIMEFRAME, limit=TRAIN_LIMIT)
                 if data:
                     all_ohlcv.extend(data)
             except Exception as e:
@@ -475,14 +487,20 @@ async def _auto_train_if_missing():
         if len(all_ohlcv) < 200:
             add_log("auto-train: not enough combined data to train; skipping")
             return
+
         model, meta = _fit_simple_model_from_ohlcv(all_ohlcv)
         if joblib:
             os.makedirs(os.path.dirname(MODEL_XGB_PATH), exist_ok=True)
             joblib.dump(model, MODEL_XGB_PATH)
             with open(MODEL_META_PATH, "w") as f:
                 json.dump(meta, f, indent=2)
-        _ML_MODEL, _ML_META = model, meta
-        add_log(f"ML: auto-trained {'and saved ' if joblib else ''}→ {MODEL_XGB_PATH}")
+            _ML_MODEL = model
+            _ML_META  = meta
+            add_log(f"ML: auto-trained and saved → {MODEL_XGB_PATH}")
+        else:
+            _ML_MODEL = model
+            _ML_META  = meta
+            add_log("ML: auto-trained in memory (joblib not available to persist)")
     except Exception as e:
         add_log(f"auto-train error: {e}")
 
@@ -509,26 +527,81 @@ def _quantum_prob(symbol: str, feats: Dict[str, Any]) -> Optional[float]:
         add_log(f"Quantum score error: {e}")
         return None
 
-# Sentiment prob for symbol
+# Sentiment loop
+async def sentiment_loop():
+    if not (SENTIMENT_ENABLED and SENTIMENT_WIRED):
+        add_log("Sentiment loop disabled or not wired.")
+        return
+    add_log("Sentiment loop started.")
+    while True:
+        try:
+            snap = run_sentiment_cycle()  # {BASE: {score, n}}
+            if isinstance(snap, dict):
+                # store a COPY to avoid mutation issues
+                global _sent_last
+                _sent_last = {k: {"score": float(v.get("score", 0.0)), "n": int(v.get("n", 0))}
+                              for k, v in snap.items()}
+                if _sent_last:
+                    m = ", ".join(f"{k}:{v['score']:+.2f}({v['n']})"
+                                  for k, v in list(_sent_last.items())[:6])
+                    add_log(f"sentiment | {m}")
+        except Exception as e:
+            add_log(f"ERROR sentiment_loop: {e}")
+        await asyncio.sleep(60)
+
 def _sentiment_prob(symbol: str) -> Optional[float]:
     if not (SENTIMENT_ENABLED and SENTIMENT_WIRED):
         return None
     try:
         base = symbol.split("/")[0].upper()
-        probs = sentiment_latest_probs()  # {BASE: prob 0..1}
-        return float(probs.get(base, 0.5))
+        row = _sent_last.get(base)
+        if not row:
+            return 0.5
+        comp = float(row.get("score", 0.0))  # [-1,1]
+        return float(np.clip(0.5 + 0.5 * comp, 0.0, 1.0))  # [0,1]
     except Exception:
         return None
 
+# ───────────────────────────── Adaptive thresholds
+def _recent_volatility(close: np.ndarray, lookback: int = 30) -> float:
+    if len(close) < lookback + 1:
+        return 0.0
+    r = np.diff(close[-(lookback+1):]) / (close[-(lookback+1):-1] + 1e-12)
+    return float(np.clip(np.std(r), 0.0, 0.05))  # cap at 5%/bar for scaling
+
+def _signal_quality(symbol: str, feats: Dict[str, Any],
+                    ml_loaded: bool, q_available: bool,
+                    sent_prob: Optional[float], sent_n: int) -> float:
+    px   = feats["close"][-1]
+    ef   = feats["ema_fast"][-1]
+    es   = feats["ema_slow"][-1]
+    ema_strength = float(np.clip(abs(ef - es) / max(px, 1e-8) * 50.0, 0.0, 1.0))
+    ml_factor = 1.0 if ml_loaded else 0.7
+    q_factor  = 1.0 if q_available else 0.9
+    sent_factor = 0.9
+    if sent_prob is not None:
+        sent_factor = 1.0 if sent_n >= SENT_MIN_N else float(np.clip(0.7 + 0.3 * (sent_n / max(1, SENT_MIN_N)), 0.7, 1.0))
+    qual = 0.5 * ema_strength + 0.5 * (ml_factor * q_factor * sent_factor)
+    return float(np.clip(qual, 0.0, 1.0))
+
+def _dynamic_min_conf(symbol: str, feats: Dict[str, Any],
+                      ml_loaded: bool, q_available: bool,
+                      sent_prob: Optional[float], sent_n: int) -> float:
+    base = MIN_CONF_BASE
+    quality = _signal_quality(symbol, feats, ml_loaded, q_available, sent_prob, sent_n)
+    adj_quality = base - QUALITY_GAIN * quality
+    vol = _recent_volatility(feats["close"])
+    adj_vol = adj_quality + VOL_PENALTY * (vol / 0.05)
+    return float(np.clip(adj_vol, MIN_CONF_FLOOR, MIN_CONF_CEIL))
+
+# ───────────────────────────── Scan list
 def _symbols_to_scan() -> List[str]:
     assert _exchange is not None
     syms: Set[str] = set()
-    # from positions
     for sym in _positions.keys():
         if sym.endswith(f"/{PRIMARY_QUOTE}") and not sym.startswith(f"{PRIMARY_QUOTE}/"):
             if sym in _exchange.markets:
                 syms.add(sym)
-    # manually forced via env
     if TRADE_SYMBOLS_ENV.strip():
         for s in TRADE_SYMBOLS_ENV.split(","):
             s = s.strip().upper()
@@ -578,8 +651,7 @@ async def signals_loop():
                 q_prob  = _quantum_prob(sym, feats)
                 s_prob  = _sentiment_prob(sym)
 
-                parts, weights = [ema_prob], [EMA_WEIGHT]
-                labels = ["ema"]
+                parts, weights, labels = [ema_prob], [EMA_WEIGHT], ["ema"]
                 if ml_prob is not None: parts.append(ml_prob); weights.append(ML_WEIGHT); labels.append("ml")
                 if q_prob  is not None: parts.append(q_prob);  weights.append(QUANTUM_WEIGHT); labels.append("q")
                 if s_prob  is not None: parts.append(s_prob);  weights.append(SENTIMENT_WEIGHT); labels.append("sent")
@@ -588,12 +660,25 @@ async def signals_loop():
                     final_prob = float(ema_prob)
                     w_norm = {"ema": 1.0}
                 else:
-                    w = np.array(weights, dtype=float); w = w / np.sum(w)
+                    w = np.array(weights, dtype=float)
+                    w = w / np.sum(w)
                     final_prob = float(np.sum(w * np.array(parts, dtype=float)))
                     w_norm = {lab: float(w[i]) for i, lab in enumerate(labels)}
 
-                thr_buy  = 0.5 + 0.5 * TRADE_MIN_CONF
-                thr_sell = 0.5 - 0.5 * TRADE_MIN_CONF
+                # adaptive thresholds
+                base = sym.split("/")[0].upper()
+                sent_n_for_base = int(_sent_last.get(base, {}).get("n", 0)) if _sent_last else 0
+                min_conf_eff = _dynamic_min_conf(
+                    sym,
+                    feats,
+                    ml_loaded=(_ML_MODEL is not None),
+                    q_available=(QuantumCircuit is not None and Aer is not None and QUANTUM_ENABLED),
+                    sent_prob=s_prob,
+                    sent_n=sent_n_for_base,
+                )
+                thr_buy  = 0.5 + 0.5 * min_conf_eff
+                thr_sell = 0.5 - 0.5 * min_conf_eff
+
                 if final_prob >= thr_buy:
                     signal, conf = "BUY", final_prob
                 elif final_prob <= thr_sell:
@@ -612,6 +697,7 @@ async def signals_loop():
                     "final_prob": round(float(final_prob), 4),
                     "thr_buy": round(float(thr_buy), 4),
                     "thr_sell": round(float(thr_sell), 4),
+                    "min_conf_eff": round(float(min_conf_eff), 4),
                     "weights": w_norm,
                     "t": int(time.time())
                 })
@@ -621,149 +707,6 @@ async def signals_loop():
         except Exception as e:
             add_log(f"ERROR signals_loop: {e}")
         await asyncio.sleep(max(0.25, SIGNAL_INTERVAL_S - (time.time() - t0)))
-
-# ───────────────────────────── Sentiment loop (polls provider to keep cache warm)
-async def sentiment_loop():
-    if not (SENTIMENT_ENABLED and SENTIMENT_WIRED):
-        add_log("Sentiment loop disabled or provider not wired.")
-        return
-    add_log("Sentiment loop started.")
-    while True:
-        try:
-            snap = sentiment_snapshot()  # provider refreshes internally with throttling
-            scores = snap.get("scores", {})
-            # brief log
-            sample = list(scores.items())[:6]
-            if sample:
-                msg = ", ".join(f"{k}:{v:+.2f}" for k, v in sample)
-                add_log(f"sentiment | {msg}")
-        except Exception as e:
-            add_log(f"ERROR sentiment_loop: {e}")
-        await asyncio.sleep(60)
-
-# ───────────────────────────── Training helpers & endpoints
-def _build_feature_table(ohlcv: List[List[float]]):
-    arr = np.array(ohlcv, dtype=float)
-    close = arr[:, 4]
-    vol   = arr[:, 5]
-    if len(close) < max(TRADE_SLOW_EMA + 10, 80):
-        raise RuntimeError("Not enough bars to train")
-
-    def ema(a, span): return pd.Series(a).ewm(span=span, adjust=False).mean().values
-    def rsi(a, p=14):
-        if len(a) <= p + 1:
-            return np.full_like(a, np.nan, dtype=float)
-        delta = np.diff(a)
-        up = np.where(delta > 0, delta, 0.0)
-        down = np.where(delta < 0, -delta, 0.0)
-        ru = pd.Series(up).rolling(p).mean()
-        rd = pd.Series(down).rolling(p).mean()
-        rs = ru / (rd + 1e-12)
-        r  = 100.0 - (100.0 / (1.0 + rs))
-        return np.concatenate([[np.nan], r.values])
-
-    ema_f = ema(close, max(2, TRADE_FAST_EMA))
-    ema_s = ema(close, max(3, TRADE_SLOW_EMA))
-    rsi14 = rsi(close, 14)
-
-    ret1 = np.zeros_like(close)
-    ret1[1:] = (close[1:] - close[:-1]) / (close[:-1] + 1e-12)
-
-    df = pd.DataFrame({
-        "close": close, "vol": vol, "ema_fast": ema_f, "ema_slow": ema_s, "rsi14": rsi14, "ret1": ret1
-    }).replace([np.inf, -np.inf], np.nan).dropna()
-
-    y = (df["ret1"].shift(-1) > 0).astype(int)[:-1].values
-    X = df[["close","rsi14","ret1","ema_fast","ema_slow","vol"]][:-1].values
-    meta = {"features": ["close","rsi14","ret1","ema_fast","ema_slow","vol"], "rows": int(X.shape[0])}
-    if X.shape[0] < 200:
-        raise RuntimeError("Too few clean rows to train (need ≥200)")
-    return X, y, meta
-
-def _train_model_from_symbols(symbols: List[str], timeframe: str, limit: int):
-    assert _exchange is not None
-    all_ohlcv: List[List[float]] = []
-    scanned = []
-    for s in symbols:
-        try:
-            o = _exchange.fetch_ohlcv(s, timeframe=timeframe, limit=limit)
-            if o and len(o) > 0:
-                all_ohlcv.extend(o)
-                scanned.append(s)
-        except Exception as e:
-            add_log(f"train: fetch_ohlcv fail {s}: {e}")
-
-    if len(all_ohlcv) < 400:
-        raise RuntimeError("Not enough combined OHLCV across symbols to train")
-
-    X, y, meta = _build_feature_table(all_ohlcv)
-
-    # Prefer XGB; fallback to sklearn LR
-    try:
-        import xgboost as xgb
-        model = xgb.XGBClassifier(
-            n_estimators=300, max_depth=5, learning_rate=0.08,
-            subsample=0.9, colsample_bytree=0.9, reg_lambda=1.0,
-            n_jobs=2, tree_method="hist"
-        )
-        model.fit(X, y)
-        algo = "xgboost"
-    except Exception:
-        from sklearn.linear_model import LogisticRegression
-        model = LogisticRegression(max_iter=2000)
-        model.fit(X, y)
-        algo = "logreg"
-
-    meta.update({
-        "algo": algo, "symbols": scanned, "timeframe": timeframe, "limit": limit,
-        "trained_at": int(time.time())
-    })
-    return model, meta
-
-def _save_and_reload_model(model, meta: Dict[str, Any]):
-    global _ML_MODEL, _ML_META
-    if not joblib:
-        _ML_MODEL, _ML_META = model, meta
-        add_log("ML: trained (in memory only – joblib missing).")
-        return
-    os.makedirs(os.path.dirname(MODEL_XGB_PATH), exist_ok=True)
-    joblib.dump(model, MODEL_XGB_PATH)
-    with open(MODEL_META_PATH, "w") as f:
-        json.dump(meta, f, indent=2)
-    _ML_MODEL, _ML_META = model, meta
-    add_log(f"ML: trained and saved → {MODEL_XGB_PATH}")
-
-@app.post("/train")
-async def train(
-    token: str = Query(..., description="TRAIN_ADMIN_TOKEN"),
-    symbols: Optional[str] = Query(None, description="Comma-separated symbols, e.g. BTC/USDT,ETH/USDT"),
-    timeframe: Optional[str] = Query(None),
-    limit: Optional[int] = Query(None),
-):
-    if token != TRAIN_ADMIN_TOKEN or not TRAIN_ADMIN_TOKEN:
-        raise HTTPException(status_code=403, detail="Forbidden")
-
-    await _ensure_exchange()
-    syms = [s.strip() for s in (symbols or TRAIN_SYMBOLS_ENV).split(",") if s.strip()]
-    tf   = timeframe or TRAIN_TIMEFRAME
-    lim  = int(limit or TRAIN_LIMIT)
-
-    try:
-        model, meta = _train_model_from_symbols(syms, tf, lim)
-        _save_and_reload_model(model, meta)
-        return {"ok": True, "trained": True, "meta": meta}
-    except Exception as e:
-        add_log(f"train error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/ml/status")
-def ml_status():
-    return {
-        "enabled": ML_ENABLED,
-        "loaded": bool(_ML_MODEL),
-        "model_path": MODEL_XGB_PATH if _ML_MODEL else None,
-        "meta": _ML_META if _ML_MODEL else None
-    }
 
 # ───────────────────────────── Startup
 @app.on_event("startup")
@@ -798,7 +741,7 @@ def health():
         "equity": last_eq,
         "quantum": _detect_quantum(),
         "ml": {"enabled": ML_ENABLED, "loaded": bool(_ML_MODEL), "model_path": MODEL_XGB_PATH if _ML_MODEL else None},
-        "sentiment": {"enabled": SENTIMENT_ENABLED and SENTIMENT_WIRED}
+        "sentiment": {"enabled": SENTIMENT_ENABLED and SENTIMENT_WIRED, "window_sec": _sent_window_sec}
     }
 
 @app.get("/status")
