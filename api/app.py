@@ -41,6 +41,14 @@ try:
 except Exception:
     SENTIMENT_WIRED = False
 
+# sentiment service (historized)
+from sentiment.sentiment_service import (
+    start_background as sentiment_start_background,
+    snapshot as sentiment_snapshot,
+    aggregate_probs as sentiment_latest_probs,
+    set_keywords as sentiment_set_keywords,
+) 
+
 # online learner
 from ml.online_learner import OnlineLearner
 
