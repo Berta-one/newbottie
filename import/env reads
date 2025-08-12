@@ -1,0 +1,4 @@
+from api.trader import SignalEngine  # NEW
+
+TRADE_SIGNALS_ENABLED = os.getenv("TRADE_SIGNALS", "1") not in ("0", "false", "False", "", None)
+SIGNAL_INTERVAL_S = float(os.getenv("SIGNAL_INTERVAL_S", "30"))
