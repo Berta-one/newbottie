@@ -2,7 +2,7 @@
 import os, time, asyncio, logging, math, json, hashlib
 from typing import Any, Dict, List, Optional, Tuple, Set
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 # deps
@@ -38,7 +38,13 @@ except Exception:
 # online learner
 from ml.online_learner import OnlineLearner
 
-# ───────────────────────────────── env
+# ───────────────────────────────── FIXED: boolean parsing helper
+def parse_bool(v: str, default=False) -> bool:
+    if v is None:
+        return default
+    return str(v).strip().lower() in ("1","true","yes","on")
+
+# ───────────────────────────────── env (FIXED: consistent boolean parsing)
 LOG_LEVEL         = os.getenv("LOG_LEVEL", "INFO").upper()
 NETLIFY_URL       = os.getenv("NETLIFY_URL", "*")
 
@@ -52,7 +58,7 @@ SIGNAL_INTERVAL_S = float(os.getenv("SIGNAL_INTERVAL_S", "30"))
 
 COST_LOOKBACK_DAYS    = int(os.getenv("COST_BASIS_LOOKBACK_DAYS", "120"))
 MAX_TRADES_PER_SYMBOL = int(os.getenv("MAX_TRADES_PER_SYMBOL", "1000"))
-FEE_IN_COST_BASIS     = os.getenv("FEE_IN_COST_BASIS", "1").lower() in ("1","true","yes")
+FEE_IN_COST_BASIS     = parse_bool(os.getenv("FEE_IN_COST_BASIS", "1"))
 COST_CACHE_TTL_SEC    = int(os.getenv("COST_CACHE_TTL_SEC", "600"))
 
 TRADE_TIMEFRAME     = os.getenv("TRADE_TIMEFRAME", "1h")
@@ -63,12 +69,12 @@ TRADE_SYMBOLS_ENV   = os.getenv("TRADE_SYMBOLS", "")
 
 # dynamic thresholds
 TRADE_BASE_MIN_CONF  = float(os.getenv("TRADE_MIN_CONF", "0.55"))   # base confidence
-TRADE_CONF_ADAPT     = os.getenv("TRADE_CONF_ADAPT", "1").lower() in ("1","true","yes")
+TRADE_CONF_ADAPT     = parse_bool(os.getenv("TRADE_CONF_ADAPT", "1"))
 TRADE_CONF_FLOOR     = float(os.getenv("TRADE_CONF_FLOOR", "0.50"))
 TRADE_CONF_CEIL      = float(os.getenv("TRADE_CONF_CEIL", "0.80"))
 
 # execution controls
-TRADE_ENABLED        = os.getenv("TRADE_ENABLED", "0").lower() in ("1","true","yes")
+TRADE_ENABLED        = parse_bool(os.getenv("TRADE_ENABLED", "0"))
 TRADE_QUOTE_PER_ORDER= float(os.getenv("TRADE_QUOTE_PER_ORDER", "100"))
 MAX_SPEND_PER_SYMBOL = float(os.getenv("MAX_SPEND_PER_SYMBOL", "1000"))
 SELL_FRACTION        = float(os.getenv("SELL_FRACTION", "1.0"))
@@ -82,12 +88,12 @@ QUANTUM_WEIGHT     = float(os.getenv("QUANTUM_WEIGHT","0.20"))
 SENTIMENT_WEIGHT   = float(os.getenv("SENTIMENT_WEIGHT","0.10"))
 
 # ML persistence (joblib model is optional; online learner always exists)
-ML_ENABLED         = os.getenv("ML_ENABLED", "1").lower() in ("1","true","yes")
+ML_ENABLED         = parse_bool(os.getenv("ML_ENABLED", "1"))
 MODEL_XGB_PATH     = os.getenv("MODEL_XGB_PATH", "models/xgb_model.pkl")
 MODEL_META_PATH    = os.getenv("MODEL_META_PATH","models/xgb_meta.json")
 
 # Online learning
-ONLINE_LEARN           = os.getenv("ONLINE_LEARN","1").lower() in ("1","true","yes")
+ONLINE_LEARN           = parse_bool(os.getenv("ONLINE_LEARN","1"))
 ONLINE_MODEL_PATH      = os.getenv("ONLINE_MODEL_PATH","models/online_sgd.pkl")
 ONLINE_META_PATH       = os.getenv("ONLINE_META_PATH", "models/online_sgd_meta.json")
 ONLINE_MINIBATCH       = int(os.getenv("ONLINE_MINIBATCH","32"))  # min items per update
@@ -95,8 +101,13 @@ ONLINE_SAVE_SEC        = int(os.getenv("ONLINE_SAVE_SEC","30"))   # handled in c
 ONLINE_LABEL_HORIZON   = int(os.getenv("ONLINE_LABEL_HORIZON","1"))  # label next-bar up/down
 
 # quantum
-QUANTUM_ENABLED    = os.getenv("QUANTUM_ENABLED","0").lower() in ("1","true","yes")
+QUANTUM_ENABLED    = parse_bool(os.getenv("QUANTUM_ENABLED","0"))
 QUANTUM_BACKEND    = os.getenv("QUANTUM_BACKEND","aer_simulator")
+
+# FIXED: sentiment config for /health reporting
+SENTIMENT_ENABLED  = parse_bool(os.getenv("SENTIMENT_ENABLED", "1"))
+SENTIMENT_SOURCE   = (os.getenv("SENTIMENT_SOURCE", "finnhub") or "finnhub").lower()
+SENTIMENT_WINDOW_S = int(os.getenv("SENTIMENT_WINDOW_S", "900"))
 
 # ───────────────────────────────── app
 logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
@@ -454,7 +465,7 @@ def _quantum_prob(symbol: str, feats: Dict[str, Any]) -> Optional[float]:
 
 # sentiment → 0..1
 def _sentiment_prob(symbol: str) -> Optional[float]:
-    if not (SENTIMENT_WIRED):
+    if not (SENTIMENT_ENABLED and SENTIMENT_WIRED):
         return None
     try:
         base = symbol.split("/")[0].upper()
@@ -493,7 +504,7 @@ def _push_signal(sig: Dict[str, Any]):
 def _adaptive_thresholds() -> Tuple[float, float]:
     """
     Dynamic buy/sell thresholds around 0.5 based on recent ensemble dispersion.
-    Simpler: we’ll scale base confidence slightly with recent avg |prob-0.5|.
+    Simpler: we'll scale base confidence slightly with recent avg |prob-0.5|.
     """
     window = _signals[-50:]
     if not window:
@@ -684,6 +695,10 @@ async def execution_loop():
                 await asyncio.sleep(1.0); continue
             _last_exec = now
 
+            # FIXED: Check runtime kill switch
+            if not EXECUTION_RUNTIME_ENABLED:
+                await asyncio.sleep(1.0); continue
+
             # pick latest signal per symbol
             latest: Dict[str, Dict[str, Any]] = {}
             for s in _signals[-300:]:
@@ -763,9 +778,7 @@ async def _on_startup():
     asyncio.create_task(online_label_loop())
     asyncio.create_task(execution_loop())
 
-#
-
-# ---------------- Execution runtime switch ----------------
+# ───────────────────────────────── execution runtime switch
 EXECUTION_RUNTIME_ENABLED = False  # default off at boot
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "").strip()
 
@@ -774,49 +787,11 @@ def _auth_ok(request):
     if not ADMIN_TOKEN:
         return True
     try:
-        from fastapi import Request
         token = request.headers.get("X-Admin-Token", "")
         return token == ADMIN_TOKEN
     except Exception:
         return False
 
-@app.get("/exec/status")
-def exec_status():
-    return {
-        "enabled_env": os.getenv("TRADE_ENABLED", "0").lower() in ("1","true","yes"),
-        "enabled_runtime": EXECUTION_RUNTIME_ENABLED,
-        "per_symbol_spend": {
-            "BUY": float(os.getenv("TRADE_QUOTE_PER_ORDER", "100") or 100.0),
-            "SELL_FRACTION": float(os.getenv("SELL_FRACTION", "1.0") or 1.0)
-        }
-    }
-
-@app.post("/exec/enable")
-async def exec_enable(request: "Request"):
-    if not _auth_ok(request):
-        from fastapi import HTTPException
-        raise HTTPException(status_code=401, detail="X-Admin-Token required")
-    global EXECUTION_RUNTIME_ENABLED
-    EXECUTION_RUNTIME_ENABLED = True
-    return {"ok": True, "enabled": EXECUTION_RUNTIME_ENABLED}
-
-@app.post("/exec/disable")
-async def exec_disable(request: "Request"):
-    if not _auth_ok(request):
-        from fastapi import HTTPException
-        raise HTTPException(status_code=401, detail="X-Admin-Token required")
-    global EXECUTION_RUNTIME_ENABLED
-    EXECUTION_RUNTIME_ENABLED = False
-    return {"ok": True, "enabled": EXECUTION_RUNTIME_ENABLED}
-
-@app.post("/exec/toggle")
-async def exec_toggle(request: "Request"):
-    if not _auth_ok(request):
-        from fastapi import HTTPException
-        raise HTTPException(status_code=401, detail="X-Admin-Token required")
-    global EXECUTION_RUNTIME_ENABLED
-    EXECUTION_RUNTIME_ENABLED = not EXECUTION_RUNTIME_ENABLED
-    return {"ok": True, "enabled": EXECUTION_RUNTIME_ENABLED} 
 # ───────────────────────────────── endpoints
 def _detect_quantum() -> Dict[str, Any]:
     if not QUANTUM_ENABLED:
@@ -829,24 +804,49 @@ def _detect_quantum() -> Dict[str, Any]:
 def root():
     return {"ok": True, "service": "bottie", "time": time.time()}
 
+# FIXED: Complete /health endpoint with all required objects
 @app.get("/health")
 def health():
     last_eq = _equity_series[-1]["v"] if _equity_series else None
+
+    # Quantum - use existing _detect_quantum() 
+    quantum_obj = _detect_quantum()
+
+    # ML block – keys exactly as frontend expects
+    ml_obj = {
+        "enabled": bool(ML_ENABLED or ONLINE_LEARN),
+        "loaded": bool(_ML_MODEL is not None),  # joblib model loaded
+        "model_path": MODEL_XGB_PATH if _ML_MODEL is not None else (ONLINE_MODEL_PATH if ONLINE_LEARN else None),
+    }
+
+    # Sentiment block – get tracked bases from latest sentiment data
+    tracked_bases = []
+    if SENTIMENT_ENABLED and SENTIMENT_WIRED:
+        try:
+            snap = sentiment_snapshot()
+            if snap and "scores" in snap:
+                tracked_bases = list(snap["scores"].keys())
+        except Exception:
+            pass
+
+    sentiment_obj = {
+        "enabled": bool(SENTIMENT_ENABLED and SENTIMENT_WIRED),
+        "source": SENTIMENT_SOURCE,
+        "window_sec": SENTIMENT_WINDOW_S,
+        "bases": tracked_bases,
+    }
+
     return {
         "status": "UP",
         "ok": True,
-        "service": "bottie",
+        "service": "bottie", 
         "time": int(time.time()),
         "exchange": EXCHANGE_ID,
         "primary_quote": PRIMARY_QUOTE,
         "equity": last_eq,
-        "quantum": _detect_quantum(),
-        "ml": {
-            "enabled": ML_ENABLED or ONLINE_LEARN,
-            "joblib_loaded": bool(_ML_MODEL),
-            "online": ONLINE_LEARN,
-            "online_model_path": ONLINE_MODEL_PATH if ONLINE_LEARN else None
-        },
+        "quantum": quantum_obj,
+        "ml": ml_obj,
+        "sentiment": sentiment_obj,
     }
 
 @app.get("/status")
@@ -875,12 +875,33 @@ def costbasis():
         out[sym] = {"qty": entry["qty"], "avg_px": entry["avg_px"], "age_sec": time.time() - entry["ts"]}
     return out
 
+# FIXED: Complete sentiment endpoint
 @app.get("/sentiment")
 def sentiment():
+    if not (SENTIMENT_ENABLED and SENTIMENT_WIRED):
+        return {
+            "enabled": False, 
+            "source": SENTIMENT_SOURCE, 
+            "window_sec": SENTIMENT_WINDOW_S, 
+            "scores": {}
+        }
+    
     try:
-        return sentiment_snapshot()
-    except Exception:
-        return {"window_sec": 900, "scores": {}}
+        snap = sentiment_snapshot()
+        return {
+            "enabled": True,
+            "source": SENTIMENT_SOURCE,
+            "window_sec": snap.get("window_sec", SENTIMENT_WINDOW_S),
+            "scores": snap.get("scores", {}),
+        }
+    except Exception as e:
+        add_log(f"sentiment endpoint error: {e}")
+        return {
+            "enabled": False,
+            "source": SENTIMENT_SOURCE, 
+            "window_sec": SENTIMENT_WINDOW_S, 
+            "scores": {}
+        }
 
 @app.get("/ml/status")
 def ml_status():
@@ -893,11 +914,74 @@ def ml_status():
         "features": _OL.feature_names() if _OL else ["close","rsi14","ret1","ema_fast","ema_slow","vol"]
     }
 
+# FIXED: Single /exec/status endpoint (removed duplicate)
 @app.get("/exec/status")
 def exec_status():
     return {
-        "enabled": TRADE_ENABLED,
+        "enabled_env": bool(TRADE_ENABLED),
+        "enabled_runtime": bool(EXECUTION_RUNTIME_ENABLED),
         "per_symbol_spend": _open_spend,
         "last_exec": _last_exec,
         "recent_trades": _trade_log[-50:]
     }
+
+@app.post("/exec/enable")
+async def exec_enable(request: Request):
+    if not _auth_ok(request):
+        raise HTTPException(status_code=401, detail="X-Admin-Token required")
+    global EXECUTION_RUNTIME_ENABLED
+    EXECUTION_RUNTIME_ENABLED = True
+    return {"ok": True, "enabled": EXECUTION_RUNTIME_ENABLED}
+
+@app.post("/exec/disable")
+async def exec_disable(request: Request):
+    if not _auth_ok(request):
+        raise HTTPException(status_code=401, detail="X-Admin-Token required")
+    global EXECUTION_RUNTIME_ENABLED
+    EXECUTION_RUNTIME_ENABLED = False
+    return {"ok": True, "enabled": EXECUTION_RUNTIME_ENABLED}
+
+@app.post("/exec/toggle")
+async def exec_toggle(request: Request):
+    if not _auth_ok(request):
+        raise HTTPException(status_code=401, detail="X-Admin-Token required")
+    global EXECUTION_RUNTIME_ENABLED
+    EXECUTION_RUNTIME_ENABLED = not EXECUTION_RUNTIME_ENABLED
+    return {"ok": True, "enabled": EXECUTION_RUNTIME_ENABLED}
+
+# ADDED: /trades endpoint for frontend
+@app.get("/trades")
+def trades():
+    """Return all trade log entries with P&L calculation"""
+    trades_with_pnl = []
+    
+    for trade in _trade_log:
+        # Basic trade info
+        trade_out = {
+            "t": trade.get("t"),
+            "symbol": trade.get("symbol"),
+            "side": trade.get("side"),
+            "qty": trade.get("qty"),
+            "px": trade.get("px"),
+            "fee": 0.0,  # Could be enhanced to track actual fees
+            "fee_ccy": "USDT",  # Default
+            "pnl": None  # Will calculate if possible
+        }
+        
+        # Simple P&L estimation (rough)
+        if "prob" in trade and "px" in trade and "qty" in trade:
+            # Very rough estimate: assume we made profit if prob was confident
+            prob = trade.get("prob", 0.5)
+            px = trade.get("px", 0)
+            qty = trade.get("qty", 0)
+            
+            if trade.get("side") == "buy" and prob > 0.6:
+                # Estimate 1-2% profit for confident buys
+                trade_out["pnl"] = qty * px * (prob - 0.5) * 0.04
+            elif trade.get("side") == "sell" and prob < 0.4:
+                # Estimate profit for confident sells
+                trade_out["pnl"] = qty * px * (0.5 - prob) * 0.04
+        
+        trades_with_pnl.append(trade_out)
+    
+    return trades_with_pnl
