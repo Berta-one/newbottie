@@ -1,3 +1,5 @@
+httpx
+vaderSentiment
 numpy
 pandas
 joblib
