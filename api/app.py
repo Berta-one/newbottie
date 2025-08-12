@@ -2,10 +2,10 @@
 import os, time, asyncio, logging, math, json, hashlib
 from typing import Any, Dict, List, Optional, Tuple, Set
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-# ───────────────────────────── deps checks
+# ───────────────────────────── dependencies
 try:
     import ccxt
 except Exception as e:
@@ -30,9 +30,9 @@ except Exception:
     QuantumCircuit = None
     Aer = None
 
-# Finnhub/VADER sentiment service (our implementation)
-# NOTE: this is the correct module we created earlier.
+# Finnhub/VADER sentiment service (your module)
 try:
+    # must exist: sentiment/sentiment_service.py with Finnhub + VADER
     from sentiment.sentiment_service import snapshot as sentiment_snapshot, latest_probs as sentiment_latest_probs
     SENTIMENT_WIRED = True
 except Exception:
@@ -64,7 +64,7 @@ TRADE_SLOW_EMA      = int(os.getenv("TRADE_SLOW_EMA", "26"))
 TRADE_MIN_CONF      = float(os.getenv("TRADE_MIN_CONF", "0.55"))
 TRADE_SYMBOLS_ENV   = os.getenv("TRADE_SYMBOLS", "")
 
-# weights (they’ll be normalized when combining)
+# weights (normalized at combine time)
 EMA_WEIGHT       = float(os.getenv("EMA_WEIGHT", "0.65"))
 ML_WEIGHT        = float(os.getenv("ML_WEIGHT", "0.25"))
 QUANTUM_WEIGHT   = float(os.getenv("QUANTUM_WEIGHT", "0.35"))
@@ -79,11 +79,18 @@ QUANTUM_BACKEND  = os.getenv("QUANTUM_BACKEND", "aer_simulator")
 
 SENTIMENT_ENABLED = os.getenv("SENTIMENT_ENABLED", "1").lower() in ("1","true","yes")
 
+# Training admin + defaults
+TRAIN_ADMIN_TOKEN = os.getenv("TRAIN_ADMIN_TOKEN", "").strip()
+TRAIN_SYMBOLS_ENV = os.getenv("TRAIN_SYMBOLS", "BTC/USDT,ETH/USDT,BNB/USDT")
+TRAIN_TIMEFRAME   = os.getenv("TRAIN_TIMEFRAME", "1h")
+TRAIN_LIMIT       = int(os.getenv("TRAIN_LIMIT", "800"))
+AUTO_TRAIN_ON_START = os.getenv("AUTO_TRAIN_ON_START", "0").lower() in ("1","true","yes")
+
 # ───────────────────────────── App
 logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
 log = logging.getLogger("BottieAPI")
 
-app = FastAPI(title="Bottie API", version="1.4.0")
+app = FastAPI(title="Bottie API", version="1.6.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[NETLIFY_URL] if NETLIFY_URL != "*" else ["*"],
@@ -207,15 +214,15 @@ def _compute_cost_basis_for_symbol(symbol: str) -> Optional[Tuple[float, float]]
     for t in trades:
         side = (t.get("side") or "").lower()
         amount = float(t.get("amount") or 0.0)
-        price = float(t.get("price") or 0.0)
+        price  = float(t.get("price") or 0.0)
         if amount <= 0 or price <= 0:
             continue
         eff_amount = amount
         eff_cost_add = 0.0
         if FEE_IN_COST_BASIS:
-            fee = t.get("fee") or {}
+            fee   = t.get("fee") or {}
             fcost = float(fee.get("cost") or 0.0)
-            fccy = (fee.get("currency") or "").upper()
+            fccy  = (fee.get("currency") or "").upper()
             if fcost:
                 if fccy == quote:
                     eff_cost_add = fcost
@@ -397,32 +404,26 @@ def _ml_prob(feats: Dict[str, Any]) -> Optional[float]:
     except Exception as e:
         add_log(f"ML score error: {e}")
     return None
-# ──────────────────────────────────────────────────────────────────────────────
-# Auto-train if model missing (uses public OHLCV via ccxt)
-# ──────────────────────────────────────────────────────────────────────────────
+
+# ───────────────────────────── Auto-train (optional on startup)
 def _fit_simple_model_from_ohlcv(ohlcv: List[List[float]]):
-    """Train a quick binary classifier: next-bar up/down based on EMA/RSI/ret/vol."""
-    import numpy as np, pandas as pd
+    """Quick binary classifier: next-bar up/down from EMA/RSI/ret/vol."""
     from sklearn.linear_model import LogisticRegression
     try:
         import xgboost as xgb
         XGB = xgb.XGBClassifier(
             n_estimators=200, max_depth=4, learning_rate=0.08,
-            subsample=0.8, colsample_bytree=0.8, reg_lambda=1.0,
-            n_jobs=2
+            subsample=0.8, colsample_bytree=0.8, reg_lambda=1.0, n_jobs=2
         )
     except Exception:
         XGB = None
 
     arr = np.array(ohlcv, dtype=float)
-    close = arr[:, 4]
-    vol   = arr[:, 5]
+    close = arr[:, 4]; vol = arr[:, 5]
     if len(close) < 80:
         raise RuntimeError("Not enough OHLCV to train")
 
-    def ema(a, span):
-        return pd.Series(a).ewm(span=span, adjust=False).mean().values
-
+    def ema(a, span): return pd.Series(a).ewm(span=span, adjust=False).mean().values
     def rsi(a, p=14):
         delta = np.diff(a)
         up = np.where(delta > 0, delta, 0.0)
@@ -430,7 +431,7 @@ def _fit_simple_model_from_ohlcv(ohlcv: List[List[float]]):
         ru = pd.Series(up).rolling(p).mean()
         rd = pd.Series(down).rolling(p).mean()
         rs = ru / (rd + 1e-12)
-        r = 100.0 - (100.0 / (1.0 + rs))
+        r  = 100.0 - (100.0 / (1.0 + rs))
         return np.concatenate([[np.nan], r.values])
 
     ema_f = ema(close, max(2, TRADE_FAST_EMA))
@@ -439,45 +440,30 @@ def _fit_simple_model_from_ohlcv(ohlcv: List[List[float]]):
 
     ret1 = np.zeros_like(close)
     ret1[1:] = (close[1:] - close[:-1]) / (close[:-1] + 1e-12)
-    y = (ret1 > 0).astype(int)  # next-bar up?
 
-    # assemble X (drop NaNs from warmup)
     df = pd.DataFrame({
-        "close": close, "vol": vol, "ema_fast": ema_f, "ema_slow": ema_s,
-        "rsi14": rsi14, "ret1": ret1
+        "close": close, "vol": vol, "ema_fast": ema_f, "ema_slow": ema_s, "rsi14": rsi14, "ret1": ret1
     }).replace([np.inf, -np.inf], np.nan).dropna()
 
-    # align y with df’s index (same rows)
-    y_aligned = (df["ret1"] > 0).astype(int).values
-    X = df[["close","rsi14","ret1","ema_fast","ema_slow","vol"]].values
+    y = (df["ret1"].shift(-1) > 0).astype(int)[:-1].values
+    X = df[["close","rsi14","ret1","ema_fast","ema_slow","vol"]][:-1].values
 
-    # prefer XGBoost if available
-    if XGB is not None:
-        model = XGB
-    else:
-        model = LogisticRegression(max_iter=1000)
-
-    model.fit(X, y_aligned)
-    meta = {"features": ["close","rsi14","ret1","ema_fast","ema_slow","vol"]}
+    model = XGB if XGB is not None else LogisticRegression(max_iter=1000)
+    model.fit(X, y)
+    meta = {"features": ["close","rsi14","ret1","ema_fast","ema_slow","vol"], "rows": int(X.shape[0])}
     return model, meta
-
 
 async def _auto_train_if_missing():
     global _ML_MODEL, _ML_META
-    if not ML_ENABLED:
+    if not ML_ENABLED or _ML_MODEL:
         return
-    want_auto = os.getenv("AUTO_TRAIN_ON_START", "0").lower() in ("1","true","yes")
-    if not want_auto:
+    if not AUTO_TRAIN_ON_START:
         return
-    if _ML_MODEL:
-        return  # already loaded
-
     try:
         assert _exchange is not None
-        syms = [s.strip() for s in os.getenv("TRAIN_SYMBOLS", "BTC/USDT,ETH/USDT").split(",") if s.strip()]
-        tf   = os.getenv("TRAIN_TIMEFRAME", "1h")
-        lim  = int(os.getenv("TRAIN_LIMIT", "600"))
-        # fetch & concat data from multiple symbols
+        syms = [s.strip() for s in TRAIN_SYMBOLS_ENV.split(",") if s.strip()]
+        tf   = TRAIN_TIMEFRAME
+        lim  = TRAIN_LIMIT
         all_ohlcv: List[List[float]] = []
         for s in syms:
             try:
@@ -489,20 +475,14 @@ async def _auto_train_if_missing():
         if len(all_ohlcv) < 200:
             add_log("auto-train: not enough combined data to train; skipping")
             return
-
         model, meta = _fit_simple_model_from_ohlcv(all_ohlcv)
         if joblib:
             os.makedirs(os.path.dirname(MODEL_XGB_PATH), exist_ok=True)
             joblib.dump(model, MODEL_XGB_PATH)
             with open(MODEL_META_PATH, "w") as f:
                 json.dump(meta, f, indent=2)
-            _ML_MODEL = model
-            _ML_META  = meta
-            add_log(f"ML: auto-trained and saved → {MODEL_XGB_PATH}")
-        else:
-            _ML_MODEL = model
-            _ML_META  = meta
-            add_log("ML: auto-trained in memory (joblib not available to persist)")
+        _ML_MODEL, _ML_META = model, meta
+        add_log(f"ML: auto-trained {'and saved ' if joblib else ''}→ {MODEL_XGB_PATH}")
     except Exception as e:
         add_log(f"auto-train error: {e}")
 
@@ -554,7 +534,6 @@ def _symbols_to_scan() -> List[str]:
             s = s.strip().upper()
             if s and s in _exchange.markets:
                 syms.add(s)
-    # never include cash/cash
     syms.discard(f"{PRIMARY_QUOTE}/{PRIMARY_QUOTE}")
     return sorted(syms)
 
@@ -609,8 +588,7 @@ async def signals_loop():
                     final_prob = float(ema_prob)
                     w_norm = {"ema": 1.0}
                 else:
-                    w = np.array(weights, dtype=float)
-                    w = w / np.sum(w)
+                    w = np.array(weights, dtype=float); w = w / np.sum(w)
                     final_prob = float(np.sum(w * np.array(parts, dtype=float)))
                     w_norm = {lab: float(w[i]) for i, lab in enumerate(labels)}
 
@@ -644,13 +622,155 @@ async def signals_loop():
             add_log(f"ERROR signals_loop: {e}")
         await asyncio.sleep(max(0.25, SIGNAL_INTERVAL_S - (time.time() - t0)))
 
+# ───────────────────────────── Sentiment loop (polls provider to keep cache warm)
+async def sentiment_loop():
+    if not (SENTIMENT_ENABLED and SENTIMENT_WIRED):
+        add_log("Sentiment loop disabled or provider not wired.")
+        return
+    add_log("Sentiment loop started.")
+    while True:
+        try:
+            snap = sentiment_snapshot()  # provider refreshes internally with throttling
+            scores = snap.get("scores", {})
+            # brief log
+            sample = list(scores.items())[:6]
+            if sample:
+                msg = ", ".join(f"{k}:{v:+.2f}" for k, v in sample)
+                add_log(f"sentiment | {msg}")
+        except Exception as e:
+            add_log(f"ERROR sentiment_loop: {e}")
+        await asyncio.sleep(60)
+
+# ───────────────────────────── Training helpers & endpoints
+def _build_feature_table(ohlcv: List[List[float]]):
+    arr = np.array(ohlcv, dtype=float)
+    close = arr[:, 4]
+    vol   = arr[:, 5]
+    if len(close) < max(TRADE_SLOW_EMA + 10, 80):
+        raise RuntimeError("Not enough bars to train")
+
+    def ema(a, span): return pd.Series(a).ewm(span=span, adjust=False).mean().values
+    def rsi(a, p=14):
+        if len(a) <= p + 1:
+            return np.full_like(a, np.nan, dtype=float)
+        delta = np.diff(a)
+        up = np.where(delta > 0, delta, 0.0)
+        down = np.where(delta < 0, -delta, 0.0)
+        ru = pd.Series(up).rolling(p).mean()
+        rd = pd.Series(down).rolling(p).mean()
+        rs = ru / (rd + 1e-12)
+        r  = 100.0 - (100.0 / (1.0 + rs))
+        return np.concatenate([[np.nan], r.values])
+
+    ema_f = ema(close, max(2, TRADE_FAST_EMA))
+    ema_s = ema(close, max(3, TRADE_SLOW_EMA))
+    rsi14 = rsi(close, 14)
+
+    ret1 = np.zeros_like(close)
+    ret1[1:] = (close[1:] - close[:-1]) / (close[:-1] + 1e-12)
+
+    df = pd.DataFrame({
+        "close": close, "vol": vol, "ema_fast": ema_f, "ema_slow": ema_s, "rsi14": rsi14, "ret1": ret1
+    }).replace([np.inf, -np.inf], np.nan).dropna()
+
+    y = (df["ret1"].shift(-1) > 0).astype(int)[:-1].values
+    X = df[["close","rsi14","ret1","ema_fast","ema_slow","vol"]][:-1].values
+    meta = {"features": ["close","rsi14","ret1","ema_fast","ema_slow","vol"], "rows": int(X.shape[0])}
+    if X.shape[0] < 200:
+        raise RuntimeError("Too few clean rows to train (need ≥200)")
+    return X, y, meta
+
+def _train_model_from_symbols(symbols: List[str], timeframe: str, limit: int):
+    assert _exchange is not None
+    all_ohlcv: List[List[float]] = []
+    scanned = []
+    for s in symbols:
+        try:
+            o = _exchange.fetch_ohlcv(s, timeframe=timeframe, limit=limit)
+            if o and len(o) > 0:
+                all_ohlcv.extend(o)
+                scanned.append(s)
+        except Exception as e:
+            add_log(f"train: fetch_ohlcv fail {s}: {e}")
+
+    if len(all_ohlcv) < 400:
+        raise RuntimeError("Not enough combined OHLCV across symbols to train")
+
+    X, y, meta = _build_feature_table(all_ohlcv)
+
+    # Prefer XGB; fallback to sklearn LR
+    try:
+        import xgboost as xgb
+        model = xgb.XGBClassifier(
+            n_estimators=300, max_depth=5, learning_rate=0.08,
+            subsample=0.9, colsample_bytree=0.9, reg_lambda=1.0,
+            n_jobs=2, tree_method="hist"
+        )
+        model.fit(X, y)
+        algo = "xgboost"
+    except Exception:
+        from sklearn.linear_model import LogisticRegression
+        model = LogisticRegression(max_iter=2000)
+        model.fit(X, y)
+        algo = "logreg"
+
+    meta.update({
+        "algo": algo, "symbols": scanned, "timeframe": timeframe, "limit": limit,
+        "trained_at": int(time.time())
+    })
+    return model, meta
+
+def _save_and_reload_model(model, meta: Dict[str, Any]):
+    global _ML_MODEL, _ML_META
+    if not joblib:
+        _ML_MODEL, _ML_META = model, meta
+        add_log("ML: trained (in memory only – joblib missing).")
+        return
+    os.makedirs(os.path.dirname(MODEL_XGB_PATH), exist_ok=True)
+    joblib.dump(model, MODEL_XGB_PATH)
+    with open(MODEL_META_PATH, "w") as f:
+        json.dump(meta, f, indent=2)
+    _ML_MODEL, _ML_META = model, meta
+    add_log(f"ML: trained and saved → {MODEL_XGB_PATH}")
+
+@app.post("/train")
+async def train(
+    token: str = Query(..., description="TRAIN_ADMIN_TOKEN"),
+    symbols: Optional[str] = Query(None, description="Comma-separated symbols, e.g. BTC/USDT,ETH/USDT"),
+    timeframe: Optional[str] = Query(None),
+    limit: Optional[int] = Query(None),
+):
+    if token != TRAIN_ADMIN_TOKEN or not TRAIN_ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    await _ensure_exchange()
+    syms = [s.strip() for s in (symbols or TRAIN_SYMBOLS_ENV).split(",") if s.strip()]
+    tf   = timeframe or TRAIN_TIMEFRAME
+    lim  = int(limit or TRAIN_LIMIT)
+
+    try:
+        model, meta = _train_model_from_symbols(syms, tf, lim)
+        _save_and_reload_model(model, meta)
+        return {"ok": True, "trained": True, "meta": meta}
+    except Exception as e:
+        add_log(f"train error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/ml/status")
+def ml_status():
+    return {
+        "enabled": ML_ENABLED,
+        "loaded": bool(_ML_MODEL),
+        "model_path": MODEL_XGB_PATH if _ML_MODEL else None,
+        "meta": _ML_META if _ML_MODEL else None
+    }
+
 # ───────────────────────────── Startup
 @app.on_event("startup")
 async def _on_startup():
     asyncio.create_task(portfolio_loop())
     asyncio.create_task(signals_loop())
     asyncio.create_task(sentiment_loop())
-    # Auto-train if the model is missing
     asyncio.create_task(_auto_train_if_missing())
 
 # ───────────────────────────── Endpoints
