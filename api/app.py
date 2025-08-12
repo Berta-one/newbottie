@@ -397,6 +397,114 @@ def _ml_prob(feats: Dict[str, Any]) -> Optional[float]:
     except Exception as e:
         add_log(f"ML score error: {e}")
     return None
+# ──────────────────────────────────────────────────────────────────────────────
+# Auto-train if model missing (uses public OHLCV via ccxt)
+# ──────────────────────────────────────────────────────────────────────────────
+def _fit_simple_model_from_ohlcv(ohlcv: List[List[float]]):
+    """Train a quick binary classifier: next-bar up/down based on EMA/RSI/ret/vol."""
+    import numpy as np, pandas as pd
+    from sklearn.linear_model import LogisticRegression
+    try:
+        import xgboost as xgb
+        XGB = xgb.XGBClassifier(
+            n_estimators=200, max_depth=4, learning_rate=0.08,
+            subsample=0.8, colsample_bytree=0.8, reg_lambda=1.0,
+            n_jobs=2
+        )
+    except Exception:
+        XGB = None
+
+    arr = np.array(ohlcv, dtype=float)
+    close = arr[:, 4]
+    vol   = arr[:, 5]
+    if len(close) < 80:
+        raise RuntimeError("Not enough OHLCV to train")
+
+    def ema(a, span):
+        return pd.Series(a).ewm(span=span, adjust=False).mean().values
+
+    def rsi(a, p=14):
+        delta = np.diff(a)
+        up = np.where(delta > 0, delta, 0.0)
+        down = np.where(delta < 0, -delta, 0.0)
+        ru = pd.Series(up).rolling(p).mean()
+        rd = pd.Series(down).rolling(p).mean()
+        rs = ru / (rd + 1e-12)
+        r = 100.0 - (100.0 / (1.0 + rs))
+        return np.concatenate([[np.nan], r.values])
+
+    ema_f = ema(close, max(2, TRADE_FAST_EMA))
+    ema_s = ema(close, max(3, TRADE_SLOW_EMA))
+    rsi14 = rsi(close, 14)
+
+    ret1 = np.zeros_like(close)
+    ret1[1:] = (close[1:] - close[:-1]) / (close[:-1] + 1e-12)
+    y = (ret1 > 0).astype(int)  # next-bar up?
+
+    # assemble X (drop NaNs from warmup)
+    df = pd.DataFrame({
+        "close": close, "vol": vol, "ema_fast": ema_f, "ema_slow": ema_s,
+        "rsi14": rsi14, "ret1": ret1
+    }).replace([np.inf, -np.inf], np.nan).dropna()
+
+    # align y with df’s index (same rows)
+    y_aligned = (df["ret1"] > 0).astype(int).values
+    X = df[["close","rsi14","ret1","ema_fast","ema_slow","vol"]].values
+
+    # prefer XGBoost if available
+    if XGB is not None:
+        model = XGB
+    else:
+        model = LogisticRegression(max_iter=1000)
+
+    model.fit(X, y_aligned)
+    meta = {"features": ["close","rsi14","ret1","ema_fast","ema_slow","vol"]}
+    return model, meta
+
+
+async def _auto_train_if_missing():
+    global _ML_MODEL, _ML_META
+    if not ML_ENABLED:
+        return
+    want_auto = os.getenv("AUTO_TRAIN_ON_START", "0").lower() in ("1","true","yes")
+    if not want_auto:
+        return
+    if _ML_MODEL:
+        return  # already loaded
+
+    try:
+        assert _exchange is not None
+        syms = [s.strip() for s in os.getenv("TRAIN_SYMBOLS", "BTC/USDT,ETH/USDT").split(",") if s.strip()]
+        tf   = os.getenv("TRAIN_TIMEFRAME", "1h")
+        lim  = int(os.getenv("TRAIN_LIMIT", "600"))
+        # fetch & concat data from multiple symbols
+        all_ohlcv: List[List[float]] = []
+        for s in syms:
+            try:
+                data = _exchange.fetch_ohlcv(s, timeframe=tf, limit=lim)
+                if data:
+                    all_ohlcv.extend(data)
+            except Exception as e:
+                add_log(f"auto-train: fetch_ohlcv fail {s}: {e}")
+        if len(all_ohlcv) < 200:
+            add_log("auto-train: not enough combined data to train; skipping")
+            return
+
+        model, meta = _fit_simple_model_from_ohlcv(all_ohlcv)
+        if joblib:
+            os.makedirs(os.path.dirname(MODEL_XGB_PATH), exist_ok=True)
+            joblib.dump(model, MODEL_XGB_PATH)
+            with open(MODEL_META_PATH, "w") as f:
+                json.dump(meta, f, indent=2)
+            _ML_MODEL = model
+            _ML_META  = meta
+            add_log(f"ML: auto-trained and saved → {MODEL_XGB_PATH}")
+        else:
+            _ML_MODEL = model
+            _ML_META  = meta
+            add_log("ML: auto-trained in memory (joblib not available to persist)")
+    except Exception as e:
+        add_log(f"auto-train error: {e}")
 
 # Quantum
 def _quantum_prob(symbol: str, feats: Dict[str, Any]) -> Optional[float]:
