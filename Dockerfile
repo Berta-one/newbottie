@@ -27,4 +27,4 @@ EXPOSE 10000
 
 # Start API (uses $PORT from Render)
 CMD ["sh", "-c", "uvicorn api_app:app --host 0.0.0.0 --port ${PORT}"]
-CMD ["uvicorn", "api.app:app", "--host", "0.0.0.0", "--port", "$PORT"]
+CMD uvicorn api.app:app --host 0.0.0.0 --port $PORT 
