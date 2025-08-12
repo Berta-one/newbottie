@@ -25,7 +25,94 @@ try:
     import joblib
 except Exception:
     joblib = None
+import json
 
+# File to persist execution state
+EXEC_STATE_FILE = "exec_state.json"
+
+def load_execution_state():
+    """Load execution state from file"""
+    global EXECUTION_RUNTIME_ENABLED
+    try:
+        if os.path.exists(EXEC_STATE_FILE):
+            with open(EXEC_STATE_FILE, 'r') as f:
+                data = json.load(f)
+                EXECUTION_RUNTIME_ENABLED = data.get("enabled", True)  # Default to enabled
+                add_log(f"Loaded execution state: {'enabled' if EXECUTION_RUNTIME_ENABLED else 'disabled'}")
+        else:
+            EXECUTION_RUNTIME_ENABLED = True  # Default to enabled if no file
+            save_execution_state()
+    except Exception as e:
+        add_log(f"Error loading execution state: {e}")
+        EXECUTION_RUNTIME_ENABLED = True
+
+def save_execution_state():
+    """Save execution state to file"""
+    try:
+        with open(EXEC_STATE_FILE, 'w') as f:
+            json.dump({"enabled": EXECUTION_RUNTIME_ENABLED}, f)
+        add_log(f"Saved execution state: {'enabled' if EXECUTION_RUNTIME_ENABLED else 'disabled'}")
+    except Exception as e:
+        add_log(f"Error saving execution state: {e}")
+
+# Replace the current execution variable with:
+EXECUTION_RUNTIME_ENABLED = False  # Will be loaded from file
+
+# Add this in your startup event:
+@app.on_event("startup")
+async def _on_startup():
+    load_execution_state()  # ← Add this line
+    asyncio.create_task(portfolio_loop())
+    asyncio.create_task(signals_loop())
+    asyncio.create_task(online_label_loop())
+    asyncio.create_task(execution_loop())
+
+# Update your exec endpoints to save state:
+@app.post("/exec/enable")
+async def exec_enable(request: Request):
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    global EXECUTION_RUNTIME_ENABLED
+    EXECUTION_RUNTIME_ENABLED = True
+    save_execution_state()  # ← Add this line
+    
+    client_ip = request.client.host if hasattr(request, 'client') else "unknown"
+    log_audit(user["username"], "EXEC_ENABLE", "/exec/enable", client_ip)
+    
+    return {"ok": True, "enabled": EXECUTION_RUNTIME_ENABLED}
+
+@app.post("/exec/disable")
+async def exec_disable(request: Request):
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    global EXECUTION_RUNTIME_ENABLED
+    EXECUTION_RUNTIME_ENABLED = False
+    save_execution_state()  # ← Add this line
+    
+    client_ip = request.client.host if hasattr(request, 'client') else "unknown"
+    log_audit(user["username"], "EXEC_DISABLE", "/exec/disable", client_ip)
+    
+    return {"ok": True, "enabled": EXECUTION_RUNTIME_ENABLED}
+
+@app.post("/exec/toggle")
+async def exec_toggle(request: Request):
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    global EXECUTION_RUNTIME_ENABLED
+    EXECUTION_RUNTIME_ENABLED = not EXECUTION_RUNTIME_ENABLED
+    save_execution_state()  # ← Add this line
+    
+    client_ip = request.client.host if hasattr(request, 'client') else "unknown"
+    log_audit(user["username"], "EXEC_TOGGLE", "/exec/toggle", client_ip, 
+             f"Toggled to: {'enabled' if EXECUTION_RUNTIME_ENABLED else 'disabled'}")
+    
+    return {"ok": True, "enabled": EXECUTION_RUNTIME_ENABLED}
 # quantum optional
 try:
     from qiskit import QuantumCircuit
