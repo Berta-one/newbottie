@@ -1,41 +1,71 @@
-# api/app.py — LIVE spot + true cost-basis (WAC) from trade history
-import os, time, asyncio, logging
+# api/app.py — LIVE spot portfolio + true cost-basis (WAC) + signals (EMA + optional quantum)
+import os
+import time
+import math
+import asyncio
+import logging
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+# ---------------------------------------------------------------------------------------
+# Dependencies
+# ---------------------------------------------------------------------------------------
 try:
-    import ccxt
+    import ccxt  # exchange connectivity
 except Exception as e:
     raise RuntimeError(f"ccxt not installed. Add to requirements.txt: {e}")
 
-# -----------------------------------------------------------------------------
-# Config (Render → Environment)
-# -----------------------------------------------------------------------------
+# Optional quantum libs will be used indirectly (via qiskit-aer) if present
+try:
+    import qiskit  # noqa: F401
+    _HAS_QISKIT = True
+except Exception:
+    _HAS_QISKIT = False
+
+# ---------------------------------------------------------------------------------------
+# Config (Render/Heroku/DO → Environment)
+# ---------------------------------------------------------------------------------------
 NETLIFY_URL       = os.getenv("NETLIFY_URL", "*")
+
 EXCHANGE_ID       = os.getenv("EXCHANGE_ID", "binance").lower()
 API_KEY           = os.getenv("API_KEY", os.getenv("BINANCE_API_KEY", ""))
 API_SECRET        = os.getenv("API_SECRET", os.getenv("BINANCE_API_SECRET", ""))
-API_PASSPHRASE    = os.getenv("API_PASSPHRASE", "")  # e.g., coinbaseadvanced
-API_UID           = os.getenv("API_UID", "")          # e.g., bitstamp
+API_PASSPHRASE    = os.getenv("API_PASSPHRASE", "")  # coinbaseadvanced only
+API_UID           = os.getenv("API_UID", "")          # bitstamp only
+
 PRIMARY_QUOTE     = os.getenv("PRIMARY_QUOTE", "USDT")
 LOOP_SLEEP_S      = float(os.getenv("LOOP_SLEEP_S", "7.0"))
 LOG_LEVEL         = os.getenv("LOG_LEVEL", "INFO").upper()
 
-# Cost-basis settings
-COST_LOOKBACK_DAYS     = int(os.getenv("COST_BASIS_LOOKBACK_DAYS", "120"))  # how far back to fetch trades
-MAX_TRADES_PER_SYMBOL  = int(os.getenv("MAX_TRADES_PER_SYMBOL", "1000"))    # safety cap per cycle
-FEE_IN_COST_BASIS      = os.getenv("FEE_IN_COST_BASIS", "1") not in ("0", "false", "False", "", None)
-COST_CACHE_TTL_SEC     = int(os.getenv("COST_CACHE_TTL_SEC", "600"))        # recalc each 10 min per symbol
+# Cost-basis options
+COST_LOOKBACK_DAYS     = int(os.getenv("COST_BASIS_LOOKBACK_DAYS", "120"))
+MAX_TRADES_PER_SYMBOL  = int(os.getenv("MAX_TRADES_PER_SYMBOL", "1000"))
+FEE_IN_COST_BASIS      = os.getenv("FEE_IN_COST_BASIS", "1").lower() not in ("0", "false", "")
+COST_CACHE_TTL_SEC     = int(os.getenv("COST_CACHE_TTL_SEC", "600"))
 
-# -----------------------------------------------------------------------------
+# Signals (EMA + optional quantum)
+TRADE_SIGNALS_ENABLED  = os.getenv("TRADE_SIGNALS", "1").lower() not in ("0", "false", "")
+TRADE_TIMEFRAME        = os.getenv("TRADE_TIMEFRAME", "1h")
+TRADE_FAST_EMA         = int(os.getenv("TRADE_FAST_EMA", "12"))
+TRADE_SLOW_EMA         = int(os.getenv("TRADE_SLOW_EMA", "26"))
+TRADE_LOOKBACK_BARS    = int(os.getenv("TRADE_LOOKBACK_BARS", "300"))
+SIGNAL_INTERVAL_S      = float(os.getenv("SIGNAL_INTERVAL_S", "30"))
+
+QUANTUM_ENABLED        = os.getenv("QUANTUM_ENABLED", "0").lower() not in ("0", "false", "")
+QUANTUM_WEIGHT         = float(os.getenv("QUANTUM_WEIGHT", "0.35"))
+EMA_WEIGHT             = float(os.getenv("EMA_WEIGHT", "0.65"))
+WATCHLIST_ENV          = os.getenv("TRADE_SYMBOLS", "").strip()
+WATCHLIST              = [s.strip() for s in WATCHLIST_ENV.split(",") if s.strip()]
+
+# ---------------------------------------------------------------------------------------
 # App + CORS
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
 log = logging.getLogger("BottieAPI")
 logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
 
-app = FastAPI(title="Bottie API", version="1.1.0")
+app = FastAPI(title="Bottie API", version="1.2.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -45,14 +75,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
 # In-memory state
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
 _started = time.time()
-_equity_series: List[Dict[str, Any]] = []         # [{"t": ts, "v": float}]
-_positions: Dict[str, Dict[str, float]] = {}      # { "ADA/USDT": {"qty":..., "avg_px":..., "last_px":...}, ... }
-_signals: List[Dict[str, Any]] = []
-_logs: List[str] = []
+_equity_series: List[Dict[str, Any]] = []                  # [{"t": ts, "v": float}]
+_positions: Dict[str, Dict[str, float]] = {}               # {"SYM/QUOTE": {"qty":..., "avg_px":..., "last_px":...}}
+_signals: List[Dict[str, Any]] = []                        # [{"symbol":..., "signal":..., "confidence":..., "t":...}]
+_logs: List[str] = []                                      # recent log lines
 
 # cost-basis cache: symbol -> {"ts": last_calc, "qty": float, "avg_px": float}
 _cost_basis_cache: Dict[str, Dict[str, float]] = {}
@@ -64,22 +94,20 @@ def add_log(msg: str):
         del _logs[:-1000]
     log.info(msg)
 
-# -----------------------------------------------------------------------------
-# Optional quantum flag
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+# Optional quantum detection info (for /health cosmetics)
+# ---------------------------------------------------------------------------------------
 def _detect_quantum() -> Dict[str, str]:
-    try:
-        from quantum.backends import get_backend  # optional
-        qb = get_backend()
-        name = getattr(qb.backend, "name", None)
-        name = name() if callable(name) else (name or "unknown")
-        return {"kind": qb.kind, "backend": name}
-    except Exception:
-        return {"kind": "none", "backend": os.getenv("QUANTUM_BACKEND", "disabled")}
+    if not QUANTUM_ENABLED:
+        return {"kind": "disabled", "backend": "n/a"}
+    if _HAS_QISKIT:
+        # minimal disclosure; exact backend name would require full backend setup
+        return {"kind": "qiskit", "backend": os.getenv("QUANTUM_BACKEND", "aer_simulator")}
+    return {"kind": "unavailable", "backend": "none"}
 
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
 # Exchange (LIVE spot)
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
 _exchange: Optional[ccxt.Exchange] = None
 
 def _init_exchange() -> ccxt.Exchange:
@@ -87,12 +115,14 @@ def _init_exchange() -> ccxt.Exchange:
         raise RuntimeError("API_KEY / API_SECRET missing.")
     if EXCHANGE_ID not in ccxt.exchanges:
         raise RuntimeError(f"Exchange '{EXCHANGE_ID}' not supported by CCXT.")
+
     klass = getattr(ccxt, EXCHANGE_ID)
     params = {"apiKey": API_KEY, "secret": API_SECRET, "enableRateLimit": True}
     if EXCHANGE_ID == "coinbaseadvanced" and API_PASSPHRASE:
         params["password"] = API_PASSPHRASE
     if EXCHANGE_ID == "bitstamp" and API_UID:
         params["uid"] = API_UID
+
     ex = klass(params)
     if hasattr(ex, "options"):
         ex.options = {**getattr(ex, "options", {}), **{"defaultType": "spot"}}
@@ -109,9 +139,9 @@ async def _ensure_exchange():
         except Exception as e:
             add_log(f"ERROR load_markets: {e}")
 
-# -----------------------------------------------------------------------------
-# Helpers
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+# Helpers (balances, symbols, tickers)
+# ---------------------------------------------------------------------------------------
 def _nonzero_assets_from_balance(balance: Dict[str, Any]) -> Dict[str, float]:
     assets: Dict[str, float] = {}
     for asset, entry in (balance.get("total") or {}).items():
@@ -130,11 +160,11 @@ def _symbol_exists(base: str, quote: str) -> bool:
 def _quote_priority() -> List[str]:
     tail = ["USD", "BUSD", "USDC", "BTC", "ETH", "EUR", "TRY", "GBP"]
     ordered = [PRIMARY_QUOTE] + [x for x in tail if x != PRIMARY_QUOTE]
-    # keep unique order
     seen, pr = set(), []
     for q in ordered:
         if q not in seen:
-            seen.add(q); pr.append(q)
+            seen.add(q)
+            pr.append(q)
     return pr
 
 def _best_symbol_for_asset(asset: str, preferred_quotes: List[str]) -> Optional[str]:
@@ -153,16 +183,16 @@ def _fetch_tickers(symbols: List[str]) -> Dict[str, Any]:
         add_log(f"ERROR fetch_tickers: {e}")
         return {}
 
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
 # Cost-basis (true avg entry) via WAC from trade history
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
 def _ms_since(days: int) -> int:
     return int((time.time() - days * 86400) * 1000)
 
 def _compute_cost_basis_for_symbol(symbol: str) -> Optional[Tuple[float, float]]:
     """
     Returns (net_qty, avg_px) for current position using Weighted Average Cost (WAC).
-    Process trades chronologically within lookback; fees included if enabled.
+    Processes trades chronologically within lookback; includes fees if configured.
     """
     assert _exchange is not None
     since = _ms_since(COST_LOOKBACK_DAYS)
@@ -190,9 +220,11 @@ def _compute_cost_basis_for_symbol(symbol: str) -> Optional[Tuple[float, float]]
     net_qty = 0.0     # base units
     cost    = 0.0     # in quote currency
 
+    base_ccy, quote_ccy = symbol.split("/")[0].upper(), symbol.split("/")[1].upper()
+
     for t in trades:
         side   = (t.get("side") or "").lower()      # "buy" / "sell"
-        amount = float(t.get("amount") or 0.0)      # base
+        amount = float(t.get("amount") or 0.0)      # base units
         price  = float(t.get("price") or 0.0)       # quote per base
         fee    = t.get("fee") or {}
         fee_cost = float(fee.get("cost") or 0.0)
@@ -202,30 +234,24 @@ def _compute_cost_basis_for_symbol(symbol: str) -> Optional[Tuple[float, float]]
             continue
 
         # Include fee if configured:
-        # - If fee paid in QUOTE -> increase cost (extra quote spent)
-        # - If fee paid in BASE  -> reduce acquired base amount
         eff_amount = amount
         eff_cost_add = 0.0
         if FEE_IN_COST_BASIS and fee_cost:
-            if fee_ccy == symbol.split("/")[1].upper():  # fee in QUOTE
+            if fee_ccy == quote_ccy:
                 eff_cost_add = fee_cost
-            elif fee_ccy == symbol.split("/")[0].upper():  # fee in BASE
-                eff_amount = max(0.0, amount - fee_cost)   # reduce acquired/sold base
+            elif fee_ccy == base_ccy:
+                eff_amount = max(0.0, amount - fee_cost)
 
         if side == "buy":
-            # increase inventory and cost
             net_qty += eff_amount
             cost    += eff_amount * price + eff_cost_add
         elif side == "sell":
-            # reduce inventory; WAC removes cost at current avg
             if net_qty <= 0:
-                # no inventory tracked; skip WAC decrement (can't go negative)
                 continue
             avg_px = cost / net_qty if net_qty > 0 else 0.0
             dec_amount = min(eff_amount, net_qty)
             cost    -= avg_px * dec_amount
             net_qty -= dec_amount
-        # else ignore unknown side
 
     if net_qty <= 0:
         return (0.0, 0.0)
@@ -234,7 +260,6 @@ def _compute_cost_basis_for_symbol(symbol: str) -> Optional[Tuple[float, float]]
     return (net_qty, avg_px)
 
 def _get_cost_basis(symbol: str) -> Optional[Tuple[float, float]]:
-    # simple TTL cache
     now = time.time()
     entry = _cost_basis_cache.get(symbol)
     if entry and (now - entry["ts"] < COST_CACHE_TTL_SEC):
@@ -245,9 +270,9 @@ def _get_cost_basis(symbol: str) -> Optional[Tuple[float, float]]:
         _cost_basis_cache[symbol] = {"ts": now, "qty": qty, "avg_px": avg_px}
     return res
 
-# -----------------------------------------------------------------------------
-# Valuation loop
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+# Portfolio valuation loop
+# ---------------------------------------------------------------------------------------
 def _value_portfolio(assets: Dict[str, float]) -> Tuple[float, Dict[str, Dict[str, float]]]:
     preferred = _quote_priority()
     symbols: List[str] = []
@@ -272,8 +297,6 @@ def _value_portfolio(assets: Dict[str, float]) -> Tuple[float, Dict[str, Dict[st
 
         if asset.upper() == PRIMARY_QUOTE.upper():
             symbol = f"{asset}/{PRIMARY_QUOTE}"
-            last_px = 1.0
-            # cash: no cost basis
             positions[symbol] = {"qty": float(qty), "avg_px": 1.0, "last_px": 1.0}
             equity += qty * 1.0
             continue
@@ -289,14 +312,12 @@ def _value_portfolio(assets: Dict[str, float]) -> Tuple[float, Dict[str, Dict[st
             add_log(f"Missing price for {sym}, skipping")
             continue
 
-        # True cost basis via WAC (cached)
         cb = _get_cost_basis(sym)
         if cb:
             cb_qty, cb_avg = cb
-            # We present the current balance qty with avg from history if there is inventory
             avg_px = float(cb_avg) if cb_qty > 0 else float(last_px)
         else:
-            avg_px = float(last_px)  # fallback
+            avg_px = float(last_px)
 
         positions[sym] = {"qty": float(qty), "avg_px": float(avg_px), "last_px": float(last_px)}
         equity += qty * last_px
@@ -335,16 +356,177 @@ async def portfolio_loop():
 
         await asyncio.sleep(LOOP_SLEEP_S)
 
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
+# Signals (EMA + optional quantum toy scorer)
+# ---------------------------------------------------------------------------------------
+def _ema(series: List[float], period: int) -> List[float]:
+    if not series or period <= 1:
+        return series[:]
+    k = 2.0 / (period + 1.0)
+    out: List[float] = []
+    ema_val = series[0]
+    for x in series:
+        ema_val = x * k + ema_val * (1 - k)
+        out.append(ema_val)
+    return out
+
+def _pct_change(series: List[float], n: int) -> float:
+    if len(series) < n + 1:
+        return 0.0
+    a, b = series[-1], series[-1 - n]
+    return 0.0 if b == 0 else (a - b) / b
+
+def _quantum_feature_vector(closes: List[float]) -> List[float]:
+    mom1 = _pct_change(closes, 3)
+    mom2 = _pct_change(closes, 8)
+    mom3 = _pct_change(closes, 21)
+    volw = 0.0
+    if len(closes) > 21:
+        window = closes[-21:]
+        mean = sum(window) / len(window)
+        var = sum((x - mean) ** 2 for x in window) / max(1, len(window) - 1)
+        volw = math.sqrt(var) / mean if mean else 0.0
+    vec = [mom1, mom2, mom3, volw]
+    out: List[float] = []
+    for v in vec:
+        v = max(min(v, 0.1), -0.1)  # cap extremes
+        out.append(v / 0.1)         # scale to [-1,1]
+    return out
+
+def _quantum_score(features: List[float]) -> float:
+    """Return score in [-1,1]; 0 if quantum disabled/unavailable."""
+    if not QUANTUM_ENABLED or not _HAS_QISKIT:
+        return 0.0
+    try:
+        from qiskit import QuantumCircuit
+        from qiskit_aer import Aer
+        from qiskit.transpiler import PassManager
+
+        qc = QuantumCircuit(2)
+        a, b, c, d = (features + [0, 0, 0, 0])[:4]
+        qc.ry((a + 1) * math.pi / 2, 0)
+        qc.ry((b + 1) * math.pi / 2, 1)
+        qc.cx(0, 1)
+        qc.rz((c + 1) * math.pi / 2, 0)
+        qc.rz((d + 1) * math.pi / 2, 1)
+        qc.cx(1, 0)
+        qc.barrier()
+        qc.measure_all()
+
+        backend = Aer.get_backend("aer_simulator")
+        tqc = PassManager().run(qc)
+        res = backend.run(tqc, shots=512).result()
+        counts = res.get_counts()
+        shots = sum(counts.values())
+        p1 = sum(cnt for bitstr, cnt in counts.items() if bitstr.endswith("1"))
+        prob = (p1 / shots) if shots else 0.5
+        return 2.0 * (prob - 0.5)
+    except Exception:
+        return 0.0
+
+def _blend_scores(ema_score: float, q_score: float) -> float:
+    wq = max(0.0, min(1.0, QUANTUM_WEIGHT))
+    we = max(0.0, min(1.0, EMA_WEIGHT))
+    if (wq + we) <= 0:
+        wq, we = 0.35, 0.65
+    total = wq + we
+    return (wq * q_score + we * ema_score) / total
+
+def _get_positions_copy() -> Dict[str, Dict[str, float]]:
+    return dict(_positions)
+
+def _push_signal(sig: Dict[str, Any]):
+    # keep only last one per symbol
+    existing_idx = None
+    for i in range(len(_signals) - 1, -1, -1):
+        if _signals[i].get("symbol") == sig.get("symbol"):
+            existing_idx = i
+            break
+    if existing_idx is not None:
+        _signals[existing_idx] = sig
+    else:
+        _signals.append(sig)
+    if len(_signals) > 500:
+        del _signals[:-300]
+
+async def signals_loop():
+    await _ensure_exchange()
+    assert _exchange is not None
+    min_bars_ok = max(TRADE_SLOW_EMA * 2, 100)
+    add_log(
+        f"Signal loop started | TF={TRADE_TIMEFRAME} | FAST={TRADE_FAST_EMA} | "
+        f"SLOW={TRADE_SLOW_EMA} | Q={QUANTUM_ENABLED}"
+    )
+    while True:
+        try:
+            # Universe = anything we hold + optional watchlist
+            uni = set(WATCHLIST)
+            for sym in _get_positions_copy().keys():
+                uni.add(sym)
+            uni = [s for s in uni if s]
+
+            batch: List[Dict[str, Any]] = []
+            for symbol in uni:
+                try:
+                    ohlcv = _exchange.fetch_ohlcv(symbol, timeframe=TRADE_TIMEFRAME, limit=max(TRADE_LOOKBACK_BARS, min_bars_ok))
+                except Exception as e:
+                    add_log(f"fetch_ohlcv fail {symbol}: {e}")
+                    continue
+                if not ohlcv or len(ohlcv) < min_bars_ok:
+                    continue
+
+                closes = [float(x[4]) for x in ohlcv]
+                fema = _ema(closes, TRADE_FAST_EMA)
+                sema = _ema(closes, TRADE_SLOW_EMA)
+                fval = fema[-1]
+                sval = sema[-1]
+
+                spread = (fval - sval) / sval if sval else 0.0
+                spread = max(min(spread, 0.02), -0.02)   # clip ±2%
+                ema_score = spread / 0.02                # map to [-1,1]
+
+                q_score = _quantum_score(_quantum_feature_vector(closes))
+                final = _blend_scores(ema_score, q_score)
+
+                if final > 0.25:
+                    sig = "BUY"
+                elif final < -0.25:
+                    sig = "SELL"
+                else:
+                    sig = "HOLD"
+
+                conf = min(0.99, max(0.0, abs(final)))
+                r = {
+                    "symbol": symbol,
+                    "signal": sig,
+                    "confidence": conf,
+                    "ema_score": round(ema_score, 4),
+                    "q_score": round(q_score, 4),
+                    "final": round(final, 4),
+                    "t": int(time.time()),
+                }
+                _push_signal(r)
+
+                batch.append(r)
+
+            add_log(f"signals | n={len(batch)} universe={len(uni)}")
+        except Exception as e:
+            add_log(f"ERROR signal loop: {e}")
+
+        await asyncio.sleep(SIGNAL_INTERVAL_S)
+
+# ---------------------------------------------------------------------------------------
 # Startup
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
 @app.on_event("startup")
 async def _on_startup():
     asyncio.create_task(portfolio_loop())
+    if TRADE_SIGNALS_ENABLED:
+        asyncio.create_task(signals_loop())
 
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
 # Endpoints
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------
 @app.get("/")
 def root():
     return {"ok": True, "service": "bottie", "time": time.time()}
@@ -373,27 +555,18 @@ def status():
         "positions": _positions,
         "last_signals": _signals[-100:],
     }
-_positions: Dict[str, Any] = {}
-_signals: List[Dict[str, Any]] = []
-_logs: List[str] = []
 
-# --- ADD THESE HERE ---
-def _get_positions_copy():
-    return dict(_positions)
-
-def _push_signal(sig: Dict[str, Any]):
-    # keep only last one per symbol
-    existing_idx = None
-    for i in range(len(_signals) - 1, -1, -1):
-        if _signals[i].get("symbol") == sig.get("symbol"):
-            existing_idx = i
-            break
-    if existing_idx is not None:
-        _signals[existing_idx] = sig
-    else:
-        _signals.append(sig)
-    if len(_signals) > 500:
-        del _signals[:-300]
+@app.get("/signals")
+def signals():
+    # Return the most recent signal per symbol
+    latest: Dict[str, Dict[str, Any]] = {}
+    for s in _signals:
+        sym = s.get("symbol")
+        if not sym:
+            continue
+        if sym not in latest or s.get("t", 0) >= latest[sym].get("t", 0):
+            latest[sym] = s
+    return {"signals": list(latest.values())}
 
 @app.get("/logs/last")
 def logs_last():
@@ -401,10 +574,11 @@ def logs_last():
 
 @app.get("/costbasis")
 def costbasis():
-    """
-    Inspect current cached cost-basis per symbol.
-    """
-    out = {}
+    out: Dict[str, Any] = {}
     for sym, entry in _cost_basis_cache.items():
-        out[sym] = {"qty": entry["qty"], "avg_px": entry["avg_px"], "age_sec": time.time() - entry["ts"]}
+        out[sym] = {
+            "qty": entry["qty"],
+            "avg_px": entry["avg_px"],
+            "age_sec": round(time.time() - entry["ts"], 1),
+        }
     return out
