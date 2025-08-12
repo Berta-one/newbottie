@@ -373,6 +373,27 @@ def status():
         "positions": _positions,
         "last_signals": _signals[-100:],
     }
+_positions: Dict[str, Any] = {}
+_signals: List[Dict[str, Any]] = []
+_logs: List[str] = []
+
+# --- ADD THESE HERE ---
+def _get_positions_copy():
+    return dict(_positions)
+
+def _push_signal(sig: Dict[str, Any]):
+    # keep only last one per symbol
+    existing_idx = None
+    for i in range(len(_signals) - 1, -1, -1):
+        if _signals[i].get("symbol") == sig.get("symbol"):
+            existing_idx = i
+            break
+    if existing_idx is not None:
+        _signals[existing_idx] = sig
+    else:
+        _signals.append(sig)
+    if len(_signals) > 500:
+        del _signals[:-300]
 
 @app.get("/logs/last")
 def logs_last():
