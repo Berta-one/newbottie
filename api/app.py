@@ -649,6 +649,9 @@ async def signals_loop():
 async def _on_startup():
     asyncio.create_task(portfolio_loop())
     asyncio.create_task(signals_loop())
+    asyncio.create_task(sentiment_loop())
+    # Auto-train if the model is missing
+    asyncio.create_task(_auto_train_if_missing())
 
 # ───────────────────────────── Endpoints
 def _detect_quantum() -> Dict[str, Any]:
