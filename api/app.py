@@ -815,9 +815,8 @@ def health():
     # ML block – keys exactly as frontend expects
     ml_obj = {
         "enabled": bool(ML_ENABLED or ONLINE_LEARN),
-        "loaded": bool(_ML_MODEL is not None or _OL is not None),  # Check BOTH models
-        "model_path": (MODEL_XGB_PATH if _ML_MODEL is not None else 
-                      (ONLINE_MODEL_PATH if _OL is not None else None)),
+        "loaded": bool(_ML_MODEL is not None),  # joblib model loaded
+        "model_path": MODEL_XGB_PATH if _ML_MODEL is not None else (ONLINE_MODEL_PATH if ONLINE_LEARN else None),
     }
 
     # Sentiment block – get tracked bases from latest sentiment data
