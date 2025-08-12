@@ -1217,6 +1217,45 @@ def trades():
     
     return trades_with_pnl
 
+from fastapi import Query
+
+@app.get("/sentiment/assets")
+def sentiment_assets():
+    """
+    List tracked assets for sentiment (useful for UI dropdowns).
+    """
+    try:
+        assets = sentiment_list_assets()
+        return {"assets": assets}
+    except Exception as e:
+        return {"assets": [], "error": str(e)}
+
+@app.get("/sentiment/history")
+def sentiment_history(
+    asset: str = Query(default="ALL", description="Comma-separated assets or 'ALL'"),
+    window_sec: int = Query(default=86400, ge=60, le=90*24*3600),
+    max_points: int = Query(default=500, ge=50, le=5000),
+):
+    """
+    Return per-asset historical sentiment within the lookback window, downsampled.
+    """
+    now = time.time()
+    since = now - float(window_sec)
+    if asset.strip().upper() == "ALL":
+        assets = None  # means: use all known assets
+    else:
+        assets = [a.strip().upper() for a in asset.split(",") if a.strip()]
+
+    try:
+        data = sentiment_history_points(assets=assets, since=since, until=now, max_points=max_points)
+        return {
+            "window_sec": window_sec,
+            "max_points": max_points,
+            "data": data
+        }
+    except Exception as e:
+        return {"window_sec": window_sec, "max_points": max_points, "data": {}, "error": str(e)}
+
 # ───────────────────────────────── Protected Execution Endpoints
 @app.get("/exec/status")
 def exec_status():
