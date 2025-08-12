@@ -5,7 +5,13 @@ import logging
 from typing import Dict, List, Any
 
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "").strip()
 
+if not FINNHUB_API_KEY:
+    import logging
+    logging.getLogger("FinnhubProvider").warning(
+        "⚠ FINNHUB_API_KEY is missing! Sentiment news fetch will fail until it’s set."
+    )
 SENTIMENT_ENABLED = os.getenv("SENTIMENT_ENABLED", "0") not in ("0", "false", "False", "", None)
 SENTIMENT_SOURCE = os.getenv("SENTIMENT_SOURCE", "finnhub").lower()
 SENTIMENT_WINDOW_S = int(os.getenv("SENTIMENT_WINDOW_S", "900"))
