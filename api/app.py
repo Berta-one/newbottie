@@ -215,11 +215,6 @@ USERS_DB = {
 
 AUDIT_LOGS = []
 
-# TEMPORARY DEBUG - remove after testing
-print(f"Superuser password from env: {SUPERUSER_PASSWORD}")
-print(f"Admin password from env: {ADMIN_PASSWORD}")
-
-
 # ───────────────────────────────── Execution State Persistence
 EXEC_STATE_FILE = "exec_state.json"
 
