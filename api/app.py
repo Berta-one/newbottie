@@ -763,7 +763,60 @@ async def _on_startup():
     asyncio.create_task(online_label_loop())
     asyncio.create_task(execution_loop())
 
-# ───────────────────────────────── endpoints
+#
+
+# ---------------- Execution runtime switch ----------------
+EXECUTION_RUNTIME_ENABLED = False  # default off at boot
+ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "").strip()
+
+def _auth_ok(request):
+    # optional: if ADMIN_TOKEN is set, require it
+    if not ADMIN_TOKEN:
+        return True
+    try:
+        from fastapi import Request
+        token = request.headers.get("X-Admin-Token", "")
+        return token == ADMIN_TOKEN
+    except Exception:
+        return False
+
+@app.get("/exec/status")
+def exec_status():
+    return {
+        "enabled_env": os.getenv("TRADE_ENABLED", "0").lower() in ("1","true","yes"),
+        "enabled_runtime": EXECUTION_RUNTIME_ENABLED,
+        "per_symbol_spend": {
+            "BUY": float(os.getenv("TRADE_QUOTE_PER_ORDER", "100") or 100.0),
+            "SELL_FRACTION": float(os.getenv("SELL_FRACTION", "1.0") or 1.0)
+        }
+    }
+
+@app.post("/exec/enable")
+async def exec_enable(request: "Request"):
+    if not _auth_ok(request):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=401, detail="X-Admin-Token required")
+    global EXECUTION_RUNTIME_ENABLED
+    EXECUTION_RUNTIME_ENABLED = True
+    return {"ok": True, "enabled": EXECUTION_RUNTIME_ENABLED}
+
+@app.post("/exec/disable")
+async def exec_disable(request: "Request"):
+    if not _auth_ok(request):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=401, detail="X-Admin-Token required")
+    global EXECUTION_RUNTIME_ENABLED
+    EXECUTION_RUNTIME_ENABLED = False
+    return {"ok": True, "enabled": EXECUTION_RUNTIME_ENABLED}
+
+@app.post("/exec/toggle")
+async def exec_toggle(request: "Request"):
+    if not _auth_ok(request):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=401, detail="X-Admin-Token required")
+    global EXECUTION_RUNTIME_ENABLED
+    EXECUTION_RUNTIME_ENABLED = not EXECUTION_RUNTIME_ENABLED
+    return {"ok": True, "enabled": EXECUTION_RUNTIME_ENABLED} ───────────────────────────────── endpoints
 def _detect_quantum() -> Dict[str, Any]:
     if not QUANTUM_ENABLED:
         return {"enabled": False, "backend": "disabled"}
