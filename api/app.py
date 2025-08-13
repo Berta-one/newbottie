@@ -511,6 +511,13 @@ async def portfolio_loop():
         try:
             bal = _exchange.fetch_balance(params={}) if (API_KEY and API_SECRET) else {"total": {}}
             assets = _nonzero_assets_from_balance(bal)
+            
+            # If no API keys (paper trading mode), initialize with starting capital
+            if not (API_KEY and API_SECRET) and not assets:
+                paper_capital = float(os.getenv("EQUITY_START", "10000"))
+                assets = {PRIMARY_QUOTE: paper_capital}
+                add_log(f"Paper trading mode: initialized with {paper_capital} {PRIMARY_QUOTE}")
+            
             equity, pos = _value_portfolio(assets)
             ts = int(time.time())
             _equity_series.append({"t": ts, "v": float(equity)})
@@ -1061,6 +1068,86 @@ async def logout(request: Request):
         log_audit(user["username"], "LOGOUT", "/auth/logout", client_ip)
     
     return {"message": "Logged out successfully"}
+
+# ───────────────────────────────── DEBUG ENDPOINTS (TEMPORARY)
+@app.get("/debug/auth")
+async def debug_auth_info():
+    """Debug endpoint to check authentication setup"""
+    return {
+        "environment_variables": {
+            "SUPERUSER_PASSWORD": SUPERUSER_PASSWORD,
+            "ADMIN_PASSWORD": ADMIN_PASSWORD,
+            "JWT_SECRET_KEY": JWT_SECRET_KEY[:10] + "...",
+        },
+        "users_in_db": {
+            username: {
+                "username": user["username"],
+                "role": user["role"], 
+                "hashed_password": user["hashed_password"][:20] + "...",
+                "created_at": user["created_at"].isoformat(),
+                "last_login": user["last_login"].isoformat() if user["last_login"] else None
+            } for username, user in USERS_DB.items()
+        },
+        "password_verification_test": {
+            "admin_password_verify": pwd_context.verify(ADMIN_PASSWORD, USERS_DB["admin"]["hashed_password"]),
+            "superuser_password_verify": pwd_context.verify(SUPERUSER_PASSWORD, USERS_DB["superuser"]["hashed_password"]),
+        }
+    }
+
+@app.post("/debug/test-login")
+async def debug_test_login(test_user: User):
+    """Debug endpoint to test login process step by step"""
+    username = test_user.username
+    password = test_user.password
+    
+    debug_info = {
+        "provided_credentials": {
+            "username": username,
+            "password": password
+        },
+        "user_lookup": {
+            "user_exists": username in USERS_DB,
+            "user_data": USERS_DB.get(username, {}).get("username", "NOT_FOUND") if username in USERS_DB else "USER_NOT_FOUND"
+        }
+    }
+    
+    if username in USERS_DB:
+        user = USERS_DB[username]
+        stored_hash = user["hashed_password"]
+        
+        debug_info["password_verification"] = {
+            "stored_hash": stored_hash[:20] + "...",
+            "password_verify_result": pwd_context.verify(password, stored_hash),
+            "manual_hash_check": stored_hash == pwd_context.hash(password),  # This should be False - different salts
+        }
+        
+        # Test authentication function
+        auth_result = authenticate_user(username, password)
+        debug_info["authenticate_user_result"] = {
+            "success": bool(auth_result),
+            "user_data": auth_result if auth_result else "AUTHENTICATION_FAILED"
+        }
+    
+    return debug_info
+
+@app.post("/debug/reset-passwords")
+async def debug_reset_passwords():
+    """Debug endpoint to force reset passwords"""
+    global USERS_DB
+    
+    # Re-hash passwords from environment variables
+    USERS_DB["superuser"]["hashed_password"] = pwd_context.hash(SUPERUSER_PASSWORD)
+    USERS_DB["admin"]["hashed_password"] = pwd_context.hash(ADMIN_PASSWORD)
+    
+    return {
+        "message": "Passwords reset successfully",
+        "admin_password": ADMIN_PASSWORD,
+        "superuser_password": SUPERUSER_PASSWORD,
+        "verification": {
+            "admin_verify": pwd_context.verify(ADMIN_PASSWORD, USERS_DB["admin"]["hashed_password"]),
+            "superuser_verify": pwd_context.verify(SUPERUSER_PASSWORD, USERS_DB["superuser"]["hashed_password"])
+        }
+    }
 
 @app.get("/auth/me")
 async def get_current_user_info(request: Request):
