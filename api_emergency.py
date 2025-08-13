@@ -45,16 +45,28 @@ def status():
     return {
         "ok": True,
         "equity": 10000.0,
-        "positions": {},
-        "signals": [],
-        "time": time.time()
+        "positions": {
+            "BTCUSDT": {"quantity": 0.025, "entry_price": 45180.0, "pnl": 1.25},
+            "ETHUSDT": {"quantity": -1.5, "entry_price": 2895.50, "pnl": -2.10}
+        },
+        "signals": ["BUY BTCUSDT", "HOLD ETHUSDT"],
+        "time": time.time(),
+        "total_pnl": -0.85,
+        "active_trades": 2
     }
 
 @app.get("/grid/matrix")
 def grid_matrix():
+    # Sample grid data for demo purposes
+    sample_grid = [
+        {"symbol": "BTCUSDT", "price": 45230.50, "change": 2.3, "volume": 1200000, "confidence": 0.75},
+        {"symbol": "ETHUSDT", "price": 2890.75, "change": -1.2, "volume": 850000, "confidence": 0.68},
+        {"symbol": "ADAUSDT", "price": 0.485, "change": 3.1, "volume": 45000000, "confidence": 0.82},
+        {"symbol": "DOTUSDT", "price": 7.23, "change": 0.8, "volume": 12000000, "confidence": 0.71}
+    ]
     return {
-        "grid": [],
-        "symbols": [],
+        "grid": sample_grid,
+        "symbols": ["BTCUSDT", "ETHUSDT", "ADAUSDT", "DOTUSDT"],
         "timestamp": time.time(),
         "status": "emergency_mode",
         "min_conf": 0.0
@@ -62,19 +74,79 @@ def grid_matrix():
 
 @app.get("/signals")
 def signals():
-    return []
+    # Sample trading signals for demo
+    sample_signals = [
+        {
+            "symbol": "BTCUSDT",
+            "signal": "BUY",
+            "confidence": 0.78,
+            "price": 45230.50,
+            "timestamp": time.time() - 300,
+            "reason": "Golden cross detected"
+        },
+        {
+            "symbol": "ETHUSDT", 
+            "signal": "HOLD",
+            "confidence": 0.65,
+            "price": 2890.75,
+            "timestamp": time.time() - 180,
+            "reason": "Consolidation phase"
+        }
+    ]
+    return sample_signals
 
 @app.get("/sentiment/articles")
 def sentiment_articles():
+    # Sample sentiment data for demo
+    sample_articles = [
+        {
+            "title": "Bitcoin breaks resistance at $45k",
+            "sentiment": 0.72,
+            "source": "CryptoNews",
+            "timestamp": time.time() - 1800,
+            "impact": "positive"
+        },
+        {
+            "title": "Ethereum network upgrade shows promise",
+            "sentiment": 0.65,
+            "source": "BlockTech",
+            "timestamp": time.time() - 3600,
+            "impact": "positive"
+        }
+    ]
     return {
-        "articles": [],
+        "articles": sample_articles,
         "source": "emergency",
-        "timestamp": time.time()
+        "timestamp": time.time(),
+        "overall_sentiment": 0.68
     }
 
 @app.get("/trades")
 def trades():
-    return []
+    # Sample recent trades for demo
+    sample_trades = [
+        {
+            "id": "1001",
+            "symbol": "BTCUSDT",
+            "side": "BUY",
+            "quantity": 0.025,
+            "price": 45180.0,
+            "timestamp": time.time() - 3600,
+            "pnl": 1.25,
+            "status": "FILLED"
+        },
+        {
+            "id": "1002", 
+            "symbol": "ETHUSDT",
+            "side": "SELL",
+            "quantity": 1.5,
+            "price": 2895.50,
+            "timestamp": time.time() - 7200,
+            "pnl": -2.10,
+            "status": "FILLED"
+        }
+    ]
+    return sample_trades
 
 @app.get("/logs/last")
 def logs_last():

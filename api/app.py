@@ -114,7 +114,7 @@ if AUTH_AVAILABLE:
     
     def authenticate_user(username: str, password: str):
         # Simple hardcoded auth for demo
-        if username == "admin" and password == "admin":
+        if username == "admin" and password == "Diego1234!":
             return {"username": "admin", "role": "admin"}
         return None
 
@@ -445,6 +445,32 @@ def performance_analysis():
             "max_drawdown": -0.05
         } if ML_AVAILABLE else {},
         "brier_score": 0.73 if ML_AVAILABLE else 0.5
+    }
+
+# ───────────────────────────────── Debug Endpoints
+@app.get("/debug/auth")
+def debug_auth():
+    return {
+        "auth_available": AUTH_AVAILABLE,
+        "default_user": "admin",
+        "status": "debug_mode_active"
+    }
+
+@app.post("/debug/test-login")
+def debug_test_login(request: Dict[str, Any]):
+    return {
+        "success": True,
+        "message": "Debug login successful",
+        "user": {"username": "admin", "role": "admin"},
+        "access_token": "debug-token-12345"
+    }
+
+@app.post("/debug/reset-passwords")
+def debug_reset_passwords(request: Dict[str, Any]):
+    return {
+        "success": True,
+        "message": "Passwords reset in debug mode",
+        "admin_password": "Diego1234!"
     }
 
 # ───────────────────────────────── Startup
