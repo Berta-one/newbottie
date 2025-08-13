@@ -1086,26 +1086,43 @@
 
   async function refreshSentiment() {
     try {
-      const data = await fetchJSON('/sentiment');
+      // Use the enhanced sentiment articles endpoint
+      const data = await fetchJSON('/sentiment/articles');
       if (!sentimentTable) return;
       
       const tbody = sentimentTable.querySelector('tbody');
       tbody.innerHTML = '';
       
-      Object.entries(data.scores || {}).forEach(([asset, info]) => {
+      // Display articles if available
+      if (data.enabled && data.articles && data.articles.length > 0) {
+        data.articles.slice(0, 10).forEach(article => { // Show max 10 articles
+          const row = document.createElement('tr');
+          const sentiment = article.sentiment || 'neutral';
+          const score = article.score || 0.5;
+          const scoreClass = sentiment === 'positive' ? 'positive' : 
+                           sentiment === 'negative' ? 'negative' : '';
+          
+          row.innerHTML = `
+            <td class="symbol">${(article.symbols || []).join(', ') || 'General'}</td>
+            <td class="${scoreClass}">${score.toFixed(3)}</td>
+            <td title="${article.summary || ''}">${(article.headline || '').substring(0, 50)}${(article.headline || '').length > 50 ? '...' : ''}</td>
+          `;
+          tbody.appendChild(row);
+        });
+      } else {
+        // Fallback to old sentiment format or show status
+        const statusMessage = data.enabled ? 'No articles available' : 'Sentiment analysis disabled';
         const row = document.createElement('tr');
-        const score = info.score || 0;
-        const scoreClass = score > 0.1 ? 'positive' : score < -0.1 ? 'negative' : '';
-        
-        row.innerHTML = `
-          <td class="symbol">${asset}</td>
-          <td class="${scoreClass}">${score.toFixed(3)}</td>
-          <td>${info.count || 0}</td>
-        `;
+        row.innerHTML = `<td colspan="3" style="text-align: center; color: #666;">${statusMessage}</td>`;
         tbody.appendChild(row);
-      });
+      }
     } catch (error) {
       console.error('Sentiment refresh failed:', error);
+      // Show error state
+      if (sentimentTable) {
+        const tbody = sentimentTable.querySelector('tbody');
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: #ff6b6b;">Failed to load sentiment data</td></tr>';
+      }
     }
   }
 
@@ -1838,9 +1855,9 @@
       '/health',
       '/status', 
       '/signals',
-      '/sentiment',
+      '/sentiment/articles',
       '/ml/status',
-      '/quantum/details',
+      '/quantum/analysis',
       '/grid/matrix',
       '/trades',
       '/logs/last'
