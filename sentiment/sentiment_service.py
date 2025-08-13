@@ -6,7 +6,7 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 log = logging.getLogger("SentimentService")
 
 # ── Config
-FINNHUB_API_KEY = (os.getenv("FINNHUB_API_KEY") or "").strip()
+FINNHUB_API_KEY = (os.getenv("FINNHUB_API_KEY") or os.getenv("FINNHUB_KEY") or "").strip()
 SENTIMENT_ENABLED = os.getenv("SENTIMENT_ENABLED", "1").lower() in ("1","true","yes")
 SENTIMENT_SOURCE  = os.getenv("SENTIMENT_SOURCE", "finnhub").lower()
 SENTIMENT_WINDOW_S = int(os.getenv("SENTIMENT_WINDOW_S", "900"))
@@ -16,7 +16,7 @@ SENTIMENT_POLL_S = int(os.getenv("SENTIMENT_POLL_S", "60"))
 SENTIMENT_HISTORY_PATH = os.getenv("SENTIMENT_HISTORY_PATH", "").strip()  # optional JSONL persistence
 
 if not FINNHUB_API_KEY and SENTIMENT_SOURCE == "finnhub":
-    log.warning("⚠ FINNHUB_API_KEY is missing! News pull will be empty.")
+    log.warning("⚠ FINNHUB_API_KEY/FINNHUB_KEY is missing! News pull will be empty.")
 
 _analyzer = SentimentIntensityAnalyzer()
 

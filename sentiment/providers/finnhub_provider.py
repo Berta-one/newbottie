@@ -4,7 +4,7 @@ from typing import Dict, List
 
 log = logging.getLogger("FinnhubProvider")
 
-API_KEY = (os.getenv("FINNHUB_API_KEY") or "").strip()
+API_KEY = (os.getenv("FINNHUB_API_KEY") or os.getenv("FINNHUB_KEY") or "").strip()
 
 # sane defaults; can be overridden via SENTIMENT_KW_<ASSET>
 DEFAULT_KW = {
@@ -27,7 +27,7 @@ def _norm(text: str) -> str:
 
 def _fetch_recent_news(limit: int = 100) -> List[Dict]:
     if not API_KEY:
-        log.warning("FINNHUB_API_KEY missing; returning no news")
+        log.warning("FINNHUB_API_KEY/FINNHUB_KEY missing; returning no news")
         return []
     out: List[Dict] = []
     try:
