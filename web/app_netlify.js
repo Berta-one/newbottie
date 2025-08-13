@@ -664,14 +664,33 @@
   }
 
   function updatePerformanceSummary() {
-    if (!tradesData.length) return;
+    if (!tradesData.length) {
+      document.getElementById('total-trades').textContent = '0';
+      document.getElementById('win-rate').textContent = '0%';
+      return;
+    }
     
     const totalTrades = tradesData.length;
+    const realTrades = tradesData.filter(t => t.order_id).length;
     const profitableTrades = tradesData.filter(t => t.pnl > 0).length;
     const winRate = (profitableTrades / totalTrades) * 100;
     
-    document.getElementById('total-trades').textContent = totalTrades;
+    // Calculate total volume and P&L
+    const totalVolume = tradesData.reduce((sum, t) => sum + (t.quantity * t.price), 0);
+    const totalPnL = tradesData.reduce((sum, t) => sum + (t.pnl || 0), 0);
+    
+    document.getElementById('total-trades').textContent = `${totalTrades} (${realTrades} real)`;
     document.getElementById('win-rate').textContent = winRate.toFixed(1) + '%';
+    
+    // Update additional performance metrics if elements exist
+    const volumeEl = document.getElementById('total-volume');
+    const pnlEl = document.getElementById('total-pnl');
+    
+    if (volumeEl) volumeEl.textContent = `$${totalVolume.toFixed(2)}`;
+    if (pnlEl) {
+      pnlEl.textContent = `$${totalPnL.toFixed(2)}`;
+      pnlEl.className = totalPnL >= 0 ? 'positive' : 'negative';
+    }
   }
 
   // Authenticated API functions
@@ -716,6 +735,7 @@
       const data = await fetchJSON('/ml/status');
       mlData = data;
       updateMLHealthIndicators(data);
+      updateMLInterpretation(data);
       updateFeatureImportance(data);
       updateQuickMLStatus(data);
       updatePerformanceChart(data);
@@ -733,27 +753,55 @@
     const dataQualityEl = document.getElementById('ml-data-quality');
     const totalPredEl = document.getElementById('ml-total-predictions');
     const successPredEl = document.getElementById('ml-successful-predictions');
+    const sampleCountEl = document.getElementById('ml-sample-count');
 
-    if (healthEl) {
-      const score = data.overall_score || 0;
-      let healthClass = 'ml-insufficient';
-      let healthText = 'Insufficient Data';
-      
-      if (score >= 0.8) { healthClass = 'ml-excellent'; healthText = 'Excellent'; }
-      else if (score >= 0.6) { healthClass = 'ml-good'; healthText = 'Good'; }
-      else if (score >= 0.4) { healthClass = 'ml-moderate'; healthText = 'Moderate'; }
-      else if (score >= 0.2) { healthClass = 'ml-poor'; healthText = 'Poor'; }
-      
-      healthEl.className = `ml-health-indicator ${healthClass}`;
-      healthEl.textContent = healthText;
+    // Use interpretation data if available
+    if (data.interpretation && healthEl) {
+      const interp = data.interpretation;
+      healthEl.className = `ml-health-indicator ${interp.class}`;
+      healthEl.textContent = `${interp.emoji} ${interp.health.charAt(0).toUpperCase() + interp.health.slice(1)}`;
     }
 
-    if (scoreEl) scoreEl.textContent = ((data.overall_score || 0) * 100).toFixed(1) + '%';
+    if (scoreEl) scoreEl.textContent = ((data.accuracy || 0) * 100).toFixed(1) + '%';
     if (accuracyEl) accuracyEl.textContent = ((data.accuracy || 0) * 100).toFixed(1) + '%';
-    if (confidenceEl) confidenceEl.textContent = ((data.confidence || 0) * 100).toFixed(1) + '%';
-    if (dataQualityEl) dataQualityEl.textContent = ((data.data_quality || 0) * 100).toFixed(1) + '%';
-    if (totalPredEl) totalPredEl.textContent = data.total_predictions || 0;
+    if (confidenceEl) confidenceEl.textContent = ((data.success_rate || 0) * 100).toFixed(1) + '%';
+    if (dataQualityEl) dataQualityEl.textContent = data.brier_score ? (100 - data.brier_score * 400).toFixed(1) + '%' : '—';
+    if (totalPredEl) totalPredEl.textContent = data.sample_count || 0;
     if (successPredEl) successPredEl.textContent = data.successful_predictions || 0;
+    if (sampleCountEl) sampleCountEl.textContent = data.sample_count || 0;
+  }
+
+  function updateMLInterpretation(data) {
+    const interpretationEl = document.getElementById('ml-interpretation-content');
+    if (!interpretationEl || !data.interpretation) {
+      // Show placeholder if no data
+      if (interpretationEl) {
+        interpretationEl.innerHTML = `
+          <div class="interpretation-content">
+            <p class="interpretation-description">📊 ML Health Interpretation will appear here once sufficient data is collected.</p>
+          </div>
+        `;
+      }
+      return;
+    }
+
+    const interp = data.interpretation;
+    interpretationEl.innerHTML = `
+      <div class="interpretation-header">
+        <span class="interpretation-emoji">${interp.emoji}</span>
+        <span class="interpretation-title">📊 ML Health Interpretation</span>
+      </div>
+      <div class="interpretation-content ${interp.class}">
+        <p class="interpretation-description">${interp.description}</p>
+        ${data.brier_score ? `<p class="brier-details">Brier Score: <strong>${data.brier_score.toFixed(3)}</strong></p>` : ''}
+        <div class="interpretation-legend">
+          <div class="legend-item excellent">🎉 Excellent: &lt; 0.18 (strong learning)</div>
+          <div class="legend-item good">✅ Good: &lt; 0.22 (beating random)</div>
+          <div class="legend-item moderate">⚠️ Moderate: &lt; 0.25 (improving slowly)</div>
+          <div class="legend-item poor">❌ Poor: &gt; 0.25 (struggling to learn)</div>
+        </div>
+      </div>
+    `;
   }
 
   function updateFeatureImportance(data) {
@@ -1042,24 +1090,62 @@
       const tbody = tradesTable.querySelector('tbody');
       tbody.innerHTML = '';
       
+      // Update trades table header with data source info
+      const tradesHeader = document.querySelector('#trades-table h3');
+      if (tradesHeader && data.summary) {
+        const dataSource = data.summary.data_source || 'unknown';
+        const totalTrades = data.summary.total_trades || 0;
+        const realTradesOnly = dataSource.includes('real_trades_only');
+        const sourceIcon = realTradesOnly ? '🔗' : '⚠️';
+        const sourceText = realTradesOnly ? 'Real Binance Trades' : 'Mixed Data';
+        
+        tradesHeader.innerHTML = `Recent Trades (${totalTrades}) ${sourceIcon} ${sourceText}`;
+        
+        // Add note about real trades only if applicable
+        if (data.summary.note && realTradesOnly) {
+          let noteEl = document.getElementById('trades-data-note');
+          if (!noteEl) {
+            noteEl = document.createElement('div');
+            noteEl.id = 'trades-data-note';
+            noteEl.style.cssText = 'font-size: 12px; color: #4caf50; margin-bottom: 10px; padding: 5px; background: rgba(76, 175, 80, 0.1); border-radius: 4px;';
+            tradesHeader.parentNode.insertBefore(noteEl, tradesTable);
+          }
+          noteEl.textContent = `✅ ${data.summary.note}`;
+        }
+      }
+      
+      // Display trades with enhanced real-trade indicators
       tradesData.slice(0, 20).forEach(trade => {
         const row = document.createElement('tr');
         const sideClass = trade.side?.toLowerCase() === 'buy' ? 'positive' : 'negative';
         
+        // Add real trade indicator if trade has order_id (indicating real Binance trade)
+        const realTradeIcon = trade.order_id ? '🔗' : '';
+        const tradeSource = trade.order_id ? 'Real' : 'Local';
+        
         row.innerHTML = `
-          <td>${formatTime(trade.timestamp)}</td>
+          <td>${formatTime(trade.timestamp)} ${realTradeIcon}</td>
           <td class="symbol">${trade.symbol}</td>
           <td class="${sideClass}">${trade.side}</td>
           <td>${fmt(trade.quantity)}</td>
           <td>${fmt(trade.price)}</td>
           <td>${fmt(trade.quantity * trade.price)}</td>
         `;
+        
+        // Add tooltip for trade source
+        row.title = `${tradeSource} trade${trade.order_id ? ` (Order ID: ${trade.order_id})` : ''}`;
         tbody.appendChild(row);
       });
       
       updatePerformanceSummary();
     } catch (error) {
       console.error('Trades refresh failed:', error);
+      
+      // Show error message to user if trades fail to load
+      const tbody = tradesTable?.querySelector('tbody');
+      if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #f44336; padding: 20px;">❌ Failed to load real trades. Check connection to Binance API.</td></tr>';
+      }
     }
   }
 
