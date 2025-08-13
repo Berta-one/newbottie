@@ -160,14 +160,9 @@ log = logging.getLogger("BottieAPI")
 app = FastAPI(title="Bottie API", version="2.0.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://helpful-maamoul-8aa9bd.netlify.app",  # Your Netlify deployment
-        "http://localhost:3000",                        # Local development
-        "http://localhost:8000",                        # Local API testing
-        "*" if NETLIFY_URL == "*" else NETLIFY_URL      # Environment variable fallback
-    ],
-    allow_credentials=True,  # Enable credentials for cross-origin requests
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"],  # Added more methods
+    allow_origins=["*"],  # Allow all origins temporarily for debugging
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all methods
     allow_headers=["*"],
 )
 
@@ -1564,11 +1559,6 @@ def health():
         "ml": {"enabled": ML_ENABLED, "loaded": bool(_ML_MODEL), "model_path": MODEL_XGB_PATH if _ML_MODEL else None},
         "sentiment": {"enabled": SENTIMENT_ENABLED}  # <-- boolean only; no heavy work here
     }
-
-# Universal OPTIONS handler for CORS preflight
-@app.options("/{full_path:path}")
-def options_handler():
-    return {"message": "OK"}
 
 @app.get("/websocket/status")
 def websocket_status():
