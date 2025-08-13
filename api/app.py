@@ -166,8 +166,8 @@ app.add_middleware(
         "http://localhost:8000",                        # Local API testing
         "*" if NETLIFY_URL == "*" else NETLIFY_URL      # Environment variable fallback
     ],
-    allow_credentials=False,
-    allow_methods=["GET","POST","OPTIONS","HEAD"],
+    allow_credentials=True,  # Enable credentials for cross-origin requests
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"],  # Added more methods
     allow_headers=["*"],
 )
 
