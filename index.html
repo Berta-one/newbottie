@@ -1,0 +1,2502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Bottie Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  * { box-sizing: border-box; }
+  body { 
+    font-family: Arial, sans-serif; 
+    background: #0c1426; 
+    color: #ffffff;
+    margin: 0; 
+    padding: 0; 
+    font-size: 14px;
+  }
+  
+  header { 
+    background: #1a2332; 
+    color: #fff; 
+    padding: 12px 20px; 
+    font-size: 18px; 
+    border-bottom: 1px solid #2a3441;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .user-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+  }
+  
+  .user-badge {
+    background: #64ffda;
+    color: #0c1426;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  
+  .logout-btn {
+    background: #f44336;
+    color: #ffffff;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+  }
+
+  /* Tab Navigation */
+  .dashboard-tabs {
+    background: #1a2332;
+    border-bottom: 1px solid #2a3441;
+    padding: 0 20px;
+    display: flex;
+    gap: 0;
+  }
+  
+  .tab-btn {
+    background: none;
+    border: none;
+    color: #8892b0;
+    padding: 12px 20px;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    font-weight: 500;
+  }
+  
+  .tab-btn:hover {
+    color: #64ffda;
+    background: rgba(100, 255, 218, 0.05);
+  }
+  
+  .tab-btn.active {
+    color: #64ffda;
+    border-bottom-color: #64ffda;
+    background: rgba(100, 255, 218, 0.1);
+  }
+  
+  .tab-content {
+    display: none;
+  }
+  
+  .tab-content.active {
+    display: block;
+  }
+  
+  main { 
+    max-width: 1600px; 
+    margin: auto; 
+    padding: 20px; 
+  }
+  
+  /* Login Modal Styles */
+  .login-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(12, 20, 38, 0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 3000;
+  }
+  
+  .login-form {
+    background: #1a2332;
+    border: 1px solid #2a3441;
+    border-radius: 8px;
+    padding: 30px;
+    min-width: 400px;
+    text-align: center;
+  }
+  
+  .login-form h2 {
+    color: #64ffda;
+    margin-bottom: 20px;
+  }
+  
+  .form-group {
+    margin-bottom: 15px;
+    text-align: left;
+  }
+  
+  .form-label {
+    display: block;
+    color: #ffffff;
+    margin-bottom: 5px;
+    font-size: 12px;
+  }
+  
+  .form-input {
+    width: 100%;
+    background: #0f1419;
+    border: 1px solid #2a3441;
+    border-radius: 4px;
+    padding: 10px;
+    color: #ffffff;
+    font-size: 14px;
+  }
+  
+  .form-input:focus {
+    outline: none;
+    border-color: #64ffda;
+  }
+  
+  .login-btn {
+    width: 100%;
+    background: #64ffda;
+    color: #0c1426;
+    border: none;
+    padding: 12px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 10px;
+  }
+  
+  .login-btn:hover {
+    opacity: 0.8;
+  }
+  
+  .login-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  .login-error {
+    color: #f44336;
+    font-size: 12px;
+    margin-top: 10px;
+  }
+  
+  /* Keep all your existing styles */
+  .debug-panel {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background: #1a2332;
+    border: 1px solid #2a3441;
+    border-radius: 8px;
+    padding: 16px;
+    min-width: 280px;
+    max-height: 80vh;
+    overflow-y: auto;
+    z-index: 1000;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+  }
+  
+  .debug-panel.open {
+    transform: translateX(0);
+  }
+  
+  .debug-toggle {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background: #64ffda;
+    color: #0c1426;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 12px;
+    z-index: 1001;
+  }
+  
+  .debug-header {
+    color: #64ffda;
+    font-weight: 600;
+    margin-bottom: 12px;
+    font-size: 14px;
+  }
+  
+  .card {
+    background: #0f1419;
+    border: 1px solid #2a3441;
+    border-radius: 6px;
+    padding: 15px;
+  }
+  
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  
+  .chip {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+  }
+  
+  .chip--ok { background: rgba(76, 175, 80, 0.2); color: #4caf50; border: 1px solid #4caf50; }
+  .chip--warn { background: rgba(255, 152, 0, 0.2); color: #ff9800; border: 1px solid #ff9800; }
+  .chip--err { background: rgba(244, 67, 54, 0.2); color: #f44336; border: 1px solid #f44336; }
+  
+  .kv {
+    display: flex;
+    justify-content: space-between;
+    margin: 8px 0;
+    font-size: 13px;
+  }
+  
+  .k { color: #8892b0; }
+  .v { font-weight: 600; color: #ffffff; }
+  
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  
+  .data-table th {
+    background: #0f1419;
+    padding: 8px 6px;
+    text-align: left;
+    font-weight: 600;
+    color: #64ffda;
+    border-bottom: 1px solid #2a3441;
+  }
+  
+  .data-table td {
+    padding: 6px;
+    border-bottom: 1px solid #2a3441;
+  }
+  
+  .data-table tr:hover {
+    background: rgba(100, 255, 218, 0.05);
+  }
+  
+  .symbol {
+    color: #ffffff;
+    font-weight: 600;
+  }
+  
+  .hold-badge {
+    background: #ff9800;
+    color: #000;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  
+  .buy-badge {
+    background: #4caf50;
+    color: #fff;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  
+  .sell-badge {
+    background: #f44336;
+    color: #fff;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  
+  .positive { color: #4caf50; }
+  .negative { color: #f44336; }
+  
+  .equity-chart {
+    background: #0f1419;
+    border-radius: 6px;
+    border: 1px solid #2a3441;
+    padding: 16px;
+    height: 220px;
+    position: relative;
+  }
+  
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    font-size: 12px;
+  }
+  
+  .chart-stats {
+    color: #8892b0;
+  }
+  
+  .chart-canvas {
+    width: 100%;
+    height: 180px;
+  }
+  
+  .endpoint-grid {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  
+  .endpoint-box {
+    background: #0f1419;
+    border: 1px solid #2a3441;
+    border-radius: 4px;
+    padding: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 12px;
+  }
+  
+  .endpoint-box:hover {
+    border-color: #64ffda;
+    background: rgba(100, 255, 218, 0.1);
+  }
+  
+  .endpoint-box.loading {
+    border-color: #ff9800;
+    background: rgba(255, 152, 0, 0.1);
+  }
+  
+  .endpoint-box.success {
+    border-color: #4caf50;
+    background: rgba(76, 175, 80, 0.1);
+  }
+  
+  .endpoint-box.error {
+    border-color: #f44336;
+    background: rgba(244, 67, 54, 0.1);
+  }
+  
+  .endpoint-name {
+    font-weight: 600;
+    color: #ffffff;
+  }
+  
+  .endpoint-url {
+    color: #8892b0;
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    margin: 4px 0;
+  }
+  
+  .endpoint-status {
+    font-size: 10px;
+    color: #64ffda;
+  }
+  
+  .refresh-controls {
+    border-top: 1px solid #2a3441;
+    padding-top: 12px;
+  }
+  
+  .control-group {
+    margin-bottom: 12px;
+  }
+  
+  .control-label {
+    display: block;
+    color: #ffffff;
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+  
+  .control-input {
+    width: 100%;
+    background: #0f1419;
+    border: 1px solid #2a3441;
+    border-radius: 4px;
+    padding: 6px;
+    color: #ffffff;
+    font-size: 12px;
+  }
+  
+  .control-input:focus {
+    outline: none;
+    border-color: #64ffda;
+  }
+  
+  .control-buttons {
+    display: flex;
+    gap: 8px;
+  }
+  
+  .control-btn {
+    flex: 1;
+    background: #64ffda;
+    color: #0c1426;
+    border: none;
+    border-radius: 4px;
+    padding: 6px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  
+  .control-btn:hover {
+    opacity: 0.8;
+  }
+  
+  .control-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  .control-btn.secondary {
+    background: #2a3441;
+    color: #ffffff;
+  }
+  
+  .response-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(12, 20, 38, 0.95);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+  }
+  
+  .response-content {
+    background: #1a2332;
+    border: 1px solid #2a3441;
+    border-radius: 8px;
+    padding: 20px;
+    max-width: 80vw;
+    max-height: 80vh;
+    overflow: auto;
+  }
+  
+  .response-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  
+  .close-btn {
+    background: #f44336;
+    color: #ffffff;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  
+  .response-data {
+    background: #0f1419;
+    border: 1px solid #2a3441;
+    border-radius: 4px;
+    padding: 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    color: #64ffda;
+    white-space: pre-wrap;
+    max-height: 60vh;
+    overflow: auto;
+  }
+  
+  h3 {
+    margin: 0;
+    color: #ffffff;
+    font-size: 14px;
+  }
+  
+  .main-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+  
+  .hidden {
+    display: none !important;
+  }
+
+  /* Audit Trail Styles */
+  .audit-section {
+    margin-bottom: 16px;
+    border-top: 1px solid #2a3441;
+    padding-top: 12px;
+  }
+  
+  .audit-log {
+    background: #0f1419;
+    border: 1px solid #2a3441;
+    border-radius: 4px;
+    padding: 8px;
+    margin-bottom: 4px;
+    font-size: 11px;
+  }
+  
+  .audit-header {
+    display: flex;
+    justify-content: space-between;
+    color: #64ffda;
+    font-weight: 600;
+  }
+  
+  .audit-details {
+    color: #8892b0;
+    margin-top: 4px;
+  }
+
+  /* ML Monitor Specific Styles */
+  .ml-health-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  
+  .ml-excellent { background: rgba(76, 175, 80, 0.2); color: #4caf50; }
+  .ml-good { background: rgba(33, 150, 243, 0.2); color: #2196f3; }
+  .ml-moderate { background: rgba(255, 152, 0, 0.2); color: #ff9800; }
+  .ml-poor { background: rgba(244, 67, 54, 0.2); color: #f44336; }
+  .ml-insufficient { background: rgba(156, 39, 176, 0.2); color: #9c27b0; }
+  
+  .feature-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 8px 0;
+    padding: 4px 0;
+  }
+  
+  .feature-name {
+    min-width: 100px;
+    font-size: 11px;
+    color: #8892b0;
+  }
+  
+  .feature-progress {
+    flex: 1;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  
+  .feature-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+  
+  .feature-rank {
+    background: linear-gradient(45deg, #64ffda, #4caf50);
+    color: #0c1426;
+    padding: 2px 6px;
+    border-radius: 8px;
+    font-size: 9px;
+    font-weight: 600;
+    min-width: 24px;
+    text-align: center;
+  }
+  
+  .ml-interpretation {
+    background: rgba(100, 255, 218, 0.1);
+    border: 1px solid rgba(100, 255, 218, 0.3);
+    border-radius: 6px;
+    padding: 12px;
+    margin-top: 12px;
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  
+  .ml-interpretation-title {
+    color: #64ffda;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  /* Quick ML Health in Main Dashboard */
+  .ml-quick-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(100, 255, 218, 0.05);
+    border: 1px solid rgba(100, 255, 218, 0.2);
+    border-radius: 6px;
+    margin: 8px 0;
+  }
+  
+  .ml-quick-metric {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 60px;
+  }
+  
+  .ml-quick-label {
+    font-size: 9px;
+    color: #8892b0;
+    text-transform: uppercase;
+  }
+  
+  .ml-quick-value {
+    font-size: 12px;
+    font-weight: 600;
+    color: #64ffda;
+  }
+</style>
+</head>
+<body>
+
+<!-- Login Modal -->
+<div id="login-modal" class="login-modal">
+  <div class="login-form">
+    <h2>🤖 Bottie Dashboard Login</h2>
+    <form id="login-form">
+      <div class="form-group">
+        <label class="form-label">Username</label>
+        <input type="text" id="username" class="form-input" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="password" id="password" class="form-input" required>
+      </div>
+      <button type="submit" id="login-btn" class="login-btn">Login</button>
+      <div id="login-error" class="login-error"></div>
+    </form>
+  </div>
+</div>
+
+<header>
+  <div>Bottie Live Dashboard</div>
+  <div class="user-info" id="user-info" style="display: none;">
+    <span class="user-badge" id="user-role">USER</span>
+    <span id="user-name">Unknown</span>
+    <button class="logout-btn" id="logout-btn">Logout</button>
+  </div>
+</header>
+
+<!-- Tab Navigation -->
+<div class="dashboard-tabs" id="dashboard-tabs" style="display: none;">
+  <button class="tab-btn active" data-tab="trading">📊 Trading</button>
+  <button class="tab-btn" data-tab="ml-monitor">🧠 ML Learning</button>
+  <button class="tab-btn" data-tab="quantum">⚡ Quantum Analysis</button>
+</div>
+
+<main id="main-content" style="display: none;">
+  
+  <!-- Trading Tab (Your existing dashboard) -->
+  <div id="trading-tab" class="tab-content active">
+    <!-- Quick ML Health Status Bar -->
+    <div class="ml-quick-status">
+      <div class="ml-quick-metric">
+        <div class="ml-quick-label">ML Health</div>
+        <div class="ml-quick-value" id="quick-ml-health">—</div>
+      </div>
+      <div class="ml-quick-metric">
+        <div class="ml-quick-label">Accuracy</div>
+        <div class="ml-quick-value" id="quick-ml-accuracy">—</div>
+      </div>
+      <div class="ml-quick-metric">
+        <div class="ml-quick-label">Samples</div>
+        <div class="ml-quick-value" id="quick-ml-samples">—</div>
+      </div>
+      <div class="ml-quick-metric">
+        <div class="ml-quick-label">Quantum Rank</div>
+        <div class="ml-quick-value" id="quick-quantum-rank">—</div>
+      </div>
+      <div style="flex: 1; text-align: right;">
+        <button class="tab-btn" data-tab="ml-monitor" style="padding: 4px 8px; font-size: 10px;">View Details →</button>
+      </div>
+    </div>
+
+    <div class="main-grid">
+      <!-- Equity Chart -->
+      <div style="background: #1a2332; border-radius: 8px; border: 1px solid #2a3441; overflow: hidden;">
+        <div style="background: #141b26; padding: 12px 16px; border-bottom: 1px solid #2a3441; font-weight: 600; color: #64ffda; font-size: 14px;">
+          Equity Performance (24h)
+        </div>
+        <div style="padding: 16px;">
+          <div class="equity-chart">
+            <div class="chart-header">
+              <div>
+                <span style="color: #64ffda;">$<span id="chart-current">0.00</span></span>
+                <span id="chart-change" style="margin-left: 12px;">+0.00%</span>
+              </div>
+              <div class="chart-stats">
+                High: $<span id="chart-high">0.00</span> | Low: $<span id="chart-low">0.00</span>
+              </div>
+            </div>
+            <canvas id="equity-canvas" class="chart-canvas"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sentiment Analysis -->
+      <div style="background: #1a2332; border-radius: 8px; border: 1px solid #2a3441; overflow: hidden;">
+        <div style="background: #141b26; padding: 12px 16px; border-bottom: 1px solid #2a3441; font-weight: 600; color: #64ffda; font-size: 14px;">
+          Sentiment Analysis
+        </div>
+        <div style="padding: 16px;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Asset</th>
+                <th>Score</th>
+                <th>Articles</th>
+              </tr>
+            </thead>
+            <tbody id="sentiment-table">
+              <tr><td colspan="3">Loading sentiment...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Trading Signals -->
+    <div style="background: #1a2332; border-radius: 8px; border: 1px solid #2a3441; overflow: hidden; margin-bottom: 20px;">
+      <div style="background: #141b26; padding: 12px 16px; border-bottom: 1px solid #2a3441; font-weight: 600; color: #64ffda; font-size: 14px;">
+        Trading Signals (EMA • ML • Quantum • Sentiment)
+      </div>
+      <div style="padding: 16px;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th>Signal</th>
+              <th>Confidence</th>
+              <th>EMA</th>
+              <th>ML</th>
+              <th>Quantum</th>
+              <th>Sentiment</th>
+              <th>Final Prob</th>
+              <th>Thresholds</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody id="signals-table">
+            <tr><td colspan="10">Loading signals...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="main-grid">
+      <!-- Open Positions -->
+      <div style="background: #1a2332; border-radius: 8px; border: 1px solid #2a3441; overflow: hidden;">
+        <div style="background: #141b26; padding: 12px 16px; border-bottom: 1px solid #2a3441; font-weight: 600; color: #64ffda; font-size: 14px;">
+          Open Positions
+        </div>
+        <div style="padding: 16px;">
+          <div id="positions-container">
+            Loading positions...
+          </div>
+        </div>
+      </div>
+
+      <!-- Trading Performance Summary -->
+      <div style="background: #1a2332; border-radius: 8px; border: 1px solid #2a3441; overflow: hidden;">
+        <div style="background: #141b26; padding: 12px 16px; border-bottom: 1px solid #2a3441; font-weight: 600; color: #64ffda; font-size: 14px;">
+          Performance Summary
+        </div>
+        <div style="padding: 16px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div style="background: #0f1419; border: 1px solid #2a3441; border-radius: 6px; padding: 12px; text-align: center;">
+              <div style="font-size: 10px; color: #8892b0; margin-bottom: 4px;">Total P&L</div>
+              <div style="font-size: 16px; font-weight: 600; color: #64ffda;" id="total-pnl">$0.00</div>
+            </div>
+            <div style="background: #0f1419; border: 1px solid #2a3441; border-radius: 6px; padding: 12px; text-align: center;">
+              <div style="font-size: 10px; color: #8892b0; margin-bottom: 4px;">Win Rate</div>
+              <div style="font-size: 16px; font-weight: 600; color: #64ffda;" id="win-rate">0%</div>
+            </div>
+            <div style="background: #0f1419; border: 1px solid #2a3441; border-radius: 6px; padding: 12px; text-align: center;">
+              <div style="font-size: 10px; color: #8892b0; margin-bottom: 4px;">Avg Win</div>
+              <div style="font-size: 16px; font-weight: 600; color: #4caf50;" id="avg-win">$0.00</div>
+            </div>
+            <div style="background: #0f1419; border: 1px solid #2a3441; border-radius: 6px; padding: 12px; text-align: center;">
+              <div style="font-size: 10px; color: #8892b0; margin-bottom: 4px;">Avg Loss</div>
+              <div style="font-size: 16px; font-weight: 600; color: #f44336;" id="avg-loss">$0.00</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- All Trades Panel -->
+    <div id="trades-panel" style="background: #1a2332; border-radius: 8px; border: 1px solid #2a3441; overflow: hidden; margin-bottom: 20px;" class="hidden">
+      <div style="background: #141b26; padding: 12px 16px; border-bottom: 1px solid #2a3441; font-weight: 600; color: #64ffda; font-size: 14px;">
+        All Trades
+      </div>
+      <div style="padding: 16px;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Symbol</th>
+              <th>Side</th>
+              <th>Quantity</th>
+              <th>Price</th>
+              <th>Fee</th>
+              <th>P&L</th>
+            </tr>
+          </thead>
+          <tbody id="trades-table">
+            <tr><td colspan="7">No trades available</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Recent Logs -->
+    <div style="background: #1a2332; border-radius: 8px; border: 1px solid #2a3441; overflow: hidden;">
+      <div style="background: #141b26; padding: 12px 16px; border-bottom: 1px solid #2a3441; font-weight: 600; color: #64ffda; font-size: 14px;">
+        Recent Logs
+      </div>
+      <div style="padding: 16px;">
+        <div style="background: #0f1419; border: 1px solid #2a3441; border-radius: 6px; padding: 12px; max-height: 300px; overflow-y: auto;">
+          <pre id="logs" style="margin: 0; font-size: 11px; color: #64ffda; white-space: pre-wrap;">{}</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ML Monitor Tab -->
+  <div id="ml-monitor-tab" class="tab-content">
+    <div class="main-grid">
+      <!-- Learning Health Overview -->
+      <div style="background: #1a2332; border-radius: 8px; border: 1px solid #2a3441; overflow: hidden;">
+        <div style="background: #141b26; padding: 12px 16px; border-bottom: 1px solid #2a3441; font-weight: 600; color: #64ffda; font-size: 14px;">
+          🎯 Learning Health
+        </div>
+        <div style="padding: 16px;">
+          <div class="kv">
+            <span class="k">ML Accuracy</span>
+            <span class="v" id="ml-accuracy">—</span>
+          </div>
+          <div class="kv">
+            <span class="k">Prediction Quality (Brier)</span>
+            <span class="v" id="brier-score">—</span>
+          </div>
+          <div class="kv">
+            <span class="k">Learning Samples</span>
+            <span class="v" id="sample-count">—</span>
+          </div>
+          <div class="kv">
+            <span class="k">Health Status</span>
+            <span class="v">
+              <span id="ml-health-indicator" class="ml-health-indicator ml-insufficient">Initializing</span>
+            </span>
+          </div>
+          
+          <div class="ml-interpretation" id="health-interpretation">
+            <div class="ml-interpretation-title">📊 Health Analysis</div>
+            <div id="health-text">Loading analysis...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quantum Learning Analysis -->
+      <div style="background: #1a2332; border-radius: 8px; border: 1px solid #2a3441; overflow: hidden;">
+        <div style="background: #141b26; padding: 12px 16px; border-bottom: 1px solid #2a3441; font-weight: 600; color: #64ffda; font-size: 14px;">
+          ⚡ Quantum Learning Impact
+        </div>
+        <div style="padding: 16px;">
+          <div class="kv">
+            <span class="k">Quantum Importance</span>
+            <span class="v" id="quantum-importance">—</span>
+          </div>
+          <div class="kv">
+            <span class="k">Feature Rank</span>
+            <span class="v" id="quantum-rank">—</span>
+          </div>
+          <div class="kv">
+            <span class="k">Quantum Mode</span>
+            <span class="v" id="quantum-mode">—</span>
+          </div>
+          <div class="kv">
+            <span class="k">Auto-Weight</span>
+            <span class="v" id="quantum-weight">—</span>
+          </div>
+          
+          <div class="ml-interpretation" id="quantum-interpretation">
+            <div class="ml-interpretation-title">🔬 Quantum Analysis</div>
+            <div id="quantum-text">Loading analysis...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feature Importance Chart -->
+    <div style="background: #1a2332; border-radius: 8px; border: 1px solid #2a3441; overflow: hidden; margin-bottom: 20px;">
+      <div style="background: #141b26; padding: 12px 16px; border-bottom: 1px solid #2a3441; font-weight: 600; color: #64ffda; font-size: 14px;">
+        📈 Feature Importance Evolution
+      </div>
+      <div style="padding: 16px;">
+        <div id="feature-bars">
+          <div style="text-align: center; color: #8892b0; padding: 20px;">
+            Loading feature importance data...
+          </div>
+        </div>
+        
+        <div class="ml-interpretation">
+          <div class="ml-interpretation-title">🧠 Feature Insights</div>
+          <div id="feature-insights">Features ranked by ML model importance. Higher bars = more predictive power.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="main-grid">
+      <!-- Performance Trends -->
+      <div style="background: #1a2332; border-radius: 8px; border: 1px solid #2a3441; overflow: hidden;">
+        <div style="background: #141b26; padding: 12px 16px; border-bottom: 1px solid #2a3441; font-weight: 600; color: #64ffda; font-size: 14px;">
+          📊 Performance Trends
+        </div>
+        <div style="padding: 16px;">
+          <div style="position: relative; height: 200px;">
+            <canvas id="performance-chart" style="width: 100%; height: 200px;"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Learning Activity Log -->
+      <div style="background: #1a2332; border-radius: 8px; border: 1px solid #2a3441; overflow: hidden;">
+        <div style="background: #141b26; padding: 12px 16px; border-bottom: 1px solid #2a3441; font-weight: 600; color: #64ffda; font-size: 14px;">
+          📝 Learning Activity
+        </div>
+        <div style="padding: 16px;">
+          <div id="activity-log" style="max-height: 200px; overflow-y: auto;">
+            <div style="color: #8892b0; text-align: center; padding: 10px;">
+              No learning activity yet
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quantum Analysis Tab -->
+  <div id="quantum-tab" class="tab-content">
+    <div class="main-grid">
+      <!-- Quantum System Status -->
+      <div style="background: #1a2332; border-radius: 8px; border: 1px solid #2a3441; overflow: hidden;">
+        <div style="background: #141b26; padding: 12px 16px; border-bottom: 1px solid #2a3441; font-weight: 600; color: #64ffda; font-size: 14px;">
+          ⚡ Quantum System Status
+        </div>
+        <div style="padding: 16px;">
+          <div class="kv">
+            <span class="k">Backend</span>
+            <span class="v" id="q-backend-detail">—</span>
+          </div>
+          <div class="kv">
+            <span class="k">Enabled</span>
+            <span class="v" id="q-enabled-detail">—</span>
+          </div>
+          <div class="kv">
+            <span class="k">Circuit Depth</span>
+            <span class="v" id="q-circuit-depth">—</span>
+          </div>
+          <div class="kv">
+            <span class="k">Shots per Prediction</span>
+            <span class="v" id="q-shots">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quantum vs Classical Comparison -->
+      <div style="background: #1a2332; border-radius: 8px; border: 1px solid #2a3441; overflow: hidden;">
+        <div style="background: #141b26; padding: 12px 16px; border-bottom: 1px solid #2a3441; font-weight: 600; color: #64ffda; font-size: 14px;">
+          🔬 Quantum vs Classical
+        </div>
+        <div style="padding: 16px;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Metric</th>
+                <th>Quantum</th>
+                <th>Classical</th>
+                <th>Advantage</th>
+              </tr>
+            </thead>
+            <tbody id="quantum-comparison">
+              <tr><td colspan="4">Loading comparison data...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quantum Circuit Visualization -->
+    <div style="background: #1a2332; border-radius: 8px; border: 1px solid #2a3441; overflow: hidden; margin-bottom: 20px;">
+      <div style="background: #141b26; padding: 12px 16px; border-bottom: 1px solid #2a3441; font-weight: 600; color: #64ffda; font-size: 14px;">
+        🎛️ Quantum Circuit Analysis
+      </div>
+      <div style="padding: 16px;">
+        <div id="quantum-circuit-info">
+          <div style="text-align: center; color: #8892b0; padding: 20px;">
+            Quantum circuit analysis will appear here when quantum features are enabled.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- Debug Panel -->
+<button class="debug-toggle" id="debug-toggle" style="display: none;">🔧 Debug</button>
+
+<div class="debug-panel" id="debug-panel">
+  <div class="debug-header">🔧 API Debug Panel</div>
+  
+  <!-- System Status -->
+  <div style="margin-bottom: 16px;">
+    <div class="debug-header" style="font-size: 12px; margin-bottom: 8px;">⚙️ System Status</div>
+    <div style="display: grid; gap: 8px;">
+      
+      <div class="card" style="padding: 8px;">
+        <div class="card-header" style="margin-bottom: 6px;">
+          <h3 style="font-size: 12px;">Quantum Engine</h3>
+          <span id="quantum-chip" class="chip" style="font-size: 10px;">Loading…</span>
+        </div>
+        <div class="kv" style="font-size: 10px;"><span class="k">Backend</span><span class="v" id="quantum-backend">—</span></div>
+        <div class="kv" style="font-size: 10px;"><span class="k">Enabled</span><span class="v" id="quantum-enabled">—</span></div>
+      </div>
+
+      <div class="card" style="padding: 8px;">
+        <div class="card-header" style="margin-bottom: 6px;">
+          <h3 style="font-size: 12px;">Machine Learning</h3>
+          <span id="ml-chip" class="chip" style="font-size: 10px;">Loading…</span>
+        </div>
+        <div class="kv" style="font-size: 10px;"><span class="k">Enabled</span><span class="v" id="ml-enabled">—</span></div>
+        <div class="kv" style="font-size: 10px;"><span class="k">Loaded</span><span class="v" id="ml-loaded">—</span></div>
+        <div class="kv" style="font-size: 10px;"><span class="k">Model</span><span class="v" id="ml-path">—</span></div>
+      </div>
+
+      <div class="card" style="padding: 8px;">
+        <div class="card-header" style="margin-bottom: 6px;">
+          <h3 style="font-size: 12px;">Sentiment</h3>
+          <span id="sent-chip" class="chip" style="font-size: 10px;">Loading…</span>
+        </div>
+        <div class="kv" style="font-size: 10px;"><span class="k">Enabled</span><span class="v" id="sent-enabled">—</span></div>
+        <div class="kv" style="font-size: 10px;"><span class="k">Source</span><span class="v" id="sent-source">—</span></div>
+        <div class="kv" style="font-size: 10px;"><span class="k">Window</span><span class="v" id="sent-window">—</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Execution Control -->
+  <div style="margin-bottom: 16px;">
+    <div class="debug-header" style="font-size: 12px; margin-bottom: 8px;">🔴 Execution Control</div>
+    <div class="card" style="padding: 10px;">
+      <div class="card-header" style="margin-bottom: 8px;">
+        <h3 style="font-size: 12px;">Trading Execution</h3>
+        <span id="exec-chip" class="chip" style="font-size: 10px;">Loading…</span>
+      </div>
+      
+      <div style="margin-bottom: 8px;">
+        <div class="kv" style="font-size: 10px;"><span class="k">Runtime</span><span class="v" id="exec-rt">—</span></div>
+        <div class="kv" style="font-size: 10px;"><span class="k">Environment</span><span class="v" id="exec-env">—</span></div>
+      </div>
+      
+      <div style="display: flex; gap: 4px; margin-bottom: 6px;">
+        <button id="btnExecEnable" class="control-btn" style="background: #4caf50; color: #fff; font-size: 10px; padding: 4px 8px;">Enable</button>
+        <button id="btnExecDisable" class="control-btn" style="background: #ff9800; color: #fff; font-size: 10px; padding: 4px 8px;">Disable</button>
+        <button id="btnExecToggle" class="control-btn" style="background: #f44336; color: #fff; font-size: 10px; padding: 4px 8px;">Toggle</button>
+      </div>
+      
+      <div style="font-size: 9px; color: #8892b0;">
+        Emergency stop controls for trading execution
+      </div>
+    </div>
+  </div>
+  
+  <!-- Audit Trail (Superuser Only) -->
+  <div id="audit-section" class="audit-section" style="display: none;">
+    <div class="debug-header" style="font-size: 12px; margin-bottom: 8px;">📝 Audit Trail</div>
+    <div style="max-height: 200px; overflow-y: auto;" id="audit-logs">
+      <div style="color: #8892b0; text-align: center; padding: 10px;">No audit logs</div>
+    </div>
+    <button class="control-btn" id="refresh-audit" style="width: 100%; margin-top: 8px;">Refresh Audit Logs</button>
+  </div>
+  
+  <!-- API Endpoints -->
+  <div class="endpoint-grid">
+    <div class="endpoint-box" data-endpoint="/health">
+      <div class="endpoint-name">Health Check</div>
+      <div class="endpoint-url">/health</div>
+      <div class="endpoint-status">Ready</div>
+    </div>
+    
+    <div class="endpoint-box" data-endpoint="/sentiment">
+      <div class="endpoint-name">Sentiment Analysis</div>
+      <div class="endpoint-url">/sentiment</div>
+      <div class="endpoint-status">Ready</div>
+    </div>
+    
+    <div class="endpoint-box" data-endpoint="/status">
+      <div class="endpoint-name">Full Status</div>
+      <div class="endpoint-url">/status</div>
+      <div class="endpoint-status">Ready</div>
+    </div>
+    
+    <div class="endpoint-box" data-endpoint="/signals">
+      <div class="endpoint-name">Trading Signals</div>
+      <div class="endpoint-url">/signals</div>
+      <div class="endpoint-status">Ready</div>
+    </div>
+    
+    <div class="endpoint-box" data-endpoint="/trades">
+      <div class="endpoint-name">All Trades</div>
+      <div class="endpoint-url">/trades</div>
+      <div class="endpoint-status">Ready</div>
+    </div>
+    
+    <div class="endpoint-box" data-endpoint="/logs/last">
+      <div class="endpoint-name">Recent Logs</div>
+      <div class="endpoint-url">/logs/last</div>
+      <div class="endpoint-status">Ready</div>
+    </div>
+    
+    <div class="endpoint-box" data-endpoint="/exec/status">
+      <div class="endpoint-name">Execution Status</div>
+      <div class="endpoint-url">/exec/status</div>
+      <div class="endpoint-status">Ready</div>
+    </div>
+    
+    <div class="endpoint-box" data-endpoint="/ml/status" id="ml-status-endpoint">
+      <div class="endpoint-name">ML Status</div>
+      <div class="endpoint-url">/ml/status</div>
+      <div class="endpoint-status">Ready</div>
+    </div>
+    
+    <div class="endpoint-box" data-endpoint="/auth/me" id="auth-me-endpoint" style="display: none;">
+      <div class="endpoint-name">User Info</div>
+      <div class="endpoint-url">/auth/me</div>
+      <div class="endpoint-status">Ready</div>
+    </div>
+  </div>
+  
+  <!-- Refresh Controls -->
+  <div class="refresh-controls">
+    <div class="debug-header">⏱️ Refresh Settings</div>
+    
+    <div class="control-group">
+      <label class="control-label">Health Check (seconds)</label>
+      <input type="number" class="control-input" id="health-interval" value="20" min="5" max="300">
+    </div>
+    
+    <div class="control-group">
+      <label class="control-label">Signals (seconds)</label>
+      <input type="number" class="control-input" id="signals-interval" value="25" min="10" max="300">
+    </div>
+    
+    <div class="control-group">
+      <label class="control-label">Positions (seconds)</label>
+      <input type="number" class="control-input" id="positions-interval" value="15" min="5" max="300">
+    </div>
+    
+    <div class="control-group">
+      <label class="control-label">Equity Chart (seconds)</label>
+      <input type="number" class="control-input" id="chart-interval" value="10" min="5" max="120">
+    </div>
+    
+    <div class="control-group">
+      <label class="control-label">Logs (seconds)</label>
+      <input type="number" class="control-input" id="logs-interval" value="15" min="10" max="300">
+    </div>
+    
+    <div class="control-group">
+      <label class="control-label">Trades (seconds)</label>
+      <input type="number" class="control-input" id="trades-interval" value="30" min="15" max="300">
+    </div>
+    
+    <div class="control-group">
+      <label class="control-label">ML Metrics (seconds)</label>
+      <input type="number" class="control-input" id="ml-interval" value="30" min="15" max="300">
+    </div>
+    
+    <div class="control-buttons">
+      <button class="control-btn" id="apply-intervals">Apply Settings</button>
+      <button class="control-btn secondary" id="refresh-all">Refresh All</button>
+    </div>
+  </div>
+</div>
+
+<!-- Response Modal -->
+<div class="response-modal" id="response-modal">
+  <div class="response-content">
+    <div class="response-header">
+      <h3 id="response-title">API Response</h3>
+      <button class="close-btn" id="close-modal">✕</button>
+    </div>
+    <div class="response-data" id="response-data"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const API = new URLSearchParams(location.search).get('api') || 'https://bottie-1.onrender.com';
+  
+  let currentUser = null;
+  let authToken = null;
+  let equityData = [];
+  let refreshIntervals = {};
+  let tradesData = [];
+  let performanceChart = null;
+  let performanceData = [];
+  let mlData = {};
+
+  // Tab Management
+  function initTabs() {
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+    
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const targetTab = btn.dataset.tab;
+        
+        // Update button states
+        tabBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        // Update content visibility
+        tabContents.forEach(content => {
+          content.classList.remove('active');
+          if (content.id === `${targetTab}-tab`) {
+            content.classList.add('active');
+          }
+        });
+        
+        // Initialize tab-specific content
+        if (targetTab === 'ml-monitor') {
+          initPerformanceChart();
+          refreshMLStatus();
+        } else if (targetTab === 'quantum') {
+          refreshQuantumDetails();
+        }
+      });
+    });
+  }
+
+  // Chart Initialization for ML Monitor
+  function initPerformanceChart() {
+    if (performanceChart) return; // Already initialized
+    
+    const canvas = document.getElementById('performance-chart');
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    
+    // Simple chart implementation (you could use Chart.js here)
+    performanceChart = {
+      canvas: canvas,
+      ctx: ctx,
+      data: {
+        labels: [],
+        datasets: [
+          { label: 'ML Brier Score', data: [], color: '#64ffda' },
+          { label: 'Quantum Brier Score', data: [], color: '#4caf50' }
+        ]
+      },
+      update: function() {
+        this.draw();
+      },
+      draw: function() {
+        const width = this.canvas.width;
+        const height = this.canvas.height;
+        
+        this.ctx.clearRect(0, 0, width, height);
+        
+        if (this.data.datasets[0].data.length < 2) return;
+        
+        // Simple line chart drawing
+        this.ctx.strokeStyle = this.data.datasets[0].color;
+        this.ctx.lineWidth = 2;
+        this.ctx.beginPath();
+        
+        const dataPoints = this.data.datasets[0].data;
+        const maxVal = Math.max(...dataPoints);
+        const minVal = Math.min(...dataPoints);
+        const range = maxVal - minVal || 1;
+        
+        dataPoints.forEach((value, index) => {
+          const x = (index / (dataPoints.length - 1)) * width;
+          const y = height - ((value - minVal) / range) * height;
+          
+          if (index === 0) {
+            this.ctx.moveTo(x, y);
+          } else {
+            this.ctx.lineTo(x, y);
+          }
+        });
+        
+        this.ctx.stroke();
+      }
+    };
+    
+    // Resize canvas
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = rect.height + 'px';
+    performanceChart.ctx.scale(dpr, dpr);
+  }
+
+  // Authentication State Management (keeping your existing code)
+  function saveAuthState(token, user) {
+    localStorage.setItem('bottie_auth_token', token);
+    localStorage.setItem('bottie_user', JSON.stringify(user));
+    authToken = token;
+    currentUser = user;
+  }
+
+  function loadAuthState() {
+    const token = localStorage.getItem('bottie_auth_token');
+    const userStr = localStorage.getItem('bottie_user');
+    if (token && userStr) {
+      try {
+        authToken = token;
+        currentUser = JSON.parse(userStr);
+        return true;
+      } catch (e) {
+        clearAuthState();
+      }
+    }
+    return false;
+  }
+
+  function clearAuthState() {
+    localStorage.removeItem('bottie_auth_token');
+    localStorage.removeItem('bottie_user');
+    authToken = null;
+    currentUser = null;
+  }
+
+  function updateUI() {
+    const loginModal = document.getElementById('login-modal');
+    const mainContent = document.getElementById('main-content');
+    const userInfo = document.getElementById('user-info');
+    const debugToggle = document.getElementById('debug-toggle');
+    const dashboardTabs = document.getElementById('dashboard-tabs');
+    const auditSection = document.getElementById('audit-section');
+    const authMeEndpoint = document.getElementById('auth-me-endpoint');
+
+    if (currentUser) {
+      loginModal.style.display = 'none';
+      mainContent.style.display = 'block';
+      userInfo.style.display = 'flex';
+      debugToggle.style.display = 'block';
+      dashboardTabs.style.display = 'flex';
+      
+      document.getElementById('user-name').textContent = currentUser.username;
+      document.getElementById('user-role').textContent = currentUser.role.toUpperCase();
+      
+      // Show audit section for superuser only
+      if (currentUser.role === 'superuser') {
+        auditSection.style.display = 'block';
+        authMeEndpoint.style.display = 'block';
+      }
+      
+      // Initialize tabs
+      initTabs();
+      
+      // Start data refreshing
+      initializeDashboard();
+    } else {
+      loginModal.style.display = 'flex';
+      mainContent.style.display = 'none';
+      userInfo.style.display = 'none';
+      debugToggle.style.display = 'none';
+      dashboardTabs.style.display = 'none';
+      clearAllIntervals();
+    }
+  }
+
+  // Login functionality (keeping your existing code)
+  document.getElementById('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    const loginBtn = document.getElementById('login-btn');
+    const loginError = document.getElementById('login-error');
+    
+    loginBtn.disabled = true;
+    loginBtn.textContent = 'Logging in...';
+    loginError.textContent = '';
+    
+    try {
+      const response = await fetch(`${API}/auth/login`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username, password})
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Login failed');
+      }
+      
+      const data = await response.json();
+      saveAuthState(data.access_token, data.user);
+      updateUI();
+      
+    } catch (error) {
+      loginError.textContent = error.message;
+    } finally {
+      loginBtn.disabled = false;
+      loginBtn.textContent = 'Login';
+    }
+  });
+
+  // Logout functionality
+  document.getElementById('logout-btn').addEventListener('click', async () => {
+    try {
+      if (authToken) {
+        await fetch(`${API}/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      clearAuthState();
+      updateUI();
+    }
+  });
+
+  // Utility functions (keeping your existing code)
+  function pct01(x) { 
+    return (typeof x === 'number' && !isNaN(x)) ? (x * 100).toFixed(1) + '%' : '—'; 
+  }
+
+  function fmt(n) { 
+    if (n == null || isNaN(n)) return '—'; 
+    return Number(n).toLocaleString(undefined, {maximumFractionDigits: 4}); 
+  }
+
+  function formatTime(timestamp) {
+    if (!timestamp) return '—';
+    return new Date(timestamp * 1000).toLocaleTimeString();
+  }
+
+  function setChip(el, status) {
+    if (!el) return;
+    el.classList.remove('chip--ok','chip--warn','chip--err');
+    if (status) {
+      el.textContent = 'Enabled';
+      el.classList.add('chip--ok');
+    } else {
+      el.textContent = 'Disabled';
+      el.classList.add('chip--warn');
+    }
+  }
+
+  // Element references
+  const qChip = document.getElementById('quantum-chip');
+  const qBackend = document.getElementById('quantum-backend');
+  const qEnabled = document.getElementById('quantum-enabled');
+  const mlChip = document.getElementById('ml-chip');
+  const mlEnabled = document.getElementById('ml-enabled');
+  const mlLoaded = document.getElementById('ml-loaded');
+  const mlPath = document.getElementById('ml-path');
+  const sentChip = document.getElementById('sent-chip');
+  const sentEnabled = document.getElementById('sent-enabled');
+  const sentSource = document.getElementById('sent-source');
+  const sentWindow = document.getElementById('sent-window');
+  const logsContainer = document.getElementById('logs');
+  const signalsTable = document.getElementById('signals-table');
+  const sentimentTable = document.getElementById('sentiment-table');
+  const positionsContainer = document.getElementById('positions-container');
+  const equityCanvas = document.getElementById('equity-canvas');
+  const ctx = equityCanvas.getContext('2d');
+  const tradesPanel = document.getElementById('trades-panel');
+  const tradesTable = document.getElementById('trades-table');
+
+  // Debug panel functionality
+  const debugToggle = document.getElementById('debug-toggle');
+  const debugPanel = document.getElementById('debug-panel');
+  const responseModal = document.getElementById('response-modal');
+  const responseTitle = document.getElementById('response-title');
+  const responseData = document.getElementById('response-data');
+  const closeModal = document.getElementById('close-modal');
+
+  debugToggle.addEventListener('click', () => {
+    debugPanel.classList.toggle('open');
+  });
+
+  closeModal.addEventListener('click', () => {
+    responseModal.style.display = 'none';
+  });
+
+  // Canvas functions (keeping your existing code)
+  function resizeCanvas() {
+    const rect = equityCanvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    equityCanvas.width = Math.max(1, Math.floor(rect.width * dpr));
+    equityCanvas.height = Math.max(1, Math.floor(rect.height * dpr));
+    equityCanvas.style.width = rect.width + 'px';
+    equityCanvas.style.height = rect.height + 'px';
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.scale(dpr, dpr);
+  }
+
+  function drawChart() {
+    if (equityData.length < 2) return;
+    
+    const width = equityCanvas.clientWidth;
+    const height = equityCanvas.clientHeight;
+    
+    ctx.clearRect(0, 0, width, height);
+    
+    const values = equityData.map(d => d.v);
+    const minValue = Math.min(...values);
+    const maxValue = Math.max(...values);
+    const valueRange = maxValue - minValue || 1;
+    
+    const points = equityData.map((d, i) => ({
+      x: (i / (equityData.length - 1)) * width,
+      y: height - ((d.v - minValue) / valueRange) * height
+    }));
+    
+    // Draw area fill
+    if (points.length > 1) {
+      const gradient = ctx.createLinearGradient(0, 0, 0, height);
+      gradient.addColorStop(0, 'rgba(100, 255, 218, 0.2)');
+      gradient.addColorStop(1, 'rgba(100, 255, 218, 0.05)');
+      
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, height);
+      points.forEach(point => ctx.lineTo(point.x, point.y));
+      ctx.lineTo(points[points.length - 1].x, height);
+      ctx.closePath();
+      ctx.fill();
+    }
+    
+    // Draw line
+    ctx.strokeStyle = '#64ffda';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    points.forEach((point, i) => {
+      if (i === 0) ctx.moveTo(point.x, point.y);
+      else ctx.lineTo(point.x, point.y);
+    });
+    ctx.stroke();
+  }
+
+  function updateChartStats() {
+    if (equityData.length === 0) return;
+    
+    const values = equityData.map(d => d.v);
+    const current = values[values.length - 1];
+    const start = values[0];
+    const high = Math.max(...values);
+    const low = Math.min(...values);
+    const change = ((current - start) / start) * 100;
+    
+    document.getElementById('chart-current').textContent = current.toFixed(2);
+    document.getElementById('chart-high').textContent = high.toFixed(2);
+    document.getElementById('chart-low').textContent = low.toFixed(2);
+    
+    const changeEl = document.getElementById('chart-change');
+    changeEl.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
+    changeEl.className = change >= 0 ? 'positive' : 'negative';
+  }
+
+  function updatePerformanceSummary() {
+    if (tradesData.length === 0) {
+      document.getElementById('total-pnl').textContent = '$0.00';
+      document.getElementById('win-rate').textContent = '0%';
+      document.getElementById('avg-win').textContent = '$0.00';
+      document.getElementById('avg-loss').textContent = '$0.00';
+      return;
+    }
+
+    const closedTrades = tradesData.filter(t => t.pnl != null);
+    const totalPnl = closedTrades.reduce((sum, t) => sum + (t.pnl || 0), 0);
+    const winners = closedTrades.filter(t => (t.pnl || 0) > 0);
+    const losers = closedTrades.filter(t => (t.pnl || 0) < 0);
+    
+    const winRate = closedTrades.length > 0 ? (winners.length / closedTrades.length) : 0;
+    const avgWin = winners.length > 0 ? winners.reduce((sum, t) => sum + t.pnl, 0) / winners.length : 0;
+    const avgLoss = losers.length > 0 ? losers.reduce((sum, t) => sum + Math.abs(t.pnl), 0) / losers.length : 0;
+
+    document.getElementById('total-pnl').textContent = `${fmt(totalPnl)}`;
+    document.getElementById('win-rate').textContent = `${(winRate * 100).toFixed(1)}%`;
+    document.getElementById('avg-win').textContent = `${fmt(avgWin)}`;
+    document.getElementById('avg-loss').textContent = `${fmt(avgLoss)}`;
+  }
+
+  // Authenticated API functions
+  async function authFetch(url, options = {}) {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...options.headers
+    };
+    
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+    }
+    
+    const response = await fetch(`${API}${url}`, {
+      ...options,
+      headers
+    });
+    
+    if (response.status === 401) {
+      // Token expired, logout
+      clearAuthState();
+      updateUI();
+      throw new Error('Session expired');
+    }
+    
+    return response;
+  }
+
+  async function postJSON(path) {
+    const response = await authFetch(path, { method: 'POST' });
+    if (!response.ok) throw new Error(`${path} -> ${response.status}`);
+    return await response.json();
+  }
+
+  // ML Status refresh functions
+  async function refreshMLStatus() {
+    try {
+      const r = await fetch(`${API}/ml/status`);
+      if (!r.ok) {
+        console.log('ML status endpoint not available');
+        return;
+      }
+      
+      const data = await r.json();
+      mlData = data;
+      
+      // Update ML monitor tab
+      updateMLHealthIndicators(data);
+      updateFeatureImportance(data);
+      updateQuantumAnalysis(data);
+      
+      // Update quick status in trading tab
+      updateQuickMLStatus(data);
+      
+    } catch (err) {
+      console.error('ML status fetch failed', err);
+    }
+  }
+
+  function updateMLHealthIndicators(data) {
+    // Update basic metrics
+    const accuracy = data.accuracy || 0;
+    const brierScore = data.brier_score;
+    const sampleCount = data.sample_count || 0;
+    
+    document.getElementById('ml-accuracy').textContent = accuracy ? pct01(accuracy) : '—';
+    document.getElementById('brier-score').textContent = brierScore ? brierScore.toFixed(3) : '—';
+    document.getElementById('sample-count').textContent = sampleCount.toLocaleString();
+    
+    // Health status analysis
+    const healthIndicator = document.getElementById('ml-health-indicator');
+    const healthText = document.getElementById('health-text');
+    
+    let status = 'insufficient';
+    let interpretation = 'Need more training samples (minimum 50-100)';
+    
+    if (sampleCount >= 50 && brierScore !== null) {
+      if (brierScore < 0.18) {
+        status = 'excellent';
+        interpretation = '🎉 Excellent! ML is learning strong patterns and making high-quality predictions.';
+      } else if (brierScore < 0.22) {
+        status = 'good';
+        interpretation = '✅ Good learning progress. Model is beating random guessing significantly.';
+      } else if (brierScore < 0.25) {
+        status = 'moderate';
+        interpretation = '⚠️ Moderate learning. Model is improving but slowly. May need more diverse data.';
+      } else {
+        status = 'poor';
+        interpretation = '❌ Poor learning. Model struggling to find patterns. Check data quality or features.';
+      }
+    }
+    
+    healthIndicator.className = `ml-health-indicator ml-${status}`;
+    healthIndicator.textContent = status.replace('_', ' ').toUpperCase();
+    healthText.textContent = interpretation;
+  }
+
+  function updateFeatureImportance(data) {
+    const container = document.getElementById('feature-bars');
+    const importance = data.feature_importance || {};
+    
+    if (Object.keys(importance).length === 0) {
+      container.innerHTML = '<p style="text-align: center; color: #8892b0; padding: 20px;">No feature importance data available yet.</p>';
+      return;
+    }
+    
+    // Sort features by importance
+    const sorted = Object.entries(importance).sort((a, b) => b[1] - a[1]);
+    const maxImportance = Math.max(...Object.values(importance));
+    
+    container.innerHTML = '';
+    sorted.forEach(([feature, value], index) => {
+      const percentage = (value / maxImportance) * 100;
+      const isQuantum = feature.includes('quantum');
+      
+      const bar = document.createElement('div');
+      bar.className = 'feature-bar';
+      bar.innerHTML = `
+        <div class="feature-name">${feature}</div>
+        <div class="feature-progress">
+          <div class="feature-fill" style="width: ${percentage}%; background: ${isQuantum ? '#4caf50' : '#64ffda'}"></div>
+        </div>
+        <div class="feature-rank">#${index + 1}</div>
+      `;
+      container.appendChild(bar);
+    });
+  }
+
+  function updateQuantumAnalysis(data) {
+    const quantumImportance = data.quantum_importance;
+    const quantumRank = data.quantum_feature_rank;
+    const quantumMode = data.quantum_mode || 'unknown';
+    
+    document.getElementById('quantum-importance').textContent = quantumImportance ? quantumImportance.toFixed(3) : '—';
+    document.getElementById('quantum-rank').textContent = quantumRank ? `#${quantumRank}` : '—';
+    document.getElementById('quantum-mode').textContent = quantumMode;
+    document.getElementById('quantum-weight').textContent = data.quantum_weight ? pct01(data.quantum_weight) : '—';
+    
+    // Quantum interpretation
+    const quantumText = document.getElementById('quantum-text');
+    let interpretation = '';
+    
+    if (!quantumImportance) {
+      interpretation = '⏳ Quantum learning starting. Need more training data to assess impact.';
+    } else if (quantumRank === 1) {
+      interpretation = '🏆 Quantum is the #1 most important feature! ML heavily relies on quantum predictions.';
+    } else if (quantumRank <= 3) {
+      interpretation = '🥉 Quantum is highly valuable! ML considers it one of the top predictive features.';
+    } else if (quantumRank <= 5) {
+      interpretation = '📊 Quantum provides moderate value. ML uses it but other features are more important.';
+    } else {
+      interpretation = '🤔 Quantum has low importance. ML finds other features more predictive than quantum signals.';
+    }
+    
+    if (quantumMode === 'shadow') {
+      interpretation += ' Currently in shadow mode - computing but not affecting trades.';
+    }
+    
+    quantumText.textContent = interpretation;
+  }
+
+  function updateQuickMLStatus(data) {
+    // Update quick status indicators in trading tab
+    const healthEl = document.getElementById('quick-ml-health');
+    const accuracyEl = document.getElementById('quick-ml-accuracy');
+    const samplesEl = document.getElementById('quick-ml-samples');
+    const quantumRankEl = document.getElementById('quick-quantum-rank');
+    
+    if (!healthEl) return; // Elements not loaded yet
+    
+    const sampleCount = data.sample_count || 0;
+    const brierScore = data.brier_score;
+    
+    // Health status
+    let healthStatus = '⏳';
+    if (sampleCount >= 50 && brierScore !== null) {
+      if (brierScore < 0.18) healthStatus = '🎉';
+      else if (brierScore < 0.22) healthStatus = '✅';
+      else if (brierScore < 0.25) healthStatus = '⚠️';
+      else healthStatus = '❌';
+    }
+    
+    healthEl.textContent = healthStatus;
+    accuracyEl.textContent = data.accuracy ? pct01(data.accuracy) : '—';
+    samplesEl.textContent = sampleCount < 1000 ? sampleCount.toString() : `${(sampleCount/1000).toFixed(1)}k`;
+    quantumRankEl.textContent = data.quantum_feature_rank ? `#${data.quantum_feature_rank}` : '—';
+  }
+
+  function updatePerformanceChart(data) {
+    if (!performanceChart) return;
+    
+    const timestamp = new Date().toLocaleTimeString();
+    const mlBrier = data.brier_score;
+    const qBrier = data.quantum_brier_score; // If available
+    
+    if (mlBrier !== undefined) {
+      performanceChart.data.labels.push(timestamp);
+      performanceChart.data.datasets[0].data.push(mlBrier);
+      performanceChart.data.datasets[1].data.push(qBrier || null);
+      
+      // Keep only last 20 points
+      if (performanceChart.data.labels.length > 20) {
+        performanceChart.data.labels.shift();
+        performanceChart.data.datasets[0].data.shift();
+        performanceChart.data.datasets[1].data.shift();
+      }
+      
+      performanceChart.update();
+    }
+  }
+
+  function updateActivityLog(data) {
+    const log = document.getElementById('activity-log');
+    if (!log) return;
+    
+    const timestamp = new Date().toLocaleTimeString();
+    
+    // Add new activity
+    const activity = document.createElement('div');
+    activity.style.cssText = 'padding: 6px; margin: 4px 0; background: rgba(100, 255, 218, 0.05); border-radius: 4px; font-size: 11px; border-left: 3px solid #64ffda;';
+    
+    let message = '';
+    const samples = data.sample_count || 0;
+    const mlBrier = data.brier_score;
+    
+    if (samples > 0 && mlBrier) {
+      if (mlBrier < 0.20) message = '🎯 High-quality learning detected';
+      else if (mlBrier < 0.25) message = '📈 Model improving steadily';
+      else message = '⚠️ Learning slowly, monitoring...';
+    } else {
+      message = '🔄 Collecting training data...';
+    }
+    
+    activity.innerHTML = `
+      <div style="display: flex; justify-content: space-between;">
+        <span>${message}</span>
+        <span style="color: #8892b0;">${timestamp}</span>
+      </div>
+    `;
+    
+    log.insertBefore(activity, log.firstChild);
+    
+    // Keep only last 10 items
+    while (log.children.length > 10) {
+      log.removeChild(log.lastChild);
+    }
+  }
+
+  async function refreshQuantumDetails() {
+    try {
+      const r = await fetch(`${API}/health`);
+      const h = await r.json();
+      
+      const q = h.quantum || {};
+      document.getElementById('q-backend-detail').textContent = q.backend || '—';
+      document.getElementById('q-enabled-detail').textContent = q.enabled ? 'Yes' : 'No';
+      document.getElementById('q-circuit-depth').textContent = q.circuit_depth || '—';
+      document.getElementById('q-shots').textContent = q.shots || '—';
+      
+      // Update quantum comparison table
+      const comparisonTable = document.getElementById('quantum-comparison');
+      comparisonTable.innerHTML = `
+        <tr>
+          <td>Prediction Accuracy</td>
+          <td>${mlData.quantum_accuracy ? pct01(mlData.quantum_accuracy) : '—'}</td>
+          <td>${mlData.classical_accuracy ? pct01(mlData.classical_accuracy) : '—'}</td>
+          <td class="${(mlData.quantum_accuracy || 0) > (mlData.classical_accuracy || 0) ? 'positive' : 'negative'}">
+            ${mlData.quantum_accuracy && mlData.classical_accuracy ? 
+              ((mlData.quantum_accuracy - mlData.classical_accuracy) * 100).toFixed(1) + '%' : '—'}
+          </td>
+        </tr>
+        <tr>
+          <td>Feature Importance</td>
+          <td>${mlData.quantum_importance ? mlData.quantum_importance.toFixed(3) : '—'}</td>
+          <td>Avg: ${mlData.classical_avg_importance ? mlData.classical_avg_importance.toFixed(3) : '—'}</td>
+          <td class="${(mlData.quantum_importance || 0) > (mlData.classical_avg_importance || 0) ? 'positive' : 'negative'}">
+            ${mlData.quantum_importance && mlData.classical_avg_importance ? 
+              (((mlData.quantum_importance / mlData.classical_avg_importance) - 1) * 100).toFixed(1) + '%' : '—'}
+          </td>
+        </tr>
+      `;
+      
+    } catch (err) {
+      console.error('Quantum details fetch failed', err);
+    }
+  }
+
+  // Your existing refresh functions (keeping all of them)
+  async function refreshHealth() {
+    try {
+      const r = await fetch(`${API}/health`);
+      const h = await r.json();
+
+      const q = h.quantum || {};
+      setChip(qChip, !!q.enabled);
+      if (qEnabled) qEnabled.textContent = q.enabled ? 'Yes' : 'No';
+      if (qBackend) qBackend.textContent = q.backend || '—';
+
+      const m = h.ml || {};
+      setChip(mlChip, !!m.enabled);
+      if (mlEnabled) mlEnabled.textContent = m.enabled ? 'Yes' : 'No';
+      if (mlLoaded) mlLoaded.textContent = m.loaded ? 'Yes' : 'No';
+      if (mlPath) mlPath.textContent = m.model_path ? m.model_path.split('/').pop() : '—';
+
+      const s = h.sentiment || {};
+      setChip(sentChip, !!s.enabled);
+      if (sentEnabled) sentEnabled.textContent = s.enabled ? 'Yes' : 'No';
+
+    } catch (err) {
+      console.error('Health fetch failed', err);
+    }
+  }
+
+  async function refreshSentiment() {
+    try {
+      const r = await fetch(`${API}/sentiment`);
+      const s = await r.json();
+
+      if (sentSource) sentSource.textContent = s.source || '—';
+      if (sentWindow) sentWindow.textContent = s.window_sec ? `${s.window_sec}s` : '—';
+
+      if (sentimentTable) {
+        sentimentTable.innerHTML = '';
+        if (s.scores && typeof s.scores === 'object') {
+          Object.entries(s.scores).forEach(([asset, data]) => {
+            const row = document.createElement('tr');
+            const n = data.n || 0;
+            
+            const scorePct = (typeof data.score === 'number') 
+              ? ((0.5 + 0.5 * data.score) * 100).toFixed(1) + '%'
+              : '—';
+            
+            row.innerHTML = `
+              <td class="symbol">${asset}</td>
+              <td>${scorePct}</td>
+              <td>${n}</td>
+            `;
+            sentimentTable.appendChild(row);
+          });
+        } else {
+          sentimentTable.innerHTML = '<tr><td colspan="3">No sentiment data</td></tr>';
+        }
+      }
+    } catch (err) {
+      console.error('Sentiment fetch failed', err);
+    }
+  }
+
+  async function refreshSignals() {
+    try {
+      const r = await fetch(`${API}/signals`);
+      if (!r.ok) {
+        if (r.status === 404) {
+          console.log('Signals endpoint not implemented, falling back to /status');
+          return refreshSignalsFromStatus();
+        }
+        throw new Error(`HTTP ${r.status}`);
+      }
+      
+      const data = await r.json();
+      
+      if (signalsTable) {
+        signalsTable.innerHTML = '';
+        const signals = data.signals || [];
+        
+        if (signals.length > 0) {
+          signals.forEach(sig => {
+            const row = document.createElement('tr');
+            let badgeClass = 'hold-badge';
+            if (sig.signal === 'BUY') badgeClass = 'buy-badge';
+            if (sig.signal === 'SELL') badgeClass = 'sell-badge';
+            
+            row.innerHTML = `
+              <td class="symbol">${sig.symbol || '—'}</td>
+              <td><span class="${badgeClass}">${sig.signal || 'HOLD'}</span></td>
+              <td>${pct01(sig.conf)}</td>
+              <td>${pct01(sig.ema)}</td>
+              <td>${pct01(sig.ml)}</td>
+              <td>${pct01(sig.q)}</td>
+              <td>${pct01(sig.sent)}</td>
+              <td>${pct01(sig.final_prob)}</td>
+              <td>${(sig.thr_buy != null && sig.thr_sell != null) ? 
+                    pct01(sig.thr_buy) + ' / ' + pct01(sig.thr_sell) : '—'}</td>
+              <td>${formatTime(sig.t)}</td>
+            `;
+            signalsTable.appendChild(row);
+          });
+        } else {
+          signalsTable.innerHTML = '<tr><td colspan="10">No signals available</td></tr>';
+        }
+      }
+    } catch (err) {
+      console.error('Signals fetch failed', err);
+      if (signalsTable) signalsTable.innerHTML = '<tr><td colspan="10">Error loading signals</td></tr>';
+    }
+  }
+
+  async function refreshSignalsFromStatus() {
+    try {
+      const r = await fetch(`${API}/status`);
+      const data = await r.json();
+      
+      if (signalsTable) {
+        signalsTable.innerHTML = '';
+        if (data.last_signals && data.last_signals.length > 0) {
+          data.last_signals.forEach(sig => {
+            const row = document.createElement('tr');
+            let badgeClass = 'hold-badge';
+            if (sig.signal === 'BUY') badgeClass = 'buy-badge';
+            if (sig.signal === 'SELL') badgeClass = 'sell-badge';
+            
+            row.innerHTML = `
+              <td class="symbol">${sig.symbol || '—'}</td>
+              <td><span class="${badgeClass}">${sig.signal || 'HOLD'}</span></td>
+              <td>${pct01(sig.conf)}</td>
+              <td>${pct01(sig.ema)}</td>
+              <td>${pct01(sig.ml)}</td>
+              <td>${pct01(sig.q)}</td>
+              <td>${pct01(sig.sent)}</td>
+              <td>${pct01(sig.final_prob)}</td>
+              <td>${(sig.thr_buy != null && sig.thr_sell != null) ? 
+                    pct01(sig.thr_buy) + ' / ' + pct01(sig.thr_sell) : '—'}</td>
+              <td>${formatTime(sig.t)}</td>
+            `;
+            signalsTable.appendChild(row);
+          });
+        } else {
+          signalsTable.innerHTML = '<tr><td colspan="10">No signals available</td></tr>';
+        }
+      }
+    } catch (err) {
+      console.error('Status fallback for signals failed', err);
+      if (signalsTable) signalsTable.innerHTML = '<tr><td colspan="10">Error loading signals</td></tr>';
+    }
+  }
+
+  async function refreshPositions() {
+    try {
+      const r = await fetch(`${API}/status`);
+      const data = await r.json();
+      
+      if (!positionsContainer) {
+        console.error('Positions container element not found');
+        return;
+      }
+      
+      if (data.positions && Object.keys(data.positions).length > 0) {
+        let html = '<table class="data-table"><thead><tr><th>Symbol</th><th>Quantity</th><th>Avg Price</th><th>Last Price</th><th>P&L</th></tr></thead><tbody>';
+        
+        Object.entries(data.positions).forEach(([symbol, pos]) => {
+          const qty = Number(pos.qty ?? 0);
+          const avg = Number(pos.avg_px ?? 0);
+          const last = Number(pos.last_px ?? 0);
+          const pnl = (last - avg) * qty;
+          const pnlPct = (avg > 0) ? (last - avg) / avg : null;
+          const pnlClass = pnl >= 0 ? 'positive' : 'negative';
+          
+          html += `
+            <tr>
+              <td class="symbol">${symbol}</td>
+              <td>${fmt(qty)}</td>
+              <td>${fmt(avg)}</td>
+              <td>${fmt(last)}</td>
+              <td class="${pnlClass}">${fmt(pnl)} ${pnlPct !== null ? '(' + pct01(pnlPct) + ')' : ''}</td>
+            </tr>
+          `;
+        });
+        html += '</tbody></table>';
+        positionsContainer.innerHTML = html;
+      } else {
+        positionsContainer.innerHTML = 'No open positions';
+      }
+    } catch (err) {
+      console.error('Positions fetch failed', err);
+      if (positionsContainer) {
+        positionsContainer.innerHTML = 'Error loading positions';
+      }
+    }
+  }
+
+  async function refreshEquityChart() {
+    try {
+      const r = await fetch(`${API}/status`);
+      const data = await r.json();
+      
+      if (data.equity_series && data.equity_series.length > 0) {
+        equityData = data.equity_series;
+        updateChartStats();
+        drawChart();
+      }
+    } catch (err) {
+      console.error('Equity chart fetch failed', err);
+    }
+  }
+
+  async function refreshTrades() {
+    try {
+      const r = await fetch(`${API}/trades`);
+      if (!r.ok) {
+        if (r.status === 404) {
+          console.log('Trades endpoint not implemented yet');
+          tradesPanel.classList.add('hidden');
+          return;
+        }
+        throw new Error(`HTTP ${r.status}`);
+      }
+      
+      const trades = await r.json();
+      tradesData = Array.isArray(trades) ? trades : [];
+      
+      if (tradesData.length > 0) {
+        tradesPanel.classList.remove('hidden');
+        
+        tradesTable.innerHTML = '';
+        tradesData.forEach(trade => {
+          const row = document.createElement('tr');
+          const pnlClass = (trade.pnl || 0) >= 0 ? 'positive' : 'negative';
+          
+          row.innerHTML = `
+            <td>${formatTime(trade.t)}</td>
+            <td class="symbol">${trade.symbol || '—'}</td>
+            <td>${trade.side || '—'}</td>
+            <td>${fmt(trade.qty)}</td>
+            <td>${fmt(trade.px)}</td>
+            <td>${fmt(trade.fee)} ${trade.fee_ccy || ''}</td>
+            <td class="${pnlClass}">${trade.pnl != null ? fmt(trade.pnl) : '—'}</td>
+          `;
+          tradesTable.appendChild(row);
+        });
+      }
+      
+      updatePerformanceSummary();
+      
+    } catch (err) {
+      console.error('Trades fetch failed', err);
+      tradesPanel.classList.add('hidden');
+    }
+  }
+
+  async function refreshLogs() {
+    try {
+      const r = await fetch(`${API}/logs/last`);
+      const l = await r.json();
+      if (logsContainer) {
+        logsContainer.textContent = (l.logs || []).join("\n");
+      }
+    } catch (err) {
+      console.error('Logs fetch failed', err);
+      if (logsContainer) {
+        logsContainer.textContent = 'Error loading logs from API';
+      }
+    }
+  }
+
+  async function refreshExec() {
+    try {
+      const r = await authFetch('/exec/status');
+      if (!r.ok) {
+        if (r.status === 404) {
+          console.log('Execution status endpoint not implemented yet');
+          return;
+        }
+        throw new Error(`HTTP ${r.status}`);
+      }
+      
+      const exec = await r.json();
+      
+      const execEnvEl = document.getElementById('exec-env');
+      const execRtEl = document.getElementById('exec-rt');
+      const execChip = document.getElementById('exec-chip');
+      
+      if (execEnvEl) execEnvEl.textContent = exec.enabled_env ? 'Yes' : 'No';
+      if (execRtEl) execRtEl.textContent = exec.enabled_runtime ? 'Yes' : 'No';
+      
+      if (execChip) {
+        execChip.classList.remove('chip--ok', 'chip--warn', 'chip--err');
+        if (exec.enabled_runtime) {
+          execChip.textContent = 'Active';
+          execChip.classList.add('chip--ok');
+        } else {
+          execChip.textContent = 'Disabled';
+          execChip.classList.add('chip--warn');
+        }
+      }
+    } catch (err) {
+      console.error('Execution status fetch failed', err);
+    }
+  }
+
+  // Audit trail functions (superuser only)
+  async function refreshAuditLogs() {
+    if (!currentUser || currentUser.role !== 'superuser') return;
+    
+    try {
+      const r = await authFetch('/audit/logs?limit=20');
+      const data = await r.json();
+      
+      const auditContainer = document.getElementById('audit-logs');
+      if (data.logs && data.logs.length > 0) {
+        auditContainer.innerHTML = '';
+        data.logs.forEach(log => {
+          const logDiv = document.createElement('div');
+          logDiv.className = 'audit-log';
+          
+          const timestamp = new Date(log.timestamp).toLocaleString();
+          logDiv.innerHTML = `
+            <div class="audit-header">
+              <span>${log.username}</span>
+              <span>${timestamp}</span>
+            </div>
+            <div class="audit-details">
+              ${log.action} on ${log.endpoint}
+              ${log.details ? ' - ' + log.details : ''}
+            </div>
+          `;
+          auditContainer.appendChild(logDiv);
+        });
+      } else {
+        auditContainer.innerHTML = '<div style="color: #8892b0; text-align: center; padding: 10px;">No audit logs</div>';
+      }
+    } catch (err) {
+      console.error('Audit logs fetch failed', err);
+    }
+  }
+
+  // Endpoint testing
+  document.querySelectorAll('.endpoint-box').forEach(box => {
+    box.addEventListener('click', async () => {
+      const endpoint = box.dataset.endpoint;
+      const statusEl = box.querySelector('.endpoint-status');
+      
+      box.className = 'endpoint-box loading';
+      statusEl.textContent = 'Loading...';
+      
+      try {
+        let response;
+        if (endpoint.startsWith('/auth/') || endpoint.startsWith('/exec/') || endpoint.startsWith('/audit/')) {
+          response = await authFetch(endpoint);
+        } else {
+          response = await fetch(`${API}${endpoint}`);
+        }
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            box.className = 'endpoint-box error';
+            statusEl.textContent = 'Not Implemented';
+            showNotImplementedModal(endpoint);
+            return;
+          }
+          throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        box.className = 'endpoint-box success';
+        statusEl.textContent = `${response.status} OK`;
+        
+        responseTitle.textContent = `${endpoint} Response`;
+        responseData.textContent = JSON.stringify(data, null, 2);
+        responseModal.style.display = 'flex';
+        
+      } catch (err) {
+        box.className = 'endpoint-box error';
+        statusEl.textContent = 'Error';
+        
+        responseTitle.textContent = `${endpoint} Error`;
+        responseData.textContent = err.message;
+        responseModal.style.display = 'flex';
+      }
+    });
+  });
+
+  function showNotImplementedModal(endpoint) {
+    responseTitle.textContent = `${endpoint} Not Implemented`;
+    responseData.textContent = `The ${endpoint} endpoint is not yet implemented on the backend.`;
+    responseModal.style.display = 'flex';
+  }
+
+  // Execution control buttons
+  document.getElementById('btnExecEnable').addEventListener('click', async () => {
+    const btn = document.getElementById('btnExecEnable');
+    btn.disabled = true;
+    try {
+      await postJSON('/exec/enable');
+      await refreshExec();
+      console.log('Execution enabled successfully');
+    } catch (err) {
+      console.error('Failed to enable execution:', err);
+      if (err.message.includes('401')) {
+        alert('Authentication failed. Please re-login.');
+      } else if (err.message.includes('404')) {
+        showNotImplementedModal('/exec/enable');
+      }
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById('btnExecDisable').addEventListener('click', async () => {
+    const btn = document.getElementById('btnExecDisable');
+    btn.disabled = true;
+    try {
+      await postJSON('/exec/disable');
+      await refreshExec();
+      console.log('Execution disabled successfully');
+    } catch (err) {
+      console.error('Failed to disable execution:', err);
+      if (err.message.includes('401')) {
+        alert('Authentication failed. Please re-login.');
+      } else if (err.message.includes('404')) {
+        showNotImplementedModal('/exec/disable');
+      }
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById('btnExecToggle').addEventListener('click', async () => {
+    const btn = document.getElementById('btnExecToggle');
+    btn.disabled = true;
+    try {
+      await postJSON('/exec/toggle');
+      await refreshExec();
+      console.log('Execution toggled successfully');
+    } catch (err) {
+      console.error('Failed to toggle execution:', err);
+      if (err.message.includes('401')) {
+        alert('Authentication failed. Please re-login.');
+      } else if (err.message.includes('404')) {
+        showNotImplementedModal('/exec/toggle');
+      }
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // Audit log refresh button
+  document.getElementById('refresh-audit').addEventListener('click', refreshAuditLogs);
+
+  // Interval management
+  function clearAllIntervals() {
+    Object.values(refreshIntervals).forEach(intervalId => {
+      if (intervalId) clearInterval(intervalId);
+    });
+    refreshIntervals = {};
+  }
+
+  function applyRefreshIntervals() {
+    clearAllIntervals();
+    
+    const healthInterval = parseInt(document.getElementById('health-interval').value) * 1000;
+    const signalsInterval = parseInt(document.getElementById('signals-interval').value) * 1000;
+    const positionsInterval = parseInt(document.getElementById('positions-interval').value) * 1000;
+    const chartInterval = parseInt(document.getElementById('chart-interval').value) * 1000;
+    const logsInterval = parseInt(document.getElementById('logs-interval').value) * 1000;
+    const tradesInterval = parseInt(document.getElementById('trades-interval').value) * 1000;
+    const mlInterval = parseInt(document.getElementById('ml-interval').value) * 1000;
+    
+    refreshIntervals.health = setInterval(refreshHealth, healthInterval);
+    refreshIntervals.sentiment = setInterval(refreshSentiment, 30000);
+    refreshIntervals.signals = setInterval(refreshSignals, signalsInterval);
+    refreshIntervals.positions = setInterval(refreshPositions, positionsInterval);
+    refreshIntervals.chart = setInterval(refreshEquityChart, chartInterval);
+    refreshIntervals.logs = setInterval(refreshLogs, logsInterval);
+    refreshIntervals.trades = setInterval(refreshTrades, tradesInterval);
+    refreshIntervals.exec = setInterval(refreshExec, 20000);
+    refreshIntervals.ml = setInterval(() => {
+      refreshMLStatus();
+      if (mlData && Object.keys(mlData).length > 0) {
+        updatePerformanceChart(mlData);
+        updateActivityLog(mlData);
+      }
+    }, mlInterval);
+    
+    // Audit logs refresh for superuser
+    if (currentUser && currentUser.role === 'superuser') {
+      refreshIntervals.audit = setInterval(refreshAuditLogs, 30000);
+    }
+    
+    console.log('Refresh intervals updated');
+  }
+
+  document.getElementById('apply-intervals').addEventListener('click', applyRefreshIntervals);
+
+  document.getElementById('refresh-all').addEventListener('click', () => {
+    refreshHealth();
+    refreshSentiment();
+    refreshSignals();
+    refreshPositions();
+    refreshEquityChart();
+    refreshTrades();
+    refreshExec();
+    refreshLogs();
+    refreshMLStatus();
+    if (currentUser && currentUser.role === 'superuser') {
+      refreshAuditLogs();
+    }
+  });
+
+  // Initialize dashboard (called after login)
+  function initializeDashboard() {
+    window.addEventListener('resize', () => {
+      resizeCanvas();
+      drawChart();
+    });
+
+    resizeCanvas();
+    
+    // Stagger initial calls to avoid cold start thundering herd
+    setTimeout(() => refreshHealth(), 100);
+    setTimeout(() => refreshSentiment(), 200);
+    setTimeout(() => refreshSignals(), 300);
+    setTimeout(() => refreshPositions(), 400);
+    setTimeout(() => refreshEquityChart(), 500);
+    setTimeout(() => refreshTrades(), 600);
+    setTimeout(() => refreshExec(), 700);
+    setTimeout(() => refreshLogs(), 800);
+    setTimeout(() => refreshMLStatus(), 900);
+    
+    if (currentUser && currentUser.role === 'superuser') {
+      setTimeout(() => refreshAuditLogs(), 1000);
+    }
+
+    // Set intervals with default values
+    setTimeout(() => applyRefreshIntervals(), 1100);
+  }
+
+  // Auto-login check on page load
+  if (loadAuthState()) {
+    // Verify token is still valid
+    fetch(`${API}/auth/me`, {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    }).then(response => {
+      if (response.ok) {
+        updateUI();
+      } else {
+        clearAuthState();
+        updateUI();
+      }
+    }).catch(() => {
+      clearAuthState();
+      updateUI();
+    });
+  } else {
+    updateUI();
+  }
+
+})();
+</script>
+</body>
+</html>

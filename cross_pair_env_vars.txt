@@ -1,0 +1,11 @@
+
+# Add these environment variables to your .env file or Render settings
+
+# Cross-Pair Trading Configuration
+CROSS_PAIR_ENABLED=1
+BINANCE_TESTNET=true
+
+# Cross-Pair Trading Parameters
+CROSS_PAIR_MIN_TRADE_VALUE_USDT=10
+CROSS_PAIR_MAX_PORTFOLIO_PCT=0.05
+CROSS_PAIR_MIN_PROFIT_THRESHOLD=0.002

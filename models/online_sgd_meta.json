@@ -1,0 +1,14 @@
+{
+  "features": [
+    "close",
+    "rsi14",
+    "ret1",
+    "ema_fast",
+    "ema_slow",
+    "vol",
+    "quantum_prob"
+  ],
+  "include_quantum": true,
+  "feature_count": 7,
+  "created_at": 1755085793.2219296
+}

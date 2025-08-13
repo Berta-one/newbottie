@@ -1,0 +1,57 @@
+
+<!-- Add this section to your dashboard HTML after trading signals -->
+<!-- Cross-Pair Portfolio Trading -->
+<div style="background: #1a2332; border-radius: 8px; border: 1px solid #2a3441; overflow: hidden; margin-bottom: 20px;">
+  <div style="background: #141b26; padding: 12px 16px; border-bottom: 1px solid #2a3441; font-weight: 600; color: #64ffda; font-size: 14px;">
+    🔄 Cross-Pair Portfolio Trading
+    <span id="cross-pair-status" style="margin-left: 10px; font-size: 10px; padding: 2px 6px; border-radius: 3px; background: #4caf50; color: #fff;">ENABLED</span>
+  </div>
+  <div style="padding: 16px;">
+    
+    <!-- Portfolio Overview -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+      <div style="background: #0f1419; border: 1px solid #2a3441; border-radius: 6px; padding: 12px; text-align: center;">
+        <div style="font-size: 10px; color: #8892b0; margin-bottom: 4px;">Portfolio Assets</div>
+        <div style="font-size: 16px; font-weight: 600; color: #64ffda;" id="portfolio-asset-count">—</div>
+      </div>
+      <div style="background: #0f1419; border: 1px solid #2a3441; border-radius: 6px; padding: 12px; text-align: center;">
+        <div style="font-size: 10px; color: #8892b0; margin-bottom: 4px;">Available Pairs</div>
+        <div style="font-size: 16px; font-weight: 600; color: #64ffda;" id="cross-pair-count">—</div>
+      </div>
+      <div style="background: #0f1419; border: 1px solid #2a3441; border-radius: 6px; padding: 12px; text-align: center;">
+        <div style="font-size: 10px; color: #8892b0; margin-bottom: 4px;">Opportunities</div>
+        <div style="font-size: 16px; font-weight: 600; color: #4caf50;" id="cross-opportunities-count">—</div>
+      </div>
+    </div>
+    
+    <!-- Cross-Pair Opportunities Table -->
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Trade Direction</th>
+          <th>Symbol</th>
+          <th>Action</th>
+          <th>AI Confidence</th>
+          <th>Est. Profit</th>
+          <th>Price</th>
+          <th>Available</th>
+        </tr>
+      </thead>
+      <tbody id="cross-pair-opportunities">
+        <tr><td colspan="7">Loading cross-pair opportunities...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- AI Portfolio Rebalancing Suggestions -->
+<div style="background: #1a2332; border-radius: 8px; border: 1px solid #2a3441; overflow: hidden; margin-bottom: 20px;">
+  <div style="background: #141b26; padding: 12px 16px; border-bottom: 1px solid #2a3441; font-weight: 600; color: #64ffda; font-size: 14px;">
+    🧠 AI Portfolio Rebalancing Suggestions
+  </div>
+  <div style="padding: 16px;">
+    <div id="rebalancing-suggestions">
+      <div style="color: #8892b0; text-align: center; padding: 20px;">Loading AI recommendations...</div>
+    </div>
+  </div>
+</div>

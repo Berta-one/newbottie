@@ -155,7 +155,12 @@ log = logging.getLogger("BottieAPI")
 app = FastAPI(title="Bottie API", version="2.0.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[NETLIFY_URL] if NETLIFY_URL != "*" else ["*"],
+    allow_origins=[
+        "https://helpful-maamoul-8aa9bd.netlify.app",  # Your Netlify deployment
+        "http://localhost:3000",                        # Local development
+        "http://localhost:8000",                        # Local API testing
+        "*" if NETLIFY_URL == "*" else NETLIFY_URL      # Environment variable fallback
+    ],
     allow_credentials=False,
     allow_methods=["GET","POST","OPTIONS","HEAD"],
     allow_headers=["*"],
@@ -1130,9 +1135,68 @@ async def debug_test_login(test_user: User):
     
     return debug_info
 
+@app.post("/debug/test-login-raw")
+async def debug_test_login_raw(request: Request):
+    """Debug endpoint to test login process step by step - raw JSON"""
+    try:
+        body = await request.json()
+        username = body.get("username", "")
+        password = body.get("password", "")
+        
+        debug_info = {
+            "provided_credentials": {
+                "username": username,
+                "password": password
+            },
+            "user_lookup": {
+                "user_exists": username in USERS_DB,
+                "user_data": USERS_DB.get(username, {}).get("username", "NOT_FOUND") if username in USERS_DB else "USER_NOT_FOUND"
+            }
+        }
+        
+        if username in USERS_DB:
+            user = USERS_DB[username]
+            stored_hash = user["hashed_password"]
+            
+            debug_info["password_verification"] = {
+                "stored_hash": stored_hash[:20] + "...",
+                "password_verify_result": pwd_context.verify(password, stored_hash),
+                "manual_hash_check": stored_hash == pwd_context.hash(password),  # This should be False - different salts
+            }
+            
+            # Test authentication function
+            auth_result = authenticate_user(username, password)
+            debug_info["authenticate_user_result"] = {
+                "success": bool(auth_result),
+                "user_data": auth_result if auth_result else "AUTHENTICATION_FAILED"
+            }
+        
+        return debug_info
+    except Exception as e:
+        return {"error": f"Failed to parse request: {str(e)}"}
+
 @app.post("/debug/reset-passwords")
 async def debug_reset_passwords():
     """Debug endpoint to force reset passwords"""
+    global USERS_DB
+    
+    # Re-hash passwords from environment variables
+    USERS_DB["superuser"]["hashed_password"] = pwd_context.hash(SUPERUSER_PASSWORD)
+    USERS_DB["admin"]["hashed_password"] = pwd_context.hash(ADMIN_PASSWORD)
+    
+    return {
+        "message": "Passwords reset successfully",
+        "admin_password": ADMIN_PASSWORD,
+        "superuser_password": SUPERUSER_PASSWORD,
+        "verification": {
+            "admin_verify": pwd_context.verify(ADMIN_PASSWORD, USERS_DB["admin"]["hashed_password"]),
+            "superuser_verify": pwd_context.verify(SUPERUSER_PASSWORD, USERS_DB["superuser"]["hashed_password"])
+        }
+    }
+
+@app.get("/debug/reset-passwords-get")
+async def debug_reset_passwords_get():
+    """Debug endpoint to force reset passwords - GET version"""
     global USERS_DB
     
     # Re-hash passwords from environment variables
