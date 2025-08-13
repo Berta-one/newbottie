@@ -1008,16 +1008,32 @@ async def execution_loop():
 
                 try:
                     order = _exchange.create_order(sym, type="market", side=side, amount=qty)
-                    _trade_log.append({
+                    
+                    # Enhanced trade logging with more details
+                    trade_entry = {
                         "t": int(time.time()),
-                        "symbol": sym, "side": side, "qty": qty, "px": px,
-                        "prob": prob, "conf": conf
-                    })
+                        "symbol": sym, 
+                        "side": side, 
+                        "qty": qty, 
+                        "px": px,
+                        "value": qty * px,
+                        "prob": prob, 
+                        "conf": conf,
+                        "order_id": order.get("id") if order else None,
+                        "order_info": order.get("info", {}) if order else {},
+                        "signal_strength": strength
+                    }
+                    _trade_log.append(trade_entry)
+                    
+                    # Keep trade log manageable
+                    if len(_trade_log) > 1000:
+                        _trade_log[:] = _trade_log[-500:]  # Keep last 500
+                    
                     if side == "buy":
                         _open_spend[sym] = _open_spend.get(sym, 0.0) + qty * px
                     else:
                         _open_spend[sym] = max(0.0, _open_spend.get(sym, 0.0) - qty * px)
-                    add_log(f"ORDER {side.upper()} {sym} qty={qty} px~{px:.6f} prob={prob:.3f}")
+                    add_log(f"ORDER {side.upper()} {sym} qty={qty} px~{px:.6f} prob={prob:.3f} order_id={order.get('id') if order else 'N/A'}")
                 except ccxt.BaseError as e:
                     add_log(f"ORDER error {sym} {side} {qty}: {e}")
                 except Exception as e:
@@ -1308,12 +1324,36 @@ def health():
 @app.get("/status")
 def status():
     last_eq = _equity_series[-1]["v"] if _equity_series else None
+    
+    # Calculate P&L from trades
+    total_buy_value = sum(t.get("value", t.get("qty", 0) * t.get("px", 0)) 
+                         for t in _trade_log if t.get("side") == "buy")
+    total_sell_value = sum(t.get("value", t.get("qty", 0) * t.get("px", 0)) 
+                          for t in _trade_log if t.get("side") == "sell")
+    trading_pnl = total_sell_value - total_buy_value
+    
+    # Calculate today's P&L
+    today_start = int(time.time()) - 86400  # 24 hours ago
+    today_trades = [t for t in _trade_log if t.get("t", 0) > today_start]
+    today_buy_value = sum(t.get("value", t.get("qty", 0) * t.get("px", 0)) 
+                         for t in today_trades if t.get("side") == "buy")
+    today_sell_value = sum(t.get("value", t.get("qty", 0) * t.get("px", 0)) 
+                          for t in today_trades if t.get("side") == "sell")
+    today_pnl = today_sell_value - today_buy_value
+    
     return {
         "started_at": _started,
         "equity": last_eq,
         "equity_series": _equity_series[-300:],
         "positions": _positions,
         "last_signals": _signals[-200:],
+        "trading_summary": {
+            "total_trades": len(_trade_log),
+            "total_pnl": round(trading_pnl, 4),
+            "today_pnl": round(today_pnl, 4),
+            "today_trades": len(today_trades),
+            "recent_trades": _trade_log[-10:]  # Last 10 trades
+        }
     }
 
 @app.get("/signals")
@@ -1567,41 +1607,217 @@ async def execution_toggle(request: Request):
 
 @app.get("/trades")
 def trades():
-    """Return all trade log entries with P&L calculation"""
-    trades_with_pnl = []
-    
-    for trade in _trade_log:
-        # Basic trade info
-        trade_out = {
-            "t": trade.get("t"),
-            "symbol": trade.get("symbol"),
-            "side": trade.get("side"),
-            "qty": trade.get("qty"),
-            "px": trade.get("px"),
-            "fee": 0.0,  # Could be enhanced to track actual fees
-            "fee_ccy": "USDT",  # Default
-            "pnl": None  # Will calculate if possible
+    """Get recent trades with P&L calculation"""
+    try:
+        # Combine local trade log with exchange trades for comprehensive view
+        all_trades = []
+        
+        # Add local trade log (Bottie's executed orders)
+        for trade in _trade_log[-100:]:  # Last 100 local trades
+            all_trades.append({
+                "timestamp": trade.get("t", time.time()),
+                "symbol": trade.get("symbol", ""),
+                "side": trade.get("side", "").upper(),
+                "quantity": trade.get("qty", 0),
+                "price": trade.get("px", 0),
+                "value": trade.get("qty", 0) * trade.get("px", 0),
+                "confidence": trade.get("conf", 0),
+                "probability": trade.get("prob", 0.5),
+                "source": "bottie",
+                "order_id": f"bottie_{trade.get('t', time.time())}"
+            })
+        
+        # Try to fetch exchange trades for additional context
+        if _exchange and API_KEY and API_SECRET:
+            try:
+                # Get symbols from recent positions
+                recent_symbols = list(_positions.keys())[:10]  # Limit to avoid rate limits
+                
+                for symbol in recent_symbols:
+                    if symbol == f"{PRIMARY_QUOTE}/{PRIMARY_QUOTE}":
+                        continue
+                    try:
+                        since = _ms_since(7)  # Last 7 days
+                        exchange_trades = _exchange.fetch_my_trades(symbol, since=since, limit=50)
+                        
+                        for trade in exchange_trades[-20:]:  # Last 20 per symbol
+                            all_trades.append({
+                                "timestamp": trade.get("timestamp", 0) / 1000,
+                                "symbol": trade.get("symbol", ""),
+                                "side": trade.get("side", "").upper(),
+                                "quantity": trade.get("amount", 0),
+                                "price": trade.get("price", 0),
+                                "value": trade.get("cost", 0),
+                                "fee": trade.get("fee", {}).get("cost", 0),
+                                "fee_currency": trade.get("fee", {}).get("currency", ""),
+                                "source": "exchange",
+                                "order_id": trade.get("order", trade.get("id", ""))
+                            })
+                    except Exception as e:
+                        add_log(f"Error fetching trades for {symbol}: {e}")
+                        continue
+            except Exception as e:
+                add_log(f"Error fetching exchange trades: {e}")
+        
+        # Sort by timestamp (most recent first)
+        all_trades.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
+        
+        # Calculate P&L metrics
+        total_trades = len(all_trades)
+        buy_trades = [t for t in all_trades if t.get("side") == "BUY"]
+        sell_trades = [t for t in all_trades if t.get("side") == "SELL"]
+        
+        total_buy_value = sum(t.get("value", 0) for t in buy_trades)
+        total_sell_value = sum(t.get("value", 0) for t in sell_trades)
+        
+        # Calculate realized P&L (simplified - sell value minus buy value)
+        realized_pnl = total_sell_value - total_buy_value
+        
+        # Calculate fees
+        total_fees = sum(t.get("fee", 0) for t in all_trades if t.get("fee"))
+        
+        # Calculate win rate from Bottie trades (with confidence data)
+        bottie_trades = [t for t in all_trades if t.get("source") == "bottie"]
+        profitable_trades = 0
+        for i, trade in enumerate(bottie_trades):
+            if trade.get("side") == "SELL":
+                # Find corresponding buy for this symbol
+                symbol = trade.get("symbol")
+                for j in range(i+1, len(bottie_trades)):
+                    prev_trade = bottie_trades[j]
+                    if (prev_trade.get("symbol") == symbol and 
+                        prev_trade.get("side") == "BUY" and 
+                        prev_trade.get("timestamp", 0) < trade.get("timestamp", 0)):
+                        
+                        if trade.get("price", 0) > prev_trade.get("price", 0):
+                            profitable_trades += 1
+                        break
+        
+        win_rate = (profitable_trades / len(sell_trades)) * 100 if sell_trades else 0
+        
+        return {
+            "trades": all_trades[:50],  # Return last 50 trades
+            "summary": {
+                "total_trades": total_trades,
+                "buy_trades": len(buy_trades),
+                "sell_trades": len(sell_trades),
+                "total_buy_value": round(total_buy_value, 4),
+                "total_sell_value": round(total_sell_value, 4),
+                "realized_pnl": round(realized_pnl, 4),
+                "total_fees": round(total_fees, 4),
+                "net_pnl": round(realized_pnl - total_fees, 4),
+                "win_rate": round(win_rate, 2),
+                "avg_trade_size": round(total_buy_value / len(buy_trades), 4) if buy_trades else 0
+            }
         }
         
-        # Simple P&L estimation (rough)
-        if "prob" in trade and "px" in trade and "qty" in trade:
-            # Very rough estimate: assume we made profit if prob was confident
-            prob = trade.get("prob", 0.5)
-            px = trade.get("px", 0)
-            qty = trade.get("qty", 0)
-            
-            if trade.get("side") == "buy" and prob > 0.6:
-                # Estimate 1-2% profit for confident buys
-                trade_out["pnl"] = qty * px * (prob - 0.5) * 0.04
-            elif trade.get("side") == "sell" and prob < 0.4:
-                # Estimate profit for confident sells
-                trade_out["pnl"] = qty * px * (0.5 - prob) * 0.04
-        
-        trades_with_pnl.append(trade_out)
-    
-    return trades_with_pnl
+    except Exception as e:
+        add_log(f"Error in trades endpoint: {e}")
+        return {
+            "trades": [],
+            "summary": {
+                "total_trades": 0,
+                "buy_trades": 0,
+                "sell_trades": 0,
+                "total_buy_value": 0,
+                "total_sell_value": 0,
+                "realized_pnl": 0,
+                "total_fees": 0,
+                "net_pnl": 0,
+                "win_rate": 0,
+                "avg_trade_size": 0
+            },
+            "error": str(e)
+        }
 
 from fastapi import Query
+
+@app.get("/pnl")
+def pnl_analysis():
+    """Detailed P&L analysis"""
+    try:
+        if not _trade_log:
+            return {
+                "total_pnl": 0,
+                "daily_pnl": {},
+                "symbol_pnl": {},
+                "trade_count": 0,
+                "win_rate": 0,
+                "message": "No trading activity recorded"
+            }
+        
+        # Calculate overall P&L
+        buy_trades = [t for t in _trade_log if t.get("side") == "buy"]
+        sell_trades = [t for t in _trade_log if t.get("side") == "sell"]
+        
+        total_buy_value = sum(t.get("value", t.get("qty", 0) * t.get("px", 0)) for t in buy_trades)
+        total_sell_value = sum(t.get("value", t.get("qty", 0) * t.get("px", 0)) for t in sell_trades)
+        total_pnl = total_sell_value - total_buy_value
+        
+        # Daily P&L breakdown
+        daily_pnl = {}
+        for trade in _trade_log:
+            trade_date = datetime.fromtimestamp(trade.get("t", time.time())).strftime("%Y-%m-%d")
+            if trade_date not in daily_pnl:
+                daily_pnl[trade_date] = {"buy": 0, "sell": 0, "pnl": 0, "trades": 0}
+            
+            value = trade.get("value", trade.get("qty", 0) * trade.get("px", 0))
+            side = trade.get("side", "")
+            
+            if side == "buy":
+                daily_pnl[trade_date]["buy"] += value
+            elif side == "sell":
+                daily_pnl[trade_date]["sell"] += value
+            
+            daily_pnl[trade_date]["pnl"] = daily_pnl[trade_date]["sell"] - daily_pnl[trade_date]["buy"]
+            daily_pnl[trade_date]["trades"] += 1
+        
+        # Symbol P&L breakdown
+        symbol_pnl = {}
+        for trade in _trade_log:
+            symbol = trade.get("symbol", "")
+            if symbol not in symbol_pnl:
+                symbol_pnl[symbol] = {"buy": 0, "sell": 0, "pnl": 0, "trades": 0}
+            
+            value = trade.get("value", trade.get("qty", 0) * trade.get("px", 0))
+            side = trade.get("side", "")
+            
+            if side == "buy":
+                symbol_pnl[symbol]["buy"] += value
+            elif side == "sell":
+                symbol_pnl[symbol]["sell"] += value
+            
+            symbol_pnl[symbol]["pnl"] = symbol_pnl[symbol]["sell"] - symbol_pnl[symbol]["buy"]
+            symbol_pnl[symbol]["trades"] += 1
+        
+        # Calculate win rate (simplified - based on profitable sells)
+        profitable_sells = 0
+        total_sell_pairs = 0
+        
+        for symbol in symbol_pnl:
+            if symbol_pnl[symbol]["pnl"] > 0 and symbol_pnl[symbol]["sell"] > 0:
+                profitable_sells += 1
+            if symbol_pnl[symbol]["sell"] > 0:
+                total_sell_pairs += 1
+        
+        win_rate = (profitable_sells / total_sell_pairs * 100) if total_sell_pairs > 0 else 0
+        
+        return {
+            "total_pnl": round(total_pnl, 4),
+            "total_buy_value": round(total_buy_value, 4),
+            "total_sell_value": round(total_sell_value, 4),
+            "daily_pnl": daily_pnl,
+            "symbol_pnl": symbol_pnl,
+            "trade_count": len(_trade_log),
+            "buy_trades": len(buy_trades),
+            "sell_trades": len(sell_trades),
+            "win_rate": round(win_rate, 2),
+            "avg_trade_size": round(total_buy_value / len(buy_trades), 4) if buy_trades else 0
+        }
+        
+    except Exception as e:
+        add_log(f"Error in P&L analysis: {e}")
+        return {"error": str(e), "total_pnl": 0}
 
 @app.get("/sentiment/assets")
 def sentiment_assets():
