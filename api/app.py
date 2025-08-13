@@ -780,18 +780,91 @@ def _sentiment_prob(symbol: str) -> Optional[float]:
 def _symbols_to_scan() -> List[str]:
     assert _exchange is not None
     syms: Set[str] = set()
-    # from positions
+    
+    # Get portfolio holdings (Y-axis of grid)
+    portfolio_bases = set()
     for sym in _positions.keys():
-        if sym.endswith(f"/{PRIMARY_QUOTE}") and not sym.startswith(f"{PRIMARY_QUOTE}/"):
-            if sym in _exchange.markets:
-                syms.add(sym)
-    # forced via env
+        if "/" in sym and not sym.startswith(f"{PRIMARY_QUOTE}/"):
+            base = sym.split("/")[0]
+            if base != PRIMARY_QUOTE:
+                portfolio_bases.add(base)
+    
+    # Add forced portfolio symbols from env if no positions yet
     if TRADE_SYMBOLS_ENV.strip():
         for s in TRADE_SYMBOLS_ENV.split(","):
             s = s.strip().upper()
-            if s and s in _exchange.markets:
-                syms.add(s)
+            if s and "/" in s:
+                base = s.split("/")[0]
+                portfolio_bases.add(base)
+                # Also add the original symbol
+                if s in _exchange.markets:
+                    syms.add(s)
+    
+    # If no portfolio yet, use default watchlist
+    if not portfolio_bases:
+        portfolio_bases.update(["BTC", "ETH", "BNB", "ADA", "SOL"])
+    
+    # Get top 50 cryptos by volume (X-axis of grid)
+    try:
+        # Fetch 24hr ticker data to get volume rankings
+        all_tickers = _exchange.fetch_tickers()
+        
+        # Extract USDT pairs and sort by volume
+        usdt_pairs = []
+        for symbol, ticker in all_tickers.items():
+            if symbol.endswith("/USDT") and ticker.get("quoteVolume"):
+                base = symbol.split("/")[0]
+                volume = float(ticker.get("quoteVolume", 0))
+                usdt_pairs.append((base, volume, symbol))
+        
+        # Sort by volume and take top 50
+        usdt_pairs.sort(key=lambda x: x[1], reverse=True)
+        top_50_bases = [base for base, volume, symbol in usdt_pairs[:50]]
+        
+        add_log(f"Top 10 by volume: {[f'{base}({vol/1e6:.1f}M)' for base, vol, sym in usdt_pairs[:10]]}")
+        
+        # Generate trading pairs: Portfolio holdings (Y) vs Top 50 (X)
+        pair_count = 0
+        for portfolio_base in portfolio_bases:
+            for top_base in top_50_bases:
+                if portfolio_base != top_base and pair_count < 300:
+                    # Try both directions to find valid market
+                    pair1 = f"{portfolio_base}/{top_base}"
+                    pair2 = f"{top_base}/{portfolio_base}"
+                    
+                    if pair1 in _exchange.markets:
+                        syms.add(pair1)
+                        pair_count += 1
+                    elif pair2 in _exchange.markets:
+                        syms.add(pair2)
+                        pair_count += 1
+        
+        add_log(f"Portfolio assets (Y-axis): {sorted(portfolio_bases)}")
+        add_log(f"Top volume assets (X-axis): {top_50_bases[:20]}...")  # Show first 20
+        
+    except Exception as e:
+        add_log(f"Error fetching volume data: {e}")
+        # Fallback to basic cross-pairs
+        major_quotes = ["BTC", "ETH", "BNB", "USDT"]
+        for base in portfolio_bases:
+            for quote in major_quotes:
+                if base != quote:
+                    cross_symbol = f"{base}/{quote}"
+                    reverse_symbol = f"{quote}/{base}"
+                    
+                    if cross_symbol in _exchange.markets:
+                        syms.add(cross_symbol)
+                    elif reverse_symbol in _exchange.markets:
+                        syms.add(reverse_symbol)
+    
     syms.discard(f"{PRIMARY_QUOTE}/{PRIMARY_QUOTE}")
+    
+    # Separate for logging
+    cross_pairs = [s for s in syms if not s.endswith(f"/{PRIMARY_QUOTE}")]
+    usdt_pairs = [s for s in syms if s.endswith(f"/{PRIMARY_QUOTE}")]
+    
+    add_log(f"Volume-based scanning: {len(usdt_pairs)} USDT pairs, {len(cross_pairs)} cross-pairs (max 300 total)")
+    
     return sorted(syms)
 
 def _push_signal(sig: Dict[str, Any]):
@@ -905,19 +978,25 @@ async def signals_loop():
                 if WEBSOCKET_AVAILABLE and USE_WEBSOCKETS:
                     try:
                         ws_manager = get_websocket_manager()
-                        if ws_manager.is_connected():
+                        if ws_manager and ws_manager.is_connected():
                             # Use WebSocket OHLCV data - no API call needed!
                             data = ws_manager.get_klines(sym, limit=TRADE_LOOKBACK_BARS)
                             if data:
-                                add_log(f"Using WebSocket data for {sym} (API call avoided)")
+                                # Only log WebSocket success occasionally to reduce noise
+                                if n_scanned % 5 == 0:  # Log every 5th successful fetch
+                                    add_log(f"WebSocket data active for {len(scan)} symbols")
                     except Exception as e:
-                        add_log(f"WebSocket OHLCV fetch failed for {sym}: {e}")
+                        # Reduce noise - only log WebSocket errors once per cycle
+                        if n_scanned == 0:
+                            add_log(f"WebSocket unavailable, using API fallback for all symbols")
                 
                 # Fallback to API if WebSocket data unavailable (expensive!)
                 if not data:
                     try:
                         data = _exchange.fetch_ohlcv(sym, timeframe=TRADE_TIMEFRAME, limit=TRADE_LOOKBACK_BARS)
-                        add_log(f"Using API call for {sym} OHLCV (WebSocket unavailable)")
+                        # Reduce API fallback logging noise
+                        if n_scanned == 0:
+                            add_log(f"Using API calls for OHLCV data (WebSocket unavailable)")
                     except Exception as e:
                         add_log(f"fetch_ohlcv fail {sym}: {e}")
                         continue
@@ -2275,7 +2354,7 @@ def sentiment_debug():
 
 @app.get("/grid/matrix")
 async def grid_matrix(min_conf: float = 0.0):
-    """Grid matrix for trading dashboard"""
+    """Professional trading grid matrix with volume-based scanning"""
     try:
         # Get current signals
         latest_signals = {}
@@ -2284,35 +2363,75 @@ async def grid_matrix(min_conf: float = 0.0):
             if symbol:
                 latest_signals[symbol] = s
         
-        # Create matrix data
-        rows = []  # Base currencies (from positions + signals)
-        cols = ["USDT", "BTC", "ETH", "BNB"]  # Quote currencies
-        matrix = {}
+        # Get portfolio holdings as Y-axis (rows)
+        portfolio_holdings = set()
+        for symbol in _positions.keys():
+            if "/" in symbol:
+                base = symbol.split("/")[0]
+                # Only include if we have a meaningful position
+                if _positions[symbol].get("quantity", 0) > 0:
+                    portfolio_holdings.add(base)
         
-        # Get base currencies from signals and positions
-        bases = set()
+        # Add crypto from recent signals to portfolio holdings
         for symbol in latest_signals.keys():
             if "/" in symbol:
                 base = symbol.split("/")[0]
-                bases.add(base)
+                portfolio_holdings.add(base)
         
-        for symbol in _positions.keys():
-            if "/" in symbol and not symbol.startswith(f"{PRIMARY_QUOTE}/"):
-                base = symbol.split("/")[0]
-                bases.add(base)
+        # Get top 50 cryptos by volume as X-axis (cols) 
+        try:
+            import requests
+            response = requests.get("https://api.binance.com/api/v3/ticker/24hr", timeout=10)
+            tickers = response.json()
+            
+            # Extract all unique base currencies and sort by volume
+            crypto_volumes = {}
+            for ticker in tickers:
+                symbol = ticker['symbol']
+                # Extract base currency (remove common quote suffixes)
+                base = None
+                for quote in ['USDT', 'BUSD', 'BTC', 'ETH', 'BNB', 'FDUSD']:
+                    if symbol.endswith(quote):
+                        base = symbol[:-len(quote)]
+                        break
+                
+                if base and base not in ['USDT', 'BUSD', 'FDUSD']:  # Exclude stablecoins
+                    volume = float(ticker.get('quoteVolume', 0))
+                    if base not in crypto_volumes or volume > crypto_volumes[base]:
+                        crypto_volumes[base] = volume
+            
+            # Get top 50 by volume
+            top_cryptos = sorted(crypto_volumes.items(), key=lambda x: x[1], reverse=True)[:50]
+            volume_leaders = [crypto for crypto, _ in top_cryptos]
+            
+        except Exception as e:
+            add_log(f"Volume fetch error: {e}")
+            # Fallback to common cryptos
+            volume_leaders = ["BTC", "ETH", "BNB", "ADA", "SOL", "XRP", "DOT", "MATIC", "AVAX", "LINK",
+                             "UNI", "LTC", "BCH", "ALGO", "VET", "ICP", "ATOM", "FIL", "TRX", "ETC",
+                             "THETA", "XLM", "AAVE", "MKR", "COMP", "YFI", "SUSHI", "CRV", "BAL", "ZRX"]
         
-        rows = sorted(list(bases))
+        rows = sorted(list(portfolio_holdings))
+        cols = volume_leaders
+        matrix = {}
         
-        # Build matrix
+        # Build professional trading matrix
         for base in rows:
             matrix[base] = {}
             for quote in cols:
-                symbol = f"{base}/{quote}"
-                signal_data = latest_signals.get(symbol)
+                if base == quote:  # Skip self-pairs
+                    matrix[base][quote] = None
+                    continue
+                    
+                # Try both directions for cross-pair trading
+                symbol1 = f"{base}/{quote}"
+                symbol2 = f"{quote}/{base}"
+                
+                signal_data = latest_signals.get(symbol1) or latest_signals.get(symbol2)
                 
                 if signal_data:
                     matrix[base][quote] = {
-                        "symbol": symbol,
+                        "symbol": signal_data.get("symbol"),
                         "signal": signal_data.get("signal", "HOLD"),
                         "conf": signal_data.get("conf", 0.0),
                         "final_prob": signal_data.get("final_prob", 0.5),
@@ -2322,16 +2441,22 @@ async def grid_matrix(min_conf: float = 0.0):
                         "sent": signal_data.get("sent"),
                         "thr_buy": signal_data.get("thr_buy", 0.6),
                         "thr_sell": signal_data.get("thr_sell", 0.4),
-                        "last": _positions.get(symbol, {}).get("last_px", 0),
-                        "t": signal_data.get("t")
+                        "last": _positions.get(signal_data.get("symbol"), {}).get("last_px", 0),
+                        "t": signal_data.get("t"),
+                        "volume_rank": volume_leaders.index(quote) + 1 if quote in volume_leaders else None
                     }
                 else:
                     matrix[base][quote] = None
+        
+        add_log(f"Professional grid: {len(rows)} portfolio holdings × {len(cols)} volume leaders = {len(rows) * len(cols)} pairs")
         
         return {
             "rows": rows,
             "cols": cols,
             "matrix": matrix,
+            "portfolio_size": len(rows),
+            "volume_leaders": len(cols),
+            "total_pairs": len(rows) * len(cols),
             "ts": time.time()
         }
     except Exception as e:

@@ -1222,12 +1222,28 @@
         </div>
       </div>
 
-      <!-- MAXI GRID: Portfolio (rows) × Scan (columns) -->
+      <!-- MAXI GRID: Portfolio (rows) × Top 50 Volume Leaders (columns) -->
       <div class="card maxi-grid-card">
-        <h3>Cross-Pair Maxi Grid (Portfolio × Market)</h3>
+        <h3>🏛️ Professional Trading Grid (Portfolio × Top 50 Volume)</h3>
         <div class="grid-header">
-          <span class="grid-subtitle">Hover a cell for details</span>
+          <span class="grid-subtitle">Portfolio holdings (Y) vs Top 50 volume cryptos (X) • Max 300 pairs • WebSocket-powered</span>
           <span id="grid-last-ts" class="grid-timestamp">—</span>
+        </div>
+        
+        <!-- Grid Stats -->
+        <div style="display: flex; gap: 16px; margin-bottom: 12px; font-size: 11px;">
+          <div style="color: #64ffda;">
+            <span style="color: #8892b0;">Portfolio Holdings:</span> 
+            <span id="grid-portfolio-count">—</span>
+          </div>
+          <div style="color: #64ffda;">
+            <span style="color: #8892b0;">Volume Leaders:</span> 
+            <span id="grid-volume-count">—</span>
+          </div>
+          <div style="color: #64ffda;">
+            <span style="color: #8892b0;">Total Pairs:</span> 
+            <span id="grid-total-pairs">—</span>
+          </div>
         </div>
 
         <!-- Grid Controls -->
@@ -1291,6 +1307,10 @@
         <div class="kv">
           <span class="k">Accuracy:</span>
           <span class="v" id="ml-accuracy">—</span>
+        </div>
+        <div class="kv">
+          <span class="k">Brier Score:</span>
+          <span class="v" id="ml-brier-score" title="Lower is better (0=perfect, 0.25=random)">—</span>
         </div>
         <div class="kv">
           <span class="k">Confidence:</span>

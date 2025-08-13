@@ -740,24 +740,45 @@
     const dataQualityEl = document.getElementById('ml-data-quality');
     const totalPredEl = document.getElementById('ml-total-predictions');
     const successPredEl = document.getElementById('ml-successful-predictions');
+    const brierScoreEl = document.getElementById('ml-brier-score');
 
+    // Use new API structure
+    const interpretation = data.interpretation || {};
+    const healthStatus = interpretation.health || 'unknown';
+    const healthEmoji = interpretation.emoji || '❓';
+    const healthDesc = interpretation.description || 'No data available';
+    
     if (healthEl) {
-      const score = data.overall_score || 0;
-      let healthClass = 'ml-insufficient';
-      let healthText = 'Insufficient Data';
-      
-      if (score >= 0.8) { healthClass = 'ml-excellent'; healthText = 'Excellent'; }
-      else if (score >= 0.6) { healthClass = 'ml-good'; healthText = 'Good'; }
-      else if (score >= 0.4) { healthClass = 'ml-moderate'; healthText = 'Moderate'; }
-      else if (score >= 0.2) { healthClass = 'ml-poor'; healthText = 'Poor'; }
-      
+      const healthClass = `ml-${healthStatus}`;
       healthEl.className = `ml-health-indicator ${healthClass}`;
-      healthEl.textContent = healthText;
+      healthEl.textContent = `${healthEmoji} ${healthStatus.charAt(0).toUpperCase() + healthStatus.slice(1)}`;
     }
 
-    if (scoreEl) scoreEl.textContent = ((data.overall_score || 0) * 100).toFixed(1) + '%';
+    // Display Brier score prominently (this was missing!)
+    if (brierScoreEl) {
+      const brierScore = data.brier_score || 0;
+      brierScoreEl.textContent = brierScore.toFixed(3);
+      brierScoreEl.title = healthDesc;
+    }
+
+    // Update other metrics with correct field names
+    if (scoreEl) {
+      const successRate = (data.success_rate || 0) * 100;
+      scoreEl.textContent = successRate.toFixed(1) + '%';
+    }
     if (accuracyEl) accuracyEl.textContent = ((data.accuracy || 0) * 100).toFixed(1) + '%';
-    if (confidenceEl) confidenceEl.textContent = ((data.confidence || 0) * 100).toFixed(1) + '%';
+    
+    // Calculate confidence from feature importance or success rate
+    const confidence = data.success_rate || data.accuracy || 0;
+    if (confidenceEl) confidenceEl.textContent = (confidence * 100).toFixed(1) + '%';
+    
+    // Data quality based on sample count
+    const sampleCount = data.sample_count || 0;
+    const dataQuality = Math.min(100, (sampleCount / 50) * 100); // 50+ samples = 100% quality
+    if (dataQualityEl) dataQualityEl.textContent = dataQuality.toFixed(0) + '%';
+    
+    if (totalPredEl) totalPredEl.textContent = sampleCount;
+    if (successPredEl) successPredEl.textContent = data.successful_predictions || 0;
     if (dataQualityEl) dataQualityEl.textContent = ((data.data_quality || 0) * 100).toFixed(1) + '%';
     if (totalPredEl) totalPredEl.textContent = data.total_predictions || 0;
     if (successPredEl) successPredEl.textContent = data.successful_predictions || 0;
@@ -832,17 +853,37 @@
   }
 
   function updatePerformanceChart(data) {
-    if (!performanceChart || !data.performance_history) return;
+    // This should fetch from the ML performance endpoint, not the status endpoint
+    fetchMLPerformanceData('1h').then(perfData => {
+      if (performanceChart && perfData && perfData.current_timeframe) {
+        const currentData = perfData.current_timeframe;
+        const accuracyHistory = currentData.accuracy || [];
+        const confidenceHistory = currentData.confidence || [];
+        
+        if (accuracyHistory.length > 0) {
+          const labels = accuracyHistory.map(h => new Date(h.timestamp * 1000).toLocaleTimeString());
+          const accuracyData = accuracyHistory.map(h => h.value * 100);
+          const confidenceData = confidenceHistory.map(h => h.value * 100);
 
-    const history = data.performance_history;
-    const labels = history.map(h => new Date(h.timestamp * 1000).toLocaleTimeString());
-    const accuracyData = history.map(h => h.accuracy * 100);
-    const confidenceData = history.map(h => h.confidence * 100);
-
-    performanceChart.data.labels = labels;
-    performanceChart.data.datasets[0].data = accuracyData;
-    performanceChart.data.datasets[1].data = confidenceData;
-    performanceChart.update();
+          performanceChart.data.labels = labels;
+          performanceChart.data.datasets[0].data = accuracyData;
+          performanceChart.data.datasets[1].data = confidenceData;
+          performanceChart.update();
+        }
+      }
+    }).catch(error => {
+      console.error('Failed to update performance chart:', error);
+    });
+  }
+  
+  // New function to fetch ML performance data
+  async function fetchMLPerformanceData(timeframe = '1h') {
+    try {
+      return await fetchJSON(`/ml/performance?timeframe=${timeframe}`);
+    } catch (error) {
+      console.error('Failed to fetch ML performance data:', error);
+      return null;
+    }
   }
 
   // Enhanced performance analysis with multiple timeframes
@@ -1487,22 +1528,38 @@
     const thead = document.getElementById('maxi-grid-thead');
     const tbody = document.getElementById('maxi-grid-tbody');
     const timestampEl = document.getElementById('grid-last-ts');
+    const portfolioCountEl = document.getElementById('grid-portfolio-count');
+    const volumeCountEl = document.getElementById('grid-volume-count');
+    const totalPairsEl = document.getElementById('grid-total-pairs');
     
     if (!thead || !tbody) return;
     
-    const { rows, cols, matrix, ts } = data;
+    const { rows, cols, matrix, ts, portfolio_size, volume_leaders, total_pairs } = data;
     
     // Update timestamp
     if (timestampEl) {
       timestampEl.textContent = new Date(ts * 1000).toLocaleTimeString();
     }
     
+    // Update grid statistics
+    if (portfolioCountEl) {
+      portfolioCountEl.textContent = portfolio_size || rows?.length || 0;
+    }
+    if (volumeCountEl) {
+      volumeCountEl.textContent = volume_leaders || cols?.length || 0;
+    }
+    if (totalPairsEl) {
+      totalPairsEl.textContent = total_pairs || ((rows?.length || 0) * (cols?.length || 0));
+    }
+    
     // Build header
     thead.innerHTML = '';
     const headerRow = document.createElement('tr');
     headerRow.innerHTML = '<th>Asset</th>';
-    cols.forEach(col => {
-      headerRow.innerHTML += `<th>${col}</th>`;
+    cols.forEach((col, index) => {
+      // Show volume rank for top volume leaders
+      const volumeRank = index < 10 ? ` (#${index + 1})` : '';
+      headerRow.innerHTML += `<th title="Volume Rank: ${index + 1}">${col}${volumeRank}</th>`;
     });
     thead.appendChild(headerRow);
     
@@ -1510,14 +1567,14 @@
     tbody.innerHTML = '';
     rows.forEach(row => {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${row}</td>`;
+      tr.innerHTML = `<td title="Portfolio holding">${row}</td>`;
       
       cols.forEach(col => {
         const cellData = matrix[row]?.[col];
         const td = document.createElement('td');
         
         if (cellData) {
-          const { signal, conf, final_prob, last, ema, ml, q, sent } = cellData;
+          const { signal, conf, final_prob, last, ema, ml, q, sent, volume_rank } = cellData;
           const cellClass = `grid-cell grid-cell-${signal.toLowerCase()}`;
           
           td.innerHTML = `
@@ -1527,6 +1584,7 @@
                 <div>Signal: ${signal}</div>
                 <div>Confidence: ${(conf * 100).toFixed(1)}%</div>
                 <div>Price: ${fmt(last)}</div>
+                <div>Volume Rank: #${volume_rank || '—'}</div>
                 <div>EMA: ${ema?.toFixed(3) || '—'}</div>
                 <div>ML: ${ml?.toFixed(3) || '—'}</div>
                 <div>Quantum: ${q?.toFixed(3) || '—'}</div>
