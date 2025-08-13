@@ -1,6 +1,11 @@
 [build]
   publish = "web"
 
+[[redirects]]
+  from = "/*"
+  to = "/index_netlify.html"
+  status = 200
+
 [[headers]]
   for = "/*"
   [headers.values]
