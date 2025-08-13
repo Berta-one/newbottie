@@ -574,6 +574,13 @@
     }
   }
 
+  function updateElement(id, text) {
+    const element = document.getElementById(id);
+    if (element) {
+      element.textContent = text;
+    }
+  }
+
   // Element references
   const qChip = document.getElementById('quantum-chip');
   const qBackend = document.getElementById('quantum-backend');
@@ -1033,34 +1040,182 @@
     }
   }
 
+  // Global state for filtering
+  let currentPeriod = '1d';
+  let allTradesData = [];
+
   async function refreshTrades() {
     try {
       const data = await fetchJSON('/trades');
       if (!tradesTable) return;
       
-      tradesData = data.trades || [];
-      const tbody = tradesTable.querySelector('tbody');
-      tbody.innerHTML = '';
-      
-      tradesData.slice(0, 20).forEach(trade => {
-        const row = document.createElement('tr');
-        const sideClass = trade.side?.toLowerCase() === 'buy' ? 'positive' : 'negative';
-        
-        row.innerHTML = `
-          <td>${formatTime(trade.timestamp)}</td>
-          <td class="symbol">${trade.symbol}</td>
-          <td class="${sideClass}">${trade.side}</td>
-          <td>${fmt(trade.quantity)}</td>
-          <td>${fmt(trade.price)}</td>
-          <td>${fmt(trade.quantity * trade.price)}</td>
-        `;
-        tbody.appendChild(row);
-      });
-      
-      updatePerformanceSummary();
+      allTradesData = data.trades || [];
+      updateTradesTable();
+      updateTradeFilters();
+      updatePnLSummary();
     } catch (error) {
       console.error('Trades refresh failed:', error);
     }
+  }
+
+  function updateTradesTable() {
+    if (!tradesTable) return;
+    
+    const tbody = tradesTable.querySelector('tbody');
+    tbody.innerHTML = '';
+    
+    // Sort trades by timestamp (newest first)
+    const sortedTrades = [...allTradesData].sort((a, b) => b.timestamp - a.timestamp);
+    
+    sortedTrades.forEach(trade => {
+      const row = document.createElement('tr');
+      const sideClass = trade.side?.toLowerCase() === 'buy' ? 'trade-buy' : 'trade-sell';
+      const sideTextClass = trade.side?.toLowerCase() === 'buy' ? 'positive' : 'negative';
+      
+      // Calculate P&L impact (sell = positive, buy = negative)
+      const pnlImpact = trade.side?.toLowerCase() === 'sell' ? trade.value : -trade.value;
+      const pnlClass = pnlImpact > 0 ? 'pnl-positive' : 'pnl-negative';
+      
+      row.className = sideClass;
+      row.innerHTML = `
+        <td>${formatTime(trade.timestamp)}</td>
+        <td class="symbol">${trade.symbol}</td>
+        <td class="${sideTextClass}">${trade.side}</td>
+        <td>${fmt(trade.quantity)}</td>
+        <td>$${fmt(trade.price)}</td>
+        <td>$${fmt(trade.value || trade.quantity * trade.price)}</td>
+        <td>${Math.round((trade.confidence || 0) * 100)}%</td>
+        <td class="${pnlClass}">$${fmt(Math.abs(pnlImpact))}</td>
+      `;
+      tbody.appendChild(row);
+    });
+    
+    updatePerformanceSummary();
+  }
+
+  function updateTradeFilters() {
+    const symbolFilter = document.getElementById('symbol-filter');
+    if (symbolFilter) {
+      const symbols = [...new Set(allTradesData.map(t => t.symbol))].sort();
+      symbolFilter.innerHTML = '<option value="">All Symbols</option>';
+      symbols.forEach(symbol => {
+        const option = document.createElement('option');
+        option.value = symbol;
+        option.textContent = symbol;
+        symbolFilter.appendChild(option);
+      });
+    }
+  }
+
+  function updatePnLSummary() {
+    const filteredTrades = filterTradesByPeriod(allTradesData, currentPeriod);
+    const summary = calculateTradingSummary(filteredTrades);
+    
+    updateElement('summary-total-pnl', `$${fmt(summary.totalPnL)}`);
+    updateElement('summary-win-rate', `${summary.winRate.toFixed(1)}%`);
+    updateElement('summary-total-trades', summary.totalTrades.toString());
+    updateElement('summary-avg-size', `$${fmt(summary.avgTradeSize)}`);
+    updateElement('summary-best-trade', `$${fmt(summary.bestTrade.value)}`);
+    updateElement('summary-worst-trade', `$${fmt(Math.abs(summary.worstTrade.value))}`);
+    
+    // Update CSS classes for color coding
+    const totalPnlElement = document.getElementById('summary-total-pnl');
+    if (totalPnlElement) {
+      totalPnlElement.className = `metric-value ${summary.totalPnL > 0 ? 'pnl-positive' : summary.totalPnL < 0 ? 'pnl-negative' : 'pnl-neutral'}`;
+    }
+  }
+
+  function filterTradesByPeriod(trades, period) {
+    if (period === 'all') return trades;
+    
+    const now = Date.now() / 1000;
+    const periodSeconds = {
+      '1d': 86400,
+      '7d': 604800,
+      '30d': 2592000,
+      '90d': 7776000,
+      '180d': 15552000
+    };
+    
+    const cutoff = now - (periodSeconds[period] || 86400);
+    return trades.filter(trade => trade.timestamp >= cutoff);
+  }
+
+  function calculateTradingSummary(trades) {
+    if (!trades.length) {
+      return {
+        totalPnL: 0,
+        winRate: 0,
+        totalTrades: 0,
+        avgTradeSize: 0,
+        bestTrade: { value: 0, symbol: '--' },
+        worstTrade: { value: 0, symbol: '--' }
+      };
+    }
+    
+    const buyTrades = trades.filter(t => t.side === 'BUY');
+    const sellTrades = trades.filter(t => t.side === 'SELL');
+    
+    const totalBuyValue = buyTrades.reduce((sum, t) => sum + (t.value || 0), 0);
+    const totalSellValue = sellTrades.reduce((sum, t) => sum + (t.value || 0), 0);
+    const totalPnL = totalSellValue - totalBuyValue;
+    
+    // Calculate individual trade P&L impacts
+    const tradeImpacts = trades.map(trade => ({
+      ...trade,
+      impact: trade.side === 'SELL' ? trade.value : -trade.value
+    }));
+    
+    const positiveImpacts = tradeImpacts.filter(t => t.impact > 0);
+    const winRate = positiveImpacts.length / trades.length * 100;
+    
+    const avgTradeSize = trades.reduce((sum, t) => sum + (t.value || 0), 0) / trades.length;
+    
+    const bestTrade = tradeImpacts.reduce((best, current) => 
+      current.impact > best.impact ? current : best, 
+      { impact: 0, symbol: '--' }
+    );
+    
+    const worstTrade = tradeImpacts.reduce((worst, current) => 
+      current.impact < worst.impact ? current : worst, 
+      { impact: 0, symbol: '--' }
+    );
+    
+    return {
+      totalPnL,
+      winRate,
+      totalTrades: trades.length,
+      avgTradeSize,
+      bestTrade: { value: bestTrade.impact, symbol: bestTrade.symbol },
+      worstTrade: { value: worstTrade.impact, symbol: worstTrade.symbol }
+    };
+  }
+
+  function filterTrades() {
+    const symbolFilter = document.getElementById('symbol-filter');
+    const sideFilter = document.getElementById('side-filter');
+    const searchFilter = document.getElementById('search-filter');
+    
+    if (!tradesTable) return;
+    
+    const symbolValue = symbolFilter ? symbolFilter.value : '';
+    const sideValue = sideFilter ? sideFilter.value : '';
+    const searchValue = searchFilter ? searchFilter.value.toLowerCase() : '';
+    
+    const rows = tradesTable.querySelectorAll('tbody tr');
+    
+    rows.forEach(row => {
+      const cells = row.cells;
+      const symbol = cells[1]?.textContent || '';
+      const side = cells[2]?.textContent || '';
+      const searchText = row.textContent.toLowerCase();
+      
+      const symbolMatch = !symbolValue || symbol === symbolValue;
+      const sideMatch = !sideValue || side === sideValue;
+      const searchMatch = !searchValue || searchText.includes(searchValue);
+      
+      row.style.display = (symbolMatch && sideMatch && searchMatch) ? '' : 'none';
+    });
   }
 
   async function refreshLogs() {
@@ -1303,6 +1458,25 @@
       refreshAuditLogs();
     }
   });
+
+  // P&L Period Selection Event Listeners
+  document.querySelectorAll('.period-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      currentPeriod = this.dataset.period;
+      updatePnLSummary();
+    });
+  });
+
+  // Trade Filter Event Listeners
+  const symbolFilter = document.getElementById('symbol-filter');
+  const sideFilter = document.getElementById('side-filter');
+  const searchFilter = document.getElementById('search-filter');
+  
+  if (symbolFilter) symbolFilter.addEventListener('change', filterTrades);
+  if (sideFilter) sideFilter.addEventListener('change', filterTrades);
+  if (searchFilter) searchFilter.addEventListener('input', filterTrades);
 
   // Add this function to ensure all dashboard elements load properly
   function ensureElementsExist() {

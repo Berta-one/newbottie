@@ -333,6 +333,63 @@
     background: rgba(100, 255, 218, 0.05);
   }
   
+  /* P&L Summary Styles */
+  .period-btn {
+    background: #3a4553;
+    color: #fff;
+    border: 1px solid #64ffda;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 12px;
+  }
+  
+  .period-btn:hover {
+    background: #64ffda;
+    color: #0c1426;
+  }
+  
+  .period-btn.active {
+    background: #64ffda;
+    color: #0c1426;
+    font-weight: bold;
+  }
+  
+  .summary-metric {
+    background: #2a3441;
+    border: 1px solid #3a4553;
+    border-radius: 6px;
+    padding: 12px;
+    text-align: center;
+  }
+  
+  .metric-label {
+    font-size: 11px;
+    color: #8892b0;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+  
+  .metric-value {
+    font-size: 18px;
+    font-weight: bold;
+  }
+  
+  .pnl-positive { color: #4ade80; }
+  .pnl-negative { color: #f87171; }
+  .pnl-neutral { color: #64ffda; }
+  
+  /* Trade row styling */
+  .trade-buy { 
+    background: rgba(74, 222, 128, 0.1); 
+    border-left: 3px solid #4ade80;
+  }
+  .trade-sell { 
+    background: rgba(248, 113, 113, 0.1); 
+    border-left: 3px solid #f87171;
+  }
+  
   .symbol {
     font-family: monospace;
     font-weight: 600;
@@ -943,12 +1000,64 @@
         </div>
       </div>
 
-      <!-- Recent Trades -->
-      <div class="card">
+      <!-- P&L Trading Summary -->
+      <div class="card" style="grid-column: 1 / -1;">
         <div class="card-header">
-          <h3>🔄 Recent Trades</h3>
+          <h3>📊 Trading Performance Summary</h3>
+          <div style="display: flex; gap: 8px;">
+            <button class="period-btn active" data-period="1d">1D</button>
+            <button class="period-btn" data-period="7d">7D</button>
+            <button class="period-btn" data-period="30d">1M</button>
+            <button class="period-btn" data-period="90d">3M</button>
+            <button class="period-btn" data-period="180d">6M</button>
+            <button class="period-btn" data-period="all">All</button>
+          </div>
         </div>
-        <div id="trades-panel">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; margin-bottom: 20px;">
+          <div class="summary-metric">
+            <div class="metric-label">Total P&L</div>
+            <div class="metric-value pnl-neutral" id="summary-total-pnl">$0.00</div>
+          </div>
+          <div class="summary-metric">
+            <div class="metric-label">Win Rate</div>
+            <div class="metric-value" id="summary-win-rate">0%</div>
+          </div>
+          <div class="summary-metric">
+            <div class="metric-label">Total Trades</div>
+            <div class="metric-value" id="summary-total-trades">0</div>
+          </div>
+          <div class="summary-metric">
+            <div class="metric-label">Avg Trade Size</div>
+            <div class="metric-value" id="summary-avg-size">$0.00</div>
+          </div>
+          <div class="summary-metric">
+            <div class="metric-label">Best Trade</div>
+            <div class="metric-value pnl-positive" id="summary-best-trade">$0.00</div>
+          </div>
+          <div class="summary-metric">
+            <div class="metric-label">Worst Trade</div>
+            <div class="metric-value pnl-negative" id="summary-worst-trade">$0.00</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Trades -->
+      <div class="card" style="grid-column: 1 / -1;">
+        <div class="card-header">
+          <h3>🔄 Complete Trade History</h3>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <select id="symbol-filter" style="background: #2a3441; color: #fff; border: 1px solid #64ffda; padding: 4px 8px; border-radius: 4px;">
+              <option value="">All Symbols</option>
+            </select>
+            <select id="side-filter" style="background: #2a3441; color: #fff; border: 1px solid #64ffda; padding: 4px 8px; border-radius: 4px;">
+              <option value="">All Sides</option>
+              <option value="BUY">Buy Only</option>
+              <option value="SELL">Sell Only</option>
+            </select>
+            <input type="text" id="search-filter" placeholder="Search..." style="background: #2a3441; color: #fff; border: 1px solid #64ffda; padding: 4px 8px; border-radius: 4px; font-size: 12px;">
+          </div>
+        </div>
+        <div style="max-height: 400px; overflow-y: auto; border: 1px solid #3a4553; border-radius: 6px;">
           <table id="trades-table" class="data-table">
             <thead>
               <tr>
@@ -958,6 +1067,8 @@
                 <th>Quantity</th>
                 <th>Price</th>
                 <th>Value</th>
+                <th>Confidence</th>
+                <th>P&L Impact</th>
               </tr>
             </thead>
             <tbody>

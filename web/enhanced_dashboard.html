@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Bottie Enhanced Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  * { box-sizing: border-box; }
+  body { 
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+    background: #0c1426; 
+    color: #ffffff;
+    margin: 0; 
+    padding: 0; 
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  
+  header { 
+    background: linear-gradient(135deg, #1a2332 0%, #2a3441 100%);
+    color: #fff; 
+    padding: 16px 24px; 
+    font-size: 20px; 
+    border-bottom: 2px solid #64ffda;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  }
+  
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  
+  .header-logo {
+    font-size: 24px;
+    font-weight: bold;
+    color: #64ffda;
+  }
+  
+  .header-status {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    font-size: 12px;
+  }
+  
+  .status-badge {
+    background: #2a3441;
+    color: #64ffda;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-weight: 600;
+    border: 1px solid #64ffda;
+    box-shadow: 0 0 10px rgba(100, 255, 218, 0.3);
+  }
+  
+  .container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 24px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  
+  .card {
+    background: linear-gradient(145deg, #1a2332 0%, #2a3441 100%);
+    border: 1px solid #3a4553;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    backdrop-filter: blur(10px);
+  }
+  
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    border-bottom: 1px solid #3a4553;
+    padding-bottom: 12px;
+  }
+  
+  .card-header h3 {
+    margin: 0;
+    font-size: 18px;
+    color: #64ffda;
+    font-weight: 600;
+  }
+  
+  .card-full-width {
+    grid-column: 1 / -1;
+  }
+  
+  /* P&L Summary Styles */
+  .pnl-summary {
+    background: linear-gradient(135deg, #2a3441 0%, #1a2332 100%);
+    border: 2px solid #64ffda;
+    box-shadow: 0 0 20px rgba(100, 255, 218, 0.2);
+  }
+  
+  .pnl-controls {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  
+  .period-btn {
+    background: #3a4553;
+    color: #fff;
+    border: 1px solid #64ffda;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  
+  .period-btn:hover {
+    background: #64ffda;
+    color: #0c1426;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(100, 255, 218, 0.3);
+  }
+  
+  .period-btn.active {
+    background: #64ffda;
+    color: #0c1426;
+    font-weight: bold;
+  }
+  
+  .pnl-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  
+  .pnl-metric {
+    background: #1a2332;
+    border: 1px solid #3a4553;
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+  }
+  
+  .pnl-metric-label {
+    font-size: 12px;
+    color: #8892b0;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+  
+  .pnl-metric-value {
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 4px;
+  }
+  
+  .pnl-positive { color: #4ade80; }
+  .pnl-negative { color: #f87171; }
+  .pnl-neutral { color: #64ffda; }
+  
+  .pnl-metric-change {
+    font-size: 11px;
+    color: #8892b0;
+  }
+  
+  /* Trades Table Styles */
+  .trades-container {
+    background: #1a2332;
+    border-radius: 8px;
+    border: 1px solid #3a4553;
+  }
+  
+  .trades-header {
+    display: flex;
+    justify-content: between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid #3a4553;
+    background: #2a3441;
+  }
+  
+  .trades-controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+  
+  .trades-filter {
+    background: #3a4553;
+    color: #fff;
+    border: 1px solid #64ffda;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  
+  .trades-table-wrapper {
+    max-height: 400px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #64ffda #2a3441;
+  }
+  
+  .trades-table-wrapper::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  .trades-table-wrapper::-webkit-scrollbar-track {
+    background: #2a3441;
+  }
+  
+  .trades-table-wrapper::-webkit-scrollbar-thumb {
+    background: #64ffda;
+    border-radius: 4px;
+  }
+  
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  
+  .data-table th {
+    background: #2a3441;
+    color: #64ffda;
+    padding: 12px 8px;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 1px solid #3a4553;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  
+  .data-table td {
+    padding: 10px 8px;
+    border-bottom: 1px solid #3a4553;
+    transition: background-color 0.2s ease;
+  }
+  
+  .data-table tbody tr:hover {
+    background: #2a3441;
+  }
+  
+  .trade-buy {
+    background: rgba(74, 222, 128, 0.1);
+    border-left: 3px solid #4ade80;
+  }
+  
+  .trade-sell {
+    background: rgba(248, 113, 113, 0.1);
+    border-left: 3px solid #f87171;
+  }
+  
+  .trade-side-buy {
+    color: #4ade80;
+    font-weight: bold;
+  }
+  
+  .trade-side-sell {
+    color: #f87171;
+    font-weight: bold;
+  }
+  
+  /* Chart Styles */
+  .equity-display {
+    font-size: 36px;
+    font-weight: bold;
+    text-align: center;
+    margin: 16px 0;
+    color: #64ffda;
+    text-shadow: 0 0 10px rgba(100, 255, 218, 0.5);
+  }
+  
+  .chart-container {
+    background: #1a2332;
+    border-radius: 8px;
+    border: 1px solid #3a4553;
+    padding: 16px;
+    margin-top: 16px;
+  }
+  
+  /* Signal Grid Styles */
+  .signals-table-wrapper {
+    max-height: 300px;
+    overflow-y: auto;
+  }
+  
+  .signal-buy { background: rgba(74, 222, 128, 0.2); color: #4ade80; }
+  .signal-sell { background: rgba(248, 113, 113, 0.2); color: #f87171; }
+  .signal-hold { background: rgba(100, 255, 218, 0.1); color: #64ffda; }
+  
+  /* Responsive Design */
+  @media (max-width: 768px) {
+    .container {
+      grid-template-columns: 1fr;
+      padding: 16px;
+      gap: 16px;
+    }
+    
+    .header {
+      padding: 12px 16px;
+      font-size: 16px;
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    .pnl-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .pnl-controls {
+      justify-content: center;
+    }
+    
+    .trades-controls {
+      flex-direction: column;
+      gap: 8px;
+    }
+  }
+  
+  /* Loading Animation */
+  .loading {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(100, 255, 218, 0.3);
+    border-radius: 50%;
+    border-top-color: #64ffda;
+    animation: spin 1s ease-in-out infinite;
+  }
+  
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  
+  /* Tooltips */
+  .tooltip {
+    position: relative;
+    cursor: help;
+  }
+  
+  .tooltip:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1a2332;
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    white-space: nowrap;
+    z-index: 100;
+    border: 1px solid #64ffda;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="header-logo">🤖 Bottie</div>
+    <div>Enhanced Trading Dashboard</div>
+  </div>
+  <div class="header-status">
+    <div class="status-badge" id="connection-status">⚡ Connected</div>
+    <div class="status-badge" id="trading-status">📊 Active</div>
+    <div style="font-size: 11px; color: #8892b0;" id="last-update">Last: --</div>
+  </div>
+</header>
+
+<div class="container">
+  
+  <!-- P&L Summary Card (Full Width) -->
+  <div class="card card-full-width pnl-summary">
+    <div class="card-header">
+      <h3>📊 Trading Performance Summary</h3>
+      <div class="loading" id="pnl-loading" style="display: none;"></div>
+    </div>
+    
+    <!-- Time Period Controls -->
+    <div class="pnl-controls">
+      <button class="period-btn active" data-period="1d">Today</button>
+      <button class="period-btn" data-period="7d">Week</button>
+      <button class="period-btn" data-period="30d">Month</button>
+      <button class="period-btn" data-period="90d">3 Months</button>
+      <button class="period-btn" data-period="180d">6 Months</button>
+      <button class="period-btn" data-period="all">All Time</button>
+    </div>
+    
+    <!-- P&L Metrics Grid -->
+    <div class="pnl-grid" id="pnl-metrics">
+      <div class="pnl-metric">
+        <div class="pnl-metric-label">Total P&L</div>
+        <div class="pnl-metric-value pnl-neutral" id="total-pnl">$0.00</div>
+        <div class="pnl-metric-change" id="total-pnl-change">--</div>
+      </div>
+      
+      <div class="pnl-metric">
+        <div class="pnl-metric-label">Win Rate</div>
+        <div class="pnl-metric-value pnl-neutral" id="win-rate">0%</div>
+        <div class="pnl-metric-change" id="win-rate-change">--</div>
+      </div>
+      
+      <div class="pnl-metric">
+        <div class="pnl-metric-label">Total Trades</div>
+        <div class="pnl-metric-value pnl-neutral" id="total-trades">0</div>
+        <div class="pnl-metric-change" id="total-trades-change">--</div>
+      </div>
+      
+      <div class="pnl-metric">
+        <div class="pnl-metric-label">Avg Trade Size</div>
+        <div class="pnl-metric-value pnl-neutral" id="avg-trade-size">$0.00</div>
+        <div class="pnl-metric-change" id="avg-trade-size-change">--</div>
+      </div>
+      
+      <div class="pnl-metric">
+        <div class="pnl-metric-label">Best Trade</div>
+        <div class="pnl-metric-value pnl-positive" id="best-trade">$0.00</div>
+        <div class="pnl-metric-change" id="best-trade-symbol">--</div>
+      </div>
+      
+      <div class="pnl-metric">
+        <div class="pnl-metric-label">Worst Trade</div>
+        <div class="pnl-metric-value pnl-negative" id="worst-trade">$0.00</div>
+        <div class="pnl-metric-change" id="worst-trade-symbol">--</div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Equity Chart -->
+  <div class="card">
+    <div class="card-header">
+      <h3>📈 Portfolio Value</h3>
+      <div id="equity-change" class="pnl-neutral">+$0.00 (0%)</div>
+    </div>
+    <div class="equity-display" id="current-equity">$0.00</div>
+    <div class="chart-container">
+      <canvas id="equity-canvas" width="400" height="200"></canvas>
+    </div>
+  </div>
+  
+  <!-- Recent Trading Activity -->
+  <div class="card">
+    <div class="card-header">
+      <h3>⚡ Live Signals</h3>
+      <div id="signals-count">0 active</div>
+    </div>
+    <div class="signals-table-wrapper">
+      <table class="data-table" id="signals-table">
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Signal</th>
+            <th>Confidence</th>
+            <th>Price</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Filled by JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+  
+  <!-- All Trades Table (Full Width) -->
+  <div class="card card-full-width">
+    <div class="card-header">
+      <h3>📋 Complete Trade History</h3>
+      <div class="trades-controls">
+        <select class="trades-filter" id="symbol-filter">
+          <option value="">All Symbols</option>
+        </select>
+        <select class="trades-filter" id="side-filter">
+          <option value="">All Sides</option>
+          <option value="buy">Buy Only</option>
+          <option value="sell">Sell Only</option>
+        </select>
+        <input type="text" class="trades-filter" id="search-filter" placeholder="Search...">
+      </div>
+    </div>
+    
+    <div class="trades-container">
+      <div class="trades-table-wrapper" id="trades-scroll">
+        <table class="data-table" id="all-trades-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Symbol</th>
+              <th>Side</th>
+              <th>Quantity</th>
+              <th>Price</th>
+              <th>Value</th>
+              <th>Confidence</th>
+              <th>P&L Impact</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Filled by JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  
+</div>
+
+<script>
+// Configuration
+const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+  ? 'http://localhost:8000' 
+  : 'https://bottie-1.onrender.com';
+
+// Global state
+let currentPeriod = '1d';
+let allTrades = [];
+let allSignals = [];
+let equityData = [];
+let refreshInterval;
+
+// Initialize dashboard
+document.addEventListener('DOMContentLoaded', function() {
+  initializeEventListeners();
+  loadDashboardData();
+  startAutoRefresh();
+});
+
+// Event Listeners
+function initializeEventListeners() {
+  // Period selection buttons
+  document.querySelectorAll('.period-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      currentPeriod = this.dataset.period;
+      updatePnLSummary();
+    });
+  });
+  
+  // Trade filters
+  document.getElementById('symbol-filter').addEventListener('change', filterTrades);
+  document.getElementById('side-filter').addEventListener('change', filterTrades);
+  document.getElementById('search-filter').addEventListener('input', filterTrades);
+}
+
+// Data loading functions
+async function loadDashboardData() {
+  try {
+    updateConnectionStatus('loading');
+    
+    // Load all data in parallel
+    const [tradesRes, signalsRes, equityRes] = await Promise.all([
+      fetch(`${API_BASE}/trades`),
+      fetch(`${API_BASE}/signals`),
+      fetch(`${API_BASE}/status`)
+    ]);
+    
+    if (tradesRes.ok) {
+      const tradesData = await tradesRes.json();
+      allTrades = tradesData.trades || [];
+      updateTradesTable();
+      updateTradeFilters();
+      updatePnLSummary();
+    }
+    
+    if (signalsRes.ok) {
+      const signalsData = await signalsRes.json();
+      allSignals = signalsData.signals || [];
+      updateSignalsTable();
+    }
+    
+    if (equityRes.ok) {
+      const statusData = await equityRes.json();
+      updateEquityDisplay(statusData);
+      updateEquityChart(statusData.equity_series || []);
+    }
+    
+    updateConnectionStatus('connected');
+    updateLastUpdate();
+    
+  } catch (error) {
+    console.error('Failed to load dashboard data:', error);
+    updateConnectionStatus('error');
+  }
+}
+
+// P&L Summary functions
+function updatePnLSummary() {
+  const filteredTrades = filterTradesByPeriod(allTrades, currentPeriod);
+  const summary = calculateTradingSummary(filteredTrades);
+  
+  document.getElementById('total-pnl').textContent = formatCurrency(summary.totalPnL);
+  document.getElementById('total-pnl').className = `pnl-metric-value ${getPnLClass(summary.totalPnL)}`;
+  
+  document.getElementById('win-rate').textContent = `${summary.winRate.toFixed(1)}%`;
+  document.getElementById('win-rate').className = `pnl-metric-value ${summary.winRate >= 50 ? 'pnl-positive' : 'pnl-negative'}`;
+  
+  document.getElementById('total-trades').textContent = summary.totalTrades.toString();
+  document.getElementById('avg-trade-size').textContent = formatCurrency(summary.avgTradeSize);
+  document.getElementById('best-trade').textContent = formatCurrency(summary.bestTrade.value);
+  document.getElementById('best-trade-symbol').textContent = summary.bestTrade.symbol;
+  document.getElementById('worst-trade').textContent = formatCurrency(summary.worstTrade.value);
+  document.getElementById('worst-trade-symbol').textContent = summary.worstTrade.symbol;
+}
+
+function filterTradesByPeriod(trades, period) {
+  if (period === 'all') return trades;
+  
+  const now = Date.now() / 1000;
+  const periodSeconds = {
+    '1d': 86400,
+    '7d': 604800,
+    '30d': 2592000,
+    '90d': 7776000,
+    '180d': 15552000
+  };
+  
+  const cutoff = now - (periodSeconds[period] || 86400);
+  return trades.filter(trade => trade.timestamp >= cutoff);
+}
+
+function calculateTradingSummary(trades) {
+  if (!trades.length) {
+    return {
+      totalPnL: 0,
+      winRate: 0,
+      totalTrades: 0,
+      avgTradeSize: 0,
+      bestTrade: { value: 0, symbol: '--' },
+      worstTrade: { value: 0, symbol: '--' }
+    };
+  }
+  
+  const buyTrades = trades.filter(t => t.side === 'BUY');
+  const sellTrades = trades.filter(t => t.side === 'SELL');
+  
+  const totalBuyValue = buyTrades.reduce((sum, t) => sum + (t.value || 0), 0);
+  const totalSellValue = sellTrades.reduce((sum, t) => sum + (t.value || 0), 0);
+  const totalPnL = totalSellValue - totalBuyValue;
+  
+  // Calculate individual trade P&L impacts
+  const tradeImpacts = trades.map(trade => ({
+    ...trade,
+    impact: trade.side === 'SELL' ? trade.value : -trade.value
+  }));
+  
+  const positiveImpacts = tradeImpacts.filter(t => t.impact > 0);
+  const winRate = positiveImpacts.length / trades.length * 100;
+  
+  const avgTradeSize = trades.reduce((sum, t) => sum + (t.value || 0), 0) / trades.length;
+  
+  const bestTrade = tradeImpacts.reduce((best, current) => 
+    current.impact > best.impact ? current : best, 
+    { impact: 0, symbol: '--' }
+  );
+  
+  const worstTrade = tradeImpacts.reduce((worst, current) => 
+    current.impact < worst.impact ? current : worst, 
+    { impact: 0, symbol: '--' }
+  );
+  
+  return {
+    totalPnL,
+    winRate,
+    totalTrades: trades.length,
+    avgTradeSize,
+    bestTrade: { value: bestTrade.impact, symbol: bestTrade.symbol },
+    worstTrade: { value: worstTrade.impact, symbol: worstTrade.symbol }
+  };
+}
+
+// Trades table functions
+function updateTradesTable() {
+  const tbody = document.querySelector('#all-trades-table tbody');
+  tbody.innerHTML = '';
+  
+  const sortedTrades = [...allTrades].sort((a, b) => b.timestamp - a.timestamp);
+  
+  sortedTrades.forEach(trade => {
+    const row = document.createElement('tr');
+    row.className = trade.side === 'BUY' ? 'trade-buy' : 'trade-sell';
+    
+    const impact = trade.side === 'SELL' ? trade.value : -trade.value;
+    
+    row.innerHTML = `
+      <td>${formatTime(trade.timestamp)}</td>
+      <td>${trade.symbol}</td>
+      <td class="trade-side-${trade.side.toLowerCase()}">${trade.side}</td>
+      <td>${formatNumber(trade.quantity)}</td>
+      <td>${formatCurrency(trade.price)}</td>
+      <td>${formatCurrency(trade.value)}</td>
+      <td>${formatPercent(trade.confidence || 0)}</td>
+      <td class="${getPnLClass(impact)}">${formatCurrency(impact)}</td>
+    `;
+    
+    tbody.appendChild(row);
+  });
+}
+
+function updateTradeFilters() {
+  // Update symbol filter
+  const symbolFilter = document.getElementById('symbol-filter');
+  const symbols = [...new Set(allTrades.map(t => t.symbol))].sort();
+  
+  symbolFilter.innerHTML = '<option value="">All Symbols</option>';
+  symbols.forEach(symbol => {
+    const option = document.createElement('option');
+    option.value = symbol;
+    option.textContent = symbol;
+    symbolFilter.appendChild(option);
+  });
+}
+
+function filterTrades() {
+  const symbolFilter = document.getElementById('symbol-filter').value;
+  const sideFilter = document.getElementById('side-filter').value;
+  const searchFilter = document.getElementById('search-filter').value.toLowerCase();
+  
+  const rows = document.querySelectorAll('#all-trades-table tbody tr');
+  
+  rows.forEach(row => {
+    const cells = row.cells;
+    const symbol = cells[1].textContent;
+    const side = cells[2].textContent.toLowerCase();
+    const searchText = row.textContent.toLowerCase();
+    
+    const symbolMatch = !symbolFilter || symbol === symbolFilter;
+    const sideMatch = !sideFilter || side === sideFilter;
+    const searchMatch = !searchFilter || searchText.includes(searchFilter);
+    
+    row.style.display = (symbolMatch && sideMatch && searchMatch) ? '' : 'none';
+  });
+}
+
+// Signals table functions
+function updateSignalsTable() {
+  const tbody = document.querySelector('#signals-table tbody');
+  tbody.innerHTML = '';
+  
+  const recentSignals = allSignals.slice(-10);
+  document.getElementById('signals-count').textContent = `${allSignals.length} total`;
+  
+  recentSignals.forEach(signal => {
+    const row = document.createElement('tr');
+    row.className = `signal-${signal.signal.toLowerCase()}`;
+    
+    row.innerHTML = `
+      <td>${signal.symbol}</td>
+      <td class="signal-${signal.signal.toLowerCase()}">${signal.signal}</td>
+      <td>${formatPercent(signal.conf)}</td>
+      <td>$${(signal.last_px || 0).toFixed(4)}</td>
+    `;
+    
+    tbody.appendChild(row);
+  });
+}
+
+// Equity chart functions
+function updateEquityDisplay(statusData) {
+  const equity = statusData.equity || 0;
+  document.getElementById('current-equity').textContent = formatCurrency(equity);
+  
+  // Calculate daily change
+  const yesterdayEquity = statusData.equity_yesterday || equity;
+  const change = equity - yesterdayEquity;
+  const changePercent = yesterdayEquity > 0 ? (change / yesterdayEquity) * 100 : 0;
+  
+  const changeElement = document.getElementById('equity-change');
+  changeElement.textContent = `${change >= 0 ? '+' : ''}${formatCurrency(change)} (${changePercent.toFixed(2)}%)`;
+  changeElement.className = getPnLClass(change);
+}
+
+function updateEquityChart(equitySeriesData) {
+  const canvas = document.getElementById('equity-canvas');
+  const ctx = canvas.getContext('2d');
+  
+  if (!equitySeriesData || equitySeriesData.length === 0) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#8892b0';
+    ctx.font = '14px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('No equity data available', canvas.width / 2, canvas.height / 2);
+    return;
+  }
+  
+  // Clear canvas
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // Prepare data
+  const data = equitySeriesData.slice(-100); // Last 100 points
+  const values = data.map(d => d.v);
+  const minValue = Math.min(...values);
+  const maxValue = Math.max(...values);
+  const range = maxValue - minValue || 1;
+  
+  // Draw grid
+  ctx.strokeStyle = '#3a4553';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 5; i++) {
+    const y = (canvas.height / 5) * i;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(canvas.width, y);
+    ctx.stroke();
+  }
+  
+  // Draw equity line
+  ctx.strokeStyle = '#64ffda';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  
+  data.forEach((point, index) => {
+    const x = (canvas.width / (data.length - 1)) * index;
+    const y = canvas.height - ((point.v - minValue) / range) * canvas.height;
+    
+    if (index === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
+  });
+  
+  ctx.stroke();
+  
+  // Draw area under curve
+  ctx.fillStyle = 'rgba(100, 255, 218, 0.1)';
+  ctx.lineTo(canvas.width, canvas.height);
+  ctx.lineTo(0, canvas.height);
+  ctx.closePath();
+  ctx.fill();
+}
+
+// Utility functions
+function formatCurrency(value) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(value);
+}
+
+function formatNumber(value) {
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 6
+  }).format(value);
+}
+
+function formatPercent(value) {
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+function formatTime(timestamp) {
+  return new Date(timestamp * 1000).toLocaleString();
+}
+
+function getPnLClass(value) {
+  if (value > 0) return 'pnl-positive';
+  if (value < 0) return 'pnl-negative';
+  return 'pnl-neutral';
+}
+
+function updateConnectionStatus(status) {
+  const statusElement = document.getElementById('connection-status');
+  switch(status) {
+    case 'connected':
+      statusElement.textContent = '⚡ Connected';
+      statusElement.style.background = '#4ade80';
+      statusElement.style.color = '#0c1426';
+      break;
+    case 'loading':
+      statusElement.textContent = '🔄 Loading...';
+      statusElement.style.background = '#f59e0b';
+      statusElement.style.color = '#0c1426';
+      break;
+    case 'error':
+      statusElement.textContent = '❌ Error';
+      statusElement.style.background = '#f87171';
+      statusElement.style.color = '#0c1426';
+      break;
+  }
+}
+
+function updateLastUpdate() {
+  document.getElementById('last-update').textContent = `Last: ${new Date().toLocaleTimeString()}`;
+}
+
+function startAutoRefresh() {
+  // Refresh every 30 seconds
+  refreshInterval = setInterval(loadDashboardData, 30000);
+}
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', function() {
+  if (refreshInterval) {
+    clearInterval(refreshInterval);
+  }
+});
+</script>
+
+</body>
+</html>
