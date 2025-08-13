@@ -1076,64 +1076,73 @@ async def logout(request: Request):
 
 # ───────────────────────────────── DEBUG ENDPOINTS (TEMPORARY)
 @app.get("/debug/auth")
-async def debug_auth_info():
+def debug_auth_info():
     """Debug endpoint to check authentication setup"""
     return {
+        "users_in_db": list(USERS_DB.keys()),
         "environment_variables": {
-            "SUPERUSER_PASSWORD": SUPERUSER_PASSWORD,
-            "ADMIN_PASSWORD": ADMIN_PASSWORD,
-            "JWT_SECRET_KEY": JWT_SECRET_KEY[:10] + "...",
-        },
-        "users_in_db": {
-            username: {
-                "username": user["username"],
-                "role": user["role"], 
-                "hashed_password": user["hashed_password"][:20] + "...",
-                "created_at": user["created_at"].isoformat(),
-                "last_login": user["last_login"].isoformat() if user["last_login"] else None
-            } for username, user in USERS_DB.items()
+            "ADMIN_PASSWORD": os.getenv("ADMIN_PASSWORD", "NOT_SET"),
+            "SUPERUSER_PASSWORD": os.getenv("SUPERUSER_PASSWORD", "NOT_SET"),
         },
         "password_verification_test": {
-            "admin_password_verify": pwd_context.verify(ADMIN_PASSWORD, USERS_DB["admin"]["hashed_password"]),
-            "superuser_password_verify": pwd_context.verify(SUPERUSER_PASSWORD, USERS_DB["superuser"]["hashed_password"]),
+            "admin_password_verify": verify_password("Diego1234!", USERS_DB.get("admin", {}).get("hashed_password", "")),
+            "superuser_password_verify": verify_password("Lenny106667!", USERS_DB.get("superuser", {}).get("hashed_password", "")),
+        },
+        "user_details": {
+            user: {
+                "role": data.get("role"),
+                "created_at": str(data.get("created_at")),
+                "hash_preview": data.get("hashed_password", "")[:20] + "..."
+            }
+            for user, data in USERS_DB.items()
         }
     }
 
 @app.post("/debug/test-login")
-async def debug_test_login(test_user: User):
-    """Debug endpoint to test login process step by step"""
-    username = test_user.username
-    password = test_user.password
-    
-    debug_info = {
-        "provided_credentials": {
-            "username": username,
-            "password": password
-        },
-        "user_lookup": {
-            "user_exists": username in USERS_DB,
-            "user_data": USERS_DB.get(username, {}).get("username", "NOT_FOUND") if username in USERS_DB else "USER_NOT_FOUND"
-        }
-    }
-    
-    if username in USERS_DB:
-        user = USERS_DB[username]
-        stored_hash = user["hashed_password"]
+async def debug_test_login(request: Request):
+    """Test login with detailed debugging"""
+    try:
+        payload = await request.json()
+        username = payload.get("username")
+        password = payload.get("password")
         
-        debug_info["password_verification"] = {
-            "stored_hash": stored_hash[:20] + "...",
-            "password_verify_result": pwd_context.verify(password, stored_hash),
-            "manual_hash_check": stored_hash == pwd_context.hash(password),  # This should be False - different salts
-        }
+        # Step 1: User lookup
+        user_exists = username in USERS_DB
+        user_data = USERS_DB.get(username)
         
-        # Test authentication function
+        # Step 2: Password verification
+        password_verify_result = False
+        if user_data:
+            password_verify_result = verify_password(password, user_data["hashed_password"])
+        
+        # Step 3: Full authentication test
         auth_result = authenticate_user(username, password)
-        debug_info["authenticate_user_result"] = {
-            "success": bool(auth_result),
-            "user_data": auth_result if auth_result else "AUTHENTICATION_FAILED"
+        
+        return {
+            "username": username,
+            "password_length": len(password),
+            "user_lookup": {
+                "user_exists": user_exists,
+                "user_role": user_data.get("role") if user_data else None,
+                "hash_preview": user_data.get("hashed_password", "")[:20] + "..." if user_data else None
+            },
+            "password_verification": {
+                "password_verify_result": password_verify_result,
+                "test_passwords": {
+                    "Diego1234!": verify_password("Diego1234!", user_data["hashed_password"]) if user_data else False,
+                    "Lenny106667!": verify_password("Lenny106667!", user_data["hashed_password"]) if user_data else False,
+                    "AdminPass456!": verify_password("AdminPass456!", user_data["hashed_password"]) if user_data else False,
+                    "admin": verify_password("admin", user_data["hashed_password"]) if user_data else False,
+                }
+            },
+            "authenticate_user_result": {
+                "success": bool(auth_result),
+                "user_data": auth_result if auth_result else None
+            }
         }
-    
-    return debug_info
+        
+    except Exception as e:
+        return {"error": str(e), "traceback": str(e.__class__.__name__)}
 
 @app.post("/debug/test-login-raw")
 async def debug_test_login_raw(request: Request):
@@ -1176,22 +1185,31 @@ async def debug_test_login_raw(request: Request):
         return {"error": f"Failed to parse request: {str(e)}"}
 
 @app.post("/debug/reset-passwords")
-async def debug_reset_passwords():
-    """Debug endpoint to force reset passwords"""
+def debug_reset_passwords():
+    """Reset passwords to known values for debugging"""
     global USERS_DB
     
-    # Re-hash passwords from environment variables
-    USERS_DB["superuser"]["hashed_password"] = pwd_context.hash(SUPERUSER_PASSWORD)
-    USERS_DB["admin"]["hashed_password"] = pwd_context.hash(ADMIN_PASSWORD)
+    # Use environment variables or hardcoded test values
+    admin_password = os.getenv("ADMIN_PASSWORD", "Diego1234!")
+    superuser_password = os.getenv("SUPERUSER_PASSWORD", "Lenny106667!")
+    
+    # Recreate users with fresh password hashes
+    USERS_DB["admin"]["hashed_password"] = pwd_context.hash(admin_password)
+    USERS_DB["superuser"]["hashed_password"] = pwd_context.hash(superuser_password)
+    
+    # Test the new passwords
+    admin_verify = verify_password(admin_password, USERS_DB["admin"]["hashed_password"])
+    superuser_verify = verify_password(superuser_password, USERS_DB["superuser"]["hashed_password"])
     
     return {
-        "message": "Passwords reset successfully",
-        "admin_password": ADMIN_PASSWORD,
-        "superuser_password": SUPERUSER_PASSWORD,
+        "message": "Passwords reset",
+        "admin_password": admin_password,
+        "superuser_password": superuser_password,
         "verification": {
-            "admin_verify": pwd_context.verify(ADMIN_PASSWORD, USERS_DB["admin"]["hashed_password"]),
-            "superuser_verify": pwd_context.verify(SUPERUSER_PASSWORD, USERS_DB["superuser"]["hashed_password"])
-        }
+            "admin_verify": admin_verify,
+            "superuser_verify": superuser_verify
+        },
+        "users_updated": list(USERS_DB.keys())
     }
 
 @app.get("/debug/reset-passwords-get")
