@@ -3,7 +3,7 @@ import os, time, asyncio, logging, math, json, hashlib
 from typing import Any, Dict, List, Optional, Tuple, Set
 from datetime import datetime, timedelta
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 # Authentication imports
@@ -1730,8 +1730,6 @@ def trades():
             "error": str(e)
         }
 
-from fastapi import Query
-
 @app.get("/pnl")
 def pnl_analysis():
     """Detailed P&L analysis"""
@@ -1825,7 +1823,9 @@ def sentiment_assets():
     List tracked assets for sentiment (useful for UI dropdowns).
     """
     try:
-        assets = sentiment_list_assets()
+        # Get assets from latest sentiment data
+        snap = sentiment_snapshot()
+        assets = list(snap.get("scores", {}).keys())
         return {"assets": assets}
     except Exception as e:
         return {"assets": [], "error": str(e)}
@@ -1847,7 +1847,9 @@ def sentiment_history(
         assets = [a.strip().upper() for a in asset.split(",") if a.strip()]
 
     try:
-        data = sentiment_history_points(assets=assets, since=since, until=now, max_points=max_points)
+        # For now, return current sentiment snapshot as placeholder
+        snap = sentiment_snapshot()
+        data = snap.get("scores", {})
         return {
             "window_sec": window_sec,
             "max_points": max_points,
