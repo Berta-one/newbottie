@@ -3,7 +3,7 @@ import os, time, math, asyncio, logging, random
 from typing import Dict, List, Any, Optional, Tuple, Set
 from collections import defaultdict
 import numpy as np
-import ccxt.pro as ccxtpro
+import ccxt
 
 log = logging.getLogger("CrossPairsWS")
 
@@ -43,7 +43,7 @@ class CrossPairsWS:
         self.api_key = api_key
         self.api_secret = api_secret
         self.testnet = testnet
-        self.ex: Optional[ccxtpro.binance] = None
+        self.ex: Optional[ccxt.binance] = None
 
         self.rows: List[str] = []
         self.cols: List[str] = []
@@ -67,7 +67,7 @@ class CrossPairsWS:
             log.warning("[WS] Grid WS disabled by ENABLE_GRID_WS=0")
             return
 
-        self.ex = ccxtpro.binance({
+        self.ex = ccxt.binance({
             "apiKey": self.api_key,
             "secret": self.api_secret,
             "enableRateLimit": True,
@@ -183,14 +183,26 @@ class CrossPairsWS:
             try:
                 for batch in batches:
                     if self._stop: break
-                    # watch a batch; tolerate individual failures
-                    results = await asyncio.gather(
-                        *[self.ex.watch_ticker(sym) for sym in batch],
-                        return_exceptions=True
-                    )
+                    # fetch tickers for batch; tolerate individual failures
+                    try:
+                        # Use regular API calls instead of WebSocket
+                        tickers = await self.ex.fetch_tickers(batch)
+                        results = [tickers.get(sym) for sym in batch]
+                    except Exception as e:
+                        log.error(f"[WS] Batch ticker fetch failed: {e}")
+                        # Fallback to individual fetches
+                        results = []
+                        for sym in batch:
+                            try:
+                                ticker = await self.ex.fetch_ticker(sym)
+                                results.append(ticker)
+                            except Exception as e2:
+                                log.error(f"[WS] Individual ticker fetch failed for {sym}: {e2}")
+                                results.append(Exception(f"Fetch failed: {e2}"))
+                    
                     now = int(time.time())
                     for sym, res in zip(batch, results):
-                        if isinstance(res, Exception):
+                        if isinstance(res, Exception) or res is None:
                             # swallow & continue
                             continue
                         if not res: # empty
@@ -209,7 +221,7 @@ class CrossPairsWS:
                 except Exception:
                     pass
                 try:
-                    self.ex = ccxtpro.binance({
+                    self.ex = ccxt.binance({
                         "apiKey": self.api_key,
                         "secret": self.api_secret,
                         "enableRateLimit": True,

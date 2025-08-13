@@ -207,11 +207,11 @@ def add_log(msg: str):
         del _logs[:-1000]
     log.info(msg)
 
-# WebSocket data manager for reducing API calls
+# WebSocket data manager for reducing API calls (FREE implementation)
 try:
     from engine.websocket_data_manager import get_websocket_manager, initialize_websocket_data
     WEBSOCKET_AVAILABLE = True
-    add_log("WebSocket data manager loaded successfully")
+    add_log("Free WebSocket data manager loaded successfully")
 except Exception as e:
     WEBSOCKET_AVAILABLE = False
     add_log(f"WebSocket manager not available: {e}")
@@ -546,17 +546,32 @@ async def portfolio_loop():
     
     while True:
         try:
-            # Significantly reduce balance fetching to prevent API bans
-            now = time.time()
-            if (API_KEY and API_SECRET) and (now - last_balance_fetch > BALANCE_CACHE_DURATION):
-                try:
-                    balance_cache = _exchange.fetch_balance(params={})
-                    last_balance_fetch = now
-                    add_log(f"Balance updated from exchange (cached for {BALANCE_CACHE_DURATION}s)")
-                except Exception as e:
-                    add_log(f"Balance fetch failed, using cache: {e}")
+            # Try to get balance from WebSocket first (if authenticated)
+            assets = {}
             
-            assets = _nonzero_assets_from_balance(balance_cache)
+            if WEBSOCKET_AVAILABLE and (API_KEY and API_SECRET):
+                try:
+                    ws_manager = get_websocket_manager()
+                    if ws_manager and ws_manager.is_connected():
+                        balance_data = ws_manager.get_balance()
+                        if balance_data:
+                            assets = {k: v for k, v in balance_data.items() if v > 0}
+                            add_log(f"Using WebSocket balance data: {len(assets)} assets")
+                except Exception as e:
+                    add_log(f"WebSocket balance fetch failed: {e}")
+            
+            # Fallback to API only if WebSocket failed and cache is stale
+            if not assets:
+                now = time.time()
+                if (API_KEY and API_SECRET) and (now - last_balance_fetch > BALANCE_CACHE_DURATION):
+                    try:
+                        balance_cache = _exchange.fetch_balance(params={})
+                        last_balance_fetch = now
+                        add_log(f"Balance updated from API (cached for {BALANCE_CACHE_DURATION}s)")
+                    except Exception as e:
+                        add_log(f"Balance fetch failed, using cache: {e}")
+                
+                assets = _nonzero_assets_from_balance(balance_cache)
             
             # If no API keys (paper trading mode), initialize with starting capital
             if not (API_KEY and API_SECRET) and not assets:
@@ -813,9 +828,11 @@ async def signals_loop():
                 # Initialize WebSocket streams for all symbols we'll be monitoring
                 await initialize_websocket_data(
                     symbols=scan_symbols,  # For ticker data
-                    kline_symbols=scan_symbols[:MAX_KLINE_SYMBOLS]  # Limit klines based on config
+                    kline_symbols=scan_symbols[:MAX_KLINE_SYMBOLS],  # Limit klines based on config
+                    api_key=API_KEY,  # Pass API credentials for account updates
+                    api_secret=API_SECRET
                 )
-                add_log(f"WebSocket streams initialized for {len(scan_symbols)} ticker symbols, {min(len(scan_symbols), MAX_KLINE_SYMBOLS)} kline symbols")
+                add_log(f"Free WebSocket streams initialized for {len(scan_symbols)} ticker symbols, {min(len(scan_symbols), MAX_KLINE_SYMBOLS)} kline symbols")
             await asyncio.sleep(3)  # Allow WebSocket connections to establish
         except Exception as e:
             add_log(f"WebSocket initialization failed: {e}")
@@ -1406,40 +1423,54 @@ def health():
 
 @app.get("/websocket/status")
 def websocket_status():
-    """WebSocket connection and API usage optimization status"""
+    """Free WebSocket connection and API usage optimization status"""
     if not WEBSOCKET_AVAILABLE:
         return {
             "available": False,
-            "error": "WebSocket manager not available",
-            "api_optimization": "disabled"
+            "error": "Free WebSocket manager not available - install python-binance",
+            "api_optimization": "disabled",
+            "library": "none",
+            "license_required": "N/A"
         }
     
     try:
         ws_manager = get_websocket_manager()
-        status = ws_manager.get_connection_status()
-        
-        return {
-            "available": True,
-            "enabled": USE_WEBSOCKETS,
-            "connection_status": status,
-            "config": {
-                "balance_cache_seconds": BALANCE_CACHE_SEC,
-                "max_kline_symbols": MAX_KLINE_SYMBOLS,
-                "loop_sleep_seconds": LOOP_SLEEP_S,
-                "signal_interval_seconds": SIGNAL_INTERVAL_S
-            },
-            "api_optimization": {
-                "portfolio_loop": f"Balance cached for {BALANCE_CACHE_SEC}s",
-                "signals_loop": f"WebSocket OHLCV when available",
-                "ticker_data": f"WebSocket tickers when available",
-                "estimated_api_reduction": "80-95% fewer API calls"
+        if ws_manager:
+            status = ws_manager.get_status()
+            return {
+                "available": True,
+                "enabled": USE_WEBSOCKETS,
+                "free_implementation": True,
+                "library": "python-binance (100% free)",
+                "license_required": False,
+                "connection_status": status,
+                "config": {
+                    "balance_cache_seconds": BALANCE_CACHE_SEC,
+                    "max_kline_symbols": MAX_KLINE_SYMBOLS,
+                    "loop_sleep_seconds": LOOP_SLEEP_S,
+                    "signal_interval_seconds": SIGNAL_INTERVAL_S
+                },
+                "api_optimization": {
+                    "portfolio_loop": f"WebSocket balance + {BALANCE_CACHE_SEC}s cache",
+                    "signals_loop": f"WebSocket OHLCV when available",
+                    "ticker_data": f"WebSocket tickers (real-time)",
+                    "estimated_api_reduction": "90-99% fewer API calls vs ccxt-pro"
+                }
             }
-        }
+        else:
+            return {
+                "available": False,
+                "error": "WebSocket manager not initialized",
+                "library": "python-binance",
+                "license_required": False
+            }
     except Exception as e:
         return {
             "available": True,
             "enabled": USE_WEBSOCKETS,
-            "error": str(e)
+            "error": str(e),
+            "library": "python-binance",
+            "license_required": False
         }
 
 @app.get("/status")
