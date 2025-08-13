@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bottie System Diagnostic</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #0c1426; color: #ffffff; }
+        .test { margin: 10px 0; padding: 10px; border: 1px solid #333; border-radius: 4px; }
+        .pass { background: rgba(76, 175, 80, 0.2); border-color: #4caf50; }
+        .fail { background: rgba(244, 67, 54, 0.2); border-color: #f44336; }
+        .warn { background: rgba(255, 152, 0, 0.2); border-color: #ff9800; }
+        button { background: #64ffda; color: #0c1426; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin: 5px; }
+        pre { background: #1a2332; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 12px; }
+        .loading { color: #64ffda; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Bottie System Diagnostic</h1>
+    <p>This tool will help diagnose why you're seeing 0 equity and 0 positions.</p>
+    
+    <div style="margin: 20px 0; padding: 15px; background: #1a2332; border-radius: 8px;">
+        <h3>🎯 Current API URL:</h3>
+        <p id="current-api" style="color: #64ffda; font-family: monospace;">https://bottie-1.onrender.com</p>
+        <input type="text" id="api-input" placeholder="Enter API URL" style="width: 300px; padding: 8px; margin: 5px; background: #0f1419; color: #fff; border: 1px solid #333;">
+        <button onclick="updateAPI()">🔄 Update API URL</button>
+        
+        <h3>🔐 Authentication Status:</h3>
+        <p style="color: #ff9800; font-size: 14px;">⚠️ Authentication may require environment-specific credentials set on Render.</p>
+        <p style="color: #64ffda; font-size: 12px;">Try: admin/AdminPass456! or superuser/SuperSecret123!</p>
+        <input type="text" id="username" placeholder="Username" value="admin" style="width: 150px; padding: 8px; margin: 5px; background: #0f1419; color: #fff; border: 1px solid #333;">
+        <input type="password" id="password" placeholder="Password" value="AdminPass456!" style="width: 150px; padding: 8px; margin: 5px; background: #0f1419; color: #fff; border: 1px solid #333;">
+        <button onclick="login()">🔑 Login</button>
+        <button onclick="tryAlternativeCredentials()">🔄 Try Alternative</button>
+        <p id="auth-status" style="color: #64ffda; font-size: 12px;">Not authenticated</p>
+    </div>
+    
+    <button onclick="runDiagnostic()">🚀 Run Full Diagnostic</button>
+    <button onclick="testConnectivity()">🌐 Test Connectivity Only</button>
+    <button onclick="enableExecution()">⚡ Enable Execution</button>
+    <button onclick="showConsoleMethod()">🛠️ Browser Console Method</button>
+    <button onclick="clearResults()">🧹 Clear Results</button>
+    
+    <div id="console-method" style="display: none; margin: 20px 0; padding: 15px; background: #1a2332; border-radius: 8px;">
+        <h3>🛠️ Browser Console Alternative (CORS Bypass)</h3>
+        <p style="color: #64ffda;">If authentication fails due to CORS, use this browser console method:</p>
+        <ol style="color: #ffffff; line-height: 1.6;">
+            <li>Open <a href="https://bottie-1.onrender.com" target="_blank" style="color: #64ffda;">https://bottie-1.onrender.com</a></li>
+            <li>Press F12 to open Developer Tools</li>
+            <li>Go to Console tab</li>
+            <li>Copy and paste this code:</li>
+        </ol>
+        <pre style="background: #0f1419; color: #64ffda; padding: 10px; border-radius: 4px; font-size: 11px; overflow-x: auto;">// Quick Bottie Status Check & Enable
+async function quickBottieCheck() {
+    try {
+        // Test multiple credential combinations
+        const credentials = [
+            { username: 'admin', password: 'AdminPass456!' },
+            { username: 'superuser', password: 'SuperSecret123!' },
+            { username: 'admin', password: 'admin' },
+            { username: 'superuser', password: 'superuser' }
+        ];
+        
+        let authToken = null;
+        
+        for (const cred of credentials) {
+            try {
+                const response = await fetch('/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(cred)
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    authToken = data.access_token;
+                    console.log('✅ Login successful with:', cred.username);
+                    break;
+                }
+            } catch (e) {
+                console.log('❌ Failed:', cred.username);
+            }
+        }
+        
+        // Check current status
+        const statusResponse = await fetch('/status');
+        const status = await statusResponse.json();
+        console.log('📊 Current Status:', status);
+        
+        // Try to enable execution if we have auth
+        if (authToken) {
+            const enableResponse = await fetch('/exec/enable', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+            
+            if (enableResponse.ok) {
+                console.log('⚡ Execution enabled successfully!');
+            } else {
+                console.log('⚠️ Enable execution failed:', enableResponse.status);
+            }
+        } else {
+            console.log('⚠️ Could not authenticate - execution may already be enabled');
+        }
+        
+        return status;
+    } catch (error) {
+        console.error('❌ Error:', error);
+    }
+}
+
+// Run the check
+quickBottieCheck();</pre>
+        <p style="color: #ff9800; font-size: 12px;">This bypasses CORS restrictions by running directly on the API domain.</p>
+    </div>
+    
+    <div id="results"></div>
+
+    <script>
+        let API = 'https://bottie-1.onrender.com';
+        let authToken = null;
+        
+        function updateAPI() {
+            const newAPI = document.getElementById('api-input').value.trim();
+            if (newAPI) {
+                API = newAPI.replace(/\/$/, ''); // Remove trailing slash
+                document.getElementById('current-api').textContent = API;
+                addResult('🔄 API Updated', 'warn', `New API URL: ${API}`);
+            }
+        }
+        
+        function tryAlternativeCredentials() {
+            const alternatives = [
+                { username: 'superuser', password: 'SuperSecret123!' },
+                { username: 'admin', password: 'AdminPass456!' },
+                { username: 'admin', password: 'admin' },
+                { username: 'superuser', password: 'superuser' }
+            ];
+            
+            addResult('🔄 Trying Alternative Credentials...', 'warn', 'Testing multiple credential combinations');
+            
+            alternatives.forEach(async (cred, index) => {
+                document.getElementById('username').value = cred.username;
+                document.getElementById('password').value = cred.password;
+                await login();
+            });
+        }
+        
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            if (!username || !password) {
+                addResult('❌ Login Failed', 'fail', 'Please enter username and password');
+                return;
+            }
+            
+            addResult('🔐 Attempting Login...', 'warn', `Trying to authenticate ${username}...`);
+            
+            try {
+                // First test if the auth endpoint exists
+                const testResponse = await fetch(`${API}/auth/login`, {
+                    method: 'OPTIONS',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                addResult('🔍 Auth Endpoint Test', 'warn', `OPTIONS response: ${testResponse.status}`, {
+                    status: testResponse.status,
+                    headers: Object.fromEntries(testResponse.headers.entries())
+                });
+                
+                // Now try the actual login
+                const response = await fetch(`${API}/auth/login`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    mode: 'cors',
+                    body: JSON.stringify({ username, password })
+                });
+                
+                addResult('🔍 Login Response', 'warn', `Status: ${response.status}`, {
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: Object.fromEntries(response.headers.entries())
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    authToken = data.access_token;
+                    document.getElementById('auth-status').textContent = `✅ Authenticated as ${data.user?.username || username}`;
+                    document.getElementById('auth-status').style.color = '#4caf50';
+                    addResult('✅ Login Success', 'pass', `Authenticated as ${data.user?.username || username}`, data);
+                } else {
+                    const errorText = await response.text();
+                    addResult('❌ Login Failed', 'fail', `Authentication failed (${response.status}): ${errorText}`);
+                }
+            } catch (error) {
+                addResult('❌ Login Failed', 'fail', `Login error: ${error.message}`, {
+                    error_name: error.name,
+                    error_message: error.message,
+                    stack: error.stack
+                });
+            }
+        }
+        
+        async function testConnectivity() {
+            clearResults();
+            addResult('🌐 Testing Basic Connectivity...', 'warn', 'Checking if your Render service is reachable');
+            
+            const tests = [
+                { name: 'Basic HTTP Test', url: '', method: 'GET' },
+                { name: 'Health Endpoint', url: '/health', method: 'GET' },
+                { name: 'Root Endpoint', url: '/', method: 'GET' },
+                { name: 'CORS Preflight', url: '/health', method: 'OPTIONS' }
+            ];
+            
+            for (const test of tests) {
+                try {
+                    const response = await fetch(`${API}${test.url}`, {
+                        method: test.method,
+                        headers: { 'Content-Type': 'application/json' },
+                        mode: 'cors'
+                    });
+                    
+                    const text = await response.text();
+                    addResult(`✅ ${test.name}`, 'pass', 
+                        `Status: ${response.status} | Response length: ${text.length} chars`, {
+                            status: response.status,
+                            headers: Object.fromEntries(response.headers.entries()),
+                            preview: text.substring(0, 200)
+                        });
+                } catch (error) {
+                    addResult(`❌ ${test.name}`, 'fail', 
+                        `Error: ${error.message}`, { error_type: error.name });
+                }
+            }
+            
+            // Additional diagnostic info
+            addResult('🔍 Browser Info', 'warn', 'Current browser and network info', {
+                user_agent: navigator.userAgent,
+                online: navigator.onLine,
+                current_url: window.location.href,
+                target_api: API
+            });
+        }
+        
+        async function apiCall(endpoint, method = 'GET') {
+            try {
+                const headers = { 'Content-Type': 'application/json' };
+                if (authToken) {
+                    headers['Authorization'] = `Bearer ${authToken}`;
+                }
+                
+                const response = await fetch(`${API}${endpoint}`, { 
+                    method,
+                    headers
+                });
+                const data = await response.json();
+                return { success: true, data, status: response.status };
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        }
+        
+        function addResult(title, status, message, data = null) {
+            const div = document.createElement('div');
+            div.className = `test ${status}`;
+            div.innerHTML = `
+                <h3>${title}</h3>
+                <p>${message}</p>
+                ${data ? `<pre>${JSON.stringify(data, null, 2)}</pre>` : ''}
+            `;
+            document.getElementById('results').appendChild(div);
+        }
+        
+        async function runDiagnostic() {
+            clearResults();
+            addResult('🔄 Diagnostic Started', 'warn', 'Running comprehensive system check...');
+            
+            // Test 0: Basic connectivity
+            addResult('🌐 Testing Connectivity...', 'warn', 'Checking if Render service is reachable');
+            
+            // Test 1: Health Check with more detailed error info
+            const health = await apiCall('/health');
+            if (health.success) {
+                addResult('✅ API Health', 'pass', 'API is responding', health.data);
+            } else {
+                addResult('❌ API Health', 'fail', `API unreachable: ${health.error}`);
+                
+                // Additional connectivity tests
+                addResult('🔍 Connectivity Debug', 'warn', 'Testing alternative endpoints...');
+                
+                // Test different endpoints
+                const tests = [
+                    { name: 'Root Endpoint', url: '/' },
+                    { name: 'Status Endpoint', url: '/status' },
+                    { name: 'CORS Test', url: '/health', headers: {'Origin': 'https://dancing-figolla-978034.netlify.app'} }
+                ];
+                
+                for (const test of tests) {
+                    try {
+                        const response = await fetch(`${API}${test.url}`, {
+                            method: 'GET',
+                            headers: test.headers || { 'Content-Type': 'application/json' },
+                            mode: 'cors'
+                        });
+                        const data = await response.text();
+                        addResult(`✅ ${test.name}`, 'pass', `Status: ${response.status}`, {
+                            status: response.status,
+                            response: data.substring(0, 500)
+                        });
+                    } catch (error) {
+                        addResult(`❌ ${test.name}`, 'fail', `Failed: ${error.message}`);
+                    }
+                }
+                
+                // Network troubleshooting tips
+                addResult('🛠️ Troubleshooting', 'warn', 
+                    'If all tests fail, check: 1) Render service is running 2) Correct URL 3) CORS settings 4) Internet connection');
+                return;
+            }
+            
+            // Test 2: Trading Status - try multiple endpoint patterns
+            let trading = await apiCall('/exec/status');
+            if (!trading.success) {
+                trading = await apiCall('/trading/status');
+            }
+            if (!trading.success) {
+                trading = await apiCall('/status');
+            }
+            
+            if (trading.success) {
+                const enabled = trading.data.enabled_runtime || trading.data.enabled_env;
+                addResult('🔧 Execution Runtime', enabled ? 'pass' : 'fail', 
+                    `Execution is ${enabled ? 'ENABLED' : 'DISABLED'}`, trading.data);
+            } else {
+                addResult('❌ Trading Status', 'fail', 'Cannot check trading status - trying /exec/status endpoint');
+            }
+            
+            // Test 3: Portfolio Data - try multiple endpoint patterns  
+            let portfolio = await apiCall('/status');
+            if (!portfolio.success) {
+                portfolio = await apiCall('/portfolio/current');
+            }
+            
+            if (portfolio.success) {
+                const equity = portfolio.data.equity || 0;
+                const positions = portfolio.data.positions || {};
+                const posCount = Object.keys(positions).length;
+                
+                // Check if we have good data
+                const isHealthy = equity > 1000 && posCount > 0;
+                
+                addResult('💰 Portfolio Status', isHealthy ? 'pass' : 'fail', 
+                    `Equity: $${equity.toFixed(2)}, Positions: ${posCount}`, {
+                        equity: equity,
+                        positions: positions,
+                        equity_series: portfolio.data.equity_series?.slice(-5) || [],
+                        note: isHealthy ? '✅ Portfolio looks healthy! Trading appears active.' : '⚠️ Low equity or no positions detected.'
+                    });
+                    
+                if (isHealthy) {
+                    addResult('🎉 Good News!', 'pass', 
+                        'Your portfolio shows active trading with significant equity. The "0 equity" issue appears resolved!');
+                }
+            } else {
+                addResult('❌ Portfolio Data', 'fail', 'Cannot fetch portfolio data');
+            }
+            
+            // Test 4: Recent Logs
+            const logs = await apiCall('/logs/last');
+            if (logs.success && logs.data.logs) {
+                const recentLogs = logs.data.logs.slice(-10);
+                const hasErrors = recentLogs.some(log => log.toLowerCase().includes('error'));
+                addResult('📋 System Logs', hasErrors ? 'warn' : 'pass', 
+                    `Last ${recentLogs.length} log entries`, recentLogs);
+            } else {
+                addResult('⚠️ System Logs', 'warn', 'Logs endpoint not available or empty');
+            }
+            
+            // Test 5: Grid Status
+            const grid = await apiCall('/grid/status');
+            if (grid.success) {
+                addResult('🔲 Grid Engine', 'pass', 'Grid system operational', {
+                    symbols: grid.data.symbols?.length || 0,
+                    active: grid.data.active || false
+                });
+            } else {
+                addResult('⚠️ Grid Engine', 'warn', 'Grid status unavailable');
+            }
+            
+            addResult('✅ Diagnostic Complete', 'pass', 'Check results above for issues');
+        }
+        
+        async function enableExecution() {
+            if (!authToken) {
+                addResult('❌ Authentication Required', 'fail', 'Please login first to enable execution');
+                return;
+            }
+            
+            addResult('⚡ Enabling Execution...', 'warn', 'Attempting to enable trading execution');
+            const result = await apiCall('/exec/enable', 'POST');
+            if (result.success) {
+                addResult('✅ Execution Enabled', 'pass', 'Trading execution is now enabled', result.data);
+            } else {
+                addResult('❌ Enable Failed', 'fail', `Could not enable execution: ${result.error}`, result);
+            }
+        }
+        
+        function showConsoleMethod() {
+            const div = document.getElementById('console-method');
+            div.style.display = div.style.display === 'none' ? 'block' : 'none';
+        }
+        
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+    </script>
+</body>
+</html>

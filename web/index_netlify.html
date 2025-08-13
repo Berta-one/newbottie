@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Bottie Dashboard - Netlify</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  * { box-sizing: border-box; }
+  body { 
+    font-family: Arial, sans-serif; 
+    background: #0c1426; 
+    color: #ffffff;
+    margin: 0; 
+    padding: 0; 
+    font-size: 14px;
+  }
+  
+  header { 
+    background: #1a2332; 
+    color: #fff; 
+    padding: 12px 20px; 
+    font-size: 18px; 
+    border-bottom: 1px solid #2a3441;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .user-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+  }
+  
+  .user-badge {
+    background: #64ffda;
+    color: #0c1426;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  
+  .logout-btn {
+    background: #f44336;
+    color: #ffffff;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+  }
+
+  main { 
+    max-width: 1600px; 
+    margin: auto; 
+    padding: 20px; 
+  }
+  
+  /* Login Modal Styles */
+  .login-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(12, 20, 38, 0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 3000;
+  }
+  
+  .login-form {
+    background: #1a2332;
+    border: 1px solid #2a3441;
+    border-radius: 8px;
+    padding: 30px;
+    min-width: 400px;
+    text-align: center;
+  }
+  
+  .login-form h2 {
+    color: #64ffda;
+    margin-bottom: 20px;
+  }
+  
+  .form-group {
+    margin-bottom: 15px;
+    text-align: left;
+  }
+  
+  .form-label {
+    display: block;
+    color: #ffffff;
+    margin-bottom: 5px;
+    font-size: 12px;
+  }
+  
+  .form-input {
+    width: 100%;
+    background: #0f1419;
+    border: 1px solid #2a3441;
+    border-radius: 4px;
+    padding: 10px;
+    color: #ffffff;
+    font-size: 14px;
+  }
+  
+  .form-input:focus {
+    outline: none;
+    border-color: #64ffda;
+  }
+  
+  .login-btn {
+    width: 100%;
+    background: #64ffda;
+    color: #0c1426;
+    border: none;
+    padding: 12px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 10px;
+  }
+  
+  .login-btn:hover {
+    opacity: 0.8;
+  }
+  
+  .login-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  .login-error {
+    color: #f44336;
+    font-size: 12px;
+    margin-top: 10px;
+  }
+
+  .bypass-info {
+    background: #1a2332;
+    border: 1px solid #64ffda;
+    border-radius: 6px;
+    padding: 15px;
+    margin-top: 15px;
+    font-size: 12px;
+  }
+
+  .card {
+    background: #0f1419;
+    border: 1px solid #2a3441;
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 15px;
+  }
+
+  .grid-container {
+    overflow: auto;
+    max-height: 70vh;
+    border: 1px solid #2a3441;
+    border-radius: 6px;
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  
+  .data-table th {
+    background: #0f1419;
+    padding: 8px 6px;
+    text-align: left;
+    font-weight: 600;
+    color: #64ffda;
+    border-bottom: 1px solid #2a3441;
+  }
+  
+  .data-table td {
+    padding: 6px;
+    border-bottom: 1px solid #2a3441;
+  }
+
+  h3 {
+    color: #64ffda;
+    margin: 0 0 10px 0;
+    font-size: 14px;
+  }
+
+  .chip {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+  }
+  
+  .chip--ok { background: rgba(76, 175, 80, 0.2); color: #4caf50; border: 1px solid #4caf50; }
+  .chip--warn { background: rgba(255, 152, 0, 0.2); color: #ff9800; border: 1px solid #ff9800; }
+  .chip--err { background: rgba(244, 67, 54, 0.2); color: #f44336; border: 1px solid #f44336; }
+</style>
+</head>
+<body>
+
+<!-- Login Modal -->
+<div id="login-modal" class="login-modal">
+  <div class="login-form">
+    <h2>🔐 Bottie Access</h2>
+    <form id="login-form">
+      <div class="form-group">
+        <label class="form-label">Username</label>
+        <input type="text" id="username" class="form-input" value="admin" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="password" id="password" class="form-input" value="Diego1234!" required>
+      </div>
+      <button type="submit" id="login-btn" class="login-btn">Login</button>
+      <div id="login-error" class="login-error"></div>
+    </form>
+    
+    <div class="bypass-info">
+      <strong>Quick Access:</strong><br>
+      Default: admin / admin<br>
+      <a href="?bypass=true" style="color: #64ffda;">Skip Authentication (Debug Mode)</a>
+    </div>
+  </div>
+</div>
+
+<header>
+  <div>Bottie Live Dashboard</div>
+  <div class="user-info" id="user-info" style="display: none;">
+    <span id="user-name" class="user-badge">—</span>
+    <button id="logout-btn" class="logout-btn">Logout</button>
+  </div>
+</header>
+
+<main id="main-content" style="display: none;">
+  
+  <!-- System Status -->
+  <div class="card">
+    <h3>🔋 System Status</h3>
+    <div style="display: flex; gap: 20px; align-items: center;">
+      <span id="quantum-chip" class="chip chip--warn">Connecting...</span>
+      <span id="quantum-backend">—</span>
+    </div>
+  </div>
+
+  <!-- API Configuration -->
+  <div class="card">
+    <h3>🔧 API Configuration</h3>
+    <div style="margin: 10px 0;">
+      <label>API URL: </label>
+      <input type="text" id="api-url-display" readonly style="background: #0f1419; border: 1px solid #2a3441; color: #ffffff; padding: 5px; width: 300px;">
+    </div>
+    <p style="font-size: 12px; color: #8892b0;">
+      To change API URL, use: <code>?api=https://your-api-url.com</code>
+    </p>
+  </div>
+
+  <!-- Grid Matrix -->
+  <div class="card">
+    <h3>📊 Trading Grid Matrix</h3>
+    <div class="grid-container">
+      <table id="maxi-grid" class="data-table">
+        <thead id="maxi-grid-thead">
+          <tr><th>Loading...</th></tr>
+        </thead>
+        <tbody id="maxi-grid-tbody">
+          <tr><td>Grid data loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Connection Test -->
+  <div class="card">
+    <h3>🔍 Connection Test</h3>
+    <button onclick="testConnection()" style="background: #64ffda; color: #0c1426; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">Test API Connection</button>
+    <div id="connection-result" style="margin-top: 10px; padding: 10px; background: #0f1419; border-radius: 4px; font-family: monospace; font-size: 11px;"></div>
+  </div>
+
+</main>
+
+<script>
+// Get API URL from URL parameter or use default
+const urlParams = new URLSearchParams(window.location.search);
+const API_BASE = urlParams.get('api') || 'https://bottie-1.onrender.com';
+
+// Update display
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('api-url-display').value = API_BASE;
+});
+
+// Simple connection test
+async function testConnection() {
+  const result = document.getElementById('connection-result');
+  result.textContent = 'Testing connection...';
+  
+  try {
+    const response = await fetch(`${API_BASE}/health`);
+    const data = await response.json();
+    result.textContent = `✅ Connection successful!\nStatus: ${response.status}\nResponse: ${JSON.stringify(data, null, 2)}`;
+  } catch (error) {
+    result.textContent = `❌ Connection failed\nError: ${error.message}\n\nTroubleshooting:\n1. Check if API URL is correct\n2. Verify CORS is enabled on API\n3. Check API server is running`;
+  }
+}
+</script>
+
+<!-- Include the simplified JavaScript -->
+<script src="app_netlify.js"></script>
+
+</body>
+</html>
