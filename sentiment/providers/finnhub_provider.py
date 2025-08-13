@@ -1,84 +1,66 @@
 # sentiment/providers/finnhub_provider.py
-import os
-import time
-import logging
-from typing import List, Dict, Any, Optional
-import requests
+import os, re, logging, requests
+from typing import Dict, List
 
 log = logging.getLogger("FinnhubProvider")
 
-FINNHUB_KEY = os.getenv("FINNHUB_KEY", "")
-FINNHUB_NEWS_URL = "https://finnhub.io/api/v1/news"
+API_KEY = (os.getenv("FINNHUB_API_KEY") or "").strip()
 
-# Simple in-memory cache to avoid hammering the API
-_cache: Dict[str, Any] = {"ts": 0.0, "items": []}
-CACHE_TTL = 60.0  # seconds
-
-DEFAULT_KEYWORDS = {
-    "BTC": ["bitcoin", "btc"],
-    "ETH": ["ethereum", "eth"],
-    "BNB": ["bnb", "binance coin"],
-    "XRP": ["xrp", "ripple"],
-    "ADA": ["cardano", "ada"],
-    "SOL": ["solana", "sol"],
+# sane defaults; can be overridden via SENTIMENT_KW_<ASSET>
+DEFAULT_KW = {
+    "BTC": ["bitcoin","btc","btc/usdt","btc-usdt","btc price"],
+    "ETH": ["ethereum","eth","eth/usdt","eth-usdt","ether price"],
+    "BNB": ["binance coin","bnb","bnb/usdt","bnb-usdt"],
+    "ADA": ["cardano","ada","ada/usdt","ada-usdt"],
+    "XRP": ["ripple","xrp","xrp/usdt","xrp-usdt"],
+    "SOL": ["solana","sol","sol/usdt","sol-usdt"],
 }
 
-def _load_keywords(assets: List[str]) -> Dict[str, List[str]]:
-    # In future, let users override with ENV (e.g., SENTIMENT_KEYWORDS_JSON)
-    kw = {}
-    for a in assets:
-        a_up = a.upper().strip()
-        kw[a_up] = DEFAULT_KEYWORDS.get(a_up, [a_up])
-    return kw
+def _kw_for(asset: str) -> List[str]:
+    raw = os.getenv(f"SENTIMENT_KW_{asset.upper()}", "")
+    if raw.strip():
+        return [x.strip().lower() for x in raw.split(",") if x.strip()]
+    return DEFAULT_KW.get(asset.upper(), [asset.lower()])
 
-def fetch_crypto_news_raw() -> List[Dict[str, Any]]:
-    """Pull recent crypto news from Finnhub, cached briefly."""
-    global _cache
-    now = time.time()
-    if now - _cache["ts"] < CACHE_TTL and _cache["items"]:
-        return _cache["items"]
+def _norm(text: str) -> str:
+    return re.sub(r"\s+", " ", (text or "").lower()).strip()
 
-    if not FINNHUB_KEY:
-        log.warning("FINNHUB_KEY missing; returning empty news list.")
-        _cache = {"ts": now, "items": []}
+def _fetch_recent_news(limit: int = 100) -> List[Dict]:
+    if not API_KEY:
+        log.warning("FINNHUB_API_KEY missing; returning no news")
         return []
-
-    params = {"category": "crypto", "token": FINNHUB_KEY}
+    out: List[Dict] = []
     try:
-        resp = requests.get(FINNHUB_NEWS_URL, params=params, timeout=10)
-        resp.raise_for_status()
-        items = resp.json() or []
-        # Normalize fields we care about
-        out = []
-        for it in items:
-            headline = (it.get("headline") or "").strip()
-            summary = (it.get("summary") or "").strip()
-            source = (it.get("source") or "").strip()
-            url = (it.get("url") or "").strip()
-            ts = it.get("datetime") or 0
-            if not headline:
-                continue
-            out.append({"t": ts, "headline": headline, "summary": summary, "source": source, "url": url})
-        _cache = {"ts": now, "items": out}
-        return out
+        for cat in ("general","crypto"):
+            url = f"https://finnhub.io/api/v1/news?category={cat}&token={API_KEY}"
+            r = requests.get(url, timeout=8)
+            if r.ok:
+                out.extend(r.json()[:limit])
     except Exception as e:
-        log.error(f"Finnhub news error: {e}")
-        return []
+        log.warning(f"Finnhub fetch error: {e}")
+    return out[:limit]
 
 def filter_news_by_assets(assets: List[str]) -> Dict[str, List[str]]:
-    """Return {BASE: [texts...]} from latest Finnhub crypto news filtered by per-asset keywords."""
-    raw = fetch_crypto_news_raw()
-    if not raw:
-        return {a: [] for a in assets}
+    news = _fetch_recent_news(limit=int(os.getenv("FINNHUB_NEWS_LIMIT","50")))
+    by_asset = {a.upper(): [] for a in assets}
+    if not news:
+        return by_asset
 
-    keywords = _load_keywords(assets)
-    per_asset: Dict[str, List[str]] = {a.upper(): [] for a in assets}
+    texts = []
+    for n in news:
+        t = _norm(n.get("headline") or n.get("summary") or "")
+        if t:
+            texts.append(t)
 
-    for item in raw:
-        text = item["headline"]
-        blob = f"{text} {item.get('summary','')}".lower()
-        for base, kws in keywords.items():
-            if any(kw.lower() in blob for kw in kws):
-                per_asset[base].append(text)
-
-    return per_asset
+    for a in assets:
+        kws = _kw_for(a)
+        bucket = []
+        for t in texts:
+            if any(kw in t for kw in kws):
+                bucket.append(t)
+                if len(bucket) >= 100:
+                    break
+        by_asset[a.upper()] = bucket
+    for a in assets:
+        log.debug(f"[Finnhub] {a}: {len(by_asset[a])} matches (kw={_kw_for(a)[:4]}...)")
+    return by_asset

@@ -34,23 +34,20 @@ except Exception:
     QuantumCircuit = None
     Aer = None
 
-# sentiment (Finnhub + VADER)
-try:
-    from sentiment.sentiment_service import snapshot as sentiment_snapshot, latest_probs as sentiment_latest_probs
-    SENTIMENT_WIRED = True
-except Exception:
-    SENTIMENT_WIRED = False
-
-# sentiment service (historized)
+# sentiment service
 from sentiment.sentiment_service import (
-    start_background as sentiment_start_background,
     snapshot as sentiment_snapshot,
-    aggregate_probs as sentiment_latest_probs,
-    set_keywords as sentiment_set_keywords,
-) 
+    latest_probs as sentiment_latest_probs,
+    start_background as sentiment_start_background
+)
+SENTIMENT_WIRED = True  # New sentiment service is always available 
 
 # online learner
 from ml.online_learner import OnlineLearner
+
+# Cross-pair WebSocket grid engine
+from api.cross_pairs import CrossPairsWS
+from api import routes_grid
 
 # ───────────────────────────────── Authentication Models
 class User(BaseModel):
@@ -190,12 +187,32 @@ _trade_log: List[Dict[str, Any]] = []
 # execution runtime switch
 EXECUTION_RUNTIME_ENABLED = False
 
+# ───────── Cross-pair WS engine
+CROSS_WS: Optional[CrossPairsWS] = None
+
 # ───────────────────────────────── Define add_log function FIRST
 def add_log(msg: str):
     _logs.append(msg)
     if len(_logs) > 1500:
         del _logs[:-1000]
     log.info(msg)
+
+# Return any of: ema, ml, q, sent, final_prob (0..1)
+_last_parts_cache = {} # optional: {symbol: {ema,ml,q,sent,final_prob}}
+
+def _grid_score_adapter(symbol: str, price: float) -> dict:
+    # Prefer your live cache if you maintain one
+    parts = _last_parts_cache.get(symbol, {})
+
+    # Fallback neutrals so grid renders even before signals warm up
+    if "ema" not in parts: parts["ema"] = 0.5
+    if os.getenv("ML_ENABLED","1").lower() in ("1","true","yes"):
+        parts.setdefault("ml", 0.5)
+    if os.getenv("QUANTUM_ENABLED","0").lower() in ("1","true","yes"):
+        parts.setdefault("q", 0.5)
+    if os.getenv("SENTIMENT_ENABLED","1").lower() in ("1","true","yes"):
+        parts.setdefault("sent", 0.5)
+    return parts
 
 # ───────────────────────────────── Simple User Management
 # Get passwords from environment with defaults
@@ -667,21 +684,67 @@ def _push_signal(sig: Dict[str, Any]):
 def _adaptive_thresholds() -> Tuple[float, float]:
     """
     Dynamic buy/sell thresholds around 0.5 based on recent ensemble dispersion.
-    Simpler: we'll scale base confidence slightly with recent avg |prob-0.5|.
+    Returns buy_threshold, sell_threshold both in range [0, 1]
     """
-    window = _signals[-50:]
+    if not TRADE_CONF_ADAPT:
+        # Simple fixed thresholds when adaptation is disabled
+        # TRADE_BASE_MIN_CONF should be interpreted as the minimum confidence needed
+        # Convert to margin around 0.5
+        if TRADE_BASE_MIN_CONF > 0.5:
+            margin = TRADE_BASE_MIN_CONF - 0.5  # e.g., 0.55 -> 0.05 margin
+        else:
+            margin = 0.05  # default 5% margin
+        
+        thr_buy = 0.5 + margin
+        thr_sell = 0.5 - margin
+        
+        # Ensure thresholds stay in valid range [0, 1]
+        thr_buy = min(0.95, max(0.51, thr_buy))
+        thr_sell = max(0.05, min(0.49, thr_sell))
+        
+        return float(thr_buy), float(thr_sell)
+    
+    # Adaptive thresholds based on recent signal history
+    window = _signals[-50:]  # Last 50 signals
     if not window:
-        c = TRADE_BASE_MIN_CONF
+        # Default margin when no signal history
+        margin = 0.05
     else:
-        diffs = [abs(s.get("final_prob",0.5) - 0.5) for s in window]
-        avg_d = float(np.mean(diffs)) if diffs else 0.05
-        # push threshold up if signals are noisy/low; down if strong
-        c = np.clip(TRADE_BASE_MIN_CONF - (avg_d - 0.10)*0.3, TRADE_CONF_FLOOR-0.5, TRADE_CONF_CEIL-0.5)
-        # map back to 0..1 margin (we use 0.5±c)
-        c = float(np.clip(c, 0.0, 0.49))
-    thr_buy  = 0.5 + (c if TRADE_CONF_ADAPT else TRADE_BASE_MIN_CONF/2.0)
-    thr_sell = 0.5 - (c if TRADE_CONF_ADAPT else TRADE_BASE_MIN_CONF/2.0)
-    return thr_buy, thr_sell
+        # Calculate volatility of recent predictions
+        probs = [s.get("final_prob", 0.5) for s in window if s.get("final_prob") is not None]
+        if not probs:
+            margin = 0.05
+        else:
+            volatility = float(np.std(probs))
+            
+            # Adjust threshold based on volatility
+            # High volatility = wider thresholds (more conservative)
+            # Low volatility = tighter thresholds (more aggressive)
+            base_margin = 0.05
+            volatility_factor = min(2.0, max(0.5, volatility * 10))  # Scale volatility
+            margin = base_margin * volatility_factor
+            
+            # Clamp margin to reasonable bounds
+            # TRADE_CONF_FLOOR and TRADE_CONF_CEIL should be probabilities, not margins
+            min_margin = 0.02  # minimum 2% margin
+            max_margin = 0.3   # maximum 30% margin
+            
+            # If TRADE_CONF_FLOOR/CEIL are set properly, use them
+            if TRADE_CONF_FLOOR > 0.5:
+                min_margin = max(min_margin, TRADE_CONF_FLOOR - 0.5)
+            if TRADE_CONF_CEIL < 1.0 and TRADE_CONF_CEIL > 0.5:
+                max_margin = min(max_margin, TRADE_CONF_CEIL - 0.5)
+            
+            margin = float(np.clip(margin, min_margin, max_margin))
+    
+    thr_buy = 0.5 + margin
+    thr_sell = 0.5 - margin
+    
+    # Final safety clamps to ensure valid probability range
+    thr_buy = min(0.95, max(0.51, thr_buy))
+    thr_sell = max(0.05, min(0.49, thr_sell))
+    
+    return float(thr_buy), float(thr_sell)
 
 async def signals_loop():
     await _ensure_exchange()
@@ -1059,46 +1122,17 @@ def root():
 @app.get("/health")
 def health():
     last_eq = _equity_series[-1]["v"] if _equity_series else None
-
-    # Quantum - use existing _detect_quantum() 
-    quantum_obj = _detect_quantum()
-
-    # ML block – keys exactly as frontend expects with both model checks
-    ml_obj = {
-        "enabled": bool(ML_ENABLED or ONLINE_LEARN),
-        "loaded": bool(_ML_MODEL is not None or _OL is not None),  # Check BOTH models
-        "model_path": (MODEL_XGB_PATH if _ML_MODEL is not None else 
-                      (ONLINE_MODEL_PATH if _OL is not None else None)),
-    }
-
-    # Sentiment block – get tracked bases from latest sentiment data
-    tracked_bases = []
-    if SENTIMENT_ENABLED and SENTIMENT_WIRED:
-        try:
-            snap = sentiment_snapshot()
-            if snap and "scores" in snap:
-                tracked_bases = list(snap["scores"].keys())
-        except Exception:
-            pass
-
-    sentiment_obj = {
-        "enabled": bool(SENTIMENT_ENABLED and SENTIMENT_WIRED),
-        "source": SENTIMENT_SOURCE,
-        "window_sec": SENTIMENT_WINDOW_S,
-        "bases": tracked_bases,
-    }
-
     return {
         "status": "UP",
         "ok": True,
-        "service": "bottie", 
+        "service": "bottie",
         "time": int(time.time()),
         "exchange": EXCHANGE_ID,
         "primary_quote": PRIMARY_QUOTE,
         "equity": last_eq,
-        "quantum": quantum_obj,
-        "ml": ml_obj,
-        "sentiment": sentiment_obj,
+        "quantum": _detect_quantum(),
+        "ml": {"enabled": ML_ENABLED, "loaded": bool(_ML_MODEL), "model_path": MODEL_XGB_PATH if _ML_MODEL else None},
+        "sentiment": {"enabled": SENTIMENT_ENABLED}  # <-- boolean only; no heavy work here
     }
 
 @app.get("/status")
@@ -1129,30 +1163,26 @@ def costbasis():
 
 @app.get("/sentiment")
 def sentiment():
-    if not (SENTIMENT_ENABLED and SENTIMENT_WIRED):
-        return {
-            "enabled": False, 
-            "source": SENTIMENT_SOURCE, 
-            "window_sec": SENTIMENT_WINDOW_S, 
-            "scores": {}
-        }
-    
     try:
-        snap = sentiment_snapshot()
-        return {
-            "enabled": True,
-            "source": SENTIMENT_SOURCE,
-            "window_sec": snap.get("window_sec", SENTIMENT_WINDOW_S),
-            "scores": snap.get("scores", {}),
-        }
+        return sentiment_snapshot()
     except Exception as e:
-        add_log(f"sentiment endpoint error: {e}")
-        return {
-            "enabled": False,
-            "source": SENTIMENT_SOURCE, 
-            "window_sec": SENTIMENT_WINDOW_S, 
-            "scores": {}
-        }
+        return {"enabled": False, "scores": {}, "error": str(e)}
+
+@app.get("/sentiment/debug")
+def sentiment_debug():
+    try:
+        snap = sentiment_snapshot()  # includes scores with n
+        # For quick visibility, re-run provider to show two sample headlines per asset
+        try:
+            from sentiment.providers.finnhub_provider import filter_news_by_assets
+            assets = list((snap.get("scores") or {}).keys()) or ["BTC","ETH","BNB","ADA","XRP","SOL"]
+            sample = filter_news_by_assets(assets)
+            samples = {a: (v[:2] if v else []) for a, v in sample.items()}
+        except Exception:
+            samples = {}
+        return {"snapshot": snap, "samples": samples}
+    except Exception as e:
+        return {"error": str(e), "snapshot": {"scores": {}}}
 
 @app.get("/ml/status")
 def ml_status():
@@ -1313,11 +1343,335 @@ async def exec_toggle(request: Request):
     
     return {"ok": True, "enabled": EXECUTION_RUNTIME_ENABLED}
 
+# ───────────────────────────────── ML Monitoring Endpoints
+@app.get("/ml/status")
+async def ml_status():
+    """ML Learning Status endpoint for monitoring dashboard"""
+    try:
+        global learner, features
+        
+        # Initialize response structure
+        status = {
+            "accuracy": None,
+            "brier_score": None,
+            "sample_count": 0,
+            "quantum_importance": None,
+            "quantum_feature_rank": None,
+            "feature_importance": {},
+            "quantum_mode": "unknown"
+        }
+        
+        # Get learner status if available
+        if learner and hasattr(learner, 'brier_scores') and learner.brier_scores:
+            # Get latest ML brier score
+            status["brier_score"] = learner.brier_scores[-1] if learner.brier_scores else None
+            status["sample_count"] = len(learner.brier_scores)
+            
+            # Calculate accuracy from brier score (rough approximation)
+            if status["brier_score"]:
+                # Brier score to accuracy approximation: acc = 1 - 2*brier (clamped 0-1)
+                status["accuracy"] = max(0, min(1, 1 - 2 * status["brier_score"]))
+        
+        # Get feature importance from current features
+        if features:
+            total_importance = sum(abs(v) for v in features.values() if isinstance(v, (int, float)))
+            if total_importance > 0:
+                # Normalize feature importance
+                for key, value in features.items():
+                    if isinstance(value, (int, float)):
+                        status["feature_importance"][f"{key}_prob"] = abs(value) / total_importance
+        
+        # Get quantum-specific metrics
+        quantum_keys = [k for k in status["feature_importance"].keys() if 'quantum' in k.lower()]
+        if quantum_keys:
+            status["quantum_importance"] = status["feature_importance"].get(quantum_keys[0], 0)
+            
+            # Calculate quantum rank
+            sorted_features = sorted(status["feature_importance"].items(), key=lambda x: x[1], reverse=True)
+            for rank, (feature, _) in enumerate(sorted_features, 1):
+                if 'quantum' in feature.lower():
+                    status["quantum_feature_rank"] = rank
+                    break
+        
+        # Determine quantum mode
+        quantum_mode = os.getenv("QUANTUM_MODE", "shadow").lower()
+        status["quantum_mode"] = quantum_mode if quantum_mode in ["live", "shadow", "off"] else "unknown"
+        
+        return status
+        
+    except Exception as e:
+        # Return minimal status on error
+        return {
+            "accuracy": None,
+            "brier_score": None,
+            "sample_count": 0,
+            "quantum_importance": None,
+            "quantum_feature_rank": None,
+            "feature_importance": {},
+            "quantum_mode": "error",
+            "error": str(e)
+        }
+
+@app.get("/metrics/components")
+async def metrics_components():
+    """Component metrics for advanced monitoring (optional)"""
+    try:
+        global learner, quantum_global_prob
+        
+        metrics = {
+            "performance": {
+                "brier_loss": {},
+                "sample_counts": {}
+            },
+            "weights": {
+                "current": {}
+            },
+            "quantum_mode": os.getenv("QUANTUM_MODE", "shadow").lower()
+        }
+        
+        # ML performance metrics
+        if learner and hasattr(learner, 'brier_scores') and learner.brier_scores:
+            metrics["performance"]["brier_loss"]["ml"] = learner.brier_scores[-1]
+            metrics["performance"]["sample_counts"]["ml"] = len(learner.brier_scores)
+        
+        # Quantum metrics (if available)
+        if quantum_global_prob is not None:
+            # For quantum brier, we'd need to track it separately
+            # For now, estimate based on quantum probability quality
+            metrics["performance"]["brier_loss"]["q"] = None  # Would need separate tracking
+            metrics["weights"]["current"]["q"] = 0.25  # Example quantum weight
+        
+        return metrics
+        
+    except Exception as e:
+        return {
+            "performance": {"brier_loss": {}, "sample_counts": {}},
+            "weights": {"current": {}},
+            "quantum_mode": "error",
+            "error": str(e)
+        }
+
+# ───────────────────────────────── Cross-Pair Trading Endpoints
+# Cross-pair trading configuration
+CROSS_PAIR_ENABLED = parse_bool(os.getenv("CROSS_PAIR_ENABLED", "1"))
+
+@app.get("/cross-pairs/status")
+async def cross_pair_status():
+    """Get cross-pair trading status"""
+    return {
+        "enabled": CROSS_PAIR_ENABLED,
+        "testnet": parse_bool(os.getenv("BINANCE_TESTNET", "true")),
+        "timestamp": time.time()
+    }
+
+@app.get("/portfolio/cross-pairs")
+async def get_portfolio_cross_pairs():
+    """Get all possible cross-trading pairs in portfolio"""
+    if not CROSS_PAIR_ENABLED:
+        return {"enabled": False, "pairs": []}
+    
+    try:
+        await _ensure_exchange()
+        balance = _exchange.fetch_balance()
+        
+        # Get assets with non-zero balance
+        portfolio_assets = []
+        for asset, amount in balance['total'].items():
+            if amount > 0:
+                portfolio_assets.append(asset)
+        
+        # Find available cross-pairs
+        markets = _exchange.markets
+        available_pairs = []
+        
+        for asset1 in portfolio_assets:
+            for asset2 in portfolio_assets:
+                if asset1 != asset2:
+                    symbol1 = f"{asset1}/{asset2}"
+                    symbol2 = f"{asset2}/{asset1}"
+                    
+                    if symbol1 in markets:
+                        available_pairs.append(symbol1)
+                    elif symbol2 in markets:
+                        available_pairs.append(symbol2)
+        
+        return {
+            "enabled": True,
+            "portfolio_assets": portfolio_assets,
+            "available_pairs": available_pairs,
+            "total_pairs": len(available_pairs),
+            "total_assets": len(portfolio_assets)
+        }
+        
+    except Exception as e:
+        return {"enabled": False, "error": str(e)}
+
+@app.get("/cross-pairs/opportunities")
+async def get_cross_pair_opportunities():
+    """Get current cross-pair trading opportunities"""
+    if not CROSS_PAIR_ENABLED:
+        return {"enabled": False, "opportunities": []}
+    
+    try:
+        await _ensure_exchange()
+        balance = _exchange.fetch_balance()
+        
+        # Get portfolio assets
+        portfolio_assets = [asset for asset, amount in balance['total'].items() if amount > 0]
+        
+        # Find cross-pair symbols
+        markets = _exchange.markets
+        cross_symbols = []
+        
+        for asset1 in portfolio_assets:
+            for asset2 in portfolio_assets:
+                if asset1 != asset2:
+                    symbol1 = f"{asset1}/{asset2}"
+                    symbol2 = f"{asset2}/{asset1}"
+                    
+                    if symbol1 in markets:
+                        cross_symbols.append(symbol1)
+                    elif symbol2 in markets:
+                        cross_symbols.append(symbol2)
+        
+        if not cross_symbols:
+            return {"enabled": True, "opportunities": [], "message": "No cross-pairs available"}
+        
+        # Get tickers for cross-pairs
+        tickers = _exchange.fetch_tickers(cross_symbols[:20])  # Limit to 20 pairs
+        
+        opportunities = []
+        for symbol, ticker in tickers.items():
+            base, quote = symbol.split('/')
+            
+            # Simple signal calculation
+            change_pct = ticker.get('percentage', 0) or 0
+            signal_strength = 0.5 + (change_pct / 100.0 * 2)
+            signal_strength = max(0.0, min(1.0, signal_strength))
+            
+            # Estimate profit potential
+            profit_pct = abs(change_pct / 100.0) * 0.1  # Simple estimation
+            
+            opportunity = {
+                "symbol": symbol,
+                "from_asset": base,
+                "to_asset": quote,
+                "direction": "buy" if change_pct > 0 else "sell",
+                "current_price": ticker['last'],
+                "signal_strength": signal_strength,
+                "estimated_profit_pct": profit_pct,
+                "volume_24h": ticker.get('quoteVolume', 0),
+                "change_24h_pct": change_pct,
+                "timestamp": time.time()
+            }
+            opportunities.append(opportunity)
+        
+        # Sort by signal strength
+        opportunities.sort(key=lambda x: x['signal_strength'], reverse=True)
+        
+        return {
+            "enabled": True,
+            "opportunities": opportunities[:10],  # Top 10
+            "count": len(opportunities),
+            "scan_time": time.time()
+        }
+        
+    except Exception as e:
+        return {"enabled": False, "error": str(e)}
+
+@app.get("/portfolio/rebalancing-suggestions")
+async def get_rebalancing_suggestions():
+    """Get AI-powered portfolio rebalancing suggestions"""
+    if not CROSS_PAIR_ENABLED:
+        return {"enabled": False, "suggestions": []}
+    
+    try:
+        # Get cross-pair opportunities first
+        opportunities_response = await get_cross_pair_opportunities()
+        
+        if not opportunities_response.get("enabled") or not opportunities_response.get("opportunities"):
+            return {"enabled": True, "suggestions": [], "message": "No opportunities available"}
+        
+        opportunities = opportunities_response["opportunities"]
+        suggestions = []
+        
+        for opp in opportunities[:5]:  # Top 5 opportunities
+            if opp["signal_strength"] > 0.6 and opp["estimated_profit_pct"] > 0.005:  # 0.5% min profit
+                suggestion = {
+                    "action": f"Trade {opp['from_asset']} → {opp['to_asset']}",
+                    "symbol": opp["symbol"],
+                    "direction": opp["direction"],
+                    "confidence": opp["signal_strength"],
+                    "expected_profit": opp["estimated_profit_pct"],
+                    "reasoning": f"AI detected {opp['signal_strength']:.1%} confidence signal with {opp['change_24h_pct']:+.2f}% momentum",
+                    "priority": "high" if opp["signal_strength"] > 0.8 else "medium",
+                    "timestamp": time.time()
+                }
+                suggestions.append(suggestion)
+        
+        return {
+            "enabled": True,
+            "suggestions": suggestions,
+            "count": len(suggestions),
+            "timestamp": time.time()
+        }
+        
+    except Exception as e:
+        return {"enabled": False, "error": str(e)}
+
 # ───────────────────────────────── Startup (AFTER all functions are defined)
 @app.on_event("startup")
 async def _on_startup():
+    global CROSS_WS
+    
     load_execution_state()  # Load persistent execution state
     asyncio.create_task(portfolio_loop())
     asyncio.create_task(signals_loop())
     asyncio.create_task(online_label_loop())
     asyncio.create_task(execution_loop())
+    
+    # start sentiment background (thread-based; safe to call from here)
+    try:
+        sentiment_start_background()
+    except Exception as e:
+        add_log(f"sentiment start error: {e}")
+    
+    # Start cross-pair WebSocket engine (with rollback switch)
+    # Support both service-specific and generic environment variable names
+    enable_grid_ws = (
+        os.getenv("API_ENABLE_GRID_WS", "").lower() in ("1", "true", "yes") or
+        os.getenv("BOTTIE_ENABLE_GRID_WS", "").lower() in ("1", "true", "yes") or
+        os.getenv("ENABLE_GRID_WS", "1").lower() in ("1", "true", "yes")
+    )
+    
+    if enable_grid_ws:
+        try:
+            CROSS_WS = CrossPairsWS(
+                api_key=os.getenv("API_KEY", os.getenv("BINANCE_API_KEY", "")),
+                api_secret=os.getenv("API_SECRET", os.getenv("BINANCE_API_SECRET", "")),
+                testnet=False
+            )
+            CROSS_WS.score_fn = _grid_score_adapter
+            await CROSS_WS.start()
+            
+            # Hand reference to routes
+            routes_grid.CROSS_WS = CROSS_WS
+            add_log("✅ Cross-pair WebSocket grid engine started")
+        except Exception as e:
+            add_log(f"❌ Cross-pair WS engine start error: {e}")
+            routes_grid.CROSS_WS = None
+            CROSS_WS = None
+    else:
+        # Determine which env var was used for logging
+        env_var_used = "ENABLE_GRID_WS"
+        if "API_ENABLE_GRID_WS" in os.environ:
+            env_var_used = "API_ENABLE_GRID_WS"
+        elif "BOTTIE_ENABLE_GRID_WS" in os.environ:
+            env_var_used = "BOTTIE_ENABLE_GRID_WS"
+            
+        add_log(f"ℹ️ Cross-pair WebSocket engine disabled ({env_var_used}=0)")
+        routes_grid.CROSS_WS = None
+        CROSS_WS = None
+
+# ───────────────────────────────── Mount Grid Router
+app.include_router(routes_grid.router)
