@@ -56,7 +56,8 @@ def grid_matrix():
         "grid": [],
         "symbols": [],
         "timestamp": time.time(),
-        "status": "emergency_mode"
+        "status": "emergency_mode",
+        "min_conf": 0.0
     }
 
 @app.get("/signals")
