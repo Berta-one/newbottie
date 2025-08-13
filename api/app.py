@@ -6,6 +6,7 @@ Smart Hybrid API for Bottie - Real data when available, enhanced fallbacks when 
 import os
 import time
 import json
+import random
 import requests
 from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, HTTPException
@@ -90,7 +91,6 @@ def get_live_prices(symbols: List[str]) -> Dict[str, float]:
     }
     
     # Add realistic volatility
-    import random
     prices = {}
     for symbol in symbols:
         base = base_prices.get(symbol, 1.0)
@@ -198,16 +198,31 @@ def status():
 @app.get("/grid/matrix")
 def grid_matrix():
     """Real-time grid matrix with live data"""
-    market_data = get_market_data()
-    
-    return {
-        "grid": market_data,
-        "symbols": [item["symbol"] for item in market_data],
-        "timestamp": time.time(),
-        "status": "live_data" if exchange_client else "simulated_live",
-        "min_conf": 0.6,
-        "data_source": "binance" if exchange_client else "simulated"
-    }
+    try:
+        market_data = get_market_data()
+        
+        return {
+            "grid": market_data,
+            "symbols": [item["symbol"] for item in market_data],
+            "timestamp": time.time(),
+            "status": "live_data" if exchange_client else "simulated_live",
+            "min_conf": 0.6,
+            "data_source": "binance" if exchange_client else "simulated"
+        }
+    except Exception as e:
+        print(f"Grid matrix error: {e}")
+        # Return fallback data to prevent 500 error
+        return {
+            "grid": [
+                {"symbol": "BTCUSDT", "price": 43500.0, "change": 0.0, "volume": 1000000, "confidence": 0.7}
+            ],
+            "symbols": ["BTCUSDT"],
+            "timestamp": time.time(),
+            "status": "error_fallback",
+            "min_conf": 0.6,
+            "data_source": "fallback",
+            "error": str(e)
+        }
 
 @app.get("/signals")
 def signals():
@@ -409,6 +424,4 @@ async def startup_event():
 
 if __name__ == "__main__":
     import uvicorn
-    # Add random for simulation
-    import random
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
