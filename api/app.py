@@ -201,9 +201,17 @@ def grid_matrix():
     try:
         market_data = get_market_data()
         
+        # Frontend expects 'rows' and 'cols' structure
+        symbols = [item["symbol"] for item in market_data]
+        base_currencies = list(set([s.replace('USDT', '') for s in symbols]))
+        quote_currencies = ['USDT']  # Main quote currency
+        
         return {
-            "grid": market_data,
-            "symbols": [item["symbol"] for item in market_data],
+            "rows": base_currencies,  # Base currencies (BTC, ETH, etc.)
+            "cols": quote_currencies,  # Quote currencies (USDT)
+            "matrix": {symbol: data for symbol, data in zip(symbols, market_data)},
+            "grid": market_data,  # Keep for compatibility
+            "symbols": symbols,
             "timestamp": time.time(),
             "status": "live_data" if exchange_client else "simulated_live",
             "min_conf": 0.6,
@@ -211,11 +219,12 @@ def grid_matrix():
         }
     except Exception as e:
         print(f"Grid matrix error: {e}")
-        # Return fallback data to prevent 500 error
+        # Return fallback data with proper structure
         return {
-            "grid": [
-                {"symbol": "BTCUSDT", "price": 43500.0, "change": 0.0, "volume": 1000000, "confidence": 0.7}
-            ],
+            "rows": ["BTC"],
+            "cols": ["USDT"], 
+            "matrix": {"BTCUSDT": {"symbol": "BTCUSDT", "price": 43500.0, "change": 0.0, "volume": 1000000, "confidence": 0.7}},
+            "grid": [{"symbol": "BTCUSDT", "price": 43500.0, "change": 0.0, "volume": 1000000, "confidence": 0.7}],
             "symbols": ["BTCUSDT"],
             "timestamp": time.time(),
             "status": "error_fallback",
