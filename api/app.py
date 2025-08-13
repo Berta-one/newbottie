@@ -51,12 +51,13 @@ def status():
     }
 
 @app.get("/grid/matrix")
-def grid_matrix():
+def grid_matrix(min_conf: float = 0.0):
     return {
         "grid": [],
         "symbols": [],
         "timestamp": time.time(),
-        "status": "emergency_mode"
+        "status": "emergency_mode",
+        "min_conf": min_conf
     }
 
 @app.get("/signals")
@@ -107,9 +108,9 @@ def quantum_analysis():
     }
 
 @app.get("/performance/analysis")
-def performance_analysis():
+def performance_analysis(timeframe: str = "24h"):
     return {
-        "timeframe": "24h",
+        "timeframe": timeframe,
         "metrics": {},
         "brier_score": 0.5
     }
