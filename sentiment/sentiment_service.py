@@ -7,7 +7,7 @@ log = logging.getLogger("SentimentService")
 
 # ── Config
 FINNHUB_API_KEY = (os.getenv("FINNHUB_API_KEY") or "").strip()
-SENTIMENT_ENABLED = os.getenv("SENTIMENT_ENABLED", "0").lower() in ("1","true","yes")
+SENTIMENT_ENABLED = os.getenv("SENTIMENT_ENABLED", "1").lower() in ("1","true","yes")
 SENTIMENT_SOURCE  = os.getenv("SENTIMENT_SOURCE", "finnhub").lower()
 SENTIMENT_WINDOW_S = int(os.getenv("SENTIMENT_WINDOW_S", "900"))
 SENTIMENT_ASSETS = [a.strip().upper() for a in os.getenv("SENTIMENT_ASSETS","BTC,ETH,BNB,ADA,XRP,SOL").split(",") if a.strip()]
