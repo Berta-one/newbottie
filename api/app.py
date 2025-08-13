@@ -87,8 +87,13 @@ API_KEY           = os.getenv("BINANCE_API_KEY", os.getenv("API_KEY", "")).strip
 API_SECRET        = os.getenv("BINANCE_API_SECRET", os.getenv("API_SECRET", "")).strip()
 PRIMARY_QUOTE     = os.getenv("PRIMARY_QUOTE", "USDT").upper()
 
-LOOP_SLEEP_S      = float(os.getenv("LOOP_SLEEP_S", "6"))
-SIGNAL_INTERVAL_S = float(os.getenv("SIGNAL_INTERVAL_S", "30"))
+LOOP_SLEEP_S      = float(os.getenv("LOOP_SLEEP_S", "30"))  # Increased from 6 to 30 seconds
+SIGNAL_INTERVAL_S = float(os.getenv("SIGNAL_INTERVAL_S", "60"))  # Increased from 30 to 60 seconds
+
+# API usage optimization
+USE_WEBSOCKETS    = parse_bool(os.getenv("USE_WEBSOCKETS", "1"))  # Enable WebSocket by default
+BALANCE_CACHE_SEC = int(os.getenv("BALANCE_CACHE_SEC", "300"))    # Cache balance for 5 minutes
+MAX_KLINE_SYMBOLS = int(os.getenv("MAX_KLINE_SYMBOLS", "10"))     # Limit kline streams
 
 COST_LOOKBACK_DAYS    = int(os.getenv("COST_BASIS_LOOKBACK_DAYS", "120"))
 MAX_TRADES_PER_SYMBOL = int(os.getenv("MAX_TRADES_PER_SYMBOL", "1000"))
@@ -201,6 +206,15 @@ def add_log(msg: str):
     if len(_logs) > 1500:
         del _logs[:-1000]
     log.info(msg)
+
+# WebSocket data manager for reducing API calls
+try:
+    from engine.websocket_data_manager import get_websocket_manager, initialize_websocket_data
+    WEBSOCKET_AVAILABLE = True
+    add_log("WebSocket data manager loaded successfully")
+except Exception as e:
+    WEBSOCKET_AVAILABLE = False
+    add_log(f"WebSocket manager not available: {e}")
 
 # Return any of: ema, ml, q, sent, final_prob (0..1)
 _last_parts_cache = {} # optional: {symbol: {ema,ml,q,sent,final_prob}}
@@ -391,6 +405,17 @@ def _best_symbol_for_asset(asset: str, preferred_quotes: List[str]) -> Optional[
     return None
 
 def _fetch_tickers(symbols: List[str]) -> Dict[str, Any]:
+    """Fetch tickers - use WebSocket data if available, fallback to API"""
+    if WEBSOCKET_AVAILABLE:
+        try:
+            ws_manager = get_websocket_manager()
+            if ws_manager.is_connected():
+                # Use WebSocket data - much faster, no API calls
+                return ws_manager.get_tickers(symbols)
+        except Exception as e:
+            add_log(f"WebSocket ticker fetch failed, using API fallback: {e}")
+    
+    # Fallback to API (expensive)
     assert _exchange is not None
     syms = [s for s in symbols if s != f"{PRIMARY_QUOTE}/{PRIMARY_QUOTE}"]
     if not syms:
@@ -513,10 +538,25 @@ async def portfolio_loop():
     await _ensure_exchange()
     add_log(f"Portfolio loop started | exchange={EXCHANGE_ID} | primary_quote={PRIMARY_QUOTE}")
     assert _exchange is not None
+    
+    # Reduce balance fetching frequency to prevent API bans
+    last_balance_fetch = 0
+    balance_cache = {"total": {}}
+    BALANCE_CACHE_DURATION = BALANCE_CACHE_SEC  # Use configurable cache duration
+    
     while True:
         try:
-            bal = _exchange.fetch_balance(params={}) if (API_KEY and API_SECRET) else {"total": {}}
-            assets = _nonzero_assets_from_balance(bal)
+            # Significantly reduce balance fetching to prevent API bans
+            now = time.time()
+            if (API_KEY and API_SECRET) and (now - last_balance_fetch > BALANCE_CACHE_DURATION):
+                try:
+                    balance_cache = _exchange.fetch_balance(params={})
+                    last_balance_fetch = now
+                    add_log(f"Balance updated from exchange (cached for {BALANCE_CACHE_DURATION}s)")
+                except Exception as e:
+                    add_log(f"Balance fetch failed, using cache: {e}")
+            
+            assets = _nonzero_assets_from_balance(balance_cache)
             
             # If no API keys (paper trading mode), initialize with starting capital
             if not (API_KEY and API_SECRET) and not assets:
@@ -765,6 +805,21 @@ async def signals_loop():
     add_log(f"Signal loop started | TF={TRADE_TIMEFRAME} | Q={QUANTUM_ENABLED} | ML={ML_ENABLED or ONLINE_LEARN}")
     assert _exchange is not None
 
+    # Initialize WebSocket streams for reduced API usage
+    if WEBSOCKET_AVAILABLE and USE_WEBSOCKETS:
+        try:
+            scan_symbols = _symbols_to_scan()
+            if scan_symbols:
+                # Initialize WebSocket streams for all symbols we'll be monitoring
+                await initialize_websocket_data(
+                    symbols=scan_symbols,  # For ticker data
+                    kline_symbols=scan_symbols[:MAX_KLINE_SYMBOLS]  # Limit klines based on config
+                )
+                add_log(f"WebSocket streams initialized for {len(scan_symbols)} ticker symbols, {min(len(scan_symbols), MAX_KLINE_SYMBOLS)} kline symbols")
+            await asyncio.sleep(3)  # Allow WebSocket connections to establish
+        except Exception as e:
+            add_log(f"WebSocket initialization failed: {e}")
+
     while True:
         t0 = time.time()
         try:
@@ -773,12 +828,28 @@ async def signals_loop():
             thr_buy, thr_sell = _adaptive_thresholds()
 
             for sym in scan:
-                # 1) fetch ohlcv
-                try:
-                    data = _exchange.fetch_ohlcv(sym, timeframe=TRADE_TIMEFRAME, limit=TRADE_LOOKBACK_BARS)
-                except Exception as e:
-                    add_log(f"fetch_ohlcv fail {sym}: {e}")
-                    continue
+                # 1) fetch ohlcv - use WebSocket data if available and enabled
+                data = None
+                if WEBSOCKET_AVAILABLE and USE_WEBSOCKETS:
+                    try:
+                        ws_manager = get_websocket_manager()
+                        if ws_manager.is_connected():
+                            # Use WebSocket OHLCV data - no API call needed!
+                            data = ws_manager.get_klines(sym, limit=TRADE_LOOKBACK_BARS)
+                            if data:
+                                add_log(f"Using WebSocket data for {sym} (API call avoided)")
+                    except Exception as e:
+                        add_log(f"WebSocket OHLCV fetch failed for {sym}: {e}")
+                
+                # Fallback to API if WebSocket data unavailable (expensive!)
+                if not data:
+                    try:
+                        data = _exchange.fetch_ohlcv(sym, timeframe=TRADE_TIMEFRAME, limit=TRADE_LOOKBACK_BARS)
+                        add_log(f"Using API call for {sym} OHLCV (WebSocket unavailable)")
+                    except Exception as e:
+                        add_log(f"fetch_ohlcv fail {sym}: {e}")
+                        continue
+                        
                 if not data:
                     continue
                 f = _build_features(data)
@@ -876,11 +947,23 @@ async def online_label_loop():
     while True:
         try:
             for sym, pack in list(_prev_feature.items()):
-                # fetch just a small window to get latest close
-                try:
-                    data = _exchange.fetch_ohlcv(sym, timeframe=TRADE_TIMEFRAME, limit=3)
-                except Exception:
-                    continue
+                # Use WebSocket data if available, fallback to API
+                data = None
+                if WEBSOCKET_AVAILABLE:
+                    try:
+                        ws_manager = get_websocket_manager()
+                        if ws_manager.is_connected():
+                            data = ws_manager.get_klines(sym, limit=3)
+                    except Exception:
+                        pass
+                
+                # Fallback to API
+                if not data:
+                    try:
+                        data = _exchange.fetch_ohlcv(sym, timeframe=TRADE_TIMEFRAME, limit=3)
+                    except Exception:
+                        continue
+                        
                 if not data or len(data) < 2:
                     continue
                 latest_close = float(data[-1][4])
@@ -1320,6 +1403,44 @@ def health():
         "ml": {"enabled": ML_ENABLED, "loaded": bool(_ML_MODEL), "model_path": MODEL_XGB_PATH if _ML_MODEL else None},
         "sentiment": {"enabled": SENTIMENT_ENABLED}  # <-- boolean only; no heavy work here
     }
+
+@app.get("/websocket/status")
+def websocket_status():
+    """WebSocket connection and API usage optimization status"""
+    if not WEBSOCKET_AVAILABLE:
+        return {
+            "available": False,
+            "error": "WebSocket manager not available",
+            "api_optimization": "disabled"
+        }
+    
+    try:
+        ws_manager = get_websocket_manager()
+        status = ws_manager.get_connection_status()
+        
+        return {
+            "available": True,
+            "enabled": USE_WEBSOCKETS,
+            "connection_status": status,
+            "config": {
+                "balance_cache_seconds": BALANCE_CACHE_SEC,
+                "max_kline_symbols": MAX_KLINE_SYMBOLS,
+                "loop_sleep_seconds": LOOP_SLEEP_S,
+                "signal_interval_seconds": SIGNAL_INTERVAL_S
+            },
+            "api_optimization": {
+                "portfolio_loop": f"Balance cached for {BALANCE_CACHE_SEC}s",
+                "signals_loop": f"WebSocket OHLCV when available",
+                "ticker_data": f"WebSocket tickers when available",
+                "estimated_api_reduction": "80-95% fewer API calls"
+            }
+        }
+    except Exception as e:
+        return {
+            "available": True,
+            "enabled": USE_WEBSOCKETS,
+            "error": str(e)
+        }
 
 @app.get("/status")
 def status():
