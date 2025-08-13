@@ -1627,37 +1627,38 @@ def trades():
                 "order_id": f"bottie_{trade.get('t', time.time())}"
             })
         
-        # Try to fetch exchange trades for additional context
-        if _exchange and API_KEY and API_SECRET:
-            try:
-                # Get symbols from recent positions
-                recent_symbols = list(_positions.keys())[:10]  # Limit to avoid rate limits
-                
-                for symbol in recent_symbols:
-                    if symbol == f"{PRIMARY_QUOTE}/{PRIMARY_QUOTE}":
-                        continue
-                    try:
-                        since = _ms_since(7)  # Last 7 days
-                        exchange_trades = _exchange.fetch_my_trades(symbol, since=since, limit=50)
-                        
-                        for trade in exchange_trades[-20:]:  # Last 20 per symbol
-                            all_trades.append({
-                                "timestamp": trade.get("timestamp", 0) / 1000,
-                                "symbol": trade.get("symbol", ""),
-                                "side": trade.get("side", "").upper(),
-                                "quantity": trade.get("amount", 0),
-                                "price": trade.get("price", 0),
-                                "value": trade.get("cost", 0),
-                                "fee": trade.get("fee", {}).get("cost", 0),
-                                "fee_currency": trade.get("fee", {}).get("currency", ""),
-                                "source": "exchange",
-                                "order_id": trade.get("order", trade.get("id", ""))
-                            })
-                    except Exception as e:
-                        add_log(f"Error fetching trades for {symbol}: {e}")
-                        continue
-            except Exception as e:
-                add_log(f"Error fetching exchange trades: {e}")
+        # Skip heavy exchange trades fetching for now to avoid timeouts
+        # TODO: Add exchange trades in background or with pagination
+        # if _exchange and API_KEY and API_SECRET:
+        #     try:
+        #         # Get symbols from recent positions
+        #         recent_symbols = list(_positions.keys())[:10]  # Limit to avoid rate limits
+        #         
+        #         for symbol in recent_symbols:
+        #             if symbol == f"{PRIMARY_QUOTE}/{PRIMARY_QUOTE}":
+        #                 continue
+        #             try:
+        #                 since = _ms_since(7)  # Last 7 days
+        #                 exchange_trades = _exchange.fetch_my_trades(symbol, since=since, limit=50)
+        #                 
+        #                 for trade in exchange_trades[-20:]:  # Last 20 per symbol
+        #                     all_trades.append({
+        #                         "timestamp": trade.get("timestamp", 0) / 1000,
+        #                         "symbol": trade.get("symbol", ""),
+        #                         "side": trade.get("side", "").upper(),
+        #                         "quantity": trade.get("amount", 0),
+        #                         "price": trade.get("price", 0),
+        #                         "value": trade.get("cost", 0),
+        #                         "fee": trade.get("fee", {}).get("cost", 0),
+        #                         "fee_currency": trade.get("fee", {}).get("currency", ""),
+        #                         "source": "exchange",
+        #                         "order_id": trade.get("order", trade.get("id", ""))
+        #                     })
+        #             except Exception as e:
+        #                 add_log(f"Error fetching trades for {symbol}: {e}")
+        #                 continue
+        #     except Exception as e:
+        #         add_log(f"Error fetching exchange trades: {e}")
         
         # Sort by timestamp (most recent first)
         all_trades.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
