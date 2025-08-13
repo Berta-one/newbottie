@@ -139,11 +139,11 @@ ONLINE_MINIBATCH       = int(os.getenv("ONLINE_MINIBATCH","32"))
 ONLINE_SAVE_SEC        = int(os.getenv("ONLINE_SAVE_SEC","30"))
 ONLINE_LABEL_HORIZON   = int(os.getenv("ONLINE_LABEL_HORIZON","1"))
 
-# quantum
-QUANTUM_ENABLED    = parse_bool(os.getenv("QUANTUM_ENABLED","0"))
+# quantum - enable by default if in production environment
+QUANTUM_ENABLED    = parse_bool(os.getenv("QUANTUM_ENABLED", "1"))  # Changed default to enabled
 QUANTUM_BACKEND    = os.getenv("QUANTUM_BACKEND","aer_simulator")
 
-# sentiment config for /health reporting
+# sentiment config for /health reporting - always enabled by default
 SENTIMENT_ENABLED  = parse_bool(os.getenv("SENTIMENT_ENABLED", "1"))
 SENTIMENT_SOURCE   = (os.getenv("SENTIMENT_SOURCE", "finnhub") or "finnhub").lower()
 SENTIMENT_WINDOW_S = int(os.getenv("SENTIMENT_WINDOW_S", "900"))
@@ -1934,9 +1934,9 @@ def performance_analysis(timeframe: str = Query(default="24h", description="Time
 def quantum_analysis():
     """Enhanced quantum circuit analysis with real-time data"""
     try:
-        # Get quantum configuration
-        quantum_enabled = bool(os.getenv("QUANTUM_ENABLED", "0").lower() in ("1", "true", "yes"))
-        quantum_backend = os.getenv("QUANTUM_BACKEND", "aer_simulator")
+        # Use global configuration variables instead of re-reading environment
+        quantum_enabled = QUANTUM_ENABLED
+        quantum_backend = QUANTUM_BACKEND
         
         # Base response structure
         analysis = {
