@@ -402,7 +402,121 @@
   .positive { color: #4caf50; }
   .negative { color: #f44336; }
   
-  /* Grid Styles */
+  /* Enhanced Trades Table */
+  .trades-container {
+    max-height: 500px;
+    overflow-y: auto;
+    border: 1px solid #3a4553;
+    border-radius: 6px;
+    background: #1e2730;
+  }
+  
+  .trades-container::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  .trades-container::-webkit-scrollbar-track {
+    background: #2a3441;
+    border-radius: 4px;
+  }
+  
+  .trades-container::-webkit-scrollbar-thumb {
+    background: #64ffda;
+    border-radius: 4px;
+  }
+  
+  .trades-container::-webkit-scrollbar-thumb:hover {
+    background: #4db6ac;
+  }
+  
+  #trades-table {
+    width: 100%;
+    position: relative;
+  }
+  
+  #trades-table thead {
+    position: sticky;
+    top: 0;
+    background: #2a3441;
+    z-index: 10;
+  }
+  
+  #trades-table thead th {
+    background: #2a3441;
+    border-bottom: 2px solid #64ffda;
+    padding: 8px 12px;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  #trades-table tbody tr:hover {
+    background: rgba(100, 255, 218, 0.1);
+    cursor: pointer;
+  }
+  
+  .trade-buy {
+    color: #4caf50 !important;
+    font-weight: 600;
+  }
+  
+  .trade-sell {
+    color: #f44336 !important;
+    font-weight: 600;
+  }
+  
+  .trade-pnl-positive {
+    color: #4caf50;
+    font-weight: 600;
+  }
+  
+  .trade-pnl-negative {
+    color: #f44336;
+    font-weight: 600;
+  }
+  
+  .trade-pnl-neutral {
+    color: #8892b0;
+  }
+  
+  /* Trade Summary Box */
+  .trade-summary {
+    background: linear-gradient(135deg, #2a3441 0%, #1e2730 100%);
+    border: 1px solid #64ffda;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+  }
+  
+  .trade-summary-item {
+    text-align: center;
+  }
+  
+  .trade-summary-label {
+    font-size: 10px;
+    color: #8892b0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+  
+  .trade-summary-value {
+    font-size: 16px;
+    font-weight: 600;
+    color: #ffffff;
+  }
+  
+  .trade-summary-value.positive {
+    color: #4caf50;
+  }
+  
+  .trade-summary-value.negative {
+    color: #f44336;
+  }
   .maxi-grid-card {
     grid-column: 1 / -1;
     max-width: 100%;
@@ -1057,7 +1171,36 @@
             <input type="text" id="search-filter" placeholder="Search..." style="background: #2a3441; color: #fff; border: 1px solid #64ffda; padding: 4px 8px; border-radius: 4px; font-size: 12px;">
           </div>
         </div>
-        <div style="max-height: 400px; overflow-y: auto; border: 1px solid #3a4553; border-radius: 6px;">
+        
+        <!-- Trade Summary Box -->
+        <div class="trade-summary" id="trade-summary">
+          <div class="trade-summary-item">
+            <div class="trade-summary-label">Total Trades</div>
+            <div class="trade-summary-value" id="summary-total-trades">0</div>
+          </div>
+          <div class="trade-summary-item">
+            <div class="trade-summary-label">Realized P&L</div>
+            <div class="trade-summary-value" id="summary-realized-pnl">$0.00</div>
+          </div>
+          <div class="trade-summary-item">
+            <div class="trade-summary-label">Win Rate</div>
+            <div class="trade-summary-value" id="summary-win-rate">0%</div>
+          </div>
+          <div class="trade-summary-item">
+            <div class="trade-summary-label">Total Volume</div>
+            <div class="trade-summary-value" id="summary-total-volume">$0.00</div>
+          </div>
+          <div class="trade-summary-item">
+            <div class="trade-summary-label">Avg Trade Size</div>
+            <div class="trade-summary-value" id="summary-avg-trade">$0.00</div>
+          </div>
+          <div class="trade-summary-item">
+            <div class="trade-summary-label">Net P&L</div>
+            <div class="trade-summary-value" id="summary-net-pnl">$0.00</div>
+          </div>
+        </div>
+        
+        <div class="trades-container">
           <table id="trades-table" class="data-table">
             <thead>
               <tr>
@@ -1069,6 +1212,7 @@
                 <th>Value</th>
                 <th>Confidence</th>
                 <th>P&L Impact</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody>
