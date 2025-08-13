@@ -1565,6 +1565,11 @@ def health():
         "sentiment": {"enabled": SENTIMENT_ENABLED}  # <-- boolean only; no heavy work here
     }
 
+# Universal OPTIONS handler for CORS preflight
+@app.options("/{full_path:path}")
+def options_handler():
+    return {"message": "OK"}
+
 @app.get("/websocket/status")
 def websocket_status():
     """Free WebSocket connection and API usage optimization status"""
