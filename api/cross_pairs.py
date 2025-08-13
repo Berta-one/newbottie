@@ -11,6 +11,9 @@ PRIMARY_QUOTE = os.getenv("PRIMARY_QUOTE", "USDT").upper()
 EXCHANGE_ID = os.getenv("EXCHANGE_ID", "binance").lower()
 MAX_COLS = int(os.getenv("GRID_MAX_COLS", "80"))
 STABLES = [s.strip().upper() for s in os.getenv("GRID_STABLES", "USDT,USDC,BUSD,DAI").split(",") if s.strip()]
+# Major crypto assets for cross-pair opportunities
+MAJOR_CRYPTOS = [s.strip().upper() for s in os.getenv("GRID_MAJOR_CRYPTOS", "BTC,ETH,BNB,ADA,SOL,DOT,MATIC,AVAX,LINK,UNI,ATOM,XRP,LTC,BCH,ETC").split(",") if s.strip()]
+ENABLE_CRYPTO_PAIRS = os.getenv("ENABLE_CRYPTO_PAIRS", "1").lower() in ("1","true","yes")  # Enable crypto-to-crypto pairs
 SCAN_FILTER = os.getenv("TRADE_SYMBOLS", "")
 
 # Dynamic trade thresholds (more flexible than a single min-conf)
@@ -118,9 +121,12 @@ class CrossPairsWS:
             log.warning(f"[WS] fetch_balance failed: {e}")
 
         rows.update(STABLES)
+        # Add major cryptos to ensure cross-crypto opportunities (if enabled)
+        if ENABLE_CRYPTO_PAIRS:
+            rows.update(MAJOR_CRYPTOS)
         self.rows = sorted(rows)
 
-        # columns: from whitelist or from markets
+        # columns: from whitelist or from markets + major cryptos
         if SCAN_FILTER.strip():
             cols_set = set()
             for sym in [s.strip().upper() for s in SCAN_FILTER.split(",") if s.strip()]:
@@ -129,16 +135,26 @@ class CrossPairsWS:
                     cols_set.add(base); cols_set.add(quote)
                 except Exception:
                     pass
+            # Always include stables, and major cryptos if crypto pairs enabled
+            cols_set.update(STABLES)
+            if ENABLE_CRYPTO_PAIRS:
+                cols_set.update(MAJOR_CRYPTOS)
             self.cols = sorted(list(cols_set))[:MAX_COLS]
         else:
             bases, quotes = set(), set()
             for m in self.market_map.values():
                 if m.get("spot", True) and m.get("active", True):
                     bases.add(m["base"].upper()); quotes.add(m["quote"].upper())
-            common = [PRIMARY_QUOTE] + [x for x in (bases | quotes) if x != PRIMARY_QUOTE]
-            self.cols = common[:MAX_COLS]
+            # Prioritize stables and major cryptos (if enabled) for diverse cross-pair opportunities
+            priority_assets = STABLES + [PRIMARY_QUOTE]
+            if ENABLE_CRYPTO_PAIRS:
+                priority_assets = MAJOR_CRYPTOS + priority_assets
+            common_assets = sorted(list(set(priority_assets + list(bases | quotes))))
+            self.cols = common_assets[:MAX_COLS]
 
-        log.info(f"[WS] rows={len(self.rows)} cols={len(self.cols)}")
+        log.info(f"[WS] rows={len(self.rows)} cols={len(self.cols)} crypto_pairs_enabled={ENABLE_CRYPTO_PAIRS}")
+        if ENABLE_CRYPTO_PAIRS:
+            log.info(f"[WS] major_cryptos included: {MAJOR_CRYPTOS[:10]}")  # Show first 10 for brevity
 
     async def _resolve_symbols(self):
         found = set()

@@ -376,7 +376,8 @@ def _nonzero_assets_from_balance(balance: Dict[str, Any]) -> Dict[str, float]:
     return out
 
 def _quote_priority() -> List[str]:
-    tail = ["USDT","USD","BUSD","USDC","BTC","ETH","EUR","TRY","GBP"]
+    # Enhanced to include more crypto-to-crypto opportunities
+    tail = ["USDT","USD","BUSD","USDC","BTC","ETH","BNB","ADA","SOL","DOT","MATIC","AVAX","LINK","UNI","EUR","TRY","GBP"]
     if PRIMARY_QUOTE in tail:
         tail.remove(PRIMARY_QUOTE)
     return [PRIMARY_QUOTE] + tail
