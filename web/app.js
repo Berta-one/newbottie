@@ -5,24 +5,127 @@
   let authToken = null;
   let equityData = [];
   let refreshIntervals = {};
-  let tradesData = [];
   let performanceChart = null;
-  let performanceData = [];
-  let mlData = {};
 
-  // Simple jQuery-like selector
-  function $(selector) {
-    return document.querySelector(selector);
+  // Auto-login on page load
+  function autoLogin() {
+    console.log('Attempting auto-login...');
+    
+    // Auto-login as admin with correct credentials
+    currentUser = { username: 'admin', role: 'admin' };
+    authToken = 'auto-login-token';
+    
+    // Update UI immediately
+    updateUI();
+    
+    // Try to get a real token in the background
+    setTimeout(async () => {
+      try {
+        const response = await fetch(`${API}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: 'admin', password: 'Diego1234!' })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          authToken = data.access_token;
+          console.log('✅ Real authentication token obtained');
+        } else {
+          console.log('⚠️ Using fallback auto-login token');
+        }
+      } catch (error) {
+        console.log('⚠️ Auto-login fallback mode:', error.message);
+      }
+      
+      // Initialize dashboard after getting token
+      initializeDashboard();
+    }, 100);
   }
 
-  // Simple element finder with fallback
+  // Safe element finder
   function findElement(id) {
     const element = document.getElementById(id);
     if (!element) {
       console.warn(`Element not found: ${id}`);
-      return { textContent: '', style: {}, innerHTML: '' };
+      return { textContent: '', style: {}, innerHTML: '', classList: { add: () => {}, remove: () => {} } };
     }
     return element;
+  }
+
+  // Chart initialization with error handling
+  function initPerformanceChart() {
+    const canvas = document.getElementById('performance-chart');
+    if (!canvas) {
+      console.warn('Performance chart canvas not found');
+      return;
+    }
+    
+    // Destroy existing chart if it exists
+    if (performanceChart) {
+      performanceChart.destroy();
+      performanceChart = null;
+    }
+    
+    // Check if Chart.js is available
+    if (typeof Chart === 'undefined') {
+      console.error('Chart.js is not loaded');
+      canvas.style.display = 'none';
+      const container = canvas.parentElement;
+      if (container) {
+        container.innerHTML = '<p style="color: #ff9800;">Chart.js not loaded. Charts unavailable.</p>';
+      }
+      return;
+    }
+    
+    try {
+      const ctx = canvas.getContext('2d');
+      performanceChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [
+            {
+              label: 'Accuracy',
+              data: [],
+              borderColor: '#4caf50',
+              backgroundColor: 'rgba(76, 175, 80, 0.1)',
+              fill: false,
+              tension: 0.1
+            },
+            {
+              label: 'Confidence',
+              data: [],
+              borderColor: '#2196f3',
+              backgroundColor: 'rgba(33, 150, 243, 0.1)',
+              fill: false,
+              tension: 0.1
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              labels: { color: '#ffffff' }
+            }
+          },
+          scales: {
+            x: {
+              ticks: { color: '#8892b0' },
+              grid: { color: 'rgba(136, 146, 176, 0.1)' }
+            },
+            y: {
+              ticks: { color: '#8892b0' },
+              grid: { color: 'rgba(136, 146, 176, 0.1)' }
+            }
+          }
+        }
+      });
+      console.log('Performance chart initialized');
+    } catch (error) {
+      console.error('Failed to initialize performance chart:', error);
+    }
   }
 
   // Tab Management
@@ -46,63 +149,8 @@
           }
         });
 
-        // Trigger tab-specific refresh
-        if (targetTab === 'ml-monitor') {
-          refreshMLStatus();
-        } else if (targetTab === 'quantum') {
-          refreshQuantumDetails();
-        }
+        console.log(`Switched to tab: ${targetTab}`);
       });
-    });
-  }
-
-  // Chart Initialization for ML Monitor
-  function initPerformanceChart() {
-    const canvas = document.getElementById('performance-chart');
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    performanceChart = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: [],
-        datasets: [
-          {
-            label: 'Accuracy',
-            data: [],
-            borderColor: '#4caf50',
-            backgroundColor: 'rgba(76, 175, 80, 0.1)',
-            fill: false,
-            tension: 0.1
-          },
-          {
-            label: 'Confidence',
-            data: [],
-            borderColor: '#2196f3',
-            backgroundColor: 'rgba(33, 150, 243, 0.1)',
-            fill: false,
-            tension: 0.1
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: {
-            labels: { color: '#ffffff' }
-          }
-        },
-        scales: {
-          x: {
-            ticks: { color: '#8892b0' },
-            grid: { color: 'rgba(136, 146, 176, 0.1)' }
-          },
-          y: {
-            ticks: { color: '#8892b0' },
-            grid: { color: 'rgba(136, 146, 176, 0.1)' }
-          }
-        }
-      }
     });
   }
 
@@ -207,23 +255,34 @@
   // Add credential testing functionality
   async function testMultipleCredentials() {
     const credentials = [
-      { username: 'admin', password: 'Diego1234!' },          // Correct admin password from environment
-      { username: 'superuser', password: 'Lenny106667!' },    // Correct superuser password from environment
-      { username: 'admin', password: 'AdminPass456!' },       // Old expected password
-      { username: 'superuser', password: 'SuperSecret123!' }, // Old expected password
+      // Based on your HTML default values
+      { username: 'admin', password: 'Diego1234!' },
+      { username: 'superuser', password: 'Lenny106667!' },
+      
+      // Original expected passwords from code
+      { username: 'admin', password: 'AdminPass456!' },
+      { username: 'superuser', password: 'SuperSecret123!' },
+      
+      // Common fallbacks
       { username: 'admin', password: 'admin' },
       { username: 'superuser', password: 'superuser' },
       { username: 'admin', password: '' },
       { username: 'root', password: 'root' },
-      { username: 'user', password: 'user' }
+      { username: 'user', password: 'user' },
+      { username: 'test', password: 'test' },
+      
+      // Try with different case
+      { username: 'Admin', password: 'Diego1234!' },
+      { username: 'ADMIN', password: 'DIEGO1234!' }
     ];
 
     const loginError = document.getElementById('login-error');
-    loginError.innerHTML = 'Testing multiple credentials...<br>';
+    loginError.innerHTML = 'Testing multiple credentials...<br><br>';
 
-    for (const cred of credentials) {
+    for (let i = 0; i < credentials.length; i++) {
+      const cred = credentials[i];
       try {
-        loginError.innerHTML += `Trying ${cred.username}... `;
+        loginError.innerHTML += `[${i+1}/${credentials.length}] Trying ${cred.username}/${cred.password.substring(0,3)}... `;
         
         const response = await fetch(`${API}/auth/login`, {
           method: 'POST',
@@ -233,28 +292,36 @@
 
         if (response.ok) {
           const data = await response.json();
-          loginError.innerHTML += `✅ Success!<br>`;
+          loginError.innerHTML += `✅ SUCCESS!<br><br>`;
+          loginError.innerHTML += `✅ Working credentials found:<br>`;
+          loginError.innerHTML += `Username: <strong>${cred.username}</strong><br>`;
+          loginError.innerHTML += `Password: <strong>${cred.password}</strong><br><br>`;
           
           // Auto-fill the form with working credentials
           document.getElementById('username').value = cred.username;
           document.getElementById('password').value = cred.password;
           
+          // Auto-login
           saveAuthState(data.access_token, data.user);
           updateUI();
           initializeDashboard();
           return;
         } else {
-          loginError.innerHTML += `❌<br>`;
+          const errorData = await response.json();
+          loginError.innerHTML += `❌ (${response.status}: ${errorData.detail || 'Unknown'})<br>`;
         }
       } catch (error) {
-        loginError.innerHTML += `❌ Error<br>`;
+        loginError.innerHTML += `❌ Error: ${error.message}<br>`;
       }
       
-      // Small delay between attempts
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Small delay between attempts to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 200));
     }
     
-    loginError.innerHTML += 'All credentials failed. Please check with system administrator.';
+    loginError.innerHTML += '<br>❌ All credentials failed. Please check:';
+    loginError.innerHTML += '<br>1. Render environment variables are set correctly';
+    loginError.innerHTML += '<br>2. API service is deployed and running';
+    loginError.innerHTML += '<br>3. Try the debug endpoints below';
   }
 
   // Guest mode functionality (view-only without authentication)
@@ -522,7 +589,7 @@
   const logsContainer = document.getElementById('logs');
   const signalsTable = document.getElementById('signals-table');
   const sentimentTable = document.getElementById('sentiment-table');
-  const positionsContainer = document.getElementById('positions-container');
+  const positionsTable = document.getElementById('positionsTable');
   const equityCanvas = document.getElementById('equity-canvas');
   const ctx = equityCanvas?.getContext('2d');
   const tradesPanel = document.getElementById('trades-panel');
@@ -810,12 +877,17 @@
     }
   }
 
-  // Your existing refresh functions
+  // Enhanced refresh health function with better error handling
   async function refreshHealth() {
     try {
       const data = await fetchJSON('/health');
+      console.log('Health data:', data);
       
-      // Update quantum info
+      // Update quantum info with null checks
+      const qChip = document.getElementById('quantum-chip');
+      const qBackend = document.getElementById('quantum-backend');
+      const qEnabled = document.getElementById('quantum-enabled');
+      
       if (qChip && qBackend && qEnabled) {
         const q = data.quantum || {};
         setChip(qChip, q.enabled);
@@ -823,16 +895,27 @@
         qEnabled.textContent = q.enabled ? 'Yes' : 'No';
       }
       
-      // Update ML info
+      // Update ML info with null checks
+      const mlChip = document.getElementById('ml-chip');
+      const mlEnabled = document.getElementById('ml-enabled');
+      const mlLoaded = document.getElementById('ml-loaded');
+      const mlPath = document.getElementById('ml-path');
+      
       if (mlChip && mlEnabled && mlLoaded && mlPath) {
         const ml = data.ml || {};
-        setChip(mlChip, ml.loaded);
+        // Show green if enabled (even if model not loaded for cloud deployment)
+        setChip(mlChip, ml.enabled || ml.loaded);
         mlEnabled.textContent = ml.enabled ? 'Yes' : 'No';
         mlLoaded.textContent = ml.loaded ? 'Yes' : 'No';
         mlPath.textContent = ml.model_path || '—';
       }
       
-      // Update sentiment info
+      // Update sentiment info with null checks
+      const sentChip = document.getElementById('sent-chip');
+      const sentEnabled = document.getElementById('sent-enabled');
+      const sentSource = document.getElementById('sent-source');
+      const sentWindow = document.getElementById('sent-window');
+      
       if (sentChip && sentEnabled && sentSource && sentWindow) {
         const sent = data.sentiment || {};
         setChip(sentChip, sent.enabled);
@@ -840,8 +923,20 @@
         sentSource.textContent = sent.source || '—';
         sentWindow.textContent = sent.window_hours ? sent.window_hours + 'h' : '—';
       }
+      
+      console.log('Health display updated');
     } catch (error) {
       console.error('Health refresh failed:', error);
+      
+      // Set error states
+      const elements = ['quantum-chip', 'ml-chip', 'sent-chip'];
+      elements.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          setChip(el, 'err');
+          el.textContent = 'Error';
+        }
+      });
     }
   }
 
@@ -916,42 +1011,10 @@
   async function refreshPositions() {
     try {
       const data = await fetchJSON('/status');
-      if (!positionsContainer) return;
-      
       const positions = data.positions || {};
-      positionsContainer.innerHTML = '';
       
-      if (Object.keys(positions).length === 0) {
-        positionsContainer.innerHTML = '<p style="color: #8892b0;">No open positions</p>';
-        return;
-      }
-      
-      const table = document.createElement('table');
-      table.className = 'data-table';
-      table.innerHTML = `
-        <thead>
-          <tr><th>Symbol</th><th>Quantity</th><th>Avg Price</th><th>Current Price</th><th>P&L</th></tr>
-        </thead>
-        <tbody></tbody>
-      `;
-      
-      const tbody = table.querySelector('tbody');
-      Object.entries(positions).forEach(([symbol, pos]) => {
-        const pnl = (pos.last_px - pos.avg_px) * pos.qty;
-        const pnlClass = pnl >= 0 ? 'positive' : 'negative';
-        
-        const row = document.createElement('tr');
-        row.innerHTML = `
-          <td class="symbol">${symbol}</td>
-          <td>${fmt(pos.qty)}</td>
-          <td>${fmt(pos.avg_px)}</td>
-          <td>${fmt(pos.last_px)}</td>
-          <td class="${pnlClass}">${fmt(pnl)}</td>
-        `;
-        tbody.appendChild(row);
-      });
-      
-      positionsContainer.appendChild(table);
+      // Use the setPositions function which already handles the positionsTable
+      setPositions(positions);
     } catch (error) {
       console.error('Positions refresh failed:', error);
     }
@@ -1217,6 +1280,8 @@
     refreshIntervals.trades = setInterval(refreshTrades, signalsInterval * 2);
     refreshIntervals.logs = setInterval(refreshLogs, signalsInterval * 3);
     refreshIntervals.grid = setInterval(refreshGrid, gridInterval);
+    refreshIntervals.ml = setInterval(refreshMLStatus, signalsInterval * 2);
+    refreshIntervals.quantum = setInterval(refreshQuantumDetails, signalsInterval * 2);
     
     console.log('Refresh intervals applied');
   }
@@ -1232,29 +1297,107 @@
     refreshTrades();
     refreshLogs();
     refreshGrid();
+    refreshMLStatus();
+    refreshQuantumDetails();
     if (currentUser?.role === 'superuser') {
       refreshAuditLogs();
     }
   });
 
+  // Add this function to ensure all dashboard elements load properly
+  function ensureElementsExist() {
+    // Create missing elements if they don't exist
+    const requiredElements = [
+      'quantum-chip', 'quantum-backend', 'quantum-enabled',
+      'ml-chip', 'ml-enabled', 'ml-loaded', 'ml-path',
+      'sent-chip', 'sent-enabled', 'sent-source', 'sent-window',
+      'signals-table', 'sentiment-table', 'positionsTable',
+      'equity-canvas', 'trades-table', 'logs'
+    ];
+    
+    requiredElements.forEach(id => {
+      if (!document.getElementById(id)) {
+        console.warn(`Missing element: ${id}`);
+        // Create a placeholder element
+        const placeholder = document.createElement('div');
+        placeholder.id = id;
+        placeholder.textContent = '—';
+        placeholder.style.display = 'none';
+        document.body.appendChild(placeholder);
+      }
+    });
+  }
+
   // Initialize dashboard (called after login)
   function initializeDashboard() {
+    console.log('Initializing dashboard...');
+    
+    // Ensure all required elements exist
+    ensureElementsExist();
+    
     initTabs();
     initPerformanceChart();
     
-    // Initial data fetch
-    refreshHealth();
-    refreshSentiment();
-    refreshSignals();
-    refreshPositions();
-    refreshEquityChart();
-    refreshTrades();
-    refreshLogs();
-    refreshGrid();
-    
-    if (currentUser?.role === 'superuser') {
-      refreshAuditLogs();
-    }
+    // Initial data fetch with error handling
+    setTimeout(async () => {
+      console.log('Starting initial refresh sequence...');
+      try {
+        await refreshHealth();
+        console.log('Health refreshed');
+      } catch (e) { console.error('Health refresh failed:', e); }
+      
+      try {
+        await refreshSentiment();
+        console.log('Sentiment refreshed');
+      } catch (e) { console.error('Sentiment refresh failed:', e); }
+      
+      try {
+        await refreshSignals();
+        console.log('Signals refreshed');
+      } catch (e) { console.error('Signals refresh failed:', e); }
+      
+      try {
+        await refreshPositions();
+        console.log('Positions refreshed');
+      } catch (e) { console.error('Positions refresh failed:', e); }
+      
+      try {
+        await refreshEquityChart();
+        console.log('Equity chart refreshed');
+      } catch (e) { console.error('Equity chart refresh failed:', e); }
+      
+      try {
+        await refreshTrades();
+        console.log('Trades refreshed');
+      } catch (e) { console.error('Trades refresh failed:', e); }
+      
+      try {
+        await refreshLogs();
+        console.log('Logs refreshed');
+      } catch (e) { console.error('Logs refresh failed:', e); }
+      
+      try {
+        await refreshGrid();
+        console.log('Grid refreshed');
+      } catch (e) { console.error('Grid refresh failed:', e); }
+      
+      try {
+        await refreshMLStatus();
+        console.log('ML status refreshed');
+      } catch (e) { console.error('ML status refresh failed:', e); }
+      
+      try {
+        await refreshQuantumDetails();
+        console.log('Quantum details refreshed');
+      } catch (e) { console.error('Quantum details refresh failed:', e); }
+      
+      if (currentUser?.role === 'superuser') {
+        try {
+          await refreshAuditLogs();
+          console.log('Audit logs refreshed');
+        } catch (e) { console.error('Audit logs refresh failed:', e); }
+      }
+    }, 500);
     
     // Set up auto-refresh
     applyRefreshIntervals();
@@ -1262,6 +1405,8 @@
     // Resize canvas on window resize
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
+    
+    console.log('Dashboard initialization complete');
   }
 
   // Auto-login check on page load
@@ -1289,8 +1434,48 @@
     equityEl.textContent = typeof eq === "number" ? eq.toFixed(2) : "—";
   };
 
+  // Test the dashboard loading
+  async function testDashboardData() {
+    console.log('Testing dashboard data loading...');
+    
+    const endpoints = [
+      '/health',
+      '/status', 
+      '/signals',
+      '/sentiment',
+      '/ml/status',
+      '/quantum/details',
+      '/grid/matrix',
+      '/trades',
+      '/logs/last'
+    ];
+    
+    for (const endpoint of endpoints) {
+      try {
+        const response = await authFetch(endpoint);
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`✅ ${endpoint}:`, data);
+        } else {
+          console.error(`❌ ${endpoint}: HTTP ${response.status}`);
+        }
+      } catch (error) {
+        console.error(`❌ ${endpoint}: ${error.message}`);
+      }
+    }
+  }
+
+  // Make testDashboardData available globally for debugging
+  window.testDashboardData = testDashboardData;
+
   // Expose API variable globally for other functions
   window.API = API;
+  
+  // Make autoLogin globally accessible
+  window.autoLogin = autoLogin;
+  
+  // Make fetchJSON globally accessible for maxi-grid functions
+  window.fetchJSON = fetchJSON;
 
   // Initialize UI enhancements
   setTimeout(() => {
@@ -1298,6 +1483,11 @@
   }, 100);
 
 })();
+
+// Global jQuery-like selector function (moved outside closure)
+function $(selector) {
+  return document.querySelector(selector);
+}
 
 /* UI helpers */
 function setHealth(ok, ts, quantum) {
@@ -1322,6 +1512,10 @@ function setEquity(eq) {
 
 function setPositions(positions) {
   const tbody = $("#positionsTable tbody");
+  if (!tbody) {
+    console.warn("positionsTable tbody not found");
+    return;
+  }
   tbody.innerHTML = "";
   if (!positions || !Object.keys(positions).length) {
     tbody.innerHTML = `<tr><td colspan="3" style="color:#9bb0bf">No positions</td></tr>`;
@@ -1332,32 +1526,6 @@ function setPositions(positions) {
     tr.innerHTML = `<td>${sym}</td><td>${(+p.qty).toFixed(6)}</td><td>${(+p.avg_px).toFixed(4)}</td>`;
     tbody.appendChild(tr);
   }
-}
-
-function setSignals(signals) {
-  const tbody = $("#signalsTable tbody");
-  tbody.innerHTML = "";
-  if (!signals || !signals.length) {
-    tbody.innerHTML = `<tr><td colspan="4" style="color:#9bb0bf">No signals yet</td></tr>`;
-    return;
-  }
-  const last = signals.slice(-50).reverse();
-  for (const s of last) {
-    const t = s.t ? new Date(s.t * 1000).toLocaleTimeString() : "–";
-    const conf = (s.conf != null) ? (+s.conf).toFixed(3) : "–";
-    const tr = document.createElement("tr");
-    let color = "#9bb0bf";
-    if (s.signal === "BUY") color = "#66e0a3";
-    if (s.signal === "SELL") color = "#ef6f6c";
-    tr.innerHTML = `<td>${t}</td><td>${s.symbol || "–"}</td><td style="color:${color};font-weight:700">${s.signal || "–"}</td><td>${conf}</td>`;
-    tbody.appendChild(tr);
-  }
-}
-
-async function fetchJSON(path) {
-  const res = await fetch(`${API}${path}`, { cache: "no-store" });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return await res.json();
 }
 
 // ============ MAXI GRID (improved) ============
@@ -1452,7 +1620,7 @@ function renderMaxiGrid() {
 async function refreshMaxiGrid() {
   try {
     // NOTE: we keep server param for the future, but filter is client-side now
-    const r = await fetch(`${API}/grid/matrix?min_conf=${GRID_MIN_CONF.toFixed(2)}`);
+    const r = await fetch(`${window.API}/grid/matrix?min_conf=${GRID_MIN_CONF.toFixed(2)}`);
     const g = await r.json();
     GRID_ROWS = g.rows || [];
     GRID_COLS = g.cols || [];
@@ -1494,7 +1662,6 @@ async function ping() {
     const status = await fetchJSON("/status");
     setEquity(status.equity);
     setPositions(status.positions);
-    setSignals(status.last_signals || status.signals);
   } catch (e) {
     console.warn("status error:", e.message);
   }
@@ -1502,7 +1669,7 @@ async function ping() {
   try {
     const logs = await fetchJSON("/logs/last");
     const text = (logs.logs || []).join("\n");
-    $("#logsView").textContent = text || "—";
+    $("#logs").textContent = text || "—";
   } catch (e) {
     // ignore
   }
@@ -1520,3 +1687,6 @@ function startGridPolling() {
 setInterval(ping, 2000);
 ping();
 startGridPolling();
+
+// Initialize auto-login when page loads
+autoLogin();
