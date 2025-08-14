@@ -438,30 +438,35 @@ function forceOfflineMode() {
     const debugToggle = document.getElementById('debug-toggle');
     const userName = document.getElementById('user-name');
     
+    // FORCE SHOW DASHBOARD - Always show main content (auth bypassed)
+    if (loginModal) loginModal.style.display = 'none';
+    if (mainContent) mainContent.style.display = 'block';
+    if (dashboardTabs) dashboardTabs.style.display = 'flex';
+    if (userInfo) userInfo.style.display = 'flex';
+    if (debugToggle) debugToggle.style.display = 'block';
+    
     if (currentUser && authToken) {
-      loginModal.style.display = 'none';
-      mainContent.style.display = 'block';
-      dashboardTabs.style.display = 'flex';
-      userInfo.style.display = 'flex';
-      debugToggle.style.display = 'block';
-      userName.textContent = currentUser.username || 'User';
+      if (userName) userName.textContent = currentUser.username || 'User';
       
       // Show audit section for superusers
-      if (currentUser.role === 'superuser') {
-        document.getElementById('audit-section').style.display = 'block';
+      const auditSection = document.getElementById('audit-section');
+      if (auditSection && currentUser.role === 'superuser') {
+        auditSection.style.display = 'block';
       }
       
       // Update debug info
-      document.getElementById('debug-api-base').textContent = API;
-      document.getElementById('debug-user').textContent = currentUser.username;
-      document.getElementById('debug-role').textContent = currentUser.role;
-      document.getElementById('debug-session').textContent = authToken.slice(0, 8) + '...';
+      const debugApiBase = document.getElementById('debug-api-base');
+      const debugUser = document.getElementById('debug-user');
+      const debugRole = document.getElementById('debug-role');
+      const debugSession = document.getElementById('debug-session');
+      
+      if (debugApiBase) debugApiBase.textContent = API;
+      if (debugUser) debugUser.textContent = currentUser.username;
+      if (debugRole) debugRole.textContent = currentUser.role;
+      if (debugSession) debugSession.textContent = authToken.slice(0, 8) + '...';
     } else {
-      loginModal.style.display = 'flex';
-      mainContent.style.display = 'none';
-      dashboardTabs.style.display = 'none';
-      userInfo.style.display = 'none';
-      debugToggle.style.display = 'none';
+      // Even without auth, show dashboard with default user
+      if (userName) userName.textContent = 'Demo User';
     }
   }
 
@@ -488,6 +493,24 @@ function forceOfflineMode() {
     const fakeUser = { username: 'auto-user', role: 'admin' };
     
     saveAuthState(fakeToken, fakeUser);
+    
+    // Force show dashboard elements immediately
+    const loginModal = document.getElementById('login-modal');
+    const mainContent = document.getElementById('main-content');
+    const dashboardTabs = document.getElementById('dashboard-tabs');
+    const userInfo = document.getElementById('user-info');
+    const userName = document.getElementById('user-name');
+    const debugToggle = document.getElementById('debug-toggle');
+    
+    if (loginModal) loginModal.style.display = 'none';
+    if (mainContent) mainContent.style.display = 'block';
+    if (dashboardTabs) dashboardTabs.style.display = 'flex';
+    if (userInfo) userInfo.style.display = 'flex';
+    if (userName) userName.textContent = fakeUser.username || 'Auto User';
+    if (debugToggle) debugToggle.style.display = 'block';
+    
+    console.log('✅ Dashboard elements shown');
+    
     updateUI();
     initializeDashboard();
   }
