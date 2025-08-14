@@ -1481,6 +1481,11 @@ function forceOfflineMode() {
     resizeCanvas();
   }
 
+  // FORCE OFFLINE MODE - Show dashboard immediately with demo data
+  console.log('🔄 Forcing offline mode - showing demo dashboard');
+  window.offlineMode = true;
+  window.serverOnline = false;
+  
   // Auto-login check on page load - BYPASS AUTHENTICATION
   if (loadAuthState()) {
     updateUI();
@@ -1520,22 +1525,35 @@ function forceOfflineMode() {
 
 /* UI helpers */
 function setHealth(ok, ts, quantum) {
-  $("#health-status").textContent = ok ? "OK" : "DOWN";
-  $("#health-status").style.color = ok ? "#66e0a3" : "#ef6f6c";
-  $("#health-time").textContent = ts ? new Date(ts * 1000).toLocaleTimeString() : "—";
-  $("#health-quantum").textContent = quantum || "—";
+  const statusEl = document.getElementById("health-status");
+  const timeEl = document.getElementById("health-time");
+  const quantumEl = document.getElementById("health-quantum");
+  
+  if (statusEl) {
+    statusEl.textContent = ok ? "OK" : "DOWN";
+    statusEl.style.color = ok ? "#66e0a3" : "#ef6f6c";
+  }
+  if (timeEl) timeEl.textContent = ts ? new Date(ts * 1000).toLocaleTimeString() : "—";
+  if (quantumEl) quantumEl.textContent = quantum || "—";
 }
 
 function setEquity(eq) {
-  $("#equity").textContent = typeof eq === "number" ? eq.toFixed(2) : "—";
-  const ds = equityChart.data.datasets[0];
-  const labels = equityChart.data.labels;
-  const now = new Date().toLocaleTimeString();
-  if (typeof eq === "number") {
-    labels.push(now);
-    ds.data.push(eq);
-    if (labels.length > 120) { labels.shift(); ds.data.shift(); }
-    equityChart.update();
+  const equityEl = document.getElementById("equity");
+  if (equityEl) {
+    equityEl.textContent = typeof eq === "number" ? eq.toFixed(2) : "—";
+  }
+  
+  // Only update chart if it exists
+  if (typeof equityChart !== 'undefined' && equityChart) {
+    const ds = equityChart.data.datasets[0];
+    const labels = equityChart.data.labels;
+    const now = new Date().toLocaleTimeString();
+    if (typeof eq === "number") {
+      labels.push(now);
+      ds.data.push(eq);
+      if (labels.length > 120) { labels.shift(); ds.data.shift(); }
+      equityChart.update();
+    }
   }
 }
 
