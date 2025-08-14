@@ -296,7 +296,8 @@ function forceOfflineMode() {
 
 // Add this to your HTML button
 // <button onclick="forceOfflineMode()">Force Offline Mode</button>
-// (function () {
+
+(function () {
   const API = new URLSearchParams(location.search).get('api') || 'https://bottie-1.onrender.com';
   
   let currentUser = null;
