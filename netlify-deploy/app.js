@@ -136,6 +136,9 @@
     refreshIntervals.ml = setInterval(refreshMLStatus, 20000);
     refreshIntervals.quantum = setInterval(refreshQuantumDetails, 30000);
     refreshIntervals.brier = setInterval(refreshBrierScore, 25000);
+    refreshIntervals.trades = setInterval(refreshTrades, 12000);
+    refreshIntervals.equity = setInterval(refreshEquityChart, 15000);
+    refreshIntervals.mlInterpretation = setInterval(refreshMLInterpretation, 30000);
     
     // Initial data load
     setTimeout(() => {
@@ -146,6 +149,9 @@
       refreshMLStatus();
       refreshQuantumDetails();
       refreshBrierScore();
+      refreshTrades();
+      refreshEquityChart();
+      refreshMLInterpretation();
     }, 500);
   }
 
@@ -307,6 +313,61 @@
         mlChip.textContent = 'ML: Error';
       }
     }
+  }
+
+  async function refreshMLInterpretation() {
+    try {
+      const data = await fetchJSON('/ml/interpretation');
+      console.log('🔬 ML Interpretation received:', data); // Debug log
+      updateMLInterpretation(data);
+    } catch (error) {
+      console.error('Failed to refresh ML interpretation:', error);
+    }
+  }
+
+  function updateMLInterpretation(data) {
+    // Update ML interpretation section if it exists
+    const interpretationContainer = document.getElementById('ml-interpretation-container');
+    if (!interpretationContainer) return;
+    
+    const featureAnalysis = data.feature_analysis || {};
+    const learningInsights = data.learning_insights || {};
+    
+    // Create feature analysis HTML
+    const featuresHtml = Object.entries(featureAnalysis).map(([key, feature]) => `
+      <div class="ml-feature-card">
+        <div class="feature-header">
+          <span class="feature-name">${key.replace('_', ' ').toUpperCase()}</span>
+          <span class="feature-weight">${(feature.weight * 100).toFixed(1)}%</span>
+        </div>
+        <div class="feature-description">${feature.description}</div>
+        <div class="feature-signal">Current: ${feature.current_signal}</div>
+        <div class="feature-confidence">Confidence: ${(feature.pattern_confidence * 100).toFixed(1)}%</div>
+        <div class="learned-patterns">
+          ${feature.learned_patterns?.slice(0, 2).map(pattern => `<li>${pattern}</li>`).join('') || ''}
+        </div>
+      </div>
+    `).join('');
+    
+    // Update learning insights
+    const insightsHtml = `
+      <div class="learning-insights">
+        <h4>Current Learning Focus</h4>
+        <ul>${learningInsights.current_learning_focus?.slice(0, 3).map(focus => `<li>${focus}</li>`).join('') || ''}</ul>
+        
+        <h4>Recent Discoveries</h4>
+        <ul>${learningInsights.recent_discoveries?.slice(0, 3).map(discovery => `<li>${discovery}</li>`).join('') || ''}</ul>
+        
+        <h4>Model Architecture</h4>
+        <div class="model-stats">
+          <div>Type: ${learningInsights.model_evolution?.architecture || 'Ensemble Model'}</div>
+          <div>Training Samples: ${learningInsights.model_evolution?.training_samples?.toLocaleString() || '0'}</div>
+          <div>Validation Accuracy: ${((learningInsights.model_evolution?.validation_accuracy || 0) * 100).toFixed(1)}%</div>
+        </div>
+      </div>
+    `;
+    
+    interpretationContainer.innerHTML = featuresHtml + insightsHtml;
   }
 
   async function refreshQuantumDetails() {
@@ -512,17 +573,23 @@
       const positions = data.positions || {};
       console.log('💼 Positions received:', positions); // Debug log
       
-      const positionCards = Object.entries(positions).map(([symbol, pos]) => `
+      const positionCards = Object.entries(positions).map(([symbol, pos]) => {
+        const marketValue = (pos.quantity || 0) * (pos.current_price || 0);
+        const pnlPercentage = pos.pnl_percentage || 0;
+        return `
         <div class="position-card">
           <div class="position-symbol">${symbol}</div>
           <div class="position-details">
             <div class="position-qty">Qty: ${pos.quantity?.toFixed(6) || '0.000000'}</div>
             <div class="position-price">Price: $${pos.current_price?.toFixed(2) || '0.00'}</div>
-            <div class="position-value">Value: $${pos.market_value?.toFixed(2) || '0.00'}</div>
-            <div class="position-pnl ${pos.pnl >= 0 ? 'profit' : 'loss'}">P&L: ${pos.pnl >= 0 ? '+' : ''}$${pos.pnl?.toFixed(2) || '0.00'}</div>
+            <div class="position-value">Value: $${marketValue.toFixed(2)}</div>
+            <div class="position-pnl ${pos.pnl >= 0 ? 'profit' : 'loss'}">
+              P&L: ${pos.pnl >= 0 ? '+' : ''}$${pos.pnl?.toFixed(2) || '0.00'} (${pnlPercentage >= 0 ? '+' : ''}${pnlPercentage.toFixed(2)}%)
+            </div>
           </div>
         </div>
-      `).join('');
+        `;
+      }).join('');
       
       positionsContainer.innerHTML = positionCards || '<p>No positions</p>';
       

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bottie Debug Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #0f1419;
+            color: #8892b0;
+        }
+        .container {
+            background-color: #1d2230;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #64ffda;
+            color: #0f1419;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #4fd3b3;
+        }
+        #results {
+            background-color: #112240;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        input {
+            background-color: #112240;
+            color: #8892b0;
+            border: 1px solid #4fd3b3;
+            padding: 8px;
+            border-radius: 4px;
+            width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Bottie Debug Test Tool</h1>
+    
+    <div class="container">
+        <h3>API Configuration</h3>
+        <label>API Base URL:</label>
+        <input type="text" id="apiUrl" value="https://bottie-1.onrender.com">
+        <button onclick="updateApiUrl()">Update</button>
+    </div>
+
+    <div class="container">
+        <h3>Basic Connectivity Tests</h3>
+        <button onclick="testHealth()">Test /health</button>
+        <button onclick="testStatus()">Test /status</button>
+        <button onclick="testCORS()">Test CORS</button>
+    </div>
+
+    <div class="container">
+        <h3>Debug Endpoints</h3>
+        <button onclick="testDebugAuth()">Test /debug/auth</button>
+        <button onclick="testDebugLogin()">Test /debug/test-login</button>
+        <button onclick="testResetPasswords()">Test /debug/reset-passwords</button>
+    </div>
+
+    <div class="container">
+        <h3>Authentication Tests</h3>
+        <button onclick="testLoginAdmin()">Test Login (admin)</button>
+        <button onclick="testLoginSuperuser()">Test Login (superuser)</button>
+        <button onclick="testAllCredentials()">Test Multiple Credentials</button>
+    </div>
+
+    <div class="container">
+        <h3>Results</h3>
+        <div id="results">Click a button above to start testing...</div>
+    </div>
+
+    <script>
+        let API_BASE = 'https://bottie-1.onrender.com';
+        
+        function updateApiUrl() {
+            API_BASE = document.getElementById('apiUrl').value;
+            log(`API URL updated to: ${API_BASE}`);
+        }
+
+        function log(message) {
+            const results = document.getElementById('results');
+            const timestamp = new Date().toLocaleTimeString();
+            results.textContent += `[${timestamp}] ${message}\n`;
+            results.scrollTop = results.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('results').textContent = '';
+        }
+
+        async function makeRequest(endpoint, options = {}) {
+            const url = `${API_BASE}${endpoint}`;
+            log(`Making request to: ${url}`);
+            
+            try {
+                const response = await fetch(url, {
+                    mode: 'cors',
+                    ...options
+                });
+                
+                log(`Response status: ${response.status} ${response.statusText}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`Response data: ${JSON.stringify(data, null, 2)}`);
+                    return data;
+                } else {
+                    const text = await response.text();
+                    log(`Error response: ${text}`);
+                    return null;
+                }
+            } catch (error) {
+                log(`Request failed: ${error.message}`);
+                return null;
+            }
+        }
+
+        async function testHealth() {
+            log('=== Testing /health endpoint ===');
+            await makeRequest('/health');
+        }
+
+        async function testStatus() {
+            log('=== Testing /status endpoint ===');
+            await makeRequest('/status');
+        }
+
+        async function testCORS() {
+            log('=== Testing CORS ===');
+            try {
+                const response = await fetch(`${API_BASE}/health`, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Origin': window.location.origin,
+                        'Access-Control-Request-Method': 'GET',
+                        'Access-Control-Request-Headers': 'Content-Type'
+                    }
+                });
+                log(`CORS preflight status: ${response.status}`);
+                log(`CORS headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`);
+            } catch (error) {
+                log(`CORS test failed: ${error.message}`);
+            }
+        }
+
+        async function testDebugAuth() {
+            log('=== Testing /debug/auth endpoint ===');
+            await makeRequest('/debug/auth');
+        }
+
+        async function testDebugLogin() {
+            log('=== Testing /debug/test-login endpoint ===');
+            await makeRequest('/debug/test-login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: 'admin', password: 'AdminPass456!' })
+            });
+        }
+
+        async function testResetPasswords() {
+            log('=== Testing /debug/reset-passwords endpoint ===');
+            await makeRequest('/debug/reset-passwords', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
+        async function testLoginAdmin() {
+            log('=== Testing /auth/login with admin credentials ===');
+            await makeRequest('/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: 'admin', password: 'AdminPass456!' })
+            });
+        }
+
+        async function testLoginSuperuser() {
+            log('=== Testing /auth/login with superuser credentials ===');
+            await makeRequest('/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: 'superuser', password: 'SuperSecret123!' })
+            });
+        }
+
+        async function testAllCredentials() {
+            log('=== Testing multiple credential combinations ===');
+            const credentials = [
+                { username: 'admin', password: 'AdminPass456!' },
+                { username: 'superuser', password: 'SuperSecret123!' },
+                { username: 'admin', password: 'admin' },
+                { username: 'superuser', password: 'superuser' },
+                { username: 'admin', password: '' },
+                { username: 'root', password: 'root' }
+            ];
+
+            for (const cred of credentials) {
+                log(`Testing: ${cred.username} / ${cred.password || '[empty]'}`);
+                await makeRequest('/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(cred)
+                });
+                await new Promise(resolve => setTimeout(resolve, 500)); // Small delay
+            }
+        }
+
+        // Clear log button
+        window.addEventListener('load', () => {
+            const container = document.querySelector('.container:last-of-type');
+            const clearBtn = document.createElement('button');
+            clearBtn.textContent = 'Clear Log';
+            clearBtn.onclick = clearLog;
+            clearBtn.style.backgroundColor = '#ef6f6c';
+            container.insertBefore(clearBtn, container.lastElementChild);
+        });
+    </script>
+</body>
+</html>
