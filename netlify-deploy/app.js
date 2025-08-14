@@ -360,6 +360,17 @@ function forceOfflineMode() {
     const canvas = document.getElementById('performance-chart');
     if (!canvas) return;
     
+    // Check if Chart.js is available
+    if (typeof Chart === 'undefined') {
+      console.warn('📊 Chart.js not available - charts will be disabled');
+      canvas.style.display = 'flex';
+      canvas.style.alignItems = 'center';
+      canvas.style.justifyContent = 'center';
+      canvas.style.color = '#8892b0';
+      canvas.innerHTML = '<div>📊 Chart library loading...</div>';
+      return;
+    }
+    
     const ctx = canvas.getContext('2d');
     performanceChart = new Chart(ctx, {
       type: 'line',
