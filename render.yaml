@@ -8,6 +8,7 @@ services:
     buildCommand: |
       python -m pip install --upgrade pip
       pip install --no-cache-dir -r requirements.txt
+      echo "Build completed for render_api deployment"
     startCommand: uvicorn render_api:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PORT
