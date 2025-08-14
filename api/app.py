@@ -466,11 +466,14 @@ def auth_login(request: dict):
     username = request.get("username", "")
     password = request.get("password", "")
     
-    if username == "admin" and password == "Diego1234!":
+    admin_username = os.getenv("ADMIN_USERNAME")
+    admin_password = os.getenv("ADMIN_PASSWORD")
+
+    if username == admin_username and password == admin_password:
         return {
             "access_token": "real-trading-token",
             "token_type": "bearer",
-            "username": "admin",
+            "username": admin_username,
             "role": "admin"
         }
     else:
