@@ -26,6 +26,45 @@
     align-items: center;
   }
   
+  .header-status {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  
+  .connection-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: normal;
+  }
+  
+  .connection-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #f44336;
+    animation: pulse 2s infinite;
+  }
+  
+  .connection-dot.connected {
+    background: #4CAF50;
+    animation: none;
+  }
+  
+  .connection-dot.connecting {
+    background: #ff9800;
+    animation: pulse 1s infinite;
+  }
+  
+  @keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+  }
+  
   .user-info {
     display: flex;
     align-items: center;
@@ -697,6 +736,59 @@
   .grid-hold { background: rgba(255, 152, 0, 0.3); color: #ff9800; }
   .grid-sell { background: rgba(244, 67, 54, 0.3); color: #f44336; }
   .grid-na { background: rgba(158, 158, 158, 0.2); color: #9e9e9e; }
+
+  /* Signal and Trade Styles */
+  .signal {
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  
+  .signal--buy { background: #4caf50; color: #ffffff; }
+  .signal--sell { background: #f44336; color: #ffffff; }
+  .signal--hold { background: #ff9800; color: #ffffff; }
+  
+  .trade-side {
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  
+  .trade-side--buy { background: #4caf50; color: #ffffff; }
+  .trade-side--sell { background: #f44336; color: #ffffff; }
+  
+  .profit { color: #4caf50; font-weight: 600; }
+  .loss { color: #f44336; font-weight: 600; }
+
+  /* Position Cards */
+  .position-card {
+    background: #1a2332;
+    border: 1px solid #2a3441;
+    border-radius: 4px;
+    padding: 10px;
+    margin-bottom: 8px;
+  }
+  
+  .position-symbol {
+    color: #64ffda;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  
+  .position-details {
+    font-size: 11px;
+    color: #8892b0;
+  }
+  
+  .position-qty,
+  .position-price,
+  .position-last {
+    margin: 2px 0;
+  }
 </style>
 </head>
 <body>
@@ -705,15 +797,14 @@
 <div id="login-modal" class="login-modal" style="display: none !important;">
   <div class="login-form">
     <h2>🔓 Auto Login Enabled</h2>
-    <p style="color: #64ffda; text-align: center;">Authentication bypassed for demo</p>
     <form id="login-form">
       <div class="form-group">
         <label class="form-label">Username</label>
-        <input type="text" id="username" class="form-input" value="demo-user" disabled>
+        <input type="text" id="username" class="form-input" value="auto-user" required>
       </div>
       <div class="form-group">
         <label class="form-label">Password</label>
-        <input type="password" id="password" class="form-input" value="bypassed" disabled>
+        <input type="password" id="password" class="form-input" value="bypass" required>
       </div>
       <button type="submit" id="login-btn" class="login-btn">Auto Login</button>
       <div id="login-error" class="login-error"></div>
@@ -723,20 +814,27 @@
 
 <header>
   <div>Bottie Live Dashboard</div>
-  <div class="user-info" id="user-info" style="display: none;">
-    <span id="user-name" class="user-badge">—</span>
+  <div class="header-status">
+    <div class="connection-status" id="connection-status">
+      <span class="connection-dot" id="connection-dot"></span>
+      <span class="connection-text" id="connection-text">Connecting...</span>
+    </div>
+    <div class="api-endpoint" id="api-endpoint" style="font-size: 11px; color: #8892b0;">—</div>
+  </div>
+  <div class="user-info" id="user-info">
+    <span id="current-user" class="user-badge">Auto-User</span>
     <button id="logout-btn" class="logout-btn">Logout</button>
   </div>
 </header>
 
 <!-- Tab Navigation -->
-<div class="dashboard-tabs" id="dashboard-tabs" style="display: none;">
+<div class="dashboard-tabs" id="dashboard-tabs">
   <button class="tab-btn active" data-tab="trading">📊 Trading</button>
   <button class="tab-btn" data-tab="ml-monitor">🧠 ML Learning</button>
   <button class="tab-btn" data-tab="quantum">⚡ Quantum Analysis</button>
 </div>
 
-<main id="main-content" style="display: none;">
+<main id="main-content">
   
   <!-- Trading Tab -->
   <div id="trading-tab" class="tab-content active">
@@ -773,19 +871,19 @@
         </div>
         <div class="kv">
           <span class="k">Sentiment Chip:</span>
-          <span class="v" id="sent-chip">—</span>
+          <span class="v" id="sentiment-chip">—</span>
         </div>
         <div class="kv">
           <span class="k">Sentiment Enabled:</span>
-          <span class="v" id="sent-enabled">—</span>
+          <span class="v" id="sentiment-enabled">—</span>
         </div>
         <div class="kv">
           <span class="k">Sentiment Source:</span>
-          <span class="v" id="sent-source">—</span>
+          <span class="v" id="sentiment-source">—</span>
         </div>
         <div class="kv">
           <span class="k">Sentiment Window:</span>
-          <span class="v" id="sent-window">—</span>
+          <span class="v" id="sentiment-window">—</span>
         </div>
       </div>
 
@@ -808,6 +906,30 @@
             <div class="ml-quick-label">Predictions</div>
             <div class="ml-quick-value" id="ml-quick-predictions">—</div>
           </div>
+        </div>
+      </div>
+
+      <!-- Brier Score Performance -->
+      <div class="card">
+        <div class="card-header">
+          <h3>🎯 Brier Score Performance</h3>
+          <span id="brier-score-chip" class="chip">—</span>
+        </div>
+        <div class="kv">
+          <span class="k">Brier Score:</span>
+          <span class="v" id="brier-score-value">—</span>
+        </div>
+        <div class="kv">
+          <span class="k">Prediction Accuracy:</span>
+          <span class="v" id="brier-accuracy">—</span>
+        </div>
+        <div class="kv">
+          <span class="k">Total Predictions:</span>
+          <span class="v" id="brier-predictions">—</span>
+        </div>
+        <div class="kv">
+          <span class="k">Performance Rating:</span>
+          <span class="v" id="brier-rating">—</span>
         </div>
       </div>
 
@@ -1084,7 +1206,7 @@
 </main>
 
 <!-- Debug Panel -->
-<button class="debug-toggle" id="debug-toggle" style="display: none;">🔧 Debug</button>
+<button class="debug-toggle" id="debug-toggle">🔧 Debug</button>
 
 <div class="debug-panel" id="debug-panel">
   <div class="debug-header">🔧 API Debug Panel</div>
@@ -1181,16 +1303,6 @@
       <div class="endpoint-url">/grid/matrix</div>
       <div class="endpoint-status">Ready</div>
     </div>
-    <div class="endpoint-box" data-endpoint="/portfolio/assets">
-      <div class="endpoint-name">Portfolio</div>
-      <div class="endpoint-url">/portfolio/assets</div>
-      <div class="endpoint-status">Ready</div>
-    </div>
-    <div class="endpoint-box" data-endpoint="/scan/assets">
-      <div class="endpoint-name">Scan Assets</div>
-      <div class="endpoint-url">/scan/assets</div>
-      <div class="endpoint-status">Ready</div>
-    </div>
   </div>
   
   <!-- Refresh Controls -->
@@ -1227,7 +1339,8 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
