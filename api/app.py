@@ -115,33 +115,71 @@ def get_real_positions():
         return {}
     
     try:
-        # Get open orders (positions)
-        open_orders = exchange_client.fetch_open_orders()
         positions = {}
         
-        # Get balance for actual holdings
-        balance = exchange_client.fetch_balance()
+        # Method 1: Check open orders (spot trading)
+        try:
+            open_orders = exchange_client.fetch_open_orders()
+            for order in open_orders:
+                symbol = order['symbol']
+                positions[symbol] = {
+                    "symbol": symbol,
+                    "quantity": order['amount'],
+                    "current_price": order['price'],
+                    "market_value": order['amount'] * order['price'],
+                    "side": order['side'].upper(),
+                    "type": "OPEN_ORDER",
+                    "order_id": order['id']
+                }
+        except Exception as e:
+            print(f"Could not fetch open orders: {e}")
         
-        for symbol, amount in balance['total'].items():
-            if amount > 0.001:  # Minimum threshold
-                # Get current price
-                try:
-                    if symbol != 'USDT':
+        # Method 2: Check futures positions (if you have futures trading)
+        try:
+            futures_positions = exchange_client.fetch_positions()
+            for pos in futures_positions:
+                if abs(pos['contracts']) > 0.001:  # Only positions with size
+                    symbol = pos['symbol']
+                    positions[f"{symbol}_FUTURES"] = {
+                        "symbol": symbol,
+                        "quantity": pos['contracts'],
+                        "current_price": pos['markPrice'] or pos['entryPrice'],
+                        "market_value": abs(pos['contracts'] * (pos['markPrice'] or pos['entryPrice'])),
+                        "side": "LONG" if pos['side'] == 'long' else "SHORT",
+                        "type": "FUTURES",
+                        "pnl": pos['unrealizedPnl'],
+                        "entry_price": pos['entryPrice']
+                    }
+        except Exception as e:
+            print(f"Could not fetch futures positions: {e}")
+        
+        # Method 3: Check balance holdings as positions (for spot holdings)
+        try:
+            balance = exchange_client.fetch_balance()
+            for symbol, amount in balance['total'].items():
+                if amount > 0.001 and symbol != 'USDT':  # Exclude USDT
+                    try:
                         ticker = exchange_client.fetch_ticker(f"{symbol}/USDT")
                         current_price = ticker['last']
                         
-                        # Calculate PnL (simplified - would need trade history for exact entry price)
-                        positions[f"{symbol}USDT"] = {
-                            "symbol": f"{symbol}USDT",
-                            "quantity": amount,
-                            "current_price": current_price,
-                            "market_value": amount * current_price,
-                            "side": "LONG"
-                        }
-                except Exception as e:
-                    print(f"Could not get price for {symbol}: {e}")
+                        # Only add if not already in positions from orders/futures
+                        position_key = f"{symbol}USDT"
+                        if position_key not in positions:
+                            positions[position_key] = {
+                                "symbol": position_key,
+                                "quantity": amount,
+                                "current_price": current_price,
+                                "market_value": amount * current_price,
+                                "side": "LONG",
+                                "type": "SPOT_HOLDING"
+                            }
+                    except Exception as e:
+                        print(f"Could not get price for {symbol}: {e}")
+        except Exception as e:
+            print(f"Could not fetch balance: {e}")
         
         real_positions = positions
+        print(f"✅ Found {len(positions)} positions")
         return positions
         
     except Exception as e:
