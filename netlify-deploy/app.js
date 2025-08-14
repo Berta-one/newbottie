@@ -204,59 +204,6 @@
     }
   });
 
-  // Add credential testing functionality
-  async function testMultipleCredentials() {
-    const credentials = [
-      { username: 'admin', password: 'Diego1234!' },          // Correct admin password from environment
-      { username: 'superuser', password: 'Lenny106667!' },    // Correct superuser password from environment
-      { username: 'admin', password: 'AdminPass456!' },       // Old expected password
-      { username: 'superuser', password: 'SuperSecret123!' }, // Old expected password
-      { username: 'admin', password: 'admin' },
-      { username: 'superuser', password: 'superuser' },
-      { username: 'admin', password: '' },
-      { username: 'root', password: 'root' },
-      { username: 'user', password: 'user' }
-    ];
-
-    const loginError = document.getElementById('login-error');
-    loginError.innerHTML = 'Testing multiple credentials...<br>';
-
-    for (const cred of credentials) {
-      try {
-        loginError.innerHTML += `Trying ${cred.username}... `;
-        
-        const response = await fetch(`${API}/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(cred)
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          loginError.innerHTML += `✅ Success!<br>`;
-          
-          // Auto-fill the form with working credentials
-          document.getElementById('username').value = cred.username;
-          document.getElementById('password').value = cred.password;
-          
-          saveAuthState(data.access_token, data.user);
-          updateUI();
-          initializeDashboard();
-          return;
-        } else {
-          loginError.innerHTML += `❌<br>`;
-        }
-      } catch (error) {
-        loginError.innerHTML += `❌ Error<br>`;
-      }
-      
-      // Small delay between attempts
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
-    
-    loginError.innerHTML += 'All credentials failed. Please check with system administrator.';
-  }
-
   // Guest mode functionality (view-only without authentication)
   async function enterGuestMode() {
     const loginError = document.getElementById('login-error');
@@ -329,27 +276,6 @@
       loginError.innerHTML += `❌ Error: ${error.message}<br>`;
     }
 
-    // Test debug/test-login endpoint
-    try {
-      loginError.innerHTML += 'Testing POST /debug/test-login with admin credentials... ';
-      const response = await fetch(`${API}/debug/test-login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: 'admin', password: 'Diego1234!' })
-      });
-      if (response.ok) {
-        const data = await response.json();
-        loginError.innerHTML += `✅ Success!<br>`;
-        loginError.innerHTML += `User exists: ${data.user_lookup?.user_exists ? '✅' : '❌'}<br>`;
-        loginError.innerHTML += `Password verify: ${data.password_verification?.password_verify_result ? '✅' : '❌'}<br>`;
-        loginError.innerHTML += `Auth result: ${data.authenticate_user_result?.success ? '✅' : '❌'}<br><br>`;
-      } else {
-        loginError.innerHTML += `❌ Failed (${response.status})<br>`;
-      }
-    } catch (error) {
-      loginError.innerHTML += `❌ Error: ${error.message}<br>`;
-    }
-
     // Test basic API connectivity
     try {
       loginError.innerHTML += 'Testing GET /health... ';
@@ -382,34 +308,8 @@
         loginError.innerHTML += `Admin Verify: ${data.verification?.admin_verify ? '✅' : '❌'}<br>`;
         loginError.innerHTML += `Superuser Verify: ${data.verification?.superuser_verify ? '✅' : '❌'}<br>`;
         
-        // Try to login with admin after reset
-        setTimeout(async () => {
-          loginError.innerHTML += '<br>Attempting login with reset admin password...<br>';
-          try {
-            const loginResponse = await fetch(`${API}/auth/login`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ username: 'admin', password: data.admin_password })
-            });
-            
-            if (loginResponse.ok) {
-              const loginData = await loginResponse.json();
-              loginError.innerHTML += '✅ Login successful after reset!<br>';
-              
-              // Auto-fill form and login
-              document.getElementById('username').value = 'admin';
-              document.getElementById('password').value = data.admin_password;
-              
-              saveAuthState(loginData.access_token, loginData.user);
-              updateUI();
-              initializeDashboard();
-            } else {
-              loginError.innerHTML += '❌ Login still failed after reset<br>';
-            }
-          } catch (error) {
-            loginError.innerHTML += `❌ Login error: ${error.message}<br>`;
-          }
-        }, 1000);
+        // Display new credentials for manual login
+        loginError.innerHTML += '<br>Please use the above passwords to log in manually.<br>';
       } else {
         loginError.innerHTML += `❌ Reset failed (${response.status})<br>`;
       }
@@ -418,19 +318,10 @@
     }
   }
 
-  // Add the test button functionality
+  // Add debug and utility buttons to the login form
   function addCredentialTestButton() {
     const loginForm = document.getElementById('login-form');
-    if (loginForm && !document.getElementById('test-credentials-btn')) {
-      const testBtn = document.createElement('button');
-      testBtn.type = 'button';
-      testBtn.id = 'test-credentials-btn';
-      testBtn.className = 'login-btn';
-      testBtn.style.marginTop = '10px';
-      testBtn.style.background = '#ff9800';
-      testBtn.textContent = 'Test All Credentials';
-      testBtn.onclick = testMultipleCredentials;
-      
+    if (loginForm && !document.getElementById('debug-endpoints-btn')) {
       const debugBtn = document.createElement('button');
       debugBtn.type = 'button';
       debugBtn.id = 'debug-endpoints-btn';
@@ -448,7 +339,7 @@
       resetBtn.style.background = '#f44336';
       resetBtn.textContent = 'Reset Passwords';
       resetBtn.onclick = resetPasswordsDebug;
-      
+
       const guestBtn = document.createElement('button');
       guestBtn.type = 'button';
       guestBtn.id = 'guest-mode-btn';
@@ -457,10 +348,9 @@
       guestBtn.style.background = '#4caf50';
       guestBtn.textContent = 'Enter Guest Mode';
       guestBtn.onclick = enterGuestMode;
-      
+
       const loginBtn = document.getElementById('login-btn');
-      loginBtn.parentNode.insertBefore(testBtn, loginBtn.nextSibling);
-      loginBtn.parentNode.insertBefore(debugBtn, testBtn.nextSibling);
+      loginBtn.parentNode.insertBefore(debugBtn, loginBtn.nextSibling);
       loginBtn.parentNode.insertBefore(resetBtn, debugBtn.nextSibling);
       loginBtn.parentNode.insertBefore(guestBtn, resetBtn.nextSibling);
     }

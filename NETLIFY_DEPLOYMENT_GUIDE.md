@@ -9,6 +9,15 @@
 
 ### **Solution:**
 
+## 🔑 Environment Variables
+
+Set your admin credentials via environment variables on Render (and Netlify if used for builds):
+
+```
+ADMIN_USERNAME=your_admin_username
+ADMIN_PASSWORD=your_admin_password
+```
+
 ## 📁 **Files to Upload to Netlify**
 
 Upload these files to your Netlify site (`dancing-figolla-978034.netlify.app`):
@@ -34,8 +43,7 @@ const API = new URLSearchParams(location.search).get('api') || 'https://YOUR-ACT
 ```
 https://dancing-figolla-978034.netlify.app/
 ```
-- Login with: `admin` / `AdminPass456!`
-- Or: `superuser` / `SuperSecret123!`
+- Login using the credentials set in your `ADMIN_USERNAME` and `ADMIN_PASSWORD` environment variables.
 
 ### **Option 2: Custom API URL**
 ```
