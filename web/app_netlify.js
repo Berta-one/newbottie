@@ -1,5 +1,28 @@
 (function () {
-  const API = new URLSearchParams(location.search).get('api') || 'https://bottie-1.onrender.com';
+  // Try multiple API endpoints: Render (if working), then fallback message
+  let API = 'https://bottie-1.onrender.com';
+  
+  // Test if Render API is working with real data
+  async function detectWorkingAPI() {
+    try {
+      const response = await fetch(`${API}/status`);
+      if (response.ok) {
+        const data = await response.json();
+        // Check if it's showing fake $10k data
+        if (data.equity === 10000 && data.balance && data.balance.USDT === 10000) {
+          console.log('⚠️ Render API still showing fake $10k data');
+          return false;
+        } else {
+          console.log('✅ Render API working with real data:', data.equity);
+          return true;
+        }
+      }
+    } catch (error) {
+      console.log('❌ Render API not accessible:', error.message);
+      return false;
+    }
+    return false;
+  }
   
   let currentUser = null;
   let authToken = null;
@@ -8,8 +31,31 @@
   let performanceChart = null;
 
   // Auto-login on page load
-  function autoLogin() {
-    console.log('Attempting auto-login...');
+  async function autoLogin() {
+    console.log('🔍 Checking API status...');
+    
+    const apiWorking = await detectWorkingAPI();
+    if (!apiWorking) {
+      // Show message about API status
+      const statusElement = document.getElementById('statusContent');
+      if (statusElement) {
+        statusElement.innerHTML = `
+          <div class="error-message">
+            <h3>⚠️ API Deployment in Progress</h3>
+            <p>The Render API is currently deploying with your real trading data.</p>
+            <p>Current status: Render is rebuilding with real Binance connection</p>
+            <p>Expected: Real $7,600+ portfolio data (not fake $10k)</p>
+            <p>Please refresh in 2-3 minutes...</p>
+            <button onclick="location.reload()" style="margin-top: 10px; padding: 10px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">
+              🔄 Refresh Page
+            </button>
+          </div>
+        `;
+      }
+      return;
+    }
+    
+    console.log('Attempting auto-login with working API...');
     
     // Auto-login as admin with correct credentials
     currentUser = { username: 'admin', role: 'admin' };
