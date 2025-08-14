@@ -1498,19 +1498,29 @@ function forceOfflineMode() {
 
   // UI helpers (moved inside closure)
   window.setHealth = function(ok, ts, quantum) {
-    const statusEl = findElement("health-status");
-    const timeEl = findElement("health-time");
-    const quantumEl = findElement("health-quantum");
+    // Update quantum chip based on health status
+    const quantumChip = document.getElementById("quantum-chip");
+    if (quantumChip) {
+      quantumChip.textContent = ok ? "ONLINE" : "OFFLINE";
+      quantumChip.className = ok ? "chip chip--ok" : "chip chip--err";
+    }
     
-    statusEl.textContent = ok ? "OK" : "DOWN";
-    statusEl.style.color = ok ? "#66e0a3" : "#ef6f6c";
-    timeEl.textContent = ts ? new Date(ts * 1000).toLocaleTimeString() : "—";
-    quantumEl.textContent = quantum || "—";
+    // Update quantum backend info
+    const quantumBackend = document.getElementById("quantum-backend");
+    if (quantumBackend) quantumBackend.textContent = quantum?.backend || "aer_simulator";
+    
+    // Update overall system status in ML chip
+    const mlChip = document.getElementById("ml-chip");
+    if (mlChip) {
+      mlChip.textContent = ok ? "ACTIVE" : "OFFLINE";
+      mlChip.className = ok ? "chip chip--ok" : "chip chip--err";
+    }
   };
 
   window.setEquity = function(eq) {
-    const equityEl = findElement("equity");
-    equityEl.textContent = typeof eq === "number" ? eq.toFixed(2) : "—";
+    // There's no single equity element in the HTML, so we'll just log it
+    console.log('📊 Equity update:', eq);
+    // Could update chart stats or other relevant elements if needed
   };
 
   // Expose API variable globally for other functions
@@ -1558,26 +1568,29 @@ function setEquity(eq) {
 }
 
 function setPositions(positions) {
-  const tbody = $("#positionsTable tbody");
-  tbody.innerHTML = "";
-  if (!positions || !Object.keys(positions).length) {
-    tbody.innerHTML = `<tr><td colspan="3" style="color:#9bb0bf">No positions</td></tr>`;
-    return;
-  }
-  for (const [sym, p] of Object.entries(positions)) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${sym}</td><td>${(+p.qty).toFixed(6)}</td><td>${(+p.avg_px).toFixed(4)}</td>`;
-    tbody.appendChild(tr);
+  const table = document.querySelector("#positionsTable tbody");
+  if (table) {
+    table.innerHTML = "";
+    if (!positions || !Object.keys(positions).length) {
+      table.innerHTML = `<tr><td colspan="3" style="color:#9bb0bf">No positions</td></tr>`;
+      return;
+    }
+    for (const [sym, p] of Object.entries(positions)) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${sym}</td><td>${(+p.qty).toFixed(6)}</td><td>${(+p.avg_px).toFixed(4)}</td>`;
+      table.appendChild(tr);
+    }
   }
 }
 
 function setSignals(signals) {
-  const tbody = $("#signalsTable tbody");
-  tbody.innerHTML = "";
-  if (!signals || !signals.length) {
-    tbody.innerHTML = `<tr><td colspan="4" style="color:#9bb0bf">No signals yet</td></tr>`;
-    return;
-  }
+  const tbody = document.querySelector("#signals-table tbody");
+  if (tbody) {
+    tbody.innerHTML = "";
+    if (!signals || !signals.length) {
+      tbody.innerHTML = `<tr><td colspan="4" style="color:#9bb0bf">No signals yet</td></tr>`;
+      return;
+    }
   const last = signals.slice(-50).reverse();
   for (const s of last) {
     const t = s.t ? new Date(s.t * 1000).toLocaleTimeString() : "–";
@@ -1588,6 +1601,7 @@ function setSignals(signals) {
     if (s.signal === "SELL") color = "#ef6f6c";
     tr.innerHTML = `<td>${t}</td><td>${s.symbol || "–"}</td><td style="color:${color};font-weight:700">${s.signal || "–"}</td><td>${conf}</td>`;
     tbody.appendChild(tr);
+    }
   }
 }
 
@@ -1739,7 +1753,8 @@ async function ping() {
   try {
     const logs = await fetchJSON("/logs/last");
     const text = (logs.logs || []).join("\n");
-    $("#logsView").textContent = text || "—";
+    const logsEl = document.getElementById("logs");
+    if (logsEl) logsEl.textContent = text || "—";
   } catch (e) {
     // ignore
   }
