@@ -923,6 +923,7 @@
   function clearAllIntervals() {
     Object.values(refreshIntervals).forEach(id => clearInterval(id));
     refreshIntervals = {};
+    if (pingTimer) clearTimeout(pingTimer);
   }
 
   function applyRefreshIntervals() {
@@ -1179,13 +1180,21 @@ if (elOnlyTradable) {
 }
 
 /* Polling */
+const PING_BASE_INTERVAL = 2000;
+let pingInterval = PING_BASE_INTERVAL;
+let pingFailures = 0;
+let pingTimer;
+let pingWarnShown = false;
+
 async function ping() {
+  let success = true;
   try {
     const health = await fetchJSON("/health");
     const q = health.quantum ? `${health.quantum.kind}:${health.quantum.backend}` : "—";
     setHealth(!!health.ok, health.time, q);
   } catch (e) {
     setHealth(false, null, null);
+    success = false;
   }
 
   try {
@@ -1195,6 +1204,7 @@ async function ping() {
     setSignals(status.last_signals || status.signals);
   } catch (e) {
     console.warn("status error:", e.message);
+    success = false;
   }
 
   try {
@@ -1202,8 +1212,41 @@ async function ping() {
     const text = (logs.logs || []).join("\n");
     $("#logsView").textContent = text || "—";
   } catch (e) {
-    // ignore
+    success = false;
   }
+
+  if (success) {
+    pingFailures = 0;
+    pingInterval = PING_BASE_INTERVAL;
+    const warnEl = document.getElementById('ping-warning');
+    if (warnEl) warnEl.remove();
+    pingWarnShown = false;
+  } else {
+    pingFailures++;
+    pingInterval = Math.min(PING_BASE_INTERVAL * Math.pow(2, pingFailures), 60000);
+    if (pingFailures >= 3 && !pingWarnShown) {
+      const warnEl = document.createElement('div');
+      warnEl.id = 'ping-warning';
+      warnEl.textContent = 'Connection issues detected. Retrying...';
+      warnEl.style.position = 'fixed';
+      warnEl.style.bottom = '10px';
+      warnEl.style.right = '10px';
+      warnEl.style.background = '#f44336';
+      warnEl.style.color = '#fff';
+      warnEl.style.padding = '10px';
+      warnEl.style.borderRadius = '4px';
+      warnEl.style.zIndex = '5000';
+      document.body.appendChild(warnEl);
+      pingWarnShown = true;
+    }
+  }
+
+  schedulePing();
+}
+
+function schedulePing() {
+  clearTimeout(pingTimer);
+  pingTimer = setTimeout(ping, pingInterval);
 }
 
 // Grid refresh with separate interval (every 15 seconds)
@@ -1215,6 +1258,5 @@ function startGridPolling() {
   setTimeout(refreshMaxiGrid, 1200);
 }
 
-setInterval(ping, 2000);
 ping();
 startGridPolling();
