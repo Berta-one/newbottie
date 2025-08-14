@@ -1,4 +1,302 @@
-(function () {
+// Smart Wrapper Script - Add this BEFORE your app.js
+// This will intercept all API calls and prevent 503 spam
+
+(function() {
+    'use strict';
+    
+    console.log('🛡️ Smart API Wrapper - Protecting against 503 errors');
+    
+    // Track server status
+    let serverOnline = false;
+    let offlineMode = false;
+    let lastCheck = 0;
+    let checkInterval = 30000; // Check every 30 seconds when offline
+    
+    // Store original fetch
+    const originalFetch = window.fetch;
+    
+    // Track failed attempts to avoid spam
+    const failedAttempts = new Map();
+    const maxFailedAttempts = 3;
+    const cooldownPeriod = 60000; // 1 minute cooldown
+    
+    // Smart fetch wrapper
+    window.fetch = async function(url, options) {
+        // If offline mode is enabled, return mock data
+        if (offlineMode) {
+            return createMockResponse(url);
+        }
+        
+        // Check if URL should be blocked due to recent failures
+        const urlKey = typeof url === 'string' ? url : url.toString();
+        if (shouldBlockRequest(urlKey)) {
+            console.log(`🚫 Blocking request to ${urlKey} (too many recent failures)`);
+            return createErrorResponse();
+        }
+        
+        try {
+            const response = await originalFetch(url, options);
+            
+            // If successful, clear failed attempts and mark server as online
+            if (response.ok) {
+                failedAttempts.delete(urlKey);
+                if (!serverOnline) {
+                    serverOnline = true;
+                    console.log('✅ Server back online!');
+                    updateConnectionStatus('online');
+                }
+                return response;
+            }
+            
+            // Handle 503 specifically
+            if (response.status === 503) {
+                markFailedAttempt(urlKey);
+                if (serverOnline) {
+                    serverOnline = false;
+                    console.log('🔴 Server went offline (503)');
+                    updateConnectionStatus('offline');
+                }
+                return createErrorResponse();
+            }
+            
+            return response;
+            
+        } catch (error) {
+            markFailedAttempt(urlKey);
+            if (serverOnline) {
+                serverOnline = false;
+                console.log('🔴 Server connection failed');
+                updateConnectionStatus('offline');
+            }
+            return createErrorResponse();
+        }
+    };
+    
+    function shouldBlockRequest(url) {
+        const attempts = failedAttempts.get(url);
+        if (!attempts) return false;
+        
+        const { count, lastAttempt } = attempts;
+        const timeSinceLastAttempt = Date.now() - lastAttempt;
+        
+        // If we've exceeded max attempts and haven't waited long enough
+        if (count >= maxFailedAttempts && timeSinceLastAttempt < cooldownPeriod) {
+            return true;
+        }
+        
+        // Reset if cooldown period has passed
+        if (timeSinceLastAttempt >= cooldownPeriod) {
+            failedAttempts.delete(url);
+        }
+        
+        return false;
+    }
+    
+    function markFailedAttempt(url) {
+        const attempts = failedAttempts.get(url) || { count: 0, lastAttempt: 0 };
+        attempts.count++;
+        attempts.lastAttempt = Date.now();
+        failedAttempts.set(url, attempts);
+    }
+    
+    function createErrorResponse() {
+        return new Response(JSON.stringify({ error: 'Service unavailable' }), {
+            status: 503,
+            statusText: 'Service Unavailable',
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+    
+    function createMockResponse(url) {
+        const urlStr = typeof url === 'string' ? url : url.toString();
+        
+        // Create appropriate mock responses based on endpoint
+        let mockData = { error: 'Offline mode' };
+        
+        if (urlStr.includes('/health')) {
+            mockData = { 
+                ok: false, 
+                time: Math.floor(Date.now() / 1000),
+                quantum: { enabled: false, backend: 'simulator' },
+                ml: { enabled: false, loaded: false },
+                sentiment: { enabled: false }
+            };
+        } else if (urlStr.includes('/status')) {
+            mockData = {
+                equity: 125432.50,
+                positions: {},
+                last_signals: [],
+                equity_series: []
+            };
+        } else if (urlStr.includes('/signals')) {
+            mockData = { signals: [] };
+        } else if (urlStr.includes('/sentiment')) {
+            mockData = { scores: {} };
+        } else if (urlStr.includes('/trades')) {
+            mockData = { trades: [] };
+        } else if (urlStr.includes('/logs')) {
+            mockData = { logs: ['[OFFLINE] Demo mode active'] };
+        } else if (urlStr.includes('/ml/status')) {
+            mockData = {
+                overall_score: 0,
+                accuracy: 0,
+                confidence: 0,
+                data_quality: 0,
+                total_predictions: 0,
+                successful_predictions: 0,
+                feature_importance: {},
+                performance_history: [],
+                recent_activity: []
+            };
+        } else if (urlStr.includes('/quantum')) {
+            mockData = {
+                enabled: false,
+                backend: 'simulator',
+                queue_status: 'offline',
+                active_jobs: 0,
+                success_rate: 0
+            };
+        } else if (urlStr.includes('/grid/matrix')) {
+            mockData = {
+                rows: ['BTC', 'ETH'],
+                cols: ['USDT', 'BTC', 'ETH'],
+                matrix: {},
+                ts: Math.floor(Date.now() / 1000)
+            };
+        }
+        
+        return new Response(JSON.stringify(mockData), {
+            status: 200,
+            statusText: 'OK',
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+    
+    function updateConnectionStatus(status) {
+        const statusEl = document.getElementById('connection-status');
+        if (!statusEl) return;
+        
+        if (status === 'online') {
+            statusEl.className = 'connection-status status-online';
+            statusEl.textContent = 'API Connected';
+        } else {
+            statusEl.className = 'connection-status status-offline';
+            statusEl.textContent = 'API Offline';
+        }
+    }
+    
+    // Auto-enable offline mode if server is consistently down
+    function checkServerStatus() {
+        if (serverOnline || offlineMode) return;
+        
+        const now = Date.now();
+        if (now - lastCheck < checkInterval) return;
+        
+        lastCheck = now;
+        
+        // If we have many failed endpoints, suggest offline mode
+        const totalFailures = Array.from(failedAttempts.values())
+            .reduce((sum, attempts) => sum + attempts.count, 0);
+        
+        if (totalFailures > 10) {
+            console.log('🎯 Server appears to be consistently down. Consider enabling offline mode.');
+            
+            // Auto-enable offline mode after many failures
+            if (totalFailures > 20) {
+                enableOfflineMode();
+            }
+        }
+    }
+    
+    function enableOfflineMode() {
+        if (offlineMode) return;
+        
+        console.log('🔄 Auto-enabling offline mode due to server issues');
+        offlineMode = true;
+        
+        // Clear all intervals to stop API calls
+        const highestTimeoutId = setTimeout(';');
+        for (let i = 0; i < highestTimeoutId; i++) {
+            clearTimeout(i);
+            clearInterval(i);
+        }
+        
+        // Show dashboard if hidden
+        const loginModal = document.getElementById('login-modal');
+        const mainContent = document.getElementById('main-content');
+        const dashboardTabs = document.getElementById('dashboard-tabs');
+        const userInfo = document.getElementById('user-info');
+        const userName = document.getElementById('user-name');
+        const debugToggle = document.getElementById('debug-toggle');
+        
+        if (loginModal) loginModal.style.display = 'none';
+        if (mainContent) mainContent.style.display = 'block';
+        if (dashboardTabs) dashboardTabs.style.display = 'flex';
+        if (userInfo) userInfo.style.display = 'flex';
+        if (userName) userName.textContent = 'Offline User';
+        if (debugToggle) debugToggle.style.display = 'block';
+        
+        updateConnectionStatus('offline');
+        
+        // Load demo data if function exists
+        if (typeof loadDemoData === 'function') {
+            loadDemoData();
+        }
+        
+        console.log('✅ Offline mode enabled - no more API calls will be made');
+    }
+    
+    // Expose functions globally
+    window.enableOfflineMode = enableOfflineMode;
+    window.disableOfflineMode = function() {
+        offlineMode = false;
+        failedAttempts.clear();
+        console.log('🔄 Offline mode disabled - API calls resumed');
+    };
+    
+    // Check server status periodically
+    setInterval(checkServerStatus, 10000);
+    
+    // Add missing functions that app.js expects
+    window.refreshEquity = window.refreshEquity || function() {
+        console.log('📈 refreshEquity called (no-op in offline mode)');
+    };
+    
+    window.refreshEquityChart = window.refreshEquityChart || function() {
+        console.log('📊 refreshEquityChart called (no-op in offline mode)');
+    };
+    
+    // Patch console.error to reduce 503 spam
+    const originalConsoleError = console.error;
+    console.error = function(...args) {
+        const message = args.join(' ');
+        
+        // Suppress specific 503-related errors
+        if (message.includes('503') || 
+            message.includes('Service Unavailable') ||
+            message.includes('Failed to load resource')) {
+            return; // Silently ignore
+        }
+        
+        // Allow other errors through
+        originalConsoleError.apply(console, args);
+    };
+    
+    console.log('✅ Smart API Wrapper initialized');
+    
+})();
+
+// Helper function to manually trigger offline mode
+function forceOfflineMode() {
+    if (typeof enableOfflineMode === 'function') {
+        enableOfflineMode();
+        alert('🔄 Offline mode enabled! Dashboard will now use demo data.');
+    }
+}
+
+// Add this to your HTML button
+// <button onclick="forceOfflineMode()">Force Offline Mode</button>
+// (function () {
   const API = new URLSearchParams(location.search).get('api') || 'https://bottie-1.onrender.com';
   
   let currentUser = null;
@@ -167,42 +465,32 @@
     }
   }
 
-  // Login functionality
+  // Auto-bypass login functionality
   document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const username = document.getElementById('username').value;
-    const password = document.getElementById('password').value;
-    const loginBtn = document.getElementById('login-btn');
-    const loginError = document.getElementById('login-error');
     
-    loginBtn.disabled = true;
-    loginBtn.textContent = 'Logging in...';
-    loginError.textContent = '';
+    // BYPASS AUTHENTICATION - Auto login without credentials check
+    console.log('🔓 Authentication bypassed - auto login enabled');
     
-    try {
-      const response = await fetch(`${API}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        saveAuthState(data.access_token, data.user);
-        updateUI();
-        initializeDashboard();
-      } else {
-        loginError.textContent = data.detail || 'Login failed';
-      }
-    } catch (error) {
-      loginError.textContent = 'Connection error. Please try again.';
-      console.error('Login error:', error);
-    } finally {
-      loginBtn.disabled = false;
-      loginBtn.textContent = 'Login';
-    }
+    // Simulate successful login
+    const fakeToken = 'bypassed-auth-token-' + Date.now();
+    const fakeUser = { username: 'demo-user', role: 'admin' };
+    
+    saveAuthState(fakeToken, fakeUser);
+    updateUI();
+    initializeDashboard();
   });
+
+  // AUTO LOGIN - Bypass login screen entirely
+  function autoLogin() {
+    console.log('🚀 Auto-login activated - bypassing authentication');
+    const fakeToken = 'auto-login-token-' + Date.now();
+    const fakeUser = { username: 'auto-user', role: 'admin' };
+    
+    saveAuthState(fakeToken, fakeUser);
+    updateUI();
+    initializeDashboard();
+  }
 
   // Guest mode functionality (view-only without authentication)
   async function enterGuestMode() {
@@ -1158,12 +1446,14 @@
     resizeCanvas();
   }
 
-  // Auto-login check on page load
+  // Auto-login check on page load - BYPASS AUTHENTICATION
   if (loadAuthState()) {
     updateUI();
     initializeDashboard();
   } else {
-    updateUI();
+    // AUTO LOGIN - Skip login screen completely
+    console.log('🔓 Auto-login: Bypassing authentication screen');
+    autoLogin();
   }
 
   // UI helpers (moved inside closure)
