@@ -14,6 +14,8 @@ uvicorn[standard]
 python-dotenv
 PyJWT==2.8.0
 passlib[bcrypt]==1.7.4
+python-jose[cryptography]
+bcrypt
 python-multipart==0.0.6
 websockets>=11.0.3
 python-binance>=1.0.19

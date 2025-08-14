@@ -13,9 +13,9 @@ NETLIFY_URL = os.getenv("NETLIFY_URL", "https://dancing-figolla-978034.netlify.a
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[NETLIFY_URL] if NETLIFY_URL != "*" else ["*"],
-    allow_credentials=False,
-    allow_methods=["GET", "OPTIONS"],
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 

@@ -8,7 +8,7 @@ services:
     buildCommand: |
       python -m pip install --upgrade pip
       pip install --no-cache-dir -r requirements.txt
-    startCommand: uvicorn diagnostic_api:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn render_api:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PORT
         value: "10000"
@@ -16,3 +16,13 @@ services:
         value: "production"
       - key: TRADE_ENABLED
         value: "1"
+      - key: ADMIN_USERNAME
+        value: "admin"
+      - key: ADMIN_PASSWORD
+        value: "Diego1234!"
+      - key: SUPERUSER_PASSWORD
+        value: "SuperUser2024!"
+      - key: JWT_SECRET_KEY
+        value: "bottie-render-secret-key-2024"
+      - key: NETLIFY_URL
+        value: "*"
