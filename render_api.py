@@ -60,6 +60,25 @@ SECRET_KEY = os.getenv("JWT_SECRET_KEY", "bottie-render-secret-key-2024")
 
 # Global variables
 exchange_client = None
+websocket_manager = None
+real_time_data = {
+    'positions': {},
+    'trades': [],
+    'balance': {'total_usdt': 0},
+    'prices': {},
+    'last_update': 0
+}
+
+# Import WebSocket manager
+try:
+    import asyncio
+    from engine.websocket_data_manager import get_websocket_manager, initialize_websocket_data
+    WEBSOCKET_AVAILABLE = True
+    print("✅ WebSocket manager available")
+except ImportError as e:
+    WEBSOCKET_AVAILABLE = False
+    print(f"❌ WebSocket manager not available: {e}")
+
 demo_data = {
     "equity": 125432.50,
     "positions": {
@@ -105,6 +124,117 @@ def initialize_exchange():
         print(f"❌ Exchange initialization failed: {e}")
         return False
 
+def initialize_websocket_data(ws_manager):
+    """Initialize WebSocket data streams for real-time Binance data"""
+    global websocket_manager
+    websocket_manager = ws_manager
+    
+    if not WEBSOCKET_AVAILABLE or not websocket_manager:
+        print("❌ WebSocket not available")
+        return False
+    
+    try:
+        # Get API credentials from environment
+        api_key = os.getenv('BINANCE_API_KEY', '')
+        api_secret = os.getenv('BINANCE_API_SECRET', '')
+        
+        if not api_key or not api_secret:
+            print("❌ No Binance API credentials - WebSocket will only provide public data")
+            return False
+        
+        # Initialize WebSocket streams for common trading pairs
+        symbols = ['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT']
+        
+        # Start WebSocket in background thread
+        import threading
+        def start_websocket():
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                loop.run_until_complete(
+                    initialize_websocket_data(
+                        symbols=symbols,
+                        api_key=api_key,
+                        api_secret=api_secret
+                    )
+                )
+                print("✅ WebSocket streams initialized")
+            except Exception as e:
+                print(f"❌ WebSocket initialization failed: {e}")
+        
+        ws_thread = threading.Thread(target=start_websocket, daemon=True)
+        ws_thread.start()
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ WebSocket setup failed: {e}")
+        return False
+
+def get_websocket_positions():
+    """Get real-time positions from WebSocket data"""
+    global websocket_manager, real_time_data
+    
+    if not websocket_manager:
+        return {}
+    
+    try:
+        # Get real-time balance and positions from WebSocket
+        ws_data = websocket_manager.get_account_data()
+        if ws_data:
+            positions = {}
+            for symbol, data in ws_data.get('positions', {}).items():
+                if data.get('quantity', 0) > 0:
+                    positions[symbol] = {
+                        'quantity': data['quantity'],
+                        'current_price': data.get('current_price', 0),
+                        'avg_buy_price': data.get('avg_price', 0),
+                        'pnl': data.get('pnl', 0),
+                        'pnl_percentage': data.get('pnl_percentage', 0)
+                    }
+            
+            real_time_data['positions'] = positions
+            real_time_data['last_update'] = time.time()
+            return positions
+    except Exception as e:
+        print(f"❌ Error getting WebSocket positions: {e}")
+    
+    return {}
+
+def get_websocket_trades():
+    """Get real-time trades from WebSocket data"""
+    global websocket_manager, real_time_data
+    
+    if not websocket_manager:
+        return []
+    
+    try:
+        # Get trade updates from WebSocket
+        ws_trades = websocket_manager.get_trade_updates()
+        if ws_trades:
+            trades = []
+            for trade in ws_trades:
+                trades.append({
+                    "timestamp": trade.get('timestamp', time.time()),
+                    "symbol": trade.get('symbol', ''),
+                    "side": trade.get('side', '').upper(),
+                    "quantity": trade.get('quantity', 0),
+                    "price": trade.get('price', 0),
+                    "pnl": trade.get('pnl', 0),
+                    "trade_id": str(trade.get('id', '')),
+                    "value": trade.get('value', 0),
+                    "confidence": 1.0,  # Real trade
+                    "status": "completed",
+                    "datetime": trade.get('datetime', '')
+                })
+            
+            real_time_data['trades'] = trades
+            return trades
+    except Exception as e:
+        print(f"❌ Error getting WebSocket trades: {e}")
+    
+    return []
+
 # Authentication functions
 def create_access_token(data: dict):
     to_encode = data.copy()
@@ -124,7 +254,16 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
 
 # Helper functions for real data
 def get_real_positions():
-    """Get real positions from exchange or demo data"""
+    """Get real positions from WebSocket or exchange - NO DEMO DATA"""
+    
+    # Try WebSocket first (real-time data)
+    if WEBSOCKET_AVAILABLE and websocket_manager:
+        ws_positions = get_websocket_positions()
+        if ws_positions:
+            print(f"✅ Got {len(ws_positions)} positions from WebSocket")
+            return ws_positions
+    
+    # Fallback to REST API if WebSocket not available
     if exchange_client and EXCHANGE_AVAILABLE:
         try:
             balance = exchange_client.fetch_balance()
@@ -150,35 +289,23 @@ def get_real_positions():
                         }
                     except:
                         continue
-                        
+            
+            print(f"✅ Got {len(positions)} positions from REST API")            
             return positions
         except Exception as e:
-            print(f"Error fetching real positions: {e}")
+            print(f"❌ Error fetching real positions: {e}")
     
-    # Return demo positions if exchange not available
-    return {
-        "BTC/USDT": {
-            "quantity": 0.5,
-            "current_price": 45000,
-            "avg_buy_price": 43000,
-            "pnl": 1000,
-            "pnl_percentage": 4.65
-        },
-        "ETH/USDT": {
-            "quantity": 2.0,
-            "current_price": 2800,
-            "avg_buy_price": 2600,
-            "pnl": 400,
-            "pnl_percentage": 7.69
-        }
-    }
+    # NO DEMO DATA - return empty if no real connection
+    print("❌ No exchange connection - no positions available")
+    return {}
 
 def get_real_balance():
     """Get real balance from exchange with improved error handling"""
     real_balance = {'total_usdt': 0}
     
     if not (exchange_client and EXCHANGE_AVAILABLE):
-        return {'total_usdt': 125432.50}  # Demo balance
+        print("❌ No exchange connection - no balance data available")
+        return {'total_usdt': 0}  # No demo data
     
     try:
         balance = exchange_client.fetch_balance()
@@ -201,8 +328,55 @@ def get_real_balance():
         return real_balance
         
     except Exception as e:
-        print(f"Error fetching balance: {e}")
-        return {'total_usdt': 125432.50}  # Fallback demo balance
+        print(f"❌ Error fetching balance: {e}")
+        return {'total_usdt': 0}  # No demo data
+
+def calculate_real_pnl(trades, positions):
+    """Calculate real P&L from actual trades and positions"""
+    if not trades:
+        return {
+            "total_pnl": 0,
+            "realized_pnl": 0,
+            "unrealized_pnl": 0,
+            "win_rate": 0,
+            "total_trades": 0,
+            "profitable_trades": 0,
+            "best_trade": 0,
+            "worst_trade": 0,
+            "avg_trade_size": 0,
+            "total_volume": 0
+        }
+    
+    # Calculate realized P&L from trades
+    realized_pnl = sum(trade.get('pnl', 0) for trade in trades)
+    total_trades = len(trades)
+    profitable_trades = len([t for t in trades if t.get('pnl', 0) > 0])
+    win_rate = (profitable_trades / total_trades) * 100 if total_trades > 0 else 0
+    total_volume = sum(trade.get('value', 0) for trade in trades)
+    avg_trade_size = total_volume / total_trades if total_trades > 0 else 0
+    
+    trade_pnls = [trade.get('pnl', 0) for trade in trades]
+    best_trade = max(trade_pnls) if trade_pnls else 0
+    worst_trade = min(trade_pnls) if trade_pnls else 0
+    
+    # Calculate unrealized P&L from current positions
+    unrealized_pnl = sum(pos.get('pnl', 0) for pos in positions.values())
+    
+    # Total P&L = realized + unrealized
+    total_pnl = realized_pnl + unrealized_pnl
+    
+    return {
+        "total_pnl": round(total_pnl, 2),
+        "realized_pnl": round(realized_pnl, 2),
+        "unrealized_pnl": round(unrealized_pnl, 2),
+        "win_rate": round(win_rate, 2),
+        "total_trades": total_trades,
+        "profitable_trades": profitable_trades,
+        "best_trade": round(best_trade, 2),
+        "worst_trade": round(worst_trade, 2),
+        "avg_trade_size": round(avg_trade_size, 2),
+        "total_volume": round(total_volume, 2)
+    }
 
 # Root endpoint
 @app.get("/")
@@ -379,19 +553,20 @@ def sentiment():
             raise ValueError("Invalid sentiment data format")
             
     except ImportError as e:
-        print(f"Sentiment import error: {e}")
+        print(f"❌ Sentiment import error: {e}")
         return {
-            "source": "fallback_import", 
-            "window_sec": 900,
-            "scores": demo_data["sentiment"]
+            "source": "unavailable", 
+            "window_sec": 0,
+            "scores": {},
+            "error": "Sentiment service not available - no demo data"
         }
     except Exception as e:
-        # Fallback to demo data if sentiment service fails
-        print(f"Sentiment service error: {e}")
+        print(f"❌ Sentiment service error: {e}")
         return {
-            "source": "fallback_error", 
-            "window_sec": 900,
-            "scores": demo_data["sentiment"]
+            "source": "error", 
+            "window_sec": 0,
+            "scores": {},
+            "error": f"Sentiment service failed: {str(e)} - no demo data"
         }
 
 # Sentiment debug endpoint (Safe version)
@@ -473,37 +648,82 @@ def positions():
 # Trades endpoint
 @app.get("/trades")
 def recent_trades():
-    """Recent real trades with realistic data and summary"""
-    import random
+    """Get real trade history from Binance - NO DEMO DATA"""
     positions = get_real_positions()
     
-    # Generate realistic recent trades based on positions
+    # If no real positions/exchange connection, return empty
+    if not positions or not exchange_client:
+        print("❌ No exchange connection - no trade history available")
+        return {
+            "trades": [],
+            "summary": {
+                "total_trades": 0,
+                "realized_pnl": 0,
+                "win_rate": 0,
+                "total_volume": 0,
+                "avg_trade_size": 0,
+                "best_trade": 0,
+                "worst_trade": 0,
+                "avg_pnl_per_trade": 0
+            }
+        }
+    
+    # Try to get real trade history - WebSocket first, then REST API
     trades = []
-    for symbol, pos in positions.items():
-        # Generate 1-3 recent trades per position
-        num_trades = random.randint(1, 3)
-        for i in range(num_trades):
-            trade_time = time.time() - random.randint(300, 7200)  # Last 2 hours
-            side = random.choice(['BUY', 'SELL'])
-            quantity = pos['quantity'] * random.uniform(0.1, 0.5)  # Partial position size
-            price = pos['current_price'] * random.uniform(0.98, 1.02)  # ±2% price variation
+    
+    # Try WebSocket first (real-time trades)
+    if WEBSOCKET_AVAILABLE and websocket_manager:
+        ws_trades = get_websocket_trades()
+        if ws_trades:
+            trades.extend(ws_trades)
+            print(f"✅ Got {len(ws_trades)} trades from WebSocket")
+    
+    # Fallback to REST API for historical trades
+    if not trades and exchange_client:
+        try:
+            for symbol in positions.keys():
+                try:
+                    # Get recent trades for this symbol from Binance REST API
+                    symbol_trades = exchange_client.fetch_my_trades(symbol, limit=10)
+                    for trade in symbol_trades:
+                        trades.append({
+                            "timestamp": trade['timestamp'] / 1000,
+                            "symbol": trade['symbol'],
+                            "side": trade['side'].upper(),
+                            "quantity": trade['amount'],
+                            "price": trade['price'],
+                            "pnl": 0,  # Will be calculated properly with cost basis
+                            "trade_id": str(trade['id']),
+                            "value": trade['cost'],
+                            "confidence": 1.0,  # Real trade = 100% confidence
+                            "status": "completed",
+                            "datetime": trade['datetime'] if trade['datetime'] else time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(trade['timestamp'] / 1000))
+                        })
+                except Exception as e:
+                    print(f"❌ Error fetching trades for {symbol}: {e}")
+                    continue
             
-            # Calculate P&L (simplified)
-            pnl = (pos['current_price'] - price) * quantity if side == 'BUY' else (price - pos['current_price']) * quantity
-            
-            trades.append({
-                "timestamp": trade_time,
-                "symbol": symbol,
-                "side": side,
-                "quantity": round(quantity, 6),
-                "price": round(price, 2),
-                "pnl": round(pnl, 2),
-                "trade_id": f"T{int(trade_time)}{symbol[:3]}",
-                "value": round(quantity * price, 2),
-                "confidence": random.uniform(0.65, 0.95),
-                "status": "completed",
-                "datetime": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(trade_time))
-            })
+            if trades:
+                print(f"✅ Got {len(trades)} trades from REST API")
+        except Exception as e:
+            print(f"❌ Error fetching trade history: {e}")
+    
+    # If no real trades found, return empty (NO DEMO DATA)
+    if not trades:
+        print("❌ No real trades found")
+        return {
+            "trades": [],
+            "summary": {
+                "total_trades": 0,
+                "realized_pnl": 0,
+                "win_rate": 0,
+                "total_volume": 0,
+                "avg_trade_size": 0,
+                "best_trade": 0,
+                "worst_trade": 0,
+                "avg_pnl_per_trade": 0
+            }
+        }
     
     # Sort by timestamp (most recent first)
     trades.sort(key=lambda x: x['timestamp'], reverse=True)
@@ -998,13 +1218,110 @@ def reset_passwords():
         "message": "Default passwords reset"
     }
 
+# Configuration endpoint for Binance API credentials
+@app.post("/config/binance")
+def configure_binance_api(request: dict):
+    """Configure Binance API credentials for real trading"""
+    api_key = request.get("api_key", "")
+    api_secret = request.get("api_secret", "")
+    testnet = request.get("testnet", True)
+    
+    if not api_key or not api_secret:
+        return {"error": "API key and secret are required"}
+    
+    try:
+        # Set environment variables
+        os.environ['BINANCE_API_KEY'] = api_key
+        os.environ['BINANCE_API_SECRET'] = api_secret
+        
+        # Reinitialize exchange client
+        global exchange_client
+        if EXCHANGE_AVAILABLE:
+            exchange_client = ccxt.binance({
+                'apiKey': api_key,
+                'secret': api_secret,
+                'sandbox': testnet,
+                'enableRateLimit': True,
+            })
+            exchange_client.load_markets()
+            
+            # Test connection
+            balance = exchange_client.fetch_balance()
+            
+            # Initialize WebSocket if available
+            if WEBSOCKET_AVAILABLE:
+                initialize_websocket_data(websocket_manager)
+            
+            return {
+                "success": True,
+                "message": f"Binance API configured successfully ({'testnet' if testnet else 'mainnet'})",
+                "balance_usdt": balance.get('USDT', {}).get('total', 0)
+            }
+        else:
+            return {"error": "Exchange library not available"}
+            
+    except Exception as e:
+        return {"error": f"Failed to configure Binance API: {str(e)}"}
+
+@app.get("/config/status")
+def config_status():
+    """Get current configuration status"""
+    return {
+        "binance_api_configured": bool(os.getenv('BINANCE_API_KEY')),
+        "exchange_connected": exchange_client is not None,
+        "websocket_available": WEBSOCKET_AVAILABLE,
+        "websocket_connected": websocket_manager is not None,
+        "mode": "LIVE" if (exchange_client and not exchange_client.sandbox) else "TESTNET" if exchange_client else "DISCONNECTED"
+    }
+
 # Startup event
 @app.on_event("startup")
 async def startup_event():
     print("🚀 Bottie Render API starting up...")
     if EXCHANGE_AVAILABLE:
         initialize_exchange()
+    if WEBSOCKET_AVAILABLE:
+        websocket_manager = get_websocket_manager()
+        initialize_websocket_data(websocket_manager)
     print("✅ Render API ready")
+
+# P&L Analysis endpoint
+@app.get("/pnl/analysis")
+def pnl_analysis():
+    """Get real P&L analysis from actual trades and positions - NO DEMO DATA"""
+    positions = get_real_positions()
+    
+    # Get trades data
+    trades_response = recent_trades()
+    trades = trades_response.get('trades', [])
+    
+    # Calculate real P&L
+    pnl_data = calculate_real_pnl(trades, positions)
+    
+    # Add equity curve data if available
+    balance = get_real_balance()
+    current_equity = balance.get('total_usdt', 0)
+    
+    # Generate equity curve from trade history
+    equity_curve = []
+    running_equity = current_equity - pnl_data.get('realized_pnl', 0)
+    
+    for trade in sorted(trades, key=lambda x: x.get('timestamp', 0)):
+        running_equity += trade.get('pnl', 0)
+        equity_curve.append({
+            "timestamp": trade.get('timestamp', 0),
+            "equity": round(running_equity, 2),
+            "trade_pnl": trade.get('pnl', 0)
+        })
+    
+    return {
+        "pnl_summary": pnl_data,
+        "current_equity": current_equity,
+        "equity_curve": equity_curve[-50:],  # Last 50 points
+        "positions_count": len(positions),
+        "has_real_data": len(trades) > 0 or len(positions) > 0,
+        "data_source": "binance_real" if (exchange_client or websocket_manager) else "no_connection"
+    }
 
 if __name__ == "__main__":
     import uvicorn
