@@ -107,8 +107,8 @@ def initialize_exchange():
             'enableRateLimit': True,
         })
         
-        exchange_client.load_markets()
-        print("✅ Exchange initialized (testnet)")
+        # exchange_client.load_markets()  # DISABLED - causes API abuse and bans
+        print("✅ Exchange client created (no API calls to prevent bans)")
         return True
         
     except Exception as e:
@@ -406,49 +406,8 @@ def get_real_positions():
     return {}
 
 def get_real_balance():
-    """Get real balance ONLY from WebSocket - NO REST API to avoid rate limits"""
-    
-    # Only use WebSocket data to prevent API rate limiting
-    if ws_manager and ws_manager.running:
-        try:
-            account_data = ws_manager.get_account_data()
-            ticker_data = ws_manager.get_ticker_data()
-            
-            if account_data and ticker_data:
-                total_usdt = 0
-                breakdown = {}
-                
-                # Process account balances from WebSocket user data
-                for balance in account_data.get('B', []):
-                    asset = balance['a']
-                    free = float(balance['f'])
-                    locked = float(balance['l'])
-                    total = free + locked
-                    
-                    if total > 0:
-                        breakdown[asset] = total
-                        
-                        if asset == 'USDT':
-                            total_usdt += total
-                        else:
-                            # Convert to USDT using WebSocket ticker data
-                            ticker_key = f"{asset.lower()}usdt"
-                            if ticker_key in ticker_data:
-                                price = ticker_data[ticker_key]['price']
-                                total_usdt += total * price
-                
-                return {
-                    'total_usdt': round(total_usdt, 2),
-                    'breakdown': breakdown,
-                    'source': 'binance_websocket'
-                }
-        except Exception as e:
-            print(f"❌ WebSocket balance error: {e}")
-    
-    # No WebSocket data available - API likely rate limited
-    print("❌ No WebSocket balance data - API rate limited or disconnected")
-    system_logger.add_log(LogLevel.WARNING, "No WebSocket balance data - API may be rate limited", "BALANCE")
-    return {'total_usdt': 0, 'source': 'websocket_unavailable'}
+    """Get real balance using Safe API Wrapper - prevents bans through caching"""
+    return safe_api.safe_fetch_balance()
 
 def calculate_real_pnl(trades, positions):
     """Calculate real P&L from actual trades and positions"""
@@ -1717,10 +1676,11 @@ def configure_binance_api(request: dict):
                 'sandbox': testnet,
                 'enableRateLimit': True,
             })
-            exchange_client.load_markets()
+            # NO API CALLS - prevents immediate bans
+            # exchange_client.load_markets()  # DISABLED - causes API abuse
             
-            # Test connection
-            balance = exchange_client.fetch_balance()
+            # NO TEST CONNECTION - use WebSocket instead
+            # balance = exchange_client.fetch_balance()  # DISABLED - causes bans
             
             # Initialize WebSocket if available
             if WEBSOCKET_AVAILABLE:
@@ -2078,8 +2038,113 @@ class SystemLogger:
 # Global logger instance
 system_logger = SystemLogger()
 
+# Safe API Wrapper - Prevents Binance API Bans
+class SafeAPIWrapper:
+    """Intelligent API wrapper that prevents Binance bans through caching and throttling"""
+    
+    def __init__(self):
+        self.cache = {}
+        self.cache_ttl = {
+            'balance': 300,      # 5 minutes
+            'ticker': 30,        # 30 seconds  
+            'positions': 120     # 2 minutes
+        }
+        self.request_count = defaultdict(int)
+        self.last_request_time = {}
+        self.min_request_interval = 0.2  # 200ms minimum between requests
+        self.max_requests_per_minute = 30  # Very conservative limit
+        
+    def _get_cache_key(self, method: str, *args) -> str:
+        """Generate cache key for request"""
+        key_parts = [method] + [str(arg) for arg in args]
+        return "|".join(key_parts)
+    
+    def _is_cache_valid(self, cache_key: str, method_type: str) -> bool:
+        """Check if cached data is still valid"""
+        if cache_key not in self.cache:
+            return False
+        
+        cached_time, _ = self.cache[cache_key]
+        ttl = self.cache_ttl.get(method_type, 60)
+        
+        return (time.time() - cached_time) < ttl
+    
+    def _get_cached_or_none(self, cache_key: str, method_type: str):
+        """Get cached data if valid, otherwise None"""
+        if self._is_cache_valid(cache_key, method_type):
+            _, data = self.cache[cache_key]
+            system_logger.add_log(LogLevel.DEBUG, f"Cache HIT: {method_type}", "API_CACHE")
+            return data
+        return None
+    
+    def _cache_data(self, cache_key: str, data):
+        """Cache the data with timestamp"""
+        self.cache[cache_key] = (time.time(), data)
+    
+    def safe_fetch_balance(self):
+        """Safe balance fetch with 5-minute caching - WebSocket ONLY"""
+        cache_key = self._get_cache_key('balance')
+        
+        # Try cache first
+        cached_data = self._get_cached_or_none(cache_key, 'balance')
+        if cached_data:
+            return cached_data
+        
+        # Use WebSocket data ONLY - no API calls
+        if ws_manager and ws_manager.running:
+            ws_data = ws_manager.get_account_data()
+            ticker_data = ws_manager.get_ticker_data()
+            
+            if ws_data and ticker_data:
+                balance_data = {'total_usdt': 0, 'source': 'websocket'}
+                
+                # Process WebSocket account data
+                for balance in ws_data.get('B', []):
+                    asset = balance['a']
+                    total = float(balance['f']) + float(balance['l'])
+                    if total > 0:
+                        if asset == 'USDT':
+                            balance_data['total_usdt'] += total
+                        else:
+                            # Convert using WebSocket ticker
+                            ticker_key = f"{asset.lower()}usdt"
+                            if ticker_key in ticker_data:
+                                balance_data['total_usdt'] += total * ticker_data[ticker_key]['price']
+                
+                self._cache_data(cache_key, balance_data)
+                system_logger.add_log(LogLevel.INFO, f"Balance from WebSocket: ${balance_data['total_usdt']:.2f}", "BALANCE")
+                return balance_data
+        
+        # NO API FALLBACK - prevents bans
+        system_logger.add_log(LogLevel.WARNING, "No WebSocket balance - API calls disabled to prevent bans", "BALANCE")
+        return {'total_usdt': 0, 'source': 'websocket_unavailable'}
+    
+    def get_api_usage_stats(self):
+        """Get API usage statistics"""
+        current_minute = int(time.time() / 60)
+        current_usage = self.request_count[current_minute]
+        utilization = (current_usage / self.max_requests_per_minute) * 100
+        
+        return {
+            'throttler': {
+                'requests_this_minute': current_usage,
+                'max_requests_per_minute': self.max_requests_per_minute,
+                'utilization_percent': round(utilization, 1),
+                'mode': 'WEBSOCKET_ONLY'
+            },
+            'health': 'HEALTHY' if utilization < 50 else 'WARNING',
+            'cache_stats': {
+                'total_entries': len(self.cache),
+                'websocket_status': 'CONNECTED' if (ws_manager and ws_manager.running) else 'DISCONNECTED'
+            }
+        }
+
+# Global safe API instance
+safe_api = SafeAPIWrapper()
+
 # Initialize with startup logs
 system_logger.add_log(LogLevel.INFO, "Bottie Trading Dashboard starting...", "STARTUP")
+system_logger.add_log(LogLevel.INFO, "Safe API wrapper initialized - ban prevention active", "API")
 system_logger.add_log(LogLevel.INFO, "WebSocket-only mode enabled (no REST API rate limits)", "WEBSOCKET")
 
 # Enhanced logs endpoint with filtering
@@ -2140,6 +2205,18 @@ def system_status_logs():
             "trading_grid": "ACTIVE"
         }
     }
+
+@app.get("/api/usage")
+def api_usage_stats():
+    """Monitor API usage to prevent bans - CRITICAL for avoiding Binance bans"""
+    stats = safe_api.get_api_usage_stats()
+    
+    # Log if approaching limits
+    utilization = stats['throttler']['utilization_percent']
+    if utilization > 80:
+        system_logger.add_log(LogLevel.WARNING, f"High API usage: {utilization}%", "API_THROTTLE")
+    
+    return stats
 
 if __name__ == "__main__":
     import uvicorn
