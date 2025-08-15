@@ -39,13 +39,42 @@ class BackendWebSocketManager {
         
         try {
             // Determine WebSocket URL based on current API URL
-            const wsUrl = API.replace('http', 'ws') + '/ws/trading';
-            console.log('Connecting to WebSocket:', wsUrl);
+            let wsUrl = API.replace('http', 'ws') + '/ws/trading';
+            
+            // Add authentication bypass parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const queryParams = [];
+            
+            // Add auth token if available
+            if (authToken && authToken !== 'auto-login-token') {
+                queryParams.push(`token=${encodeURIComponent(authToken)}`);
+            }
+            
+            // Add bypass parameters for development
+            if (urlParams.get('bypass') || urlParams.get('debug')) {
+                queryParams.push('bypass=true');
+            }
+            
+            // Check for bypass conditions
+            const isDevMode = window.location.hostname === 'localhost' || 
+                            window.location.hostname === '127.0.0.1' ||
+                            urlParams.get('bypass') === 'true' ||
+                            urlParams.get('debug') === 'true';
+            
+            if (isDevMode || !authToken) {
+                queryParams.push('bypass=debug');
+            }
+            
+            if (queryParams.length > 0) {
+                wsUrl += '?' + queryParams.join('&');
+            }
+            
+            console.log('Connecting to WebSocket:', wsUrl.replace(/token=[^&]+/, 'token=***'));
             
             this.ws = new WebSocket(wsUrl);
             
             this.ws.onopen = () => {
-                console.log('✅ Connected to Backend WebSocket');
+                console.log('✅ Connected to Backend WebSocket (Binance Proxy)');
                 this.isConnecting = false;
                 this.reconnectAttempts = 0;
                 this.connectionStatus = 'connected';
@@ -90,12 +119,15 @@ class BackendWebSocketManager {
     }
     
     handleMessage(message) {
-        const { type, channel, data } = message;
+        const { type, channel, data, binance_proxy, auth_bypassed } = message;
         
         switch (type) {
             case 'welcome':
                 console.log('WebSocket welcome:', message.message);
-                // Auto-subscribe to signals and trades
+                console.log('🔗 Binance Proxy Status:', binance_proxy || 'UNKNOWN');
+                console.log('🔓 Auth Bypassed:', auth_bypassed || false);
+                
+                // Auto-subscribe to all channels for real-time data
                 this.subscribe('signals');
                 this.subscribe('trades');
                 this.subscribe('grid');
@@ -177,26 +209,40 @@ class BackendWebSocketManager {
         const tbody = signalsTable.querySelector('tbody');
         if (!tbody) return;
         
-        tbody.innerHTML = '';
+        // Don't clear if we're receiving real-time updates, just update existing or add new
+        const signalArray = Array.isArray(signals) ? signals : [signals];
         
-        if (Array.isArray(signals)) {
-            signals.forEach(signal => {
-                const row = document.createElement('tr');
-                const signalClass = signal.signal?.toLowerCase() || 'hold';
-                const weights = signal.weights || {};
-                const weightStr = Object.entries(weights).map(([k, v]) => `${k}:${(v*100).toFixed(0)}%`).join(' ');
-                
-                row.innerHTML = `
-                    <td class="symbol">${signal.symbol}</td>
-                    <td><span class="${signalClass}-badge">${signal.signal}</span></td>
-                    <td>${signal.confidence?.toFixed(3) || signal.final_prob?.toFixed(3) || '—'}</td>
-                    <td>${signal.price?.toFixed(2) || signal.current_price?.toFixed(2) || '—'}</td>
-                    <td>${signal.change_24h?.toFixed(2) || '—'}%</td>
-                    <td>${signal.reason || signal.timestamp ? new Date(signal.timestamp * 1000).toLocaleTimeString() : '—'}</td>
-                `;
-                tbody.appendChild(row);
-            });
-        }
+        signalArray.forEach(signal => {
+            if (!signal || !signal.symbol) return;
+            
+            // Find existing row for this symbol
+            let existingRow = tbody.querySelector(`tr[data-symbol="${signal.symbol}"]`);
+            
+            if (!existingRow) {
+                existingRow = document.createElement('tr');
+                existingRow.setAttribute('data-symbol', signal.symbol);
+                tbody.appendChild(existingRow);
+            }
+            
+            const signalClass = signal.signal?.toLowerCase().replace('_', '-') || 'hold';
+            const signalDisplay = signal.signal?.replace('_', ' ') || 'HOLD';
+            
+            // Enhanced display with real-time data from Binance proxy
+            existingRow.innerHTML = `
+                <td class="symbol">${signal.symbol}</td>
+                <td><span class="${signalClass}-badge">${signalDisplay}</span></td>
+                <td>${signal.confidence?.toFixed(3) || '0.500'}</td>
+                <td>$${signal.price?.toFixed(2) || '0.00'}</td>
+                <td class="${signal.change_24h >= 0 ? 'positive' : 'negative'}">${signal.change_24h?.toFixed(2) || '0.00'}%</td>
+                <td>🔴 Live • ${new Date().toLocaleTimeString()}</td>
+            `;
+            
+            // Add visual feedback for real-time updates
+            existingRow.style.backgroundColor = 'rgba(100, 255, 218, 0.1)';
+            setTimeout(() => {
+                existingRow.style.backgroundColor = '';
+            }, 1000);
+        });
     }
     
     updateTradesTable(tradesData) {
@@ -206,33 +252,58 @@ class BackendWebSocketManager {
         const tbody = tradesTable.querySelector('tbody');
         if (!tbody) return;
         
-        // Don't clear existing data, just add new trades at the top
+        // Handle both individual trades and trade arrays from Binance proxy
+        let trades = [];
         if (tradesData.trades && Array.isArray(tradesData.trades)) {
-            const sortedTrades = tradesData.trades.sort((a, b) => b.timestamp - a.timestamp);
+            trades = tradesData.trades;
+        } else if (Array.isArray(tradesData)) {
+            trades = tradesData;
+        } else if (tradesData.symbol) {
+            // Single trade from real-time feed
+            trades = [tradesData];
+        }
+        
+        if (trades.length === 0) return;
+        
+        // For real-time updates, add new trades at the top and limit to 100
+        const currentRowCount = tbody.children.length;
+        
+        trades.forEach((trade, index) => {
+            if (!trade || !trade.symbol) return;
             
-            // Clear old data and add fresh data
-            tbody.innerHTML = '';
+            const row = document.createElement('tr');
+            const sideClass = trade.side?.toLowerCase() === 'buy' ? 'trade-buy' : 'trade-sell';
+            const tradeValue = (trade.price || 0) * (trade.quantity || 0);
             
-            sortedTrades.slice(0, 50).forEach(trade => {
-                const row = document.createElement('tr');
-                const sideClass = trade.side?.toLowerCase() === 'buy' ? 'trade-buy' : 'trade-sell';
-                
-                const pnl = trade.pnl || 0;
-                const pnlClass = pnl > 0 ? 'trade-pnl-positive' : pnl < 0 ? 'trade-pnl-negative' : 'trade-pnl-neutral';
-                const pnlDisplay = pnl !== 0 ? `${pnl > 0 ? '+' : ''}$${pnl.toFixed(2)}` : '$0.00';
-                
-                row.className = sideClass;
-                row.innerHTML = `
-                    <td>${new Date(trade.timestamp * 1000).toLocaleString()}</td>
-                    <td class="symbol">${trade.symbol}</td>
-                    <td class="${sideClass}">${trade.side}</td>
-                    <td>${trade.quantity?.toFixed(6) || '—'}</td>
-                    <td>$${trade.price?.toFixed(2) || '—'}</td>
-                    <td class="${pnlClass}">${pnlDisplay}</td>
-                    <td>${trade.trade_id || '—'}</td>
-                `;
-                tbody.appendChild(row);
-            });
+            // Enhanced real-time trade display
+            row.className = sideClass;
+            row.innerHTML = `
+                <td>🔴 ${new Date(trade.timestamp * 1000).toLocaleString()}</td>
+                <td class="symbol">${trade.symbol}</td>
+                <td class="${sideClass}">${trade.side}</td>
+                <td>${trade.quantity?.toFixed(6) || '0.000000'}</td>
+                <td>$${trade.price?.toFixed(2) || '0.00'}</td>
+                <td>$${tradeValue.toFixed(2)}</td>
+                <td>${trade.confidence?.toFixed(3) || '0.500'}</td>
+                <td class="trade-pnl-neutral">Live</td>
+                <td>✅ Executed</td>
+            `;
+            
+            // Add visual feedback for real-time updates
+            row.style.backgroundColor = sideClass === 'trade-buy' ? 
+                'rgba(74, 222, 128, 0.2)' : 'rgba(248, 113, 113, 0.2)';
+            
+            // Insert at the top
+            tbody.insertBefore(row, tbody.firstChild);
+            
+            setTimeout(() => {
+                row.style.backgroundColor = '';
+            }, 2000);
+        });
+        
+        // Limit to 100 rows for performance
+        while (tbody.children.length > 100) {
+            tbody.removeChild(tbody.lastChild);
         }
     }
     
@@ -609,6 +680,43 @@ async function refreshSentimentNews() {
     } finally {
       loginBtn.disabled = false;
       loginBtn.textContent = 'Login';
+    }
+  });
+
+  // Bypass button functionality for development
+  document.getElementById('bypass-btn').addEventListener('click', async () => {
+    const bypassBtn = document.getElementById('bypass-btn');
+    const loginError = document.getElementById('login-error');
+    
+    bypassBtn.disabled = true;
+    bypassBtn.textContent = '🔓 Bypassing...';
+    loginError.textContent = '';
+    
+    try {
+      // Create bypass user and token
+      const bypassUser = {
+        username: 'dev-user',
+        role: 'developer',
+        bypass: true
+      };
+      
+      saveAuthState('bypass-token', bypassUser);
+      
+      // Add bypass parameter to URL for WebSocket
+      const currentUrl = new URL(window.location);
+      currentUrl.searchParams.set('bypass', 'true');
+      window.history.replaceState({}, '', currentUrl);
+      
+      console.log('🔓 Development bypass activated');
+      updateUI();
+      initializeDashboard();
+      
+    } catch (error) {
+      loginError.textContent = 'Bypass failed. Please try again.';
+      console.error('Bypass error:', error);
+    } finally {
+      bypassBtn.disabled = false;
+      bypassBtn.textContent = '🔓 Dev Bypass';
     }
   });
 
