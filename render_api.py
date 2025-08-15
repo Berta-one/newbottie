@@ -458,7 +458,7 @@ def sentiment_debug():
 # Positions endpoint
 @app.get("/positions")
 def positions():
-    return {"positions": demo_data["positions"]}
+    return {"positions": get_real_positions()}
 
 # Trades endpoint
 @app.get("/trades")
