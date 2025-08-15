@@ -701,16 +701,6 @@ def sentiment_articles():
                 "api_key_configured": True
             }
             
-        except Exception as e:
-            print(f"❌ Error fetching Finnhub articles: {e}")
-            return {
-                "articles": [],
-                "total_count": 0,
-                "error": f"Failed to fetch real articles: {str(e)}",
-                "source": "finnhub_error",
-                "api_key_configured": True
-            }
-            
     except ImportError as e:
         print(f"❌ Sentiment import error: {e}")
         return {
