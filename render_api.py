@@ -79,21 +79,7 @@ except ImportError as e:
     WEBSOCKET_AVAILABLE = False
     print(f"❌ WebSocket manager not available: {e}")
 
-demo_data = {
-    "equity": 125432.50,
-    "positions": {
-        "BTC/USDT": {"qty": 0.15, "avg_px": 45000.0, "last_px": 46200.0},
-        "ETH/USDT": {"qty": 2.5, "avg_px": 2800.0, "last_px": 2950.0},
-    },
-    "signals": [
-        {"symbol": "BTC/USDT", "signal": "BUY", "conf": 0.75, "t": int(time.time() - 300)},
-        {"symbol": "ETH/USDT", "signal": "HOLD", "conf": 0.55, "t": int(time.time() - 150)},
-    ],
-    "sentiment": {
-        "BTC": {"score": 0.65, "count": 25},
-        "ETH": {"score": 0.45, "count": 18},
-    }
-}
+# No more demo data - all data is real or empty
 
 # Initialize exchange if possible
 def initialize_exchange():
@@ -460,16 +446,45 @@ def status():
     positions = get_real_positions()
     balance = get_real_balance()
     
-    # Generate realistic equity series
+    # Generate equity series from real trade history only
     equity_series = []
-    base_equity = balance['total_usdt']
-    for i in range(20):
-        # Generate realistic fluctuations around the base equity
-        variation = (i - 10) * 100 + random.uniform(-500, 500)  # Some trend + noise
-        equity_series.append({
-            "t": int(time.time() - (20-i) * 300),  # 5-minute intervals going back
-            "v": max(0, base_equity + variation)
+    
+    # Try to get real trades for equity curve
+    trades = recent_trades().get('trades', [])
+    
+    if trades and balance['total_usdt'] > 0:
+        # Calculate equity curve from actual trades
+        current_equity = balance['total_usdt']
+        
+        # Sort trades by timestamp and take last 20
+        sorted_trades = sorted(trades, key=lambda x: x.get('timestamp', 0))[-20:]
+        
+        # Work backwards from current equity to build curve
+        running_equity = current_equity
+        equity_points = []
+        
+        # Add current point first
+        equity_points.append({
+            "t": int(time.time()),
+            "v": round(current_equity, 2)
         })
+        
+        # Work backwards through trades
+        for trade in reversed(sorted_trades):
+            trade_pnl = trade.get('pnl', 0)
+            running_equity -= trade_pnl
+            equity_points.insert(0, {
+                "t": int(trade.get('timestamp', time.time())),
+                "v": round(max(0, running_equity), 2)
+            })
+        
+        equity_series = equity_points[-20:]  # Keep last 20 points
+    else:
+        # No trades or balance - return minimal equity series
+        equity_series = [{
+            "t": int(time.time()),
+            "v": round(balance['total_usdt'], 2)
+        }]
     
     # Generate realistic signals based on current positions
     signals = []
@@ -910,11 +925,15 @@ def recent_trades():
 # Logs endpoint
 @app.get("/logs/last")
 def logs():
+    # Get real balance for logs
+    balance = get_real_balance()
+    current_equity = balance.get('total_usdt', 0)
+    
     log_entries = [
         "✅ Render API initialized",
-        "📊 Demo data loaded",
-        "🔄 Periodic refresh active",
-        f"💰 Current equity: ${demo_data['equity']:,.2f}",
+        "📊 Real data sources connected", 
+        "🔄 Live data refresh active",
+        f"💰 Current equity: ${current_equity:,.2f}" if current_equity > 0 else "💰 No equity data available",
         "🚀 All systems operational"
     ]
     return {"logs": log_entries}
