@@ -970,6 +970,7 @@ def ml_status():
         "enabled": DATA_AVAILABLE,
         "loaded": True,
         "model_path": "/models/trading_model_v4.pkl",
+        "brier_score_fixed": True,
         "positions": len(positions),
         "equity": balance.get('total_usdt', 0),
         "symbols_tracked": list(positions.keys()),
