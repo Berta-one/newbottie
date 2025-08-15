@@ -355,10 +355,105 @@ def signals():
     
     return {"signals": signals_data}
 
-# Sentiment endpoint
+# Sentiment endpoint - REAL DATA (Safe version)
 @app.get("/sentiment")
 def sentiment():
-    return {"scores": demo_data["sentiment"]}
+    """Get real sentiment analysis data from Finnhub API"""
+    try:
+        # Import inside function to prevent startup crashes
+        import sys
+        import os
+        sys.path.append('.')
+        
+        # Check if sentiment module exists
+        if not os.path.exists('sentiment/sentiment_service.py'):
+            raise ImportError("Sentiment service not found")
+            
+        from sentiment.sentiment_service import snapshot
+        result = snapshot()
+        
+        # Ensure result has the expected structure
+        if isinstance(result, dict) and 'scores' in result:
+            return result
+        else:
+            raise ValueError("Invalid sentiment data format")
+            
+    except ImportError as e:
+        print(f"Sentiment import error: {e}")
+        return {
+            "source": "fallback_import", 
+            "window_sec": 900,
+            "scores": demo_data["sentiment"]
+        }
+    except Exception as e:
+        # Fallback to demo data if sentiment service fails
+        print(f"Sentiment service error: {e}")
+        return {
+            "source": "fallback_error", 
+            "window_sec": 900,
+            "scores": demo_data["sentiment"]
+        }
+
+# Sentiment debug endpoint (Safe version)
+@app.get("/sentiment/debug")
+def sentiment_debug():
+    """Debug information for sentiment analysis setup"""
+    import os
+    import sys
+    
+    debug_info = {
+        "sentiment_enabled": False,
+        "sentiment_source": "unknown",
+        "api_key_status": "UNKNOWN",
+        "assets_tracked": 0,
+        "total_articles": 0,
+        "using_real_data": False,
+        "environment": "render" if os.getenv("RENDER") else "local",
+        "python_path": sys.path[:3],  # First 3 paths for debugging
+        "sentiment_file_exists": os.path.exists('sentiment/sentiment_service.py')
+    }
+    
+    try:
+        sys.path.append('.')
+        
+        # Try to import sentiment service
+        from sentiment.sentiment_service import (
+            run_sentiment_cycle, FINNHUB_API_KEY, SENTIMENT_SOURCE,
+            SENTIMENT_ASSETS, SENTIMENT_ENABLED
+        )
+        
+        api_key_status = "SET" if FINNHUB_API_KEY else "NOT SET"
+        
+        # Get current sentiment data
+        current_data = run_sentiment_cycle()
+        total_articles = sum(item.get('n', 0) for item in current_data.values())
+        
+        debug_info.update({
+            "sentiment_enabled": SENTIMENT_ENABLED,
+            "sentiment_source": SENTIMENT_SOURCE,
+            "api_key_status": api_key_status,
+            "assets_tracked": len(SENTIMENT_ASSETS),
+            "total_articles": total_articles,
+            "using_real_data": total_articles > 0,
+            "current_scores": current_data,
+            "import_success": True
+        })
+        
+    except ImportError as e:
+        debug_info.update({
+            "import_error": str(e),
+            "import_success": False,
+            "message": "Sentiment service import failed"
+        })
+    except Exception as e:
+        debug_info.update({
+            "error": str(e),
+            "import_success": True,
+            "runtime_error": True,
+            "message": "Sentiment service runtime error"
+        })
+    
+    return debug_info
 
 # Positions endpoint
 @app.get("/positions")
