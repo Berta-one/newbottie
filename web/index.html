@@ -4,6 +4,32 @@
 <meta charset="UTF-8">
 <title>Bottie Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>
+// Emergency bypass script
+window.addEventListener('load', function() {
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('bypass') === 'true') {
+    setTimeout(() => {
+      console.log('🔧 EMERGENCY BYPASS');
+      window.currentUser = { username: 'debug-user', role: 'admin' };
+      window.authToken = 'bypass-token';
+      
+      // Hide login modal
+      const loginModal = document.getElementById('login-modal');
+      if (loginModal) loginModal.style.display = 'none';
+      
+      // Show dashboard
+      const mainContent = document.getElementById('main-content');
+      if (mainContent) mainContent.style.display = 'block';
+      
+      // Initialize if function exists
+      if (typeof initializeDashboard === 'function') {
+        initializeDashboard();
+      }
+    }, 1000);
+  }
+});
+</script>
 <link rel="stylesheet" href="style.css">
 <style>
   .login-modal {

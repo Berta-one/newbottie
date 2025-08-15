@@ -6,429 +6,90 @@
   let equityData = [];
   let refreshIntervals = {};
   let performanceChart = null;
-  let webSocketManager = null;
 
-  // --- Backend WebSocket Manager ---
-class BackendWebSocketManager {
-    constructor() {
-        this.ws = null;
-        this.reconnectAttempts = 0;
-        this.maxReconnectAttempts = 10;
-        this.reconnectDelay = 1000;
-        this.subscriptions = new Set();
-        this.isConnecting = false;
-        this.connectionStatus = 'disconnected';
-        this.lastActivity = Date.now();
-        
-        // Initialize connection
-        this.connect();
-        
-        // Heartbeat to detect connection issues
-        this.heartbeatInterval = setInterval(() => {
-            this.checkConnection();
-        }, 30000);
-    }
+// Auto-login with bypass support
+function autoLogin() {
+  console.log('Attempting auto-login...');
+  
+  // Check for bypass parameters in URL FIRST
+  const urlParams = new URLSearchParams(window.location.search);
+  const apiParam = urlParams.get('api');
+  const bypassAuth = urlParams.get('bypass') === 'true' || urlParams.get('debug') === 'true';
+  
+  // Authentication bypass for development/debugging
+  if (bypassAuth) {
+    console.log('🔧 Authentication bypass enabled via URL parameter');
+    currentUser = { username: 'debug-user', role: 'admin' };
+    authToken = 'bypass-token';
     
-    async connect() {
-        if (this.isConnecting || (this.ws && this.ws.readyState === WebSocket.OPEN)) {
-            return;
-        }
-        
-        this.isConnecting = true;
-        this.updateConnectionStatus('connecting');
-        
-        try {
-            // Determine WebSocket URL based on current API URL
-            let wsUrl = API.replace('http', 'ws') + '/ws/trading';
-            
-            // Add authentication bypass parameters
-            const urlParams = new URLSearchParams(window.location.search);
-            const queryParams = [];
-            
-            // Add auth token if available
-            if (authToken && authToken !== 'auto-login-token') {
-                queryParams.push(`token=${encodeURIComponent(authToken)}`);
-            }
-            
-            // Add bypass parameters for development
-            if (urlParams.get('bypass') || urlParams.get('debug')) {
-                queryParams.push('bypass=true');
-            }
-            
-            // Check for bypass conditions
-            const isDevMode = window.location.hostname === 'localhost' || 
-                            window.location.hostname === '127.0.0.1' ||
-                            urlParams.get('bypass') === 'true' ||
-                            urlParams.get('debug') === 'true';
-            
-            if (isDevMode || !authToken) {
-                queryParams.push('bypass=debug');
-            }
-            
-            if (queryParams.length > 0) {
-                wsUrl += '?' + queryParams.join('&');
-            }
-            
-            console.log('Connecting to WebSocket:', wsUrl.replace(/token=[^&]+/, 'token=***'));
-            
-            this.ws = new WebSocket(wsUrl);
-            
-            this.ws.onopen = () => {
-                console.log('✅ Connected to Backend WebSocket (Binance Proxy)');
-                this.isConnecting = false;
-                this.reconnectAttempts = 0;
-                this.connectionStatus = 'connected';
-                this.updateConnectionStatus('connected');
-                this.lastActivity = Date.now();
-                
-                // Re-subscribe to previous channels
-                this.resubscribeToChannels();
-            };
-            
-            this.ws.onmessage = (event) => {
-                try {
-                    const message = JSON.parse(event.data);
-                    this.lastActivity = Date.now();
-                    this.handleMessage(message);
-                } catch (error) {
-                    console.error('WebSocket message parse error:', error);
-                }
-            };
-            
-            this.ws.onclose = (event) => {
-                console.log('❌ WebSocket closed:', event.code, event.reason);
-                this.isConnecting = false;
-                this.connectionStatus = 'disconnected';
-                this.updateConnectionStatus('disconnected');
-                this.attemptReconnection();
-            };
-            
-            this.ws.onerror = (error) => {
-                console.error('❌ WebSocket error:', error);
-                this.connectionStatus = 'error';
-                this.updateConnectionStatus('error');
-            };
-            
-        } catch (error) {
-            console.error('WebSocket connection failed:', error);
-            this.isConnecting = false;
-            this.connectionStatus = 'error';
-            this.updateConnectionStatus('error');
-            this.attemptReconnection();
-        }
-    }
+    // Save bypass session
+    localStorage.setItem('bottie_auth_token', authToken);
+    localStorage.setItem('bottie_api_base', API);
+    localStorage.setItem('bottie_user', JSON.stringify(currentUser));
     
-    handleMessage(message) {
-        const { type, channel, data, binance_proxy, auth_bypassed } = message;
-        
-        switch (type) {
-            case 'welcome':
-                console.log('WebSocket welcome:', message.message);
-                console.log('🔗 Binance Proxy Status:', binance_proxy || 'UNKNOWN');
-                console.log('🔓 Auth Bypassed:', auth_bypassed || false);
-                
-                // Auto-subscribe to all channels for real-time data
-                this.subscribe('signals');
-                this.subscribe('trades');
-                this.subscribe('grid');
-                this.subscribe('prices');
-                break;
-                
-            case 'data':
-                this.handleChannelData(channel, data);
-                break;
-                
-            case 'subscription_confirmed':
-                console.log(`✅ Subscribed to channel: ${channel}`);
-                this.subscriptions.add(channel);
-                break;
-                
-            case 'unsubscription_confirmed':
-                console.log(`❌ Unsubscribed from channel: ${channel}`);
-                this.subscriptions.delete(channel);
-                break;
-                
-            case 'error':
-                console.error('WebSocket server error:', message.message);
-                break;
-                
-            default:
-                console.log('Unhandled message type:', type, message);
-        }
-    }
-    
-    handleChannelData(channel, data) {
-        switch (channel) {
-            case 'signals':
-                this.updateSignalsTable(data);
-                break;
-            case 'trades':
-                this.updateTradesTable(data);
-                break;
-            case 'grid':
-                this.updateGridDisplay(data);
-                break;
-            case 'prices':
-                this.updatePricesDisplay(data);
-                break;
-            default:
-                console.log('Unhandled channel data:', channel, data);
-        }
-    }
-    
-    subscribe(channel) {
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify({
-                action: 'subscribe',
-                channel: channel
-            }));
-        }
-    }
-    
-    unsubscribe(channel) {
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify({
-                action: 'unsubscribe',
-                channel: channel
-            }));
-        }
-    }
-    
-    resubscribeToChannels() {
-        // Always subscribe to these channels
-        const channels = ['signals', 'trades', 'grid', 'prices'];
-        channels.forEach(channel => {
-            this.subscribe(channel);
-        });
-    }
-    
-    updateSignalsTable(signals) {
-        const signalsTable = document.getElementById('signals-table');
-        if (!signalsTable) return;
-        
-        const tbody = signalsTable.querySelector('tbody');
-        if (!tbody) return;
-        
-        // Don't clear if we're receiving real-time updates, just update existing or add new
-        const signalArray = Array.isArray(signals) ? signals : [signals];
-        
-        signalArray.forEach(signal => {
-            if (!signal || !signal.symbol) return;
-            
-            // Find existing row for this symbol
-            let existingRow = tbody.querySelector(`tr[data-symbol="${signal.symbol}"]`);
-            
-            if (!existingRow) {
-                existingRow = document.createElement('tr');
-                existingRow.setAttribute('data-symbol', signal.symbol);
-                tbody.appendChild(existingRow);
-            }
-            
-            const signalClass = signal.signal?.toLowerCase().replace('_', '-') || 'hold';
-            const signalDisplay = signal.signal?.replace('_', ' ') || 'HOLD';
-            
-            // Enhanced display with real-time data from Binance proxy
-            existingRow.innerHTML = `
-                <td class="symbol">${signal.symbol}</td>
-                <td><span class="${signalClass}-badge">${signalDisplay}</span></td>
-                <td>${signal.confidence?.toFixed(3) || '0.500'}</td>
-                <td>$${signal.price?.toFixed(2) || '0.00'}</td>
-                <td class="${signal.change_24h >= 0 ? 'positive' : 'negative'}">${signal.change_24h?.toFixed(2) || '0.00'}%</td>
-                <td>🔴 Live • ${new Date().toLocaleTimeString()}</td>
-            `;
-            
-            // Add visual feedback for real-time updates
-            existingRow.style.backgroundColor = 'rgba(100, 255, 218, 0.1)';
-            setTimeout(() => {
-                existingRow.style.backgroundColor = '';
-            }, 1000);
-        });
-    }
-    
-    updateTradesTable(tradesData) {
-        const tradesTable = document.getElementById('trades-table');
-        if (!tradesTable) return;
-        
-        const tbody = tradesTable.querySelector('tbody');
-        if (!tbody) return;
-        
-        // Handle both individual trades and trade arrays from Binance proxy
-        let trades = [];
-        if (tradesData.trades && Array.isArray(tradesData.trades)) {
-            trades = tradesData.trades;
-        } else if (Array.isArray(tradesData)) {
-            trades = tradesData;
-        } else if (tradesData.symbol) {
-            // Single trade from real-time feed
-            trades = [tradesData];
-        }
-        
-        if (trades.length === 0) return;
-        
-        // For real-time updates, add new trades at the top and limit to 100
-        const currentRowCount = tbody.children.length;
-        
-        trades.forEach((trade, index) => {
-            if (!trade || !trade.symbol) return;
-            
-            const row = document.createElement('tr');
-            const sideClass = trade.side?.toLowerCase() === 'buy' ? 'trade-buy' : 'trade-sell';
-            const tradeValue = (trade.price || 0) * (trade.quantity || 0);
-            
-            // Enhanced real-time trade display
-            row.className = sideClass;
-            row.innerHTML = `
-                <td>🔴 ${new Date(trade.timestamp * 1000).toLocaleString()}</td>
-                <td class="symbol">${trade.symbol}</td>
-                <td class="${sideClass}">${trade.side}</td>
-                <td>${trade.quantity?.toFixed(6) || '0.000000'}</td>
-                <td>$${trade.price?.toFixed(2) || '0.00'}</td>
-                <td>$${tradeValue.toFixed(2)}</td>
-                <td>${trade.confidence?.toFixed(3) || '0.500'}</td>
-                <td class="trade-pnl-neutral">Live</td>
-                <td>✅ Executed</td>
-            `;
-            
-            // Add visual feedback for real-time updates
-            row.style.backgroundColor = sideClass === 'trade-buy' ? 
-                'rgba(74, 222, 128, 0.2)' : 'rgba(248, 113, 113, 0.2)';
-            
-            // Insert at the top
-            tbody.insertBefore(row, tbody.firstChild);
-            
-            setTimeout(() => {
-                row.style.backgroundColor = '';
-            }, 2000);
-        });
-        
-        // Limit to 100 rows for performance
-        while (tbody.children.length > 100) {
-            tbody.removeChild(tbody.lastChild);
-        }
-    }
-    
-    updateGridDisplay(gridData) {
-        // Use existing grid update logic
-        if (typeof updateGridDisplay === 'function') {
-            updateGridDisplay(gridData);
-        }
-    }
-    
-    updatePricesDisplay(priceData) {
-        // Update any price displays with real-time data
-        if (priceData.prices && Array.isArray(priceData.prices)) {
-            priceData.prices.forEach(price => {
-                // Update any price displays in the UI
-                const priceElements = document.querySelectorAll(`[data-symbol="${price.symbol}"] .price`);
-                priceElements.forEach(el => {
-                    el.textContent = `$${price.price?.toFixed(2) || '—'}`;
-                });
-            });
-        }
-    }
-    
-    checkConnection() {
-        const now = Date.now();
-        const timeSinceLastActivity = now - this.lastActivity;
-        
-        // If no activity for 60 seconds, consider connection stale
-        if (timeSinceLastActivity > 60000) {
-            console.warn('WebSocket connection appears stale, reconnecting...');
-            this.disconnect();
-            this.connect();
-        }
-    }
-    
-    attemptReconnection() {
-        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            console.error('Max reconnection attempts reached');
-            this.updateConnectionStatus('failed');
-            return;
-        }
-        
-        this.reconnectAttempts++;
-        const delay = Math.min(this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1), 30000);
-        
-        console.log(`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-        this.updateConnectionStatus('reconnecting');
-        
-        setTimeout(() => {
-            this.connect();
-        }, delay);
-    }
-    
-    updateConnectionStatus(status) {
-        this.connectionStatus = status;
-        
-        // Update connection status indicator
-        const statusElements = document.querySelectorAll('#websocket-status, .ws-status-indicator');
-        statusElements.forEach(element => {
-            if (element) {
-                element.textContent = `WS: ${status}`;
-                element.className = `ws-status ws-status-${status}`;
-            }
-        });
-        
-        // Update any status indicators in the UI
-        const statusIndicator = document.getElementById('connection-status');
-        if (statusIndicator) {
-            statusIndicator.textContent = status;
-            statusIndicator.className = `status-indicator status-${status}`;
-        }
-        
-        console.log(`WebSocket status: ${status}`);
-    }
-    
-    disconnect() {
-        if (this.ws) {
-            this.ws.close();
-            this.ws = null;
-        }
-        if (this.heartbeatInterval) {
-            clearInterval(this.heartbeatInterval);
-            this.heartbeatInterval = null;
-        }
-    }
-    
-    getStatus() {
-        return {
-            status: this.connectionStatus,
-            subscriptions: Array.from(this.subscriptions),
-            reconnectAttempts: this.reconnectAttempts,
-            lastActivity: this.lastActivity
-        };
-    }
-}
-// --- End Backend WebSocket Manager ---
-
-  // Auto-login on page load
-  function autoLogin() {
-    console.log('Auto-login disabled - hardcoded credentials removed for security');
-    console.log('💡 Use the "🔓 Dev Bypass" button on the login screen for development access');
-    console.log('💡 Or add ?bypass=true to the URL for instant bypass');
-    
-    // Check for URL-based bypass
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('bypass') === 'true' || urlParams.get('debug') === 'true') {
-      console.log('🔓 URL-based bypass detected, activating...');
-      currentUser = { username: 'url-bypass-user', role: 'developer', bypass: true };
-      authToken = 'url-bypass-token';
-      updateUI();
-      initializeDashboard();
-      return;
-    }
-    
-    // Check if user already has saved auth state
-    if (loadAuthState()) {
-      console.log('✅ Restored previous session');
-      updateUI();
-      initializeDashboard();
-      return;
-    }
-    
-    // Show login screen
-    console.log('🔐 Please login or use Dev Bypass button');
     updateUI();
+    initializeDashboard();
+    return;
+  }
+  
+  // Auto-login as admin with correct credentials (fallback)
+  currentUser = { username: 'admin', role: 'admin' };
+  authToken = 'auto-login-token';
+  
+  // Update UI immediately
+  updateUI();
+  
+  // Try to get a real token in the background
+  setTimeout(async () => {
+    try {
+      const response = await fetch(`${API}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'admin', password: 'Diego1234!' })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        authToken = data.access_token;
+        console.log('✅ Real authentication token obtained');
+      } else {
+        console.log('⚠️ Using fallback auto-login token');
+      }
+    } catch (error) {
+      console.log('⚠️ Auto-login fallback mode:', error.message);
+    }
+    
+    // Initialize dashboard after getting token
+    initializeDashboard();
+  }, 100);
+}
+    
+    // Update UI immediately
+    updateUI();
+    
+    // Try to get a real token in the background
+    setTimeout(async () => {
+      try {
+        const response = await fetch(`${API}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: 'admin', password: 'Diego1234!' })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          authToken = data.access_token;
+          console.log('✅ Real authentication token obtained');
+        } else {
+          console.log('⚠️ Using fallback auto-login token');
+        }
+      } catch (error) {
+        console.log('⚠️ Auto-login fallback mode:', error.message);
+      }
+      
+      // Initialize dashboard after getting token
+      initializeDashboard();
+    }, 100);
   }
 
   // Safe element finder
@@ -606,20 +267,29 @@ async function refreshSentimentNews() {
   }
 
   function updateUI() {
-    const loginModal = document.getElementById('login-modal');
-    const mainContent = document.getElementById('main-content');
-    const dashboardTabs = document.getElementById('dashboard-tabs');
-    const userInfo = document.getElementById('user-info');
-    const debugToggle = document.getElementById('debug-toggle');
-    const userName = document.getElementById('user-name');
-    
-    if (currentUser && authToken) {
-      loginModal.style.display = 'none';
-      mainContent.style.display = 'block';
-      dashboardTabs.style.display = 'flex';
-      userInfo.style.display = 'flex';
-      debugToggle.style.display = 'block';
-      userName.textContent = currentUser.username || 'User';
+  // Always show dashboard - no login required
+  const loginModal = document.getElementById('login-modal');
+  const mainContent = document.getElementById('main-content');
+  const dashboardTabs = document.getElementById('dashboard-tabs');
+  const userInfo = document.getElementById('user-info');
+  const debugToggle = document.getElementById('debug-toggle');
+  
+  if (loginModal) loginModal.style.display = 'none';
+  if (mainContent) mainContent.style.display = 'block';
+  if (dashboardTabs) dashboardTabs.style.display = 'flex';
+  if (userInfo) userInfo.style.display = 'flex';
+  if (debugToggle) debugToggle.style.display = 'block';
+  
+  // Set user info
+  const userName = document.getElementById('user-name');
+  if (userName) userName.textContent = 'admin';
+  
+  // Update debug info
+  if (document.getElementById('debug-api-base')) document.getElementById('debug-api-base').textContent = API;
+  if (document.getElementById('debug-user')) document.getElementById('debug-user').textContent = 'admin';
+  if (document.getElementById('debug-role')) document.getElementById('debug-role').textContent = 'admin';
+  if (document.getElementById('debug-session')) document.getElementById('debug-session').textContent = 'no-auth';
+}
       
       // Show audit section for superusers
       if (currentUser.role === 'superuser') {
@@ -677,83 +347,29 @@ async function refreshSentimentNews() {
     }
   });
 
-  // Bypass button functionality for development
-  function initializeBypassButton() {
-    const bypassBtn = document.getElementById('bypass-btn');
-    if (!bypassBtn) {
-      console.error('❌ Bypass button not found in DOM');
-      return;
-    }
-    
-    bypassBtn.addEventListener('click', async (e) => {
-      e.preventDefault();
-      console.log('🔓 Dev Bypass button clicked');
-      
-      const loginError = document.getElementById('login-error');
-      
-      bypassBtn.disabled = true;
-      bypassBtn.textContent = '🔓 Bypassing...';
-      if (loginError) loginError.textContent = '';
-      
-      try {
-        // Create bypass user and token
-        const bypassUser = {
-          username: 'dev-user',
-          role: 'developer',
-          bypass: true
-        };
-        
-        console.log('Setting auth state with bypass token...');
-        saveAuthState('bypass-token', bypassUser);
-        
-        // Verify auth state was set
-        console.log('Current auth state:', { authToken, currentUser });
-        
-        // Add bypass parameter to URL for WebSocket
-        const currentUrl = new URL(window.location);
-        currentUrl.searchParams.set('bypass', 'true');
-        window.history.replaceState({}, '', currentUrl);
-        
-        console.log('🔓 Development bypass activated');
-        console.log('Updating UI...');
-        updateUI();
-        
-        console.log('Initializing dashboard...');
-        try {
-          initializeDashboard();
-          console.log('✅ Bypass complete - dashboard initialized');
-        } catch (dashError) {
-          console.error('Dashboard initialization error:', dashError);
-          if (loginError) loginError.textContent = 'Bypass successful but dashboard failed to load: ' + dashError.message;
-        }
-        
-      } catch (error) {
-        const errorMsg = 'Bypass failed: ' + error.message;
-        if (loginError) loginError.textContent = errorMsg;
-        console.error('❌ Bypass error:', error);
-      } finally {
-        bypassBtn.disabled = false;
-        bypassBtn.textContent = '🔓 Dev Bypass';
-      }
-    });
-    
-    console.log('✅ Bypass button initialized');
-  }
-  
-  // Initialize bypass button when DOM is ready - will be called at the end of script
-
-  // Add credential testing functionality (disabled - use Dev Bypass instead)
+  // Add credential testing functionality
   async function testMultipleCredentials() {
-    const credentials = [];
-    
-    console.log('⚠️ Hardcoded credential testing disabled for security.');
-    console.log('💡 Use the "🔓 Dev Bypass" button for development access.');
-    
-    const loginError = document.getElementById('login-error');
-    if (loginError) {
-      loginError.innerHTML = '⚠️ Use Dev Bypass button for development access';
-    }
-    return;
+    const credentials = [
+      // Based on your HTML default values
+      { username: 'admin', password: 'Diego1234!' },
+      { username: 'superuser', password: 'Lenny106667!' },
+      
+      // Original expected passwords from code
+      { username: 'admin', password: 'AdminPass456!' },
+      { username: 'superuser', password: 'SuperSecret123!' },
+      
+      // Common fallbacks
+      { username: 'admin', password: 'admin' },
+      { username: 'superuser', password: 'superuser' },
+      { username: 'admin', password: '' },
+      { username: 'root', password: 'root' },
+      { username: 'user', password: 'user' },
+      { username: 'test', password: 'test' },
+      
+      // Try with different case
+      { username: 'Admin', password: 'Diego1234!' },
+      { username: 'ADMIN', password: 'DIEGO1234!' }
+    ];
 
     const loginError = document.getElementById('login-error');
     loginError.innerHTML = 'Testing multiple credentials...<br><br>';
@@ -851,10 +467,32 @@ async function refreshSentimentNews() {
       refreshEquity();
     }, 500);
   }
+// Add bypass button to the existing function
+const bypassBtn = document.createElement('button');
+bypassBtn.type = 'button';
+bypassBtn.id = 'bypass-auth-btn';
+bypassBtn.className = 'login-btn';
+bypassBtn.style.marginTop = '10px';
+bypassBtn.style.background = '#ff9800';
+bypassBtn.textContent = 'Skip Authentication (Debug)';
+bypassBtn.onclick = () => {
+  console.log('🔧 Manual authentication bypass');
+  currentUser = { username: 'debug-user', role: 'admin' };
+  authToken = 'bypass-token';
+  
+  localStorage.setItem('bottie_auth_token', authToken);
+  localStorage.setItem('bottie_api_base', API);
+  localStorage.setItem('bottie_user', JSON.stringify(currentUser));
+  
+  updateUI();
+  initializeDashboard();
+};
 
+// Add it after the other buttons
+loginBtn.parentNode.insertBefore(bypassBtn, guestBtn.nextSibling);
   // Debug endpoint testing functions
   async function testDebugEndpoints() {
-    const loginError = document.getElementById('login-error');
+    loginError = document.getElementById('login-error');
     loginError.innerHTML = 'Testing debug endpoints...<br><br>';
 
     // Test debug/auth endpoint
@@ -966,10 +604,6 @@ async function refreshSentimentNews() {
 
   // Add the test button functionality
   function addCredentialTestButton() {
-    // Disabled for security - use Dev Bypass button instead
-    console.log('⚠️ Credential testing disabled - use Dev Bypass button');
-    return;
-    
     const loginForm = document.getElementById('login-form');
     if (loginForm && !document.getElementById('test-credentials-btn')) {
       const testBtn = document.createElement('button');
@@ -1165,40 +799,25 @@ async function refreshSentimentNews() {
   }
 
   // Authenticated API functions
-  async function authFetch(url, options = {}) {
-    const fullUrl = url.startsWith('http') ? url : `${API}${url}`;
-    const headers = {
-      'Authorization': `Bearer ${authToken}`,
-      'Content-Type': 'application/json',
-      ...options.headers
-    };
-    
-    const response = await fetch(fullUrl, { ...options, headers });
-    
-    if (response.status === 401) {
-      clearAuthState();
-      updateUI();
-      throw new Error('Authentication expired');
-    }
-    
-    return response;
+async function authFetch(url, options = {}) {
+  const fullUrl = url.startsWith('http') ? url : `${API}${url}`;
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers
+  };
+  
+  // Add auth header only if we have a real token (not bypass tokens)
+  if (authToken && authToken !== 'bypass-token' && authToken !== 'auto-login-token') {
+    headers['Authorization'] = `Bearer ${authToken}`;
   }
-
-  async function fetchJSON(url) {
-    const response = await authFetch(url);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    return response.json();
-  }
-
-  async function postJSON(path) {
-    const response = await authFetch(path, { method: 'POST' });
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    return response.json();
-  }
+  
+  const response = await fetch(fullUrl, { ...options, headers });
+  
+  // Skip auth check for bypass/auto-login modes
+ 
+  
+  return response;
+}
 
   // ML Status refresh functions
   async function refreshMLStatus() {
@@ -1652,23 +1271,13 @@ async function refreshSentimentNews() {
 
   async function refreshSignals() {
     try {
-      // Check if WebSocket is connected and handling signals
-      if (webSocketManager && webSocketManager.subscriptions.has('signals')) {
-        console.log('✅ Signals updated via WebSocket');
-        return; // WebSocket is handling signals updates
-      }
-      
-      // Fallback to REST API if WebSocket not available
-      console.log('⚠️ Fallback: Fetching signals via REST API');
-      const response = await authFetch('/signals');
-      const data = await response.json();
-      
+      const data = await fetchJSON('/signals');
       if (!signalsTable) return;
       
       const tbody = signalsTable.querySelector('tbody');
       tbody.innerHTML = '';
       
-      (data || []).forEach(signal => {
+      (data.signals || []).forEach(signal => {
         const row = document.createElement('tr');
         const signalClass = signal.signal?.toLowerCase() || 'hold';
         const weights = signal.weights || {};
@@ -1677,15 +1286,19 @@ async function refreshSentimentNews() {
         row.innerHTML = `
           <td class="symbol">${signal.symbol}</td>
           <td><span class="${signalClass}-badge">${signal.signal}</span></td>
-          <td>${signal.confidence?.toFixed(3) || signal.final_prob?.toFixed(3) || '—'}</td>
-          <td>${signal.price?.toFixed(2) || '—'}</td>
-          <td>${signal.change_24h?.toFixed(2) || '—'}%</td>
-          <td>${signal.reason || signal.timestamp ? new Date(signal.timestamp * 1000).toLocaleTimeString() : '—'}</td>
+          <td>${signal.final_prob?.toFixed(3) || '—'}</td>
+          <td>${signal.ema?.toFixed(3) || '—'}</td>
+          <td>${signal.ml?.toFixed(3) || '—'}</td>
+          <td>${signal.q?.toFixed(3) || '—'}</td>
+          <td>${signal.sent?.toFixed(3) || '—'}</td>
+          <td style="font-size: 10px;">${weightStr}</td>
+          <td>${signal.thr_buy?.toFixed(2) || '—'}/${signal.thr_sell?.toFixed(2) || '—'}</td>
+          <td>${signal.t ? Math.floor((Date.now()/1000 - signal.t)/60) + 'm' : '—'}</td>
         `;
         tbody.appendChild(row);
       });
     } catch (error) {
-      console.error('Signals refresh error:', error);
+      console.error('Signals refresh failed:', error);
     }
   }
 
@@ -1730,14 +1343,6 @@ async function refreshSentimentNews() {
 
   async function refreshTrades() {
     try {
-      // Check if WebSocket is connected and handling trades
-      if (webSocketManager && webSocketManager.subscriptions.has('trades')) {
-        console.log('✅ Trades updated via WebSocket');
-        return; // WebSocket is handling trades updates
-      }
-      
-      // Fallback to REST API if WebSocket not available
-      console.log('⚠️ Fallback: Fetching trades via REST API');
       const data = await fetchJSON('/trades');
       if (!tradesTable) return;
       
@@ -2014,14 +1619,6 @@ async function refreshSentimentNews() {
   // Grid refresh function
   async function refreshGrid() {
     try {
-      // Check if WebSocket is connected and handling grid
-      if (webSocketManager && webSocketManager.subscriptions.has('grid')) {
-        console.log('✅ Grid updated via WebSocket');
-        return; // WebSocket is handling grid updates
-      }
-      
-      // Fallback to REST API if WebSocket not available
-      console.log('⚠️ Fallback: Fetching grid via REST API');
       const data = await fetchJSON('/grid/matrix');
       updateGridDisplay(data);
     } catch (error) {
@@ -2169,6 +1766,114 @@ async function refreshSentimentNews() {
         setTimeout(() => {
           box.classList.remove('error');
           statusEl.textContent = 'Ready';
+        }, 3000);
+      }
+    });
+  });
+
+  function showNotImplementedModal(endpoint) {
+    document.getElementById('response-title').textContent = `Endpoint: ${endpoint}`;
+    document.getElementById('response-data').textContent = 'This endpoint is not yet implemented.';
+    document.getElementById('response-modal').style.display = 'flex';
+  }
+
+  // Execution control buttons
+  document.getElementById('btnExecEnable').addEventListener('click', async () => {
+    try {
+      await postJSON('/execution/enable');
+      console.log('Execution enabled');
+    } catch (error) {
+      console.error('Failed to enable execution:', error);
+    }
+  });
+
+  document.getElementById('btnExecDisable').addEventListener('click', async () => {
+    try {
+      await postJSON('/execution/disable');
+      console.log('Execution disabled');
+    } catch (error) {
+      console.error('Failed to disable execution:', error);
+    }
+  });
+
+  document.getElementById('btnExecToggle').addEventListener('click', async () => {
+    try {
+      await postJSON('/execution/toggle');
+      console.log('Execution toggled');
+    } catch (error) {
+      console.error('Failed to toggle execution:', error);
+    }
+  });
+
+  // Audit log refresh button
+  document.getElementById('refresh-audit').addEventListener('click', refreshAuditLogs);
+
+  // Interval management
+  function clearAllIntervals() {
+    Object.values(refreshIntervals).forEach(id => clearInterval(id));
+    refreshIntervals = {};
+  }
+
+  function applyRefreshIntervals() {
+    clearAllIntervals();
+    
+    const healthInterval = parseInt(document.getElementById('health-interval').value) || 5000;
+    const signalsInterval = parseInt(document.getElementById('signals-interval').value) || 3000;
+    const gridInterval = parseInt(document.getElementById('grid-interval').value) || 15000;
+    
+    refreshIntervals.health = setInterval(refreshHealth, healthInterval);
+    refreshIntervals.sentiment = setInterval(refreshSentiment, signalsInterval);
+    refreshIntervals.signals = setInterval(refreshSignals, signalsInterval);
+    refreshIntervals.positions = setInterval(refreshPositions, signalsInterval);
+    refreshIntervals.equity = setInterval(refreshEquityChart, signalsInterval);
+    refreshIntervals.trades = setInterval(refreshTrades, signalsInterval * 2);
+    refreshIntervals.logs = setInterval(refreshLogs, signalsInterval * 3);
+    refreshIntervals.grid = setInterval(refreshGrid, gridInterval);
+    refreshIntervals.ml = setInterval(refreshMLStatus, signalsInterval * 2);
+    refreshIntervals.quantum = setInterval(refreshQuantumDetails, signalsInterval * 2);
+    
+    console.log('Refresh intervals applied');
+  }
+
+  document.getElementById('apply-intervals').addEventListener('click', applyRefreshIntervals);
+
+  document.getElementById('refresh-all').addEventListener('click', () => {
+    refreshHealth();
+    refreshSentiment();
+    refreshSignals();
+    refreshPositions();
+    refreshEquityChart();
+    refreshTrades();
+    refreshLogs();
+    refreshGrid();
+    refreshMLStatus();
+    refreshQuantumDetails();
+    if (currentUser?.role === 'superuser') {
+      refreshAuditLogs();
+    }
+  });
+
+  // P&L Period Selection Event Listeners
+  document.querySelectorAll('.period-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      currentPeriod = this.dataset.period;
+      updatePnLSummary();
+    });
+  });
+
+  // Trade Filter Event Listeners
+  const symbolFilter = document.getElementById('symbol-filter');
+  const sideFilter = document.getElementById('side-filter');
+  const searchFilter = document.getElementById('search-filter');
+  
+  if (symbolFilter) symbolFilter.addEventListener('change', filterTrades);
+  if (sideFilter) sideFilter.addEventListener('change', filterTrades);
+  if (searchFilter) searchFilter.addEventListener('input', filterTrades);
+
+  // Add this function to ensure all dashboard elements load properly
+  function ensureElementsExist() {
     // Create missing elements if they don't exist
     const requiredElements = [
       'quantum-chip', 'quantum-backend', 'quantum-enabled',
@@ -2201,13 +1906,7 @@ async function refreshSentimentNews() {
     initTabs();
     initPerformanceChart();
     
-    // Initialize WebSocket connection for real-time data
-    if (!webSocketManager) {
-      console.log('🔄 Initializing WebSocket connection...');
-      webSocketManager = new BackendWebSocketManager();
-    }
-    
-    // Initial data fetch with error handling (reduced polling, WebSocket will handle most updates)
+    // Initial data fetch with error handling
     setTimeout(async () => {
       console.log('Starting initial refresh sequence...');
       try {
@@ -2221,6 +1920,11 @@ async function refreshSentimentNews() {
       } catch (e) { console.error('Sentiment refresh failed:', e); }
       
       try {
+        await refreshSignals();
+        console.log('Signals refreshed');
+      } catch (e) { console.error('Signals refresh failed:', e); }
+      
+      try {
         await refreshPositions();
         console.log('Positions refreshed');
       } catch (e) { console.error('Positions refresh failed:', e); }
@@ -2231,9 +1935,19 @@ async function refreshSentimentNews() {
       } catch (e) { console.error('Equity chart refresh failed:', e); }
       
       try {
+        await refreshTrades();
+        console.log('Trades refreshed');
+      } catch (e) { console.error('Trades refresh failed:', e); }
+      
+      try {
         await refreshLogs();
         console.log('Logs refreshed');
       } catch (e) { console.error('Logs refresh failed:', e); }
+      
+      try {
+        await refreshGrid();
+        console.log('Grid refreshed');
+      } catch (e) { console.error('Grid refresh failed:', e); }
       
       try {
         await refreshMLStatus();
@@ -2258,31 +1972,15 @@ async function refreshSentimentNews() {
       }
     }, 500);
     
-    // Set up reduced auto-refresh (WebSocket handles signals, trades, grid, prices)
-    applyReducedRefreshIntervals();
+  // Set up auto-refresh
+  applyRefreshIntervals();
+  setInterval(refreshSentiment, 60000); // Refresh sentiment every minute
     
     // Resize canvas on window resize
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
     
     console.log('Dashboard initialization complete');
-  }
-  
-  // Reduced refresh intervals since WebSocket handles real-time data
-  function applyReducedRefreshIntervals() {
-    // Clear old intervals
-    clearAllIntervals();
-    
-    // Only refresh non-real-time data periodically
-    refreshIntervals.health = setInterval(refreshHealth, 30000); // 30 seconds
-    refreshIntervals.sentiment = setInterval(refreshSentiment, 60000); // 1 minute
-    refreshIntervals.positions = setInterval(refreshPositions, 15000); // 15 seconds
-    refreshIntervals.equity = setInterval(refreshEquityChart, 30000); // 30 seconds
-    refreshIntervals.logs = setInterval(refreshLogs, 45000); // 45 seconds
-    refreshIntervals.ml = setInterval(refreshMLStatus, 60000); // 1 minute
-    refreshIntervals.quantum = setInterval(refreshQuantumAnalysis, 60000); // 1 minute
-    
-    console.log('✅ Reduced refresh intervals applied (WebSocket handles real-time data)');
   }
 
   // Auto-login check on page load
@@ -2352,34 +2050,6 @@ async function refreshSentimentNews() {
   
   // Make fetchJSON globally accessible for maxi-grid functions
   window.fetchJSON = fetchJSON;
-  
-  // Make WebSocket manager globally accessible
-  window.webSocketManager = webSocketManager;
-  
-  // Make bypass function globally accessible for debugging
-  window.devBypass = function() {
-    console.log('🔓 Manual Dev Bypass triggered');
-    try {
-      currentUser = { username: 'dev-user', role: 'developer', bypass: true };
-      authToken = 'bypass-token';
-      
-      // Add URL parameter
-      const url = new URL(window.location);
-      url.searchParams.set('bypass', 'true');
-      window.history.replaceState({}, '', url);
-      
-      console.log('Auth state set:', { currentUser, authToken });
-      
-      updateUI();
-      initializeDashboard();
-      
-      console.log('✅ Manual bypass complete!');
-      return 'Bypass successful!';
-    } catch (error) {
-      console.error('Manual bypass failed:', error);
-      return 'Bypass failed: ' + error.message;
-    }
-  };
 
   // Initialize UI enhancements
   setTimeout(() => {
@@ -2523,14 +2193,7 @@ function renderMaxiGrid() {
 
 async function refreshMaxiGrid() {
   try {
-    // Check if WebSocket is handling grid updates
-    if (window.webSocketManager && window.webSocketManager.subscriptions.has('grid')) {
-      console.log('✅ Maxi Grid updated via WebSocket');
-      return; // WebSocket is handling grid updates
-    }
-    
-    // Fallback to REST API
-    console.log('⚠️ Fallback: Fetching maxi grid via REST API');
+    // NOTE: we keep server param for the future, but filter is client-side now
     const r = await fetch(`${window.API}/grid/matrix?min_conf=${GRID_MIN_CONF.toFixed(2)}`);
     const g = await r.json();
     GRID_ROWS = g.rows || [];
@@ -2586,59 +2249,22 @@ async function ping() {
   }
 }
 
-// Reduced polling since WebSocket handles most real-time data
+// Grid refresh with separate interval (every 15 seconds)
 let gridInterval;
 function startGridPolling() {
   if (gridInterval) clearInterval(gridInterval);
-  // Increase interval since WebSocket handles real-time updates
-  gridInterval = setInterval(refreshMaxiGrid, 60000); // 1 minute instead of 15 seconds
+  gridInterval = setInterval(refreshMaxiGrid, 15000);
   // Initial load after a short delay
   setTimeout(refreshMaxiGrid, 1200);
 }
 
-// Reduce ping frequency since WebSocket provides better real-time updates
-setInterval(ping, 10000); // 10 seconds instead of 2 seconds
+setInterval(ping, 2000);
 ping();
 startGridPolling();
 
-// Initialize auto-login when page loads
-autoLogin();
-
-// Initialize bypass button - CRITICAL: Must be at the end after all DOM elements exist
-setTimeout(() => {
-  console.log('🔧 Initializing bypass button...');
-  initializeBypassButton();
-  
-  // Also add a direct event listener as backup
-  const bypassBtn = document.getElementById('bypass-btn');
-  if (bypassBtn) {
-    console.log('✅ Bypass button found, adding direct listener');
-    bypassBtn.onclick = async function() {
-      console.log('🔓 DIRECT: Dev Bypass clicked');
-      
-      try {
-        // Simple, direct bypass
-        currentUser = { username: 'dev-user', role: 'developer', bypass: true };
-        authToken = 'bypass-token';
-        
-        // Add URL parameter
-        const url = new URL(window.location);
-        url.searchParams.set('bypass', 'true');
-        window.history.replaceState({}, '', url);
-        
-        console.log('🔄 Updating UI...');
-        updateUI();
-        
-        console.log('🚀 Initializing dashboard...');
-        initializeDashboard();
-        
-        console.log('✅ BYPASS COMPLETE!');
-      } catch (error) {
-        console.error('❌ Bypass failed:', error);
-        alert('Bypass failed: ' + error.message);
-      }
-    };
-  } else {
-    console.error('❌ Bypass button not found!');
-  }
-}, 1000); // Wait 1 second to ensure DOM is fully loaded
+// Auto-start dashboard without authentication
+currentUser = { username: 'admin', role: 'admin' };
+updateUI();
+if (typeof initializeDashboard === 'function') {
+  initializeDashboard();
+}
