@@ -455,6 +455,16 @@ def sentiment_debug():
     
     return debug_info
 
+# Debug endpoint to check exchange status
+@app.get("/debug/exchange")
+def debug_exchange():
+    return {
+        "EXCHANGE_AVAILABLE": EXCHANGE_AVAILABLE,
+        "exchange_client": exchange_client is not None,
+        "exchange_client_type": type(exchange_client).__name__ if exchange_client else None,
+        "demo_positions": get_real_positions()
+    }
+
 # Positions endpoint
 @app.get("/positions")
 def positions():
