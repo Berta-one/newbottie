@@ -181,8 +181,7 @@ function autoLogin() {
 // Refresh sentiment news feed
 async function refreshSentimentNews() {
   try {
-    const response = await fetch('/sentiment/articles');
-    const data = await response.json();
+    const data = await fetchJSON('/sentiment/articles');
     const feedContainer = document.getElementById('sentiment-news-feed');
     if (feedContainer && data.articles && data.articles.length > 0) {
       feedContainer.innerHTML = '';
@@ -733,7 +732,13 @@ async function refreshSentimentNews() {
 
   // Authenticated API functions
 async function authFetch(url, options = {}) {
-  const fullUrl = url.startsWith('http') ? url : `${API}${url}`;
+  // Normalize relative URLs to use API base
+  let path = url;
+  if (!url.startsWith('http')) {
+    // Ensure single leading slash
+    path = url.startsWith('/') ? url : `/${url}`;
+  }
+  const fullUrl = url.startsWith('http') ? url : `${API}${path}`;
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers
@@ -751,6 +756,22 @@ async function authFetch(url, options = {}) {
   
   return response;
 }
+
+  async function fetchJSON(url) {
+    try {
+      const response = await authFetch(url);
+      if (!response.ok) {
+        if (response.status === 503) {
+          throw new Error(`Service Unavailable (503)`);
+        }
+        throw new Error(`HTTP ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error(`API error for ${url}:`, error.message);
+      throw error;
+    }
+  }
 
   // ML Status refresh functions
   async function refreshMLStatus() {
