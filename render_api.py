@@ -15,6 +15,9 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from passlib.context import CryptContext
 import jwt
 from datetime import datetime, timedelta
+import websocket
+import threading
+from collections import defaultdict
 
 # Load environment variables
 try:
@@ -111,51 +114,157 @@ def initialize_exchange():
         print(f"❌ Exchange initialization failed: {e}")
         return False
 
-def initialize_websocket_data(ws_manager):
-    """Initialize WebSocket data streams for real-time Binance data"""
-    global websocket_manager
-    websocket_manager = ws_manager
+class BinanceWebSocketManager:
+    """WebSocket-only manager for Binance data - minimal REST API usage"""
     
-    if not WEBSOCKET_AVAILABLE or not websocket_manager:
-        print("❌ WebSocket not available")
+    def __init__(self):
+        self.ws = None
+        self.running = False
+        self.data = {
+            'tickers': {},
+            'user_data': {},
+            'trades': [],
+            'account': {},
+            'positions': {}
+        }
+        self.streams = []
+        
+    def start_streams(self):
+        """Start WebSocket streams for real-time data"""
+        if not BINANCE_API_KEY or not BINANCE_API_SECRET:
+            print("❌ No Binance credentials - WebSocket disabled")
+            return False
+            
+        try:
+            # Only essential streams to avoid rate limits
+            base_url = "wss://stream.binance.com:9443/ws/"
+            
+            # Top crypto tickers only (not all markets)
+            essential_symbols = ['btcusdt', 'ethusdt', 'bnbusdt', 'adausdt', 'solusdt', 'dotusdt', 'maticusdt', 'avaxusdt', 'linkusdt']
+            
+            # Create combined stream
+            streams = []
+            for symbol in essential_symbols:
+                streams.append(f"{symbol}@ticker")
+            
+            # User data stream (for account updates)
+            if self._get_listen_key():
+                streams.append(f"user_data")
+            
+            stream_url = base_url + "/".join(streams)
+            
+            self.ws = websocket.WebSocketApp(
+                stream_url,
+                on_message=self._on_message,
+                on_error=self._on_error,
+                on_close=self._on_close,
+                on_open=self._on_open
+            )
+            
+            # Start in background thread
+            self.running = True
+            thread = threading.Thread(target=self.ws.run_forever)
+            thread.daemon = True
+            thread.start()
+            
+            print("✅ WebSocket streams started (minimal API usage)")
+            return True
+            
+        except Exception as e:
+            print(f"❌ WebSocket initialization failed: {e}")
+            return False
+    
+    def _get_listen_key(self):
+        """Get listen key for user data stream - ONLY REST call needed"""
+        try:
+            if exchange_client:
+                # This is the ONLY REST API call we should make regularly
+                response = exchange_client.create_listen_key()
+                self.listen_key = response.get('listenKey')
+                return True
+        except Exception as e:
+            print(f"❌ Listen key failed: {e}")
+        return False
+    
+    def _on_message(self, ws, message):
+        """Handle WebSocket messages"""
+        try:
+            data = json.loads(message)
+            
+            # Handle ticker data
+            if data.get('e') == '24hrTicker':
+                symbol = data['s'].lower()
+                self.data['tickers'][symbol] = {
+                    'price': float(data['c']),
+                    'change': float(data['P']),
+                    'volume': float(data['v']),
+                    'high': float(data['h']),
+                    'low': float(data['l'])
+                }
+            
+            # Handle user data (account updates, trades)
+            elif data.get('e') == 'executionReport':
+                # New trade
+                self.data['trades'].append({
+                    'timestamp': data['T'] / 1000,
+                    'symbol': data['s'],
+                    'side': data['S'],
+                    'quantity': float(data['q']),
+                    'price': float(data['p']),
+                    'pnl': 0  # Calculate later
+                })
+                
+            elif data.get('e') == 'outboundAccountPosition':
+                # Account balance update
+                self.data['account'] = data
+                
+        except Exception as e:
+            print(f"❌ WebSocket message error: {e}")
+    
+    def _on_error(self, ws, error):
+        print(f"❌ WebSocket error: {error}")
+    
+    def _on_close(self, ws, close_status_code, close_msg):
+        print("🔌 WebSocket connection closed")
+        self.running = False
+    
+    def _on_open(self, ws):
+        print("✅ WebSocket connection opened")
+    
+    def get_ticker_data(self):
+        """Get real-time ticker data from WebSocket"""
+        return self.data['tickers']
+    
+    def get_account_data(self):
+        """Get account data from WebSocket"""
+        return self.data['account']
+    
+    def get_recent_trades(self):
+        """Get recent trades from WebSocket"""
+        return self.data['trades'][-50:]  # Last 50 trades
+    
+    def stop(self):
+        """Stop WebSocket streams"""
+        self.running = False
+        if self.ws:
+            self.ws.close()
+
+# Global WebSocket manager
+ws_manager = None
+
+def initialize_websocket_only():
+    """Initialize WebSocket-only data streams"""
+    global ws_manager
+    
+    if not BINANCE_API_KEY:
+        print("❌ No Binance API key - WebSocket disabled")
         return False
     
     try:
-        # Get API credentials from environment
-        api_key = os.getenv('BINANCE_API_KEY', '')
-        api_secret = os.getenv('BINANCE_API_SECRET', '')
-        
-        if not api_key or not api_secret:
-            print("❌ No Binance API credentials - WebSocket will only provide public data")
-            return False
-        
-        # Initialize WebSocket streams for common trading pairs
-        symbols = ['BTCUSDT', 'ETHUSDT', 'ADAUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT']
-        
-        # Start WebSocket in background thread
-        import threading
-        def start_websocket():
-            try:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                loop.run_until_complete(
-                    initialize_websocket_data(
-                        symbols=symbols,
-                        api_key=api_key,
-                        api_secret=api_secret
-                    )
-                )
-                print("✅ WebSocket streams initialized")
-            except Exception as e:
-                print(f"❌ WebSocket initialization failed: {e}")
-        
-        ws_thread = threading.Thread(target=start_websocket, daemon=True)
-        ws_thread.start()
-        
-        return True
-        
+        ws_manager = BinanceWebSocketManager()
+        return ws_manager.start_streams()
     except Exception as e:
-        print(f"❌ WebSocket setup failed: {e}")
+        print(f"❌ WebSocket initialization failed: {e}")
         return False
 
 def get_websocket_positions():
@@ -197,7 +306,7 @@ def get_websocket_trades():
     
     try:
         # Get trade updates from WebSocket
-        ws_trades = websocket_manager.get_trade_updates()
+        ws_trades = websocket_manager.get_recent_trades()
         if ws_trades:
             trades = []
             for trade in ws_trades:
@@ -250,73 +359,92 @@ def get_real_positions():
             print(f"✅ Got {len(ws_positions)} positions from WebSocket")
             return ws_positions
     
-    # Fallback to REST API if WebSocket not available
-    if exchange_client and EXCHANGE_AVAILABLE:
+    # NO REST API calls - only WebSocket to avoid rate limits
+    if ws_manager and ws_manager.running:
         try:
-            balance = exchange_client.fetch_balance()
-            positions = {}
+            account_data = ws_manager.get_account_data()
+            ticker_data = ws_manager.get_ticker_data()
             
-            # Get positions with positive balance
-            for symbol, amount in balance['total'].items():
-                if amount > 0 and symbol != 'USDT':
-                    try:
-                        ticker = exchange_client.fetch_ticker(f"{symbol}/USDT")
-                        current_price = ticker['last']
-                        
-                        # Calculate PnL (simplified)
-                        avg_buy_price = current_price * 0.98  # Estimate
-                        pnl = (current_price - avg_buy_price) * amount
-                        
-                        positions[f"{symbol}/USDT"] = {
-                            'quantity': amount,
-                            'current_price': current_price,
-                            'avg_buy_price': avg_buy_price,
-                            'pnl': pnl,
-                            'pnl_percentage': (pnl / (avg_buy_price * amount)) * 100 if avg_buy_price > 0 else 0
-                        }
-                    except:
-                        continue
-            
-            print(f"✅ Got {len(positions)} positions from REST API")            
-            return positions
+            if account_data and ticker_data:
+                positions = {}
+                
+                # Process positions from WebSocket account data
+                for balance in account_data.get('B', []):
+                    asset = balance['a']
+                    free = float(balance['f'])
+                    locked = float(balance['l'])
+                    total = free + locked
+                    
+                    if total > 0 and asset != 'USDT':
+                        ticker_key = f"{asset.lower()}usdt"
+                        if ticker_key in ticker_data:
+                            current_price = ticker_data[ticker_key]['price']
+                            
+                            # Estimate entry price (we don't have exact data from WebSocket)
+                            avg_buy_price = current_price * 0.98  # Conservative estimate
+                            pnl = (current_price - avg_buy_price) * total
+                            
+                            positions[f"{asset}/USDT"] = {
+                                'quantity': total,
+                                'current_price': current_price,
+                                'avg_buy_price': avg_buy_price,
+                                'pnl': pnl,
+                                'pnl_percentage': (pnl / (avg_buy_price * total)) * 100 if avg_buy_price > 0 else 0,
+                                'source': 'websocket'
+                            }
+                
+                print(f"✅ Got {len(positions)} positions from WebSocket")
+                return positions
         except Exception as e:
-            print(f"❌ Error fetching real positions: {e}")
+            print(f"❌ WebSocket positions error: {e}")
     
-    # NO DEMO DATA - return empty if no real connection
-    print("❌ No exchange connection - no positions available")
+    # NO DEMO DATA - return empty if WebSocket unavailable (API rate limited)
+    print("❌ No WebSocket positions - API rate limited or disconnected")
     return {}
 
 def get_real_balance():
-    """Get real balance from exchange with improved error handling"""
-    real_balance = {'total_usdt': 0}
+    """Get real balance ONLY from WebSocket - NO REST API to avoid rate limits"""
     
-    if not (exchange_client and EXCHANGE_AVAILABLE):
-        print("❌ No exchange connection - no balance data available")
-        return {'total_usdt': 0}  # No demo data
+    # Only use WebSocket data to prevent API rate limiting
+    if ws_manager and ws_manager.running:
+        try:
+            account_data = ws_manager.get_account_data()
+            ticker_data = ws_manager.get_ticker_data()
+            
+            if account_data and ticker_data:
+                total_usdt = 0
+                breakdown = {}
+                
+                # Process account balances from WebSocket user data
+                for balance in account_data.get('B', []):
+                    asset = balance['a']
+                    free = float(balance['f'])
+                    locked = float(balance['l'])
+                    total = free + locked
+                    
+                    if total > 0:
+                        breakdown[asset] = total
+                        
+                        if asset == 'USDT':
+                            total_usdt += total
+                        else:
+                            # Convert to USDT using WebSocket ticker data
+                            ticker_key = f"{asset.lower()}usdt"
+                            if ticker_key in ticker_data:
+                                price = ticker_data[ticker_key]['price']
+                                total_usdt += total * price
+                
+                return {
+                    'total_usdt': round(total_usdt, 2),
+                    'breakdown': breakdown,
+                    'source': 'binance_websocket'
+                }
+        except Exception as e:
+            print(f"❌ WebSocket balance error: {e}")
     
-    try:
-        balance = exchange_client.fetch_balance()
-        
-        # Calculate total equity in USDT
-        total_usdt = balance['total'].get('USDT', 0)
-        
-        # Add crypto values converted to USDT - fix dictionary iteration issue
-        balance_items = list(balance['total'].items())  # Create copy to avoid iteration error
-        for symbol, amount in balance_items:
-            if symbol != 'USDT' and amount > 0:
-                try:
-                    ticker = exchange_client.fetch_ticker(f"{symbol}/USDT")
-                    total_usdt += amount * ticker['last']
-                except Exception as e:
-                    # Skip if price not available (like NFT, ETHW)
-                    continue
-        
-        real_balance['total_usdt'] = total_usdt
-        return real_balance
-        
-    except Exception as e:
-        print(f"❌ Error fetching balance: {e}")
-        return {'total_usdt': 0}  # No demo data
+    # No WebSocket data available - API likely rate limited
+    print("❌ No WebSocket balance data - API rate limited or disconnected")
+    return {'total_usdt': 0, 'source': 'websocket_unavailable'}
 
 def calculate_real_pnl(trades, positions):
     """Calculate real P&L from actual trades and positions"""
@@ -845,35 +973,33 @@ def recent_trades():
             trades.extend(ws_trades)
             print(f"✅ Got {len(ws_trades)} trades from WebSocket")
     
-    # Fallback to REST API for historical trades
-    if not trades and exchange_client:
+    # NO REST API calls for trades - only WebSocket to avoid rate limits
+    if not trades and ws_manager and ws_manager.running:
         try:
-            for symbol in positions.keys():
-                try:
-                    # Get recent trades for this symbol from Binance REST API
-                    symbol_trades = exchange_client.fetch_my_trades(symbol, limit=10)
-                    for trade in symbol_trades:
-                        trades.append({
-                            "timestamp": trade['timestamp'] / 1000,
-                            "symbol": trade['symbol'],
-                            "side": trade['side'].upper(),
-                            "quantity": trade['amount'],
-                            "price": trade['price'],
-                            "pnl": 0,  # Will be calculated properly with cost basis
-                            "trade_id": str(trade['id']),
-                            "value": trade['cost'],
-                            "confidence": 1.0,  # Real trade = 100% confidence
-                            "status": "completed",
-                            "datetime": trade['datetime'] if trade['datetime'] else time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(trade['timestamp'] / 1000))
-                        })
-                except Exception as e:
-                    print(f"❌ Error fetching trades for {symbol}: {e}")
-                    continue
-            
-            if trades:
-                print(f"✅ Got {len(trades)} trades from REST API")
+            ws_trades = ws_manager.get_recent_trades()
+            if ws_trades:
+                for trade in ws_trades:
+                    trades.append({
+                        "timestamp": trade.get('timestamp', time.time()),
+                        "symbol": trade.get('symbol', ''),
+                        "side": trade.get('side', '').upper(),
+                        "quantity": trade.get('quantity', 0),
+                        "price": trade.get('price', 0),
+                        "pnl": trade.get('pnl', 0),
+                        "trade_id": str(trade.get('timestamp', time.time())),
+                        "value": trade.get('quantity', 0) * trade.get('price', 0),
+                        "confidence": 1.0,  # Real trade = 100% confidence
+                        "status": "completed",
+                        "datetime": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(trade.get('timestamp', time.time()))),
+                        "source": "binance_websocket"
+                    })
+                print(f"✅ Got {len(trades)} trades from WebSocket")
         except Exception as e:
-            print(f"❌ Error fetching trade history: {e}")
+            print(f"❌ WebSocket trades error: {e}")
+    
+    # If no WebSocket trades, API is likely rate limited
+    elif not trades:
+        print("❌ No WebSocket trades - API rate limited or no recent trades")
     
     # If no real trades found, return empty (NO DEMO DATA)
     if not trades:
@@ -1635,13 +1761,15 @@ def config_status():
 # Startup event
 @app.on_event("startup")
 async def startup_event():
-    print("🚀 Bottie Render API starting up...")
-    if EXCHANGE_AVAILABLE:
-        initialize_exchange()
-    if WEBSOCKET_AVAILABLE:
-        websocket_manager = get_websocket_manager()
-        initialize_websocket_data(websocket_manager)
-    print("✅ Render API ready")
+    print("🚀 Bottie Render API starting (WebSocket-only mode)...")
+    
+    # ONLY initialize WebSocket - NO REST API to avoid rate limits
+    if initialize_websocket_only():
+        print("✅ WebSocket streams established - minimal API usage")
+    else:
+        print("❌ WebSocket initialization failed - API may be rate limited")
+    
+    print("✅ Render API ready (WebSocket-only mode)")
 
 # P&L Analysis endpoint
 @app.get("/pnl/analysis")
