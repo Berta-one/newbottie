@@ -543,11 +543,25 @@ def sentiment():
         if not os.path.exists('sentiment/sentiment_service.py'):
             raise ImportError("Sentiment service not found")
             
-        from sentiment.sentiment_service import snapshot
+        from sentiment.sentiment_service import snapshot, FINNHUB_API_KEY
+        
+        if not FINNHUB_API_KEY:
+            print("❌ Finnhub API key not configured")
+            return {
+                "source": "no_api_key", 
+                "window_sec": 0,
+                "scores": {},
+                "error": "Finnhub API key not configured"
+            }
+        
         result = snapshot()
         
         # Ensure result has the expected structure
         if isinstance(result, dict) and 'scores' in result:
+            # Add API key status to response
+            result['api_key_configured'] = True
+            result['using_real_data'] = True
+            print(f"✅ Real sentiment data: {len(result.get('scores', {}))} assets")
             return result
         else:
             raise ValueError("Invalid sentiment data format")
@@ -558,7 +572,8 @@ def sentiment():
             "source": "unavailable", 
             "window_sec": 0,
             "scores": {},
-            "error": "Sentiment service not available - no demo data"
+            "error": "Sentiment service not available",
+            "api_key_configured": False
         }
     except Exception as e:
         print(f"❌ Sentiment service error: {e}")
@@ -566,7 +581,153 @@ def sentiment():
             "source": "error", 
             "window_sec": 0,
             "scores": {},
-            "error": f"Sentiment service failed: {str(e)} - no demo data"
+            "error": f"Sentiment service failed: {str(e)}",
+            "api_key_configured": False
+        }
+
+# Sentiment Articles endpoint for frontend
+@app.get("/sentiment/articles")
+def sentiment_articles():
+    """Get real sentiment articles from Finnhub API"""
+    try:
+        # Import inside function to prevent startup crashes
+        import sys
+        import requests
+        import time
+        sys.path.append('.')
+        
+        # Check if sentiment module exists and get API key
+        if not os.path.exists('sentiment/sentiment_service.py'):
+            raise ImportError("Sentiment service not found")
+            
+        from sentiment.sentiment_service import FINNHUB_API_KEY, SENTIMENT_ASSETS, run_sentiment_cycle
+        from sentiment.providers.finnhub_provider import _fetch_recent_news
+        
+        if not FINNHUB_API_KEY:
+            return {
+                "articles": [],
+                "total_count": 0,
+                "error": "Finnhub API key not configured",
+                "source": "error"
+            }
+        
+        # Try multiple real data sources in priority order
+        articles_data = None
+        data_source = "unknown"
+        
+        # 1. Try Finnhub first (primary source)
+        try:
+            news_articles = _fetch_recent_news(limit=20)
+            if news_articles:
+                print(f"✅ Got {len(news_articles)} articles from Finnhub")
+                articles_data = news_articles
+                data_source = "finnhub_real"
+        except Exception as e:
+            print(f"❌ Finnhub failed: {e}")
+        
+        # 2. Try NewsAPI as backup
+        if not articles_data:
+            newsapi_data = get_newsapi_sentiment()
+            if newsapi_data:
+                print(f"✅ Got {newsapi_data['total_count']} articles from NewsAPI")
+                return newsapi_data
+        
+        # 3. Try Reddit as final backup  
+        if not articles_data:
+            reddit_data = get_reddit_sentiment()
+            if reddit_data:
+                print(f"✅ Got {reddit_data['total_count']} articles from Reddit")
+                return reddit_data
+        
+        # Process Finnhub data if available
+        if articles_data:
+            # Get current sentiment scores
+            sentiment_scores = run_sentiment_cycle()
+            
+            # Format articles for frontend display
+            formatted_articles = []
+            for article in articles_data[:10]:  # Top 10 articles
+                # Extract sentiment for this article
+                title = article.get('headline', '') or article.get('summary', '')
+                if not title:
+                    continue
+                
+                # Simple sentiment classification based on keywords
+                positive_keywords = ['up', 'rise', 'gain', 'bull', 'positive', 'growth', 'surge', 'rally']
+                negative_keywords = ['down', 'fall', 'drop', 'bear', 'negative', 'crash', 'decline', 'sell']
+                
+                title_lower = title.lower()
+                positive_count = sum(1 for kw in positive_keywords if kw in title_lower)
+                negative_count = sum(1 for kw in negative_keywords if kw in title_lower)
+                
+                if positive_count > negative_count:
+                    sentiment = 0.7 + (positive_count * 0.1)
+                    impact = "positive"
+                elif negative_count > positive_count:
+                    sentiment = 0.3 - (negative_count * 0.1)
+                    impact = "negative"
+                else:
+                    sentiment = 0.5
+                    impact = "neutral"
+                
+                # Ensure sentiment is in valid range
+                sentiment = max(0.0, min(1.0, sentiment))
+                
+                formatted_articles.append({
+                    "title": title,
+                    "sentiment": round(sentiment, 2),
+                    "source": article.get('source', 'Finnhub'),
+                    "timestamp": article.get('datetime', time.time()),
+                    "impact": impact,
+                    "url": article.get('url', ''),
+                    "category": article.get('category', 'crypto')
+                })
+            
+            return {
+                "articles": formatted_articles,
+                "total_count": len(formatted_articles),
+                "source": data_source,
+                "sentiment_scores": sentiment_scores,
+                "api_key_configured": True
+            }
+        else:
+            # No articles from any source
+            print("❌ No articles from any real data source")
+            return {
+                "articles": [],
+                "total_count": 0,
+                "error": "No real articles available from any source",
+                "source": "no_data",
+                "api_key_configured": True
+            }
+            
+        except Exception as e:
+            print(f"❌ Error fetching Finnhub articles: {e}")
+            return {
+                "articles": [],
+                "total_count": 0,
+                "error": f"Failed to fetch real articles: {str(e)}",
+                "source": "finnhub_error",
+                "api_key_configured": True
+            }
+            
+    except ImportError as e:
+        print(f"❌ Sentiment import error: {e}")
+        return {
+            "articles": [],
+            "total_count": 0,
+            "error": "Sentiment service not available",
+            "source": "import_error",
+            "api_key_configured": False
+        }
+    except Exception as e:
+        print(f"❌ Sentiment service error: {e}")
+        return {
+            "articles": [],
+            "total_count": 0,
+            "error": f"Sentiment service failed: {str(e)}",
+            "source": "service_error",
+            "api_key_configured": False
         }
 
 # Sentiment debug endpoint (Safe version)
@@ -1322,6 +1483,139 @@ def pnl_analysis():
         "has_real_data": len(trades) > 0 or len(positions) > 0,
         "data_source": "binance_real" if (exchange_client or websocket_manager) else "no_connection"
     }
+
+# Additional real sentiment data sources
+def get_newsapi_sentiment():
+    """Get sentiment data from NewsAPI as backup source"""
+    try:
+        import requests
+        
+        newsapi_key = os.getenv('NEWSAPI_KEY', '')
+        if not newsapi_key:
+            return None
+            
+        # Get crypto-related news from NewsAPI
+        url = f"https://newsapi.org/v2/everything"
+        params = {
+            'q': 'bitcoin OR cryptocurrency OR ethereum OR crypto',
+            'sortBy': 'publishedAt',
+            'pageSize': 20,
+            'apiKey': newsapi_key
+        }
+        
+        response = requests.get(url, params=params, timeout=10)
+        if response.status_code == 200:
+            articles = response.json().get('articles', [])
+            
+            formatted_articles = []
+            for article in articles[:10]:
+                title = article.get('title', '')
+                description = article.get('description', '')
+                content = f"{title} {description}".lower()
+                
+                # Simple sentiment analysis
+                positive_words = ['rise', 'up', 'gain', 'bull', 'positive', 'growth', 'surge']
+                negative_words = ['fall', 'down', 'drop', 'bear', 'negative', 'crash', 'decline']
+                
+                pos_count = sum(1 for word in positive_words if word in content)
+                neg_count = sum(1 for word in negative_words if word in content)
+                
+                if pos_count > neg_count:
+                    sentiment = 0.6 + (pos_count * 0.1)
+                elif neg_count > pos_count:
+                    sentiment = 0.4 - (neg_count * 0.1)
+                else:
+                    sentiment = 0.5
+                
+                sentiment = max(0.0, min(1.0, sentiment))
+                
+                formatted_articles.append({
+                    "title": title,
+                    "sentiment": round(sentiment, 2),
+                    "source": "NewsAPI",
+                    "timestamp": article.get('publishedAt', ''),
+                    "impact": "positive" if sentiment > 0.5 else "negative" if sentiment < 0.5 else "neutral",
+                    "url": article.get('url', '')
+                })
+            
+            return {
+                "articles": formatted_articles,
+                "source": "newsapi_real",
+                "total_count": len(formatted_articles)
+            }
+            
+    except Exception as e:
+        print(f"❌ NewsAPI error: {e}")
+        return None
+
+def get_reddit_sentiment():
+    """Get sentiment data from Reddit API as backup source"""
+    try:
+        import requests
+        
+        # Reddit doesn't require API key for public data
+        headers = {'User-Agent': 'Bottie-Trading-Bot/1.0'}
+        
+        # Get posts from cryptocurrency subreddits
+        subreddits = ['cryptocurrency', 'Bitcoin', 'ethereum', 'CryptoMarkets']
+        all_articles = []
+        
+        for subreddit in subreddits:
+            try:
+                url = f"https://www.reddit.com/r/{subreddit}/hot.json?limit=5"
+                response = requests.get(url, headers=headers, timeout=10)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    posts = data.get('data', {}).get('children', [])
+                    
+                    for post in posts:
+                        post_data = post.get('data', {})
+                        title = post_data.get('title', '')
+                        
+                        if not title:
+                            continue
+                        
+                        # Simple sentiment analysis
+                        title_lower = title.lower()
+                        positive_indicators = ['moon', 'bullish', 'up', 'gain', 'rise', 'pump', 'hodl']
+                        negative_indicators = ['crash', 'dump', 'down', 'fall', 'bear', 'drop', 'sell']
+                        
+                        pos_score = sum(1 for word in positive_indicators if word in title_lower)
+                        neg_score = sum(1 for word in negative_indicators if word in title_lower)
+                        
+                        if pos_score > neg_score:
+                            sentiment = 0.6 + (pos_score * 0.1)
+                        elif neg_score > pos_score:
+                            sentiment = 0.4 - (neg_score * 0.1)
+                        else:
+                            sentiment = 0.5
+                        
+                        sentiment = max(0.0, min(1.0, sentiment))
+                        
+                        all_articles.append({
+                            "title": title,
+                            "sentiment": round(sentiment, 2),
+                            "source": f"Reddit r/{subreddit}",
+                            "timestamp": post_data.get('created_utc', 0),
+                            "impact": "positive" if sentiment > 0.5 else "negative" if sentiment < 0.5 else "neutral",
+                            "url": f"https://reddit.com{post_data.get('permalink', '')}"
+                        })
+                        
+            except Exception as e:
+                print(f"❌ Reddit subreddit {subreddit} error: {e}")
+                continue
+        
+        if all_articles:
+            return {
+                "articles": all_articles[:10],  # Top 10
+                "source": "reddit_real",
+                "total_count": len(all_articles)
+            }
+            
+    except Exception as e:
+        print(f"❌ Reddit API error: {e}")
+        return None
 
 if __name__ == "__main__":
     import uvicorn
