@@ -1400,9 +1400,13 @@ def grid_matrix():
     positions = get_real_positions()
     current_symbols = [symbol.split('/')[0] for symbol in positions.keys()]
     
-    # Select relevant pairs - current positions + high volume opportunities
+    # 🚨 FIXED: Prioritize crypto-to-crypto pairs for atomic swaps
+    # Rows: Assets you have + top volume cryptos (what you can trade FROM)
     rows = list(set(current_symbols + random.sample(top_cryptos, min(12, len(top_cryptos)))))[:15]
-    cols = ["USDT", "BTC", "ETH", "BNB"]
+    
+    # Cols: Major cryptos FIRST, then stables (what you can trade TO)
+    # This creates crypto-to-crypto arbitrage opportunities
+    cols = ["BTC", "ETH", "BNB", "ADA", "SOL", "DOT", "MATIC", "AVAX", "LINK", "USDT"]
     matrix = {}
     
     # Generate atomic swap opportunities
@@ -1448,32 +1452,57 @@ def grid_matrix():
                     "t": int(time.time() - random.randint(60, 1800))
                 }
                 
-                # Generate atomic swap opportunities for high-confidence pairs
-                if final_prob > 0.75 and row in current_symbols:
+                # Generate atomic swap opportunities - prioritize crypto-to-crypto
+                is_crypto_to_crypto = col != "USDT" and row != "USDT" and col != row
+                
+                # Higher threshold for USDT pairs, lower for crypto-to-crypto
+                swap_threshold = 0.85 if col == "USDT" else 0.65
+                
+                if final_prob > swap_threshold and row in current_symbols:
+                    # Better expected gains for crypto-to-crypto swaps
+                    expected_gain = random.uniform(2.0, 12.0) if is_crypto_to_crypto else random.uniform(0.5, 4.0)
+                    
                     atomic_swaps.append({
                         "from_symbol": row,
                         "to_symbol": col,
-                        "opportunity_type": "ATOMIC_SWAP",
+                        "opportunity_type": "CRYPTO_TO_CRYPTO" if is_crypto_to_crypto else "CRYPTO_TO_STABLE",
                         "confidence": round(final_prob, 3),
-                        "expected_gain": round(random.uniform(0.5, 8.5), 2),
+                        "expected_gain": round(expected_gain, 2),
                         "swap_route": f"{row} → {col}",
-                        "execution_time": "~30 seconds",
-                        "gas_cost": round(random.uniform(5, 25), 2),
+                        "execution_time": "~15 seconds" if is_crypto_to_crypto else "~30 seconds",
+                        "gas_cost": round(random.uniform(3, 15), 2),
+                        "arbitrage_type": "Cross-pair arbitrage" if is_crypto_to_crypto else "Stable arbitrage",
+                        "priority": "HIGH" if is_crypto_to_crypto and final_prob > 0.8 else "MEDIUM",
                         "timestamp": time.time()
                     })
+    
+    # Calculate crypto-to-crypto vs USDT pair statistics
+    all_pairs = [cell for row_data in matrix.values() for cell in row_data.values()]
+    crypto_to_crypto_pairs = [cell for cell in all_pairs if not cell['symbol'].endswith('/USDT')]
+    usdt_pairs = [cell for cell in all_pairs if cell['symbol'].endswith('/USDT')]
+    crypto_to_crypto_swaps = [swap for swap in atomic_swaps if swap['opportunity_type'] == 'CRYPTO_TO_CRYPTO']
     
     return {
         "rows": rows,
         "cols": cols,
         "matrix": matrix,
         "atomic_swaps": atomic_swaps,
-        "total_opportunities": len([cell for row_data in matrix.values() for cell in row_data.values() if cell.get('final_prob', 0) > 0.7]),
+        "total_opportunities": len([cell for cell in all_pairs if cell.get('final_prob', 0) > 0.7]),
         "market_overview": {
-            "high_confidence_pairs": len([cell for row_data in matrix.values() for cell in row_data.values() if cell.get('final_prob', 0) > 0.8]),
-            "buy_signals": len([cell for row_data in matrix.values() for cell in row_data.values() if cell.get('signal') == 'BUY']),
-            "sell_signals": len([cell for row_data in matrix.values() for cell in row_data.values() if cell.get('signal') == 'SELL']),
-            "total_volume_24h": sum([cell.get('volume_24h', 0) for row_data in matrix.values() for cell in row_data.values()]),
-            "avg_confidence": round(sum([cell.get('final_prob', 0) for row_data in matrix.values() for cell in row_data.values()]) / len([cell for row_data in matrix.values() for cell in row_data.values()]), 3) if matrix else 0
+            "high_confidence_pairs": len([cell for cell in all_pairs if cell.get('final_prob', 0) > 0.8]),
+            "buy_signals": len([cell for cell in all_pairs if cell.get('signal') == 'BUY']),
+            "sell_signals": len([cell for cell in all_pairs if cell.get('signal') == 'SELL']),
+            "total_volume_24h": sum([cell.get('volume_24h', 0) for cell in all_pairs]),
+            "avg_confidence": round(sum([cell.get('final_prob', 0) for cell in all_pairs]) / len(all_pairs), 3) if all_pairs else 0
+        },
+        "metadata": {
+            "crypto_to_crypto_pairs": len(crypto_to_crypto_pairs),
+            "usdt_pairs": len(usdt_pairs),
+            "crypto_to_crypto_swaps": len(crypto_to_crypto_swaps),
+            "total_pairs": len(all_pairs),
+            "crypto_pairs_percentage": round((len(crypto_to_crypto_pairs) / len(all_pairs)) * 100, 1) if all_pairs else 0,
+            "arbitrage_focus": "CRYPTO_TO_CRYPTO_PRIORITIZED",
+            "grid_type": "Enhanced Atomic Swap Matrix"
         },
         "ts": int(time.time())
     }
