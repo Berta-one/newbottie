@@ -4,127 +4,8 @@
 <meta charset="UTF-8">
 <title>Bottie Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="style.css">
 <style>
-  * { box-sizing: border-box; }
-  body { 
-    font-family: Arial, sans-serif; 
-    background: #0c1426; 
-    color: #ffffff;
-    margin: 0; 
-    padding: 0; 
-    font-size: 14px;
-  }
-  
-  header { 
-    background: #1a2332; 
-    color: #fff; 
-    padding: 12px 20px; 
-    font-size: 18px; 
-    border-bottom: 1px solid #2a3441;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  
-  .user-info {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 12px;
-  }
-  
-  .header-status {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    font-size: 12px;
-  }
-  
-  .status-badge {
-    background: #2a3441;
-    color: #64ffda;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-weight: 600;
-    border: 1px solid #64ffda;
-  }
-  
-  .status-time {
-    color: #8892b0;
-    font-family: monospace;
-  }
-  
-  .status-quantum {
-    color: #bb86fc;
-    font-weight: 600;
-  }
-  
-  .user-badge {
-    background: #64ffda;
-    color: #0c1426;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-weight: 600;
-    text-transform: uppercase;
-  }
-  
-  .logout-btn {
-    background: #f44336;
-    color: #ffffff;
-    border: none;
-    padding: 6px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 11px;
-  }
-
-  /* Tab Navigation */
-  .dashboard-tabs {
-    background: #1a2332;
-    border-bottom: 1px solid #2a3441;
-    padding: 0 20px;
-    display: flex;
-    gap: 0;
-  }
-  
-  .tab-btn {
-    background: none;
-    border: none;
-    color: #8892b0;
-    padding: 12px 20px;
-    cursor: pointer;
-    border-bottom: 3px solid transparent;
-    transition: all 0.2s ease;
-    font-size: 14px;
-    font-weight: 500;
-  }
-  
-  .tab-btn:hover {
-    color: #64ffda;
-    background: rgba(100, 255, 218, 0.05);
-  }
-  
-  .tab-btn.active {
-    color: #64ffda;
-    border-bottom-color: #64ffda;
-    background: rgba(100, 255, 218, 0.1);
-  }
-  
-  .tab-content {
-    display: none;
-  }
-  
-  .tab-content.active {
-    display: block;
-  }
-  
-  main { 
-    max-width: 1600px; 
-    margin: auto; 
-    padding: 20px; 
-  }
-  
-  /* Login Modal Styles */
   .login-modal {
     position: fixed;
     top: 0;
@@ -907,6 +788,68 @@
     font-size: 10px;
   }
 
+  /* WebSocket Status Indicator */
+  .ws-status-indicator {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-left: 8px;
+    border: 1px solid transparent;
+    transition: all 0.3s ease;
+  }
+  
+  .ws-status-connected {
+    background: rgba(76, 175, 80, 0.2);
+    color: #4caf50;
+    border-color: #4caf50;
+  }
+  
+  .ws-status-connecting {
+    background: rgba(255, 152, 0, 0.2);
+    color: #ff9800;
+    border-color: #ff9800;
+    animation: pulse 1.5s infinite;
+  }
+  
+  .ws-status-disconnected {
+    background: rgba(158, 158, 158, 0.2);
+    color: #9e9e9e;
+    border-color: #9e9e9e;
+  }
+  
+  .ws-status-error {
+    background: rgba(244, 67, 54, 0.2);
+    color: #f44336;
+    border-color: #f44336;
+  }
+  
+  .ws-status-reconnecting {
+    background: rgba(255, 152, 0, 0.2);
+    color: #ff9800;
+    border-color: #ff9800;
+    animation: pulse 1s infinite;
+  }
+  
+  .ws-status-failed {
+    background: rgba(244, 67, 54, 0.3);
+    color: #f44336;
+    border-color: #f44336;
+    animation: blink 2s infinite;
+  }
+  
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  
+  @keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0.3; }
+  }
+
   /* Grid Controls */
   #grid-controls .chip { padding: 2px 8px; font-size: 10px; }
   .grid-buy { background: rgba(76, 175, 80, 0.3); color: #4caf50; }
@@ -943,6 +886,7 @@
     <div id="health-status" class="status-badge">—</div>
     <div id="health-time" class="status-time">—</div>
     <div id="health-quantum" class="status-quantum">—</div>
+    <div id="websocket-status" class="ws-status-indicator ws-status-disconnected">WS: Disconnected</div>
   </div>
   <div class="user-info" id="user-info" style="display: none;">
     <span id="user-name" class="user-badge">—</span>
@@ -955,6 +899,7 @@
   <button class="tab-btn active" data-tab="trading">📊 Trading</button>
   <button class="tab-btn" data-tab="ml-monitor">🧠 ML Learning</button>
   <button class="tab-btn" data-tab="quantum">⚡ Quantum Analysis</button>
+  <button class="tab-btn" data-tab="sentiment">📰 Sentiment Analysis</button>
 </div>
 
 <main id="main-content" style="display: none;">
@@ -1419,6 +1364,218 @@
     </div>
   </div>
 </main>
+  <!-- Sentiment Analysis Tab -->
+  <div id="sentiment-tab" class="tab-content">
+    <div class="main-grid">
+      <!-- Market Sentiment Overview -->
+      <div class="card" style="grid-column: 1 / -1;">
+        <div class="card-header">
+          <h3>📊 Overall Market Sentiment</h3>
+          <span class="chip" id="overall-sentiment-chip">LOADING...</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px;">
+          <div style="text-align: center; background: #1a2332; padding: 16px; border-radius: 6px;">
+            <div style="font-size: 32px; font-weight: 700; color: #4caf50;" id="overall-sentiment-score">+72</div>
+            <div style="color: #8892b0; font-size: 12px;">Overall Score</div>
+          </div>
+          <div style="text-align: center; background: #1a2332; padding: 16px; border-radius: 6px;">
+            <div style="font-size: 18px; font-weight: 600; color: #4caf50;" id="bullish-percentage">68%</div>
+            <div style="color: #8892b0; font-size: 12px;">Bullish</div>
+          </div>
+          <div style="text-align: center; background: #1a2332; padding: 16px; border-radius: 6px;">
+            <div style="font-size: 18px; font-weight: 600; color: #f44336;" id="bearish-percentage">18%</div>
+            <div style="color: #8892b0; font-size: 12px;">Bearish</div>
+          </div>
+          <div style="text-align: center; background: #1a2332; padding: 16px; border-radius: 6px;">
+            <div style="font-size: 18px; font-weight: 600; color: #64ffda;" id="neutral-percentage">14%</div>
+            <div style="color: #8892b0; font-size: 12px;">Neutral</div>
+          </div>
+          <div style="text-align: center; background: #1a2332; padding: 16px; border-radius: 6px;">
+            <div style="font-size: 18px; font-weight: 600; color: #ff9800;" id="confidence-score">85%</div>
+            <div style="color: #8892b0; font-size: 12px;">Confidence</div>
+          </div>
+        </div>
+      </div>
+      <!-- Real-time News Feed -->
+      <div class="card">
+        <div class="card-header">
+          <h3>📡 Recent News & Analysis</h3>
+          <button style="background: #64ffda; color: #0c1426; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer;" onclick="refreshSentimentNews()">🔄 Refresh</button>
+        </div>
+        <div style="max-height: 400px; overflow-y: auto;" id="sentiment-news-feed">
+          <div style="background: #1a2332; border: 1px solid #3a4553; border-radius: 6px; padding: 12px; margin-bottom: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+              <div style="font-weight: 600; color: #ffffff; font-size: 13px; flex: 1;">Bitcoin ETF sees massive inflow as institutions buy the dip</div>
+              <span class="chip--ok" style="margin-left: 10px; padding: 2px 6px; border-radius: 3px; font-size: 10px; background: rgba(76, 175, 80, 0.2); color: #4caf50;">+0.82</span>
+            </div>
+            <div style="font-size: 11px; color: #8892b0; margin-bottom: 6px;">
+              <span style="background: #2a3441; color: #64ffda; padding: 2px 6px; border-radius: 3px; font-size: 10px;">COINDESK</span> • 2 hours ago • Mentions: BTC, ETH
+            </div>
+            <div style="font-size: 12px; color: #ccd6f6; line-height: 1.4;">
+              Major institutional investors continue showing strong confidence in Bitcoin's long-term potential despite market volatility...
+            </div>
+          </div>
+          <div style="background: #1a2332; border: 1px solid #3a4553; border-radius: 6px; padding: 12px; margin-bottom: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+              <div style="font-weight: 600; color: #ffffff; font-size: 13px; flex: 1;">Ethereum network upgrade reduces gas fees significantly</div>
+              <span class="chip--ok" style="margin-left: 10px; padding: 2px 6px; border-radius: 3px; font-size: 10px; background: rgba(76, 175, 80, 0.2); color: #4caf50;">+0.65</span>
+            </div>
+            <div style="font-size: 11px; color: #8892b0; margin-bottom: 6px;">
+              <span style="background: #2a3441; color: #64ffda; padding: 2px 6px; border-radius: 3px; font-size: 10px;">REDDIT</span> • 4 hours ago • Mentions: ETH
+            </div>
+            <div style="font-size: 12px; color: #ccd6f6; line-height: 1.4;">
+              Community reports substantial improvements in transaction costs following the latest network upgrade...
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Asset Sentiment Breakdown -->
+      <div class="card">
+        <div class="card-header">
+          <h3>💰 Asset Sentiment Scores</h3>
+          <div style="display: flex; gap: 6px;">
+            <button class="period-btn active" data-period="1h" style="padding: 4px 8px; font-size: 11px;">1H</button>
+            <button class="period-btn" data-period="24h" style="padding: 4px 8px; font-size: 11px;">24H</button>
+            <button class="period-btn" data-period="7d" style="padding: 4px 8px; font-size: 11px;">7D</button>
+          </div>
+        </div>
+        <div style="overflow-x: auto;">
+          <table class="data-table" id="sentiment-assets-table">
+            <thead>
+              <tr>
+                <th>Asset</th>
+                <th>Score</th>
+                <th>Trend</th>
+                <th>Volume</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>BTC</strong></td>
+                <td style="color: #4caf50; font-weight: 600;">+0.78</td>
+                <td><span style="color: #4caf50;">↗ +0.12</span></td>
+                <td>2.4K mentions</td>
+              </tr>
+              <tr>
+                <td><strong>ETH</strong></td>
+                <td style="color: #4caf50; font-weight: 600;">+0.65</td>
+                <td><span style="color: #4caf50;">↗ +0.08</span></td>
+                <td>1.8K mentions</td>
+              </tr>
+              <tr>
+                <td><strong>SOL</strong></td>
+                <td style="color: #4caf50; font-weight: 600;">+0.58</td>
+                <td><span style="color: #ff9800;">→ +0.02</span></td>
+                <td>945 mentions</td>
+              </tr>
+              <tr>
+                <td><strong>ADA</strong></td>
+                <td style="color: #64ffda; font-weight: 600;">+0.12</td>
+                <td><span style="color: #ff9800;">→ -0.01</span></td>
+                <td>673 mentions</td>
+              </tr>
+              <tr>
+                <td><strong>XRP</strong></td>
+                <td style="color: #f44336; font-weight: 600;">-0.23</td>
+                <td><span style="color: #f44336;">↘ -0.15</span></td>
+                <td>1.2K mentions</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <!-- Social Media Activity -->
+      <div class="card">
+        <div class="card-header">
+          <h3>🌐 Social Media Buzz</h3>
+          <span class="chip--warn">HIGH ACTIVITY</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+          <div style="text-align: center; background: #1a2332; padding: 12px; border-radius: 6px;">
+            <div style="font-size: 20px; font-weight: 600; color: #1da1f2;" id="twitter-mentions">2.4K</div>
+            <div style="color: #8892b0; font-size: 11px;">Twitter Mentions</div>
+          </div>
+          <div style="text-align: center; background: #1a2332; padding: 12px; border-radius: 6px;">
+            <div style="font-size: 20px; font-weight: 600; color: #ff4500;" id="reddit-posts">892</div>
+            <div style="color: #8892b0; font-size: 11px;">Reddit Posts</div>
+          </div>
+          <div style="text-align: center; background: #1a2332; padding: 12px; border-radius: 6px;">
+            <div style="font-size: 20px; font-weight: 600; color: #0088cc;" id="telegram-messages">1.8K</div>
+            <div style="color: #8892b0; font-size: 11px;">Telegram Messages</div>
+          </div>
+          <div style="text-align: center; background: #1a2332; padding: 12px; border-radius: 6px;">
+            <div style="font-size: 20px; font-weight: 600; color: #ff9800;" id="influencer-score">87</div>
+            <div style="color: #8892b0; font-size: 11px;">Influencer Score</div>
+          </div>
+        </div>
+      </div>
+      <!-- Fear & Greed Index -->
+      <div class="card">
+        <div class="card-header">
+          <h3>😱 Fear & Greed Index</h3>
+          <span class="chip--ok">GREED</span>
+        </div>
+        <div style="text-align: center;">
+          <div style="font-size: 48px; font-weight: 700; color: #4caf50; margin: 20px 0;" id="fng-score">72</div>
+          <div style="color: #8892b0; margin-bottom: 15px; font-size: 12px;">Scale: 0 (Extreme Fear) - 100 (Extreme Greed)</div>
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+            <div style="text-align: center; background: #1a2332; padding: 12px; border-radius: 6px;">
+              <div style="font-size: 16px; font-weight: 600; color: #64ffda;">23%</div>
+              <div style="color: #8892b0; font-size: 11px;">Volatility</div>
+            </div>
+            <div style="text-align: center; background: #1a2332; padding: 12px; border-radius: 6px;">
+              <div style="font-size: 16px; font-weight: 600; color: #4caf50;">+15%</div>
+              <div style="color: #8892b0; font-size: 11px;">Momentum</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Sentiment Sources -->
+      <div class="card">
+        <div class="card-header">
+          <h3>📊 Data Sources</h3>
+        </div>
+        <div style="overflow-x: auto;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th>Status</th>
+                <th>Last Update</th>
+                <th>Articles</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Finnhub News</strong></td>
+                <td><span class="chip--ok">ACTIVE</span></td>
+                <td>2 min ago</td>
+                <td>47</td>
+              </tr>
+              <tr>
+                <td><strong>Reddit r/cryptocurrency</strong></td>
+                <td><span class="chip--ok">ACTIVE</span></td>
+                <td>5 min ago</td>
+                <td>124</td>
+              </tr>
+              <tr>
+                <td><strong>Twitter/X Feed</strong></td>
+                <td><span class="chip--warn">LIMITED</span></td>
+                <td>1 hour ago</td>
+                <td>89</td>
+              </tr>
+              <tr>
+                <td><strong>Binance Live Feed</strong></td>
+                <td><span class="chip--ok">ACTIVE</span></td>
+                <td>binance_live_feed</td>
+                <td>Real-time</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
 
 <!-- Debug Panel -->
 <button class="debug-toggle" id="debug-toggle" style="display: none;">🔧 Debug</button>
