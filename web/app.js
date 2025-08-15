@@ -864,33 +864,109 @@ async function authFetch(url, options = {}) {
   }
 
   function updateQuantumAnalysis(data) {
-    const container = document.getElementById('quantum-metrics');
-    if (!container) return;
+    const metricsContainer = document.getElementById('quantum-metrics');
+    const circuitsContainer = document.getElementById('quantum-circuits');
+    
+    if (!metricsContainer) return;
 
-    container.innerHTML = `
-      <div class="kv">
-        <span class="k">Circuit Depth:</span>
-        <span class="v">${data.circuit_depth || '—'}</span>
-      </div>
-      <div class="kv">
-        <span class="k">Qubits Used:</span>
-        <span class="v">${data.qubits_used || '—'}</span>
-      </div>
-      <div class="kv">
-        <span class="k">Success Rate:</span>
-        <span class="v">${data.success_rate ? (data.success_rate * 100).toFixed(1) + '%' : '—'}</span>
-      </div>
-    `;
+    // Update quantum metrics
+    if (data.circuit_info) {
+      metricsContainer.innerHTML = `
+        <div class="kv">
+          <span class="k">Circuit Depth:</span>
+          <span class="v">${data.circuit_info.circuit_depth || '—'}</span>
+        </div>
+        <div class="kv">
+          <span class="k">Qubits Count:</span>
+          <span class="v">${data.circuit_info.qubits_count || '—'}</span>
+        </div>
+        <div class="kv">
+          <span class="k">Gate Count:</span>
+          <span class="v">${data.circuit_info.gate_count || '—'}</span>
+        </div>
+        <div class="kv">
+          <span class="k">Measurement Shots:</span>
+          <span class="v">${data.circuit_info.measurement_shots || '—'}</span>
+        </div>
+        <div class="kv">
+          <span class="k">Fidelity:</span>
+          <span class="v">${data.circuit_info.fidelity ? (data.circuit_info.fidelity * 100).toFixed(1) + '%' : '—'}</span>
+        </div>
+        <div class="kv">
+          <span class="k">Processing Time:</span>
+          <span class="v">${data.processing_time_ms ? data.processing_time_ms.toFixed(0) + 'ms' : '—'}</span>
+        </div>
+      `;
+    }
+
+    // Update quantum analysis results
+    if (circuitsContainer && data.quantum_results) {
+      circuitsContainer.innerHTML = '<h4>🔬 Quantum Analysis Results</h4>';
+      
+      Object.entries(data.quantum_results).forEach(([symbol, analysis]) => {
+        const analysisDiv = document.createElement('div');
+        analysisDiv.className = 'quantum-analysis-item';
+        analysisDiv.style.cssText = 'margin: 10px 0; padding: 10px; border: 1px solid #2a3441; border-radius: 4px; background: rgba(100, 255, 218, 0.05);';
+        
+        analysisDiv.innerHTML = `
+          <div style="font-weight: 600; color: #64ffda; margin-bottom: 8px;">${symbol}</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 11px;">
+            <div>
+              <strong>Quantum Score:</strong> ${(analysis.quantum_score * 100).toFixed(1)}%<br>
+              <strong>Regime:</strong> ${analysis.regime.current_regime}<br>
+              <strong>Regime Prob:</strong> ${(analysis.regime.regime_probability * 100).toFixed(1)}%
+            </div>
+            <div>
+              <strong>Superposition:</strong> ${analysis.superposition.coherence_time.toFixed(0)}μs<br>
+              <strong>BTC Correlation:</strong> ${(analysis.entanglement.btc_correlation * 100).toFixed(1)}%<br>
+              <strong>Prediction Conf:</strong> ${(analysis.interference.prediction_confidence * 100).toFixed(1)}%
+            </div>
+          </div>
+        `;
+        
+        circuitsContainer.appendChild(analysisDiv);
+      });
+      
+      // Add summary
+      if (data.summary) {
+        const summaryDiv = document.createElement('div');
+        summaryDiv.className = 'quantum-summary';
+        summaryDiv.style.cssText = 'margin-top: 15px; padding: 10px; border: 1px solid #64ffda; border-radius: 4px; background: rgba(100, 255, 218, 0.1);';
+        
+        summaryDiv.innerHTML = `
+          <h4 style="color: #64ffda; margin-bottom: 8px;">📊 Quantum Summary</h4>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; font-size: 11px;">
+            <div><strong>Symbols Analyzed:</strong> ${data.summary.total_symbols_analyzed}</div>
+            <div><strong>Avg Quantum Score:</strong> ${(data.summary.average_quantum_score * 100).toFixed(1)}%</div>
+            <div><strong>Highest Confidence:</strong> ${data.summary.highest_confidence_symbol || 'N/A'}</div>
+            <div><strong>Quantum Advantage:</strong> ${data.summary.quantum_advantage_detected} symbols</div>
+            <div><strong>Regime Consensus:</strong> ${data.summary.regime_consensus}</div>
+          </div>
+        `;
+        
+        circuitsContainer.appendChild(summaryDiv);
+      }
+    }
   }
 
   function updateQuickMLStatus(data) {
     const accuracyEl = document.getElementById('ml-quick-accuracy');
     const confidenceEl = document.getElementById('ml-quick-confidence');
+    const brierEl = document.getElementById('ml-quick-brier');
     const predictionsEl = document.getElementById('ml-quick-predictions');
     const healthChipEl = document.getElementById('ml-health-chip');
 
     if (accuracyEl) accuracyEl.textContent = ((data.accuracy || 0) * 100).toFixed(1) + '%';
     if (confidenceEl) confidenceEl.textContent = ((data.confidence || 0) * 100).toFixed(1) + '%';
+    if (brierEl) {
+      const brierScore = data.brier_score || 0;
+      brierEl.textContent = brierScore.toFixed(3);
+      // Color code Brier score (lower is better)
+      if (brierScore <= 0.10) brierEl.style.color = '#4caf50';  // Green for excellent
+      else if (brierScore <= 0.15) brierEl.style.color = '#64ffda';  // Cyan for good
+      else if (brierScore <= 0.20) brierEl.style.color = '#ff9800';  // Orange for moderate
+      else brierEl.style.color = '#f44336';  // Red for poor
+    }
     if (predictionsEl) predictionsEl.textContent = data.total_predictions || 0;
     
     if (healthChipEl) {
@@ -1038,22 +1114,26 @@ async function authFetch(url, options = {}) {
 
   async function refreshQuantumDetails() {
     try {
-      const data = await fetchJSON('/quantum/details');
-      updateQuantumAnalysis(data);
+      // Get quantum details for status info
+      const detailsData = await fetchJSON('/quantum/details');
       
       // Update quantum status chip
       const statusChip = document.getElementById('quantum-status-chip');
       if (statusChip) {
-        setChip(statusChip, data.enabled ? 'ok' : 'warn');
-        statusChip.textContent = data.enabled ? 'Online' : 'Offline';
+        setChip(statusChip, detailsData.enabled ? 'ok' : 'warn');
+        statusChip.textContent = detailsData.enabled ? 'Online' : 'Offline';
       }
       
       // Update other quantum fields
-      updateElement('quantum-backend-detail', data.backend || '—');
-      updateElement('quantum-queue', data.queue_status || '—');
-      updateElement('quantum-jobs', data.active_jobs || 0);
+      updateElement('quantum-backend-detail', detailsData.backend || '—');
+      updateElement('quantum-queue', detailsData.queue_status || '—');
+      updateElement('quantum-jobs', detailsData.active_jobs || 0);
       updateElement('quantum-success-rate', 
-        data.success_rate ? (data.success_rate * 100).toFixed(1) + '%' : '—');
+        detailsData.success_rate ? (detailsData.success_rate * 100).toFixed(1) + '%' : '—');
+      
+      // Get quantum analysis data
+      const analysisData = await fetchJSON('/quantum/analysis');
+      updateQuantumAnalysis(analysisData);
         
     } catch (error) {
       console.error('Failed to refresh quantum details:', error);
@@ -1590,7 +1670,7 @@ async function authFetch(url, options = {}) {
     
     if (!thead || !tbody) return;
     
-    const { rows, cols, matrix, ts, portfolio_size, volume_leaders, total_pairs } = data;
+    const { rows, cols, matrix, ts, market_overview, atomic_swaps, total_opportunities } = data;
     
     // Update timestamp
     if (timestampEl) {
@@ -1599,13 +1679,31 @@ async function authFetch(url, options = {}) {
     
     // Update grid statistics
     if (portfolioCountEl) {
-      portfolioCountEl.textContent = portfolio_size || rows?.length || 0;
+      portfolioCountEl.textContent = rows?.length || 0;
     }
     if (volumeCountEl) {
-      volumeCountEl.textContent = volume_leaders || cols?.length || 0;
+      volumeCountEl.textContent = cols?.length || 0;
     }
     if (totalPairsEl) {
-      totalPairsEl.textContent = total_pairs || ((rows?.length || 0) * (cols?.length || 0));
+      totalPairsEl.textContent = total_opportunities || 0;
+    }
+    
+    // Update additional market overview stats
+    if (market_overview) {
+      const highConfEl = document.getElementById('grid-high-conf-pairs');
+      const buySignalsEl = document.getElementById('grid-buy-signals');
+      const sellSignalsEl = document.getElementById('grid-sell-signals');
+      const avgConfEl = document.getElementById('grid-avg-confidence');
+      
+      if (highConfEl) highConfEl.textContent = market_overview.high_confidence_pairs || 0;
+      if (buySignalsEl) buySignalsEl.textContent = market_overview.buy_signals || 0;
+      if (sellSignalsEl) sellSignalsEl.textContent = market_overview.sell_signals || 0;
+      if (avgConfEl) avgConfEl.textContent = market_overview.avg_confidence ? (market_overview.avg_confidence * 100).toFixed(1) + '%' : '—';
+    }
+    
+    // Process atomic swap opportunities
+    if (atomic_swaps && atomic_swaps.length > 0) {
+      displayAtomicSwapOpportunities(atomic_swaps);
     }
     
     // Build header
@@ -1658,6 +1756,86 @@ async function authFetch(url, options = {}) {
       tbody.appendChild(tr);
     });
   }
+
+  // Display atomic swap opportunities
+  function displayAtomicSwapOpportunities(atomic_swaps) {
+    const swapContainer = document.getElementById('atomic-swap-opportunities');
+    if (!swapContainer) return;
+    
+    swapContainer.innerHTML = '<h4>🔄 Atomic Swap Opportunities</h4>';
+    
+    atomic_swaps.slice(0, 5).forEach(swap => {
+      const swapDiv = document.createElement('div');
+      swapDiv.className = 'atomic-swap-item';
+      swapDiv.innerHTML = `
+        <div class="swap-route">${swap.swap_route}</div>
+        <div class="swap-details">
+          <span class="swap-confidence">Confidence: ${(swap.confidence * 100).toFixed(1)}%</span>
+          <span class="swap-gain">Expected: +${swap.expected_gain}%</span>
+          <span class="swap-time">${swap.execution_time}</span>
+        </div>
+      `;
+      
+      // Add click handler for potential execution
+      swapDiv.addEventListener('click', () => {
+        if (swap.confidence > 0.8) {
+          console.log(`High-confidence swap opportunity: ${swap.swap_route}`);
+          // Here you could implement actual trading logic
+          showTradeExecutionModal(swap);
+        }
+      });
+      
+      swapContainer.appendChild(swapDiv);
+    });
+  }
+
+  // Show trade execution modal for high-confidence opportunities
+  function showTradeExecutionModal(opportunity) {
+    const modal = document.createElement('div');
+    modal.className = 'trade-modal';
+    modal.innerHTML = `
+      <div class="modal-content">
+        <h3>🚀 Execute Trade Opportunity</h3>
+        <div class="trade-details">
+          <p><strong>Route:</strong> ${opportunity.swap_route}</p>
+          <p><strong>Confidence:</strong> ${(opportunity.confidence * 100).toFixed(1)}%</p>
+          <p><strong>Expected Gain:</strong> +${opportunity.expected_gain}%</p>
+          <p><strong>Gas Cost:</strong> ~$${opportunity.gas_cost}</p>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-execute" onclick="executeTradeOpportunity('${opportunity.from_symbol}', '${opportunity.to_symbol}', ${opportunity.confidence})">Execute Trade</button>
+          <button class="btn-cancel" onclick="closeTradeModal()">Cancel</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Auto-close after 10 seconds
+    setTimeout(() => {
+      if (document.body.contains(modal)) {
+        document.body.removeChild(modal);
+      }
+    }, 10000);
+  }
+
+  // Execute trade opportunity (placeholder for actual implementation)
+  window.executeTradeOpportunity = function(fromSymbol, toSymbol, confidence) {
+    console.log(`Executing trade: ${fromSymbol} → ${toSymbol} (Confidence: ${(confidence * 100).toFixed(1)}%)`);
+    
+    // Here you would implement the actual trading logic
+    // For now, just log and close modal
+    alert(`Trade executed: ${fromSymbol} → ${toSymbol}`);
+    closeTradeModal();
+  };
+
+  // Close trade modal
+  window.closeTradeModal = function() {
+    const modal = document.querySelector('.trade-modal');
+    if (modal) {
+      document.body.removeChild(modal);
+    }
+  };
 
   // Audit trail functions (superuser only)
   async function refreshAuditLogs() {
