@@ -63,34 +63,6 @@ function autoLogin() {
     initializeDashboard();
   }, 100);
 }
-    
-    // Update UI immediately
-    updateUI();
-    
-    // Try to get a real token in the background
-    setTimeout(async () => {
-      try {
-        const response = await fetch(`${API}/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: 'admin', password: 'Diego1234!' })
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          authToken = data.access_token;
-          console.log('✅ Real authentication token obtained');
-        } else {
-          console.log('⚠️ Using fallback auto-login token');
-        }
-      } catch (error) {
-        console.log('⚠️ Auto-login fallback mode:', error.message);
-      }
-      
-      // Initialize dashboard after getting token
-      initializeDashboard();
-    }, 100);
-  }
 
   // Safe element finder
   function findElement(id) {
@@ -290,25 +262,6 @@ async function refreshSentimentNews() {
   if (document.getElementById('debug-role')) document.getElementById('debug-role').textContent = 'admin';
   if (document.getElementById('debug-session')) document.getElementById('debug-session').textContent = 'no-auth';
 }
-      
-      // Show audit section for superusers
-      if (currentUser.role === 'superuser') {
-        document.getElementById('audit-section').style.display = 'block';
-      }
-      
-      // Update debug info
-      document.getElementById('debug-api-base').textContent = API;
-      document.getElementById('debug-user').textContent = currentUser.username;
-      document.getElementById('debug-role').textContent = currentUser.role;
-      document.getElementById('debug-session').textContent = authToken.slice(0, 8) + '...';
-    } else {
-      loginModal.style.display = 'flex';
-      mainContent.style.display = 'none';
-      dashboardTabs.style.display = 'none';
-      userInfo.style.display = 'none';
-      debugToggle.style.display = 'none';
-    }
-  }
 
   // Login functionality (kept for compatibility, but optional)
   const loginForm = document.getElementById('login-form');
