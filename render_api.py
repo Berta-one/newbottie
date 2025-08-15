@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 import websocket
 import threading
 from collections import defaultdict
+from enum import Enum
 
 # Load environment variables
 try:
@@ -223,6 +224,7 @@ class BinanceWebSocketManager:
     
     def _on_error(self, ws, error):
         print(f"❌ WebSocket error: {error}")
+        system_logger.add_log(LogLevel.ERROR, f"WebSocket error: {error}", "WEBSOCKET")
     
     def _on_close(self, ws, close_status_code, close_msg):
         print("🔌 WebSocket connection closed")
@@ -230,6 +232,7 @@ class BinanceWebSocketManager:
     
     def _on_open(self, ws):
         print("✅ WebSocket connection opened")
+        system_logger.add_log(LogLevel.INFO, "WebSocket connection established", "WEBSOCKET")
     
     def get_ticker_data(self):
         """Get real-time ticker data from WebSocket"""
@@ -444,6 +447,7 @@ def get_real_balance():
     
     # No WebSocket data available - API likely rate limited
     print("❌ No WebSocket balance data - API rate limited or disconnected")
+    system_logger.add_log(LogLevel.WARNING, "No WebSocket balance data - API may be rate limited", "BALANCE")
     return {'total_usdt': 0, 'source': 'websocket_unavailable'}
 
 def calculate_real_pnl(trades, positions):
@@ -1049,21 +1053,7 @@ def recent_trades():
         }
     }
 
-# Logs endpoint
-@app.get("/logs/last")
-def logs():
-    # Get real balance for logs
-    balance = get_real_balance()
-    current_equity = balance.get('total_usdt', 0)
-    
-    log_entries = [
-        "✅ Render API initialized",
-        "📊 Real data sources connected", 
-        "🔄 Live data refresh active",
-        f"💰 Current equity: ${current_equity:,.2f}" if current_equity > 0 else "💰 No equity data available",
-        "🚀 All systems operational"
-    ]
-    return {"logs": log_entries}
+# Old basic logs endpoint removed - replaced with advanced logging system above
 
 # ML Status endpoint
 @app.get("/ml/status")
@@ -1995,6 +1985,161 @@ def get_reddit_sentiment():
 # Force deployment timestamp
 DEPLOYMENT_TIMESTAMP = "2024-12-19T20:30:00Z"
 API_VERSION = "2.1.0-REAL-DATA-ONLY"
+
+# Advanced Logging System with Filtering
+class LogLevel(Enum):
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
+
+class SystemLogger:
+    """Advanced logging system with filtering and real-time status"""
+    
+    def __init__(self):
+        self.logs = []
+        self.max_logs = 1000  # Keep last 1000 logs
+        
+    def add_log(self, level: LogLevel, message: str, component: str = "SYSTEM"):
+        """Add a log entry with timestamp and metadata"""
+        log_entry = {
+            "timestamp": datetime.now().isoformat(),
+            "level": level.value,
+            "component": component,
+            "message": message,
+            "unix_time": time.time()
+        }
+        
+        self.logs.append(log_entry)
+        
+        # Keep only last max_logs entries
+        if len(self.logs) > self.max_logs:
+            self.logs = self.logs[-self.max_logs:]
+            
+        # Also print to console for debugging
+        emoji = self._get_emoji(level)
+        print(f"{emoji} [{component}] {message}")
+    
+    def _get_emoji(self, level: LogLevel) -> str:
+        """Get emoji for log level"""
+        emoji_map = {
+            LogLevel.DEBUG: "🔍",
+            LogLevel.INFO: "ℹ️",
+            LogLevel.WARNING: "⚠️", 
+            LogLevel.ERROR: "❌",
+            LogLevel.CRITICAL: "🚨"
+        }
+        return emoji_map.get(level, "📝")
+    
+    def get_logs(self, level_filter: str = None, component_filter: str = None, limit: int = 50) -> List[Dict]:
+        """Get filtered logs"""
+        filtered_logs = self.logs
+        
+        # Filter by level
+        if level_filter and level_filter.upper() in [l.value for l in LogLevel]:
+            filtered_logs = [log for log in filtered_logs if log['level'] == level_filter.upper()]
+        
+        # Filter by component
+        if component_filter:
+            filtered_logs = [log for log in filtered_logs if component_filter.upper() in log['component'].upper()]
+        
+        # Return most recent logs first
+        return list(reversed(filtered_logs[-limit:]))
+    
+    def get_system_status(self) -> Dict[str, Any]:
+        """Get comprehensive system status"""
+        recent_errors = [log for log in self.logs[-100:] if log['level'] in ['ERROR', 'CRITICAL']]
+        recent_warnings = [log for log in self.logs[-100:] if log['level'] == 'WARNING']
+        
+        # Check WebSocket status
+        ws_status = "CONNECTED" if (ws_manager and ws_manager.running) else "DISCONNECTED"
+        
+        # Check API status
+        api_status = "RATE_LIMITED" if not ws_manager else "WEBSOCKET_ONLY"
+        
+        # Get balance for equity
+        balance = get_real_balance()
+        current_equity = balance.get('total_usdt', 0)
+        
+        return {
+            "system_health": "HEALTHY" if len(recent_errors) == 0 else "DEGRADED" if len(recent_errors) < 5 else "CRITICAL",
+            "websocket_status": ws_status,
+            "api_status": api_status,
+            "current_equity": current_equity,
+            "data_source": balance.get('source', 'unknown'),
+            "recent_errors": len(recent_errors),
+            "recent_warnings": len(recent_warnings),
+            "total_logs": len(self.logs),
+            "uptime_status": "OPERATIONAL",
+            "last_update": datetime.now().isoformat()
+        }
+
+# Global logger instance
+system_logger = SystemLogger()
+
+# Initialize with startup logs
+system_logger.add_log(LogLevel.INFO, "Bottie Trading Dashboard starting...", "STARTUP")
+system_logger.add_log(LogLevel.INFO, "WebSocket-only mode enabled (no REST API rate limits)", "WEBSOCKET")
+
+# Enhanced logs endpoint with filtering
+@app.get("/logs/last")
+def logs(level: str = None, component: str = None, limit: int = 50):
+    """Get system logs with optional filtering
+    
+    Parameters:
+    - level: Filter by log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+    - component: Filter by component (WEBSOCKET, API, ML, TRADING, etc.)
+    - limit: Number of logs to return (default 50, max 500)
+    """
+    limit = min(limit, 500)  # Prevent excessive requests
+    
+    logs = system_logger.get_logs(level, component, limit)
+    system_status = system_logger.get_system_status()
+    
+    return {
+        "logs": logs,
+        "system_status": system_status,
+        "filters": {
+            "level": level,
+            "component": component,
+            "limit": limit
+        },
+        "available_levels": [l.value for l in LogLevel],
+        "available_components": list(set([log['component'] for log in system_logger.logs[-100:]])),
+        "total_logs": len(logs)
+    }
+
+@app.get("/logs/errors")  
+def error_logs():
+    """Get only error and critical logs"""
+    error_logs = system_logger.get_logs("ERROR", limit=100)
+    critical_logs = system_logger.get_logs("CRITICAL", limit=100)
+    
+    all_errors = error_logs + critical_logs
+    all_errors.sort(key=lambda x: x['unix_time'], reverse=True)
+    
+    return {
+        "error_logs": all_errors,
+        "error_count": len(error_logs),
+        "critical_count": len(critical_logs),
+        "system_status": system_logger.get_system_status()
+    }
+
+@app.get("/logs/system")
+def system_status_logs():
+    """Get comprehensive system status and recent activity"""
+    return {
+        "system_status": system_logger.get_system_status(),
+        "recent_activity": system_logger.get_logs(limit=20),
+        "component_status": {
+            "websocket": "ACTIVE" if (ws_manager and ws_manager.running) else "INACTIVE",
+            "api_mode": "WEBSOCKET_ONLY",
+            "data_sources": "REAL_DATA_ONLY",
+            "ml_engine": "ACTIVE",
+            "trading_grid": "ACTIVE"
+        }
+    }
 
 if __name__ == "__main__":
     import uvicorn

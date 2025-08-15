@@ -1629,15 +1629,60 @@ async function authFetch(url, options = {}) {
     });
   }
 
+  // Advanced logging system with filtering
+  let currentLogFilter = 'all';
+  let currentComponentFilter = null;
+
   async function refreshLogs() {
     try {
-      const data = await fetchJSON('/logs/last');
+      // Build query parameters based on current filters
+      let endpoint = '/logs/last?limit=100';
+      if (currentLogFilter !== 'all') {
+        endpoint += `&level=${currentLogFilter}`;
+      }
+      if (currentComponentFilter) {
+        endpoint += `&component=${currentComponentFilter}`;
+      }
+
+      const data = await fetchJSON(endpoint);
       if (logsContainer && data.logs) {
-        logsContainer.textContent = data.logs.slice(-100).join('\n');
+        // Format logs with timestamps and levels
+        const formattedLogs = data.logs.map(log => {
+          const time = new Date(log.timestamp).toLocaleTimeString();
+          const emoji = getLogEmoji(log.level);
+          return `${time} ${emoji} [${log.component}] ${log.message}`;
+        });
+        
+        logsContainer.textContent = formattedLogs.join('\n');
         logsContainer.scrollTop = logsContainer.scrollHeight;
+
+        // Update system status if available
+        if (data.system_status) {
+          updateSystemStatus(data.system_status);
+        }
       }
     } catch (error) {
-      console.error('Logs refresh failed:', error);
+      console.error('Error refreshing logs:', error);
+    }
+  }
+
+  function getLogEmoji(level) {
+    const emojis = {
+      'DEBUG': '🔍',
+      'INFO': 'ℹ️',
+      'WARNING': '⚠️',
+      'ERROR': '❌',
+      'CRITICAL': '🚨'
+    };
+    return emojis[level] || '📝';
+  }
+
+  function updateSystemStatus(status) {
+    // Update system health indicator if it exists
+    const healthIndicator = document.querySelector('.system-health');
+    if (healthIndicator) {
+      healthIndicator.textContent = `System: ${status.system_health} | WebSocket: ${status.websocket_status}`;
+      healthIndicator.className = `system-health ${status.system_health.toLowerCase()}`;
     }
   }
 
@@ -2373,11 +2418,19 @@ async function ping() {
   }
 
   try {
-    const logs = await fetchJSON("/logs/last");
-    const text = (logs.logs || []).join("\n");
-    $("#logs").textContent = text || "—";
+    const logs = await fetchJSON("/logs/last?limit=20");
+    if (logs.logs && logs.logs.length > 0) {
+      const formattedLogs = logs.logs.map(log => {
+        const time = new Date(log.timestamp).toLocaleTimeString();
+        const emoji = getLogEmoji(log.level);
+        return `${time} ${emoji} [${log.component}] ${log.message}`;
+      });
+      $("#logs").textContent = formattedLogs.join("\n") || "—";
+    } else {
+      $("#logs").textContent = "—";
+    }
   } catch (e) {
-    // ignore
+    $("#logs").textContent = "—";
   }
 }
 

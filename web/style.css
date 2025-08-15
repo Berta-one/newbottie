@@ -129,3 +129,109 @@ body {
   background: #3a4553;
   border-radius: 8px;
 }
+
+/* Advanced Logging System Styles */
+.log-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding: 10px;
+  background: var(--page-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border-primary);
+}
+
+.log-filter-buttons {
+  display: flex;
+  gap: 5px;
+}
+
+.log-filter-btn {
+  padding: 5px 12px;
+  border: 1px solid var(--border-primary);
+  background: var(--page-primary);
+  color: var(--text-primary);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.log-filter-btn:hover {
+  background: var(--page-secondary);
+}
+
+.log-filter-btn.active {
+  background: #007bff;
+  color: white;
+  border-color: #007bff;
+}
+
+.component-filter select {
+  padding: 5px 10px;
+  border: 1px solid var(--border-primary);
+  background: var(--page-primary);
+  color: var(--text-primary);
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.system-health {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 500;
+  margin-left: 10px;
+}
+
+.system-health.healthy {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.system-health.degraded {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+}
+
+.system-health.critical {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+/* Dark theme support */
+:root[data-theme="dark"] .log-controls {
+  background: var(--page-secondary);
+}
+
+:root[data-theme="dark"] .log-filter-btn {
+  background: var(--page-primary);
+  color: var(--text-primary);
+}
+
+:root[data-theme="dark"] .component-filter select {
+  background: var(--page-primary);
+  color: var(--text-primary);
+}
+
+:root[data-theme="dark"] .system-health.healthy {
+  background: #1e4d2b;
+  color: #90ee90;
+  border-color: #2d5a3d;
+}
+
+:root[data-theme="dark"] .system-health.degraded {
+  background: #4d3319;
+  color: #ffd700;
+  border-color: #5a3d1f;
+}
+
+:root[data-theme="dark"] .system-health.critical {
+  background: #4d1e1e;
+  color: #ff6b6b;
+  border-color: #5a2d2d;
+}
