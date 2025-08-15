@@ -4,125 +4,8 @@
 <meta charset="UTF-8">
 <title>Bottie Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<script>
-// Emergency bypass script
-window.addEventListener('load', function() {
-  const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.get('bypass') === 'true') {
-    setTimeout(() => {
-      console.log('🔧 EMERGENCY BYPASS');
-      window.currentUser = { username: 'debug-user', role: 'admin' };
-      window.authToken = 'bypass-token';
-      
-      // Hide login modal
-      const loginModal = document.getElementById('login-modal');
-      if (loginModal) loginModal.style.display = 'none';
-      
-      // Show dashboard
-      const mainContent = document.getElementById('main-content');
-      if (mainContent) mainContent.style.display = 'block';
-      
-      // Initialize if function exists
-      if (typeof initializeDashboard === 'function') {
-        initializeDashboard();
-      }
-    }, 1000);
-  }
-});
-</script>
 <link rel="stylesheet" href="style.css">
 <style>
-  .login-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(12, 20, 38, 0.95);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 3000;
-  }
-  
-  .login-form {
-    background: #1a2332;
-    border: 1px solid #2a3441;
-    border-radius: 8px;
-    padding: 30px;
-    min-width: 400px;
-    text-align: center;
-  }
-  
-  .login-form h2 {
-    color: #64ffda;
-    margin-bottom: 20px;
-  }
-  
-  .form-group {
-    margin-bottom: 15px;
-    text-align: left;
-  }
-  
-  .form-label {
-    display: block;
-    color: #ffffff;
-    margin-bottom: 5px;
-    font-size: 12px;
-  }
-  
-  .form-input {
-    width: 100%;
-    background: #0f1419;
-    border: 1px solid #2a3441;
-    border-radius: 4px;
-    padding: 10px;
-    color: #ffffff;
-    font-size: 14px;
-  }
-  
-  .form-input:focus {
-    outline: none;
-    border-color: #64ffda;
-  }
-  
-  .login-btn {
-    width: 100%;
-    background: #64ffda;
-    color: #0c1426;
-    border: none;
-    padding: 12px;
-    border-radius: 4px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    margin-top: 10px;
-  }
-  
-  .login-btn:hover {
-    opacity: 0.8;
-  }
-  
-  .login-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-  
-  .login-btn.secondary {
-    background: #ff9800;
-    color: #ffffff;
-  }
-  
-  .login-btn.secondary:hover {
-    background: #f57c00;
-  }
-  
-  .login-error {
-    color: #f44336;
-    font-size: 12px;
-    margin-top: 10px;
-  }
-  
   /* Debug Panel */
   .debug-panel {
     position: fixed;
@@ -895,26 +778,6 @@ window.addEventListener('load', function() {
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-
-<!-- Login Modal -->
-<div id="login-modal" class="login-modal">
-  <div class="login-form">
-    <h2>🔐 Bottie Access</h2>
-    <form id="login-form">
-      <div class="form-group">
-        <label class="form-label">Username</label>
-        <input type="text" id="username" class="form-input" required>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Password</label>
-        <input type="password" id="password" class="form-input" required>
-      </div>
-      <button type="submit" id="login-btn" class="login-btn">Login</button>
-      <button type="button" id="bypass-btn" class="login-btn secondary" style="background: #ff9800; margin-top: 8px;">🔓 Dev Bypass</button>
-      <div id="login-error" class="login-error"></div>
-    </form>
-  </div>
-</div>
 
 <header>
   <div>Bottie Live Dashboard</div>
