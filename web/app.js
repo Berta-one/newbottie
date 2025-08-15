@@ -405,6 +405,18 @@ class BackendWebSocketManager {
   function autoLogin() {
     console.log('Auto-login disabled - hardcoded credentials removed for security');
     console.log('💡 Use the "🔓 Dev Bypass" button on the login screen for development access');
+    console.log('💡 Or add ?bypass=true to the URL for instant bypass');
+    
+    // Check for URL-based bypass
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('bypass') === 'true' || urlParams.get('debug') === 'true') {
+      console.log('🔓 URL-based bypass detected, activating...');
+      currentUser = { username: 'url-bypass-user', role: 'developer', bypass: true };
+      authToken = 'url-bypass-token';
+      updateUI();
+      initializeDashboard();
+      return;
+    }
     
     // Check if user already has saved auth state
     if (loadAuthState()) {
@@ -728,12 +740,7 @@ async function refreshSentimentNews() {
     console.log('✅ Bypass button initialized');
   }
   
-  // Initialize bypass button when DOM is ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeBypassButton);
-  } else {
-    initializeBypassButton();
-  }
+  // Initialize bypass button when DOM is ready - will be called at the end of script
 
   // Add credential testing functionality (disabled - use Dev Bypass instead)
   async function testMultipleCredentials() {
@@ -2348,6 +2355,31 @@ async function refreshSentimentNews() {
   
   // Make WebSocket manager globally accessible
   window.webSocketManager = webSocketManager;
+  
+  // Make bypass function globally accessible for debugging
+  window.devBypass = function() {
+    console.log('🔓 Manual Dev Bypass triggered');
+    try {
+      currentUser = { username: 'dev-user', role: 'developer', bypass: true };
+      authToken = 'bypass-token';
+      
+      // Add URL parameter
+      const url = new URL(window.location);
+      url.searchParams.set('bypass', 'true');
+      window.history.replaceState({}, '', url);
+      
+      console.log('Auth state set:', { currentUser, authToken });
+      
+      updateUI();
+      initializeDashboard();
+      
+      console.log('✅ Manual bypass complete!');
+      return 'Bypass successful!';
+    } catch (error) {
+      console.error('Manual bypass failed:', error);
+      return 'Bypass failed: ' + error.message;
+    }
+  };
 
   // Initialize UI enhancements
   setTimeout(() => {
@@ -2571,3 +2603,42 @@ startGridPolling();
 
 // Initialize auto-login when page loads
 autoLogin();
+
+// Initialize bypass button - CRITICAL: Must be at the end after all DOM elements exist
+setTimeout(() => {
+  console.log('🔧 Initializing bypass button...');
+  initializeBypassButton();
+  
+  // Also add a direct event listener as backup
+  const bypassBtn = document.getElementById('bypass-btn');
+  if (bypassBtn) {
+    console.log('✅ Bypass button found, adding direct listener');
+    bypassBtn.onclick = async function() {
+      console.log('🔓 DIRECT: Dev Bypass clicked');
+      
+      try {
+        // Simple, direct bypass
+        currentUser = { username: 'dev-user', role: 'developer', bypass: true };
+        authToken = 'bypass-token';
+        
+        // Add URL parameter
+        const url = new URL(window.location);
+        url.searchParams.set('bypass', 'true');
+        window.history.replaceState({}, '', url);
+        
+        console.log('🔄 Updating UI...');
+        updateUI();
+        
+        console.log('🚀 Initializing dashboard...');
+        initializeDashboard();
+        
+        console.log('✅ BYPASS COMPLETE!');
+      } catch (error) {
+        console.error('❌ Bypass failed:', error);
+        alert('Bypass failed: ' + error.message);
+      }
+    };
+  } else {
+    console.error('❌ Bypass button not found!');
+  }
+}, 1000); // Wait 1 second to ensure DOM is fully loaded
