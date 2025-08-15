@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from passlib.context import CryptContext
 import jwt
+from datetime import datetime, timedelta
 
 # Load environment variables
 try:
@@ -1858,6 +1859,14 @@ def get_reddit_sentiment():
     except Exception as e:
         print(f"❌ Reddit API error: {e}")
         return None
+
+# FastAPI Trading Dashboard - REAL DATA ONLY
+# Version: 2.1.0 - FORCE REBUILD 2024-12-19 
+# Deployment Trigger: ALL DEMO DATA REMOVED - BRIER SCORE FIXED - CRYPTO PAIRS ENABLED
+
+# Force deployment timestamp
+DEPLOYMENT_TIMESTAMP = "2024-12-19T20:30:00Z"
+API_VERSION = "2.1.0-REAL-DATA-ONLY"
 
 if __name__ == "__main__":
     import uvicorn
