@@ -82,6 +82,15 @@
     cursor: not-allowed;
   }
   
+  .login-btn.secondary {
+    background: #ff9800;
+    color: #ffffff;
+  }
+  
+  .login-btn.secondary:hover {
+    background: #f57c00;
+  }
+  
   .login-error {
     color: #f44336;
     font-size: 12px;
@@ -868,11 +877,11 @@
     <form id="login-form">
       <div class="form-group">
         <label class="form-label">Username</label>
-        <input type="text" id="username" class="form-input" value="admin" required>
+        <input type="text" id="username" class="form-input" required>
       </div>
       <div class="form-group">
         <label class="form-label">Password</label>
-        <input type="password" id="password" class="form-input" value="Diego1234!" required>
+        <input type="password" id="password" class="form-input" required>
       </div>
       <button type="submit" id="login-btn" class="login-btn">Login</button>
       <button type="button" id="bypass-btn" class="login-btn secondary" style="background: #ff9800; margin-top: 8px;">🔓 Dev Bypass</button>

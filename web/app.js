@@ -403,38 +403,20 @@ class BackendWebSocketManager {
 
   // Auto-login on page load
   function autoLogin() {
-    console.log('Attempting auto-login...');
+    console.log('Auto-login disabled - hardcoded credentials removed for security');
+    console.log('💡 Use the "🔓 Dev Bypass" button on the login screen for development access');
     
-    // Auto-login as admin with correct credentials
-    currentUser = { username: 'admin', role: 'admin' };
-    authToken = 'auto-login-token';
-    
-    // Update UI immediately
-    updateUI();
-    
-    // Try to get a real token in the background
-    setTimeout(async () => {
-      try {
-        const response = await fetch(`${API}/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: 'admin', password: 'Diego1234!' })
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          authToken = data.access_token;
-          console.log('✅ Real authentication token obtained');
-        } else {
-          console.log('⚠️ Using fallback auto-login token');
-        }
-      } catch (error) {
-        console.log('⚠️ Auto-login fallback mode:', error.message);
-      }
-      
-      // Initialize dashboard after getting token
+    // Check if user already has saved auth state
+    if (loadAuthState()) {
+      console.log('✅ Restored previous session');
+      updateUI();
       initializeDashboard();
-    }, 100);
+      return;
+    }
+    
+    // Show login screen
+    console.log('🔐 Please login or use Dev Bypass button');
+    updateUI();
   }
 
   // Safe element finder
@@ -684,65 +666,87 @@ async function refreshSentimentNews() {
   });
 
   // Bypass button functionality for development
-  document.getElementById('bypass-btn').addEventListener('click', async () => {
+  function initializeBypassButton() {
     const bypassBtn = document.getElementById('bypass-btn');
-    const loginError = document.getElementById('login-error');
-    
-    bypassBtn.disabled = true;
-    bypassBtn.textContent = '🔓 Bypassing...';
-    loginError.textContent = '';
-    
-    try {
-      // Create bypass user and token
-      const bypassUser = {
-        username: 'dev-user',
-        role: 'developer',
-        bypass: true
-      };
-      
-      saveAuthState('bypass-token', bypassUser);
-      
-      // Add bypass parameter to URL for WebSocket
-      const currentUrl = new URL(window.location);
-      currentUrl.searchParams.set('bypass', 'true');
-      window.history.replaceState({}, '', currentUrl);
-      
-      console.log('🔓 Development bypass activated');
-      updateUI();
-      initializeDashboard();
-      
-    } catch (error) {
-      loginError.textContent = 'Bypass failed. Please try again.';
-      console.error('Bypass error:', error);
-    } finally {
-      bypassBtn.disabled = false;
-      bypassBtn.textContent = '🔓 Dev Bypass';
+    if (!bypassBtn) {
+      console.error('❌ Bypass button not found in DOM');
+      return;
     }
-  });
+    
+    bypassBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      console.log('🔓 Dev Bypass button clicked');
+      
+      const loginError = document.getElementById('login-error');
+      
+      bypassBtn.disabled = true;
+      bypassBtn.textContent = '🔓 Bypassing...';
+      if (loginError) loginError.textContent = '';
+      
+      try {
+        // Create bypass user and token
+        const bypassUser = {
+          username: 'dev-user',
+          role: 'developer',
+          bypass: true
+        };
+        
+        console.log('Setting auth state with bypass token...');
+        saveAuthState('bypass-token', bypassUser);
+        
+        // Verify auth state was set
+        console.log('Current auth state:', { authToken, currentUser });
+        
+        // Add bypass parameter to URL for WebSocket
+        const currentUrl = new URL(window.location);
+        currentUrl.searchParams.set('bypass', 'true');
+        window.history.replaceState({}, '', currentUrl);
+        
+        console.log('🔓 Development bypass activated');
+        console.log('Updating UI...');
+        updateUI();
+        
+        console.log('Initializing dashboard...');
+        try {
+          initializeDashboard();
+          console.log('✅ Bypass complete - dashboard initialized');
+        } catch (dashError) {
+          console.error('Dashboard initialization error:', dashError);
+          if (loginError) loginError.textContent = 'Bypass successful but dashboard failed to load: ' + dashError.message;
+        }
+        
+      } catch (error) {
+        const errorMsg = 'Bypass failed: ' + error.message;
+        if (loginError) loginError.textContent = errorMsg;
+        console.error('❌ Bypass error:', error);
+      } finally {
+        bypassBtn.disabled = false;
+        bypassBtn.textContent = '🔓 Dev Bypass';
+      }
+    });
+    
+    console.log('✅ Bypass button initialized');
+  }
+  
+  // Initialize bypass button when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeBypassButton);
+  } else {
+    initializeBypassButton();
+  }
 
-  // Add credential testing functionality
+  // Add credential testing functionality (disabled - use Dev Bypass instead)
   async function testMultipleCredentials() {
-    const credentials = [
-      // Based on your HTML default values
-      { username: 'admin', password: 'Diego1234!' },
-      { username: 'superuser', password: 'Lenny106667!' },
-      
-      // Original expected passwords from code
-      { username: 'admin', password: 'AdminPass456!' },
-      { username: 'superuser', password: 'SuperSecret123!' },
-      
-      // Common fallbacks
-      { username: 'admin', password: 'admin' },
-      { username: 'superuser', password: 'superuser' },
-      { username: 'admin', password: '' },
-      { username: 'root', password: 'root' },
-      { username: 'user', password: 'user' },
-      { username: 'test', password: 'test' },
-      
-      // Try with different case
-      { username: 'Admin', password: 'Diego1234!' },
-      { username: 'ADMIN', password: 'DIEGO1234!' }
-    ];
+    const credentials = [];
+    
+    console.log('⚠️ Hardcoded credential testing disabled for security.');
+    console.log('💡 Use the "🔓 Dev Bypass" button for development access.');
+    
+    const loginError = document.getElementById('login-error');
+    if (loginError) {
+      loginError.innerHTML = '⚠️ Use Dev Bypass button for development access';
+    }
+    return;
 
     const loginError = document.getElementById('login-error');
     loginError.innerHTML = 'Testing multiple credentials...<br><br>';
@@ -955,6 +959,10 @@ async function refreshSentimentNews() {
 
   // Add the test button functionality
   function addCredentialTestButton() {
+    // Disabled for security - use Dev Bypass button instead
+    console.log('⚠️ Credential testing disabled - use Dev Bypass button');
+    return;
+    
     const loginForm = document.getElementById('login-form');
     if (loginForm && !document.getElementById('test-credentials-btn')) {
       const testBtn = document.createElement('button');
