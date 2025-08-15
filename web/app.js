@@ -310,42 +310,45 @@ async function refreshSentimentNews() {
     }
   }
 
-  // Login functionality
-  document.getElementById('login-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const username = document.getElementById('username').value;
-    const password = document.getElementById('password').value;
-    const loginBtn = document.getElementById('login-btn');
-    const loginError = document.getElementById('login-error');
-    
-    loginBtn.disabled = true;
-    loginBtn.textContent = 'Logging in...';
-    loginError.textContent = '';
-    
-    try {
-      const response = await fetch(`${API}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        saveAuthState(data.access_token, data.user);
-        updateUI();
-        initializeDashboard();
-      } else {
-        loginError.textContent = data.detail || 'Login failed';
+  // Login functionality (kept for compatibility, but optional)
+  const loginForm = document.getElementById('login-form');
+  if (loginForm) {
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const loginBtn = document.getElementById('login-btn');
+      const loginError = document.getElementById('login-error');
+
+      loginBtn.disabled = true;
+      loginBtn.textContent = 'Logging in...';
+      loginError.textContent = '';
+
+      try {
+        const response = await fetch(`${API}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          saveAuthState(data.access_token, data.user);
+          updateUI();
+          initializeDashboard();
+        } else {
+          loginError.textContent = data.detail || 'Login failed';
+        }
+      } catch (error) {
+        loginError.textContent = 'Connection error. Please try again.';
+        console.error('Login error:', error);
+      } finally {
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'Login';
       }
-    } catch (error) {
-      loginError.textContent = 'Connection error. Please try again.';
-      console.error('Login error:', error);
-    } finally {
-      loginBtn.disabled = false;
-      loginBtn.textContent = 'Login';
-    }
-  });
+    });
+  }
 
   // Add credential testing functionality
   async function testMultipleCredentials() {
@@ -467,29 +470,6 @@ async function refreshSentimentNews() {
       refreshEquity();
     }, 500);
   }
-// Add bypass button to the existing function
-const bypassBtn = document.createElement('button');
-bypassBtn.type = 'button';
-bypassBtn.id = 'bypass-auth-btn';
-bypassBtn.className = 'login-btn';
-bypassBtn.style.marginTop = '10px';
-bypassBtn.style.background = '#ff9800';
-bypassBtn.textContent = 'Skip Authentication (Debug)';
-bypassBtn.onclick = () => {
-  console.log('🔧 Manual authentication bypass');
-  currentUser = { username: 'debug-user', role: 'admin' };
-  authToken = 'bypass-token';
-  
-  localStorage.setItem('bottie_auth_token', authToken);
-  localStorage.setItem('bottie_api_base', API);
-  localStorage.setItem('bottie_user', JSON.stringify(currentUser));
-  
-  updateUI();
-  initializeDashboard();
-};
-
-// Add it after the other buttons
-loginBtn.parentNode.insertBefore(bypassBtn, guestBtn.nextSibling);
   // Debug endpoint testing functions
   async function testDebugEndpoints() {
     loginError = document.getElementById('login-error');
