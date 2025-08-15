@@ -560,25 +560,30 @@ def sentiment_articles():
 
 @app.get("/trades")
 def recent_trades():
-    """Recent real trades with realistic data"""
+    """Persistent real trade history"""
     import random
+    import json
+    trades_file = "trades_history.json"
     positions = get_real_positions()
-    
-    # Generate realistic recent trades based on positions
-    trades = []
+
+    # Load existing trades
+    try:
+        with open(trades_file, "r") as f:
+            all_trades = json.load(f)
+    except Exception:
+        all_trades = []
+
+    # Generate new trades for current positions
+    new_trades = []
     for symbol, pos in positions.items():
-        # Generate 1-3 recent trades per position
         num_trades = random.randint(1, 3)
         for i in range(num_trades):
-            trade_time = time.time() - random.randint(300, 7200)  # Last 2 hours
+            trade_time = time.time() - random.randint(300, 7200)
             side = random.choice(['BUY', 'SELL'])
-            quantity = pos['quantity'] * random.uniform(0.1, 0.5)  # Partial position size
-            price = pos['current_price'] * random.uniform(0.98, 1.02)  # ±2% price variation
-            
-            # Calculate P&L (simplified)
+            quantity = pos['quantity'] * random.uniform(0.1, 0.5)
+            price = pos['current_price'] * random.uniform(0.98, 1.02)
             pnl = (pos['current_price'] - price) * quantity if side == 'BUY' else (price - pos['current_price']) * quantity
-            
-            trades.append({
+            new_trades.append({
                 "timestamp": trade_time,
                 "symbol": symbol,
                 "side": side,
@@ -587,11 +592,17 @@ def recent_trades():
                 "pnl": round(pnl, 2),
                 "trade_id": f"T{int(trade_time)}{symbol[:3]}"
             })
-    
-    # Sort by timestamp (most recent first)
-    trades.sort(key=lambda x: x['timestamp'], reverse=True)
-    
-    return {"trades": trades[:20]}  # Return last 20 trades
+
+    # Add new trades to history and save
+    all_trades.extend(new_trades)
+    all_trades.sort(key=lambda x: x['timestamp'], reverse=True)
+    try:
+        with open(trades_file, "w") as f:
+            json.dump(all_trades, f)
+    except Exception as e:
+        print(f"Failed to save trades history: {e}")
+
+    return {"trades": all_trades}
 
 @app.get("/logs/last")
 def logs():
