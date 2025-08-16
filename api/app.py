@@ -56,6 +56,31 @@ real_positions = {}
 real_balance = {}
 last_update = 0
 
+# Preferred quote currencies when building market symbols dynamically
+PREFERRED_QUOTES = ["USDT", "FDUSD", "USDC", "BUSD", "TUSD"]
+
+def _find_tradable_symbol_for_base(base_asset: str) -> Optional[str]:
+    """Return a tradable symbol like "BASE/USDT" if available on the exchange.
+
+    Tries preferred USD-like quotes to avoid requesting nonexistent markets
+    such as "NFT/USDT".
+    """
+    if not exchange_client:
+        return None
+    try:
+        markets = getattr(exchange_client, "markets", {}) or {}
+        if not markets:
+            # ensure markets are loaded
+            exchange_client.load_markets()
+            markets = getattr(exchange_client, "markets", {}) or {}
+        for quote in PREFERRED_QUOTES:
+            candidate = f"{base_asset}/{quote}"
+            if candidate in markets:
+                return candidate
+        return None
+    except Exception:
+        return None
+
 def initialize_real_exchange():
     """Initialize REAL exchange connection with live trading"""
     global exchange_client
@@ -75,6 +100,12 @@ def initialize_real_exchange():
             'sandbox': not use_live_trading,  # False for live trading
             'enableRateLimit': True,
         })
+        # Suppress strict-rate-limit warning when fetching open orders without a symbol
+        # We still respect rate limits via enableRateLimit
+        try:
+            exchange_client.options['warnOnFetchOpenOrdersWithoutSymbol'] = False
+        except Exception:
+            pass
         
         # Test connection
         exchange_client.load_markets()
@@ -115,8 +146,12 @@ def get_real_balance():
         for symbol, amount in balance_items:
             if symbol != 'USDT' and amount > 0:
                 try:
-                    ticker = exchange_client.fetch_ticker(f"{symbol}/USDT")
-                    total_usdt += amount * ticker['last']
+                    tradable = _find_tradable_symbol_for_base(symbol)
+                    if not tradable:
+                        # Skip non-tradable balances (e.g., NFT, ETHW)
+                        continue
+                    ticker = exchange_client.fetch_ticker(tradable)
+                    total_usdt += amount * (ticker.get('last') or ticker.get('close') or 0)
                 except Exception as e:
                     # Skip if price not available (like NFT, ETHW)
                     continue
@@ -193,8 +228,11 @@ def get_real_positions():
             for symbol, amount in balance['total'].items():
                 if amount > 0.001 and symbol != 'USDT':  # Exclude USDT
                     try:
-                        ticker = exchange_client.fetch_ticker(f"{symbol}/USDT")
-                        current_price = ticker['last']
+                        tradable = _find_tradable_symbol_for_base(symbol)
+                        if not tradable:
+                            continue
+                        ticker = exchange_client.fetch_ticker(tradable)
+                        current_price = ticker.get('last') or ticker.get('close') or 0
                         
                         # Only add if not already in positions from orders/futures
                         position_key = f"{symbol}USDT"
@@ -208,7 +246,8 @@ def get_real_positions():
                                 "type": "SPOT_HOLDING"
                             }
                     except Exception as e:
-                        print(f"Could not get price for {symbol}: {e}")
+                        # Silently skip assets without a tradable USD-quoted market
+                        continue
         except Exception as e:
             print(f"Could not fetch balance: {e}")
         

@@ -48,6 +48,26 @@ real_positions = {}
 real_balance = {}
 last_update = 0
 
+# Preferred USD-like quotes for dynamic market selection
+PREFERRED_QUOTES = ["USDT", "FDUSD", "USDC", "BUSD", "TUSD"]
+
+def _find_tradable_symbol_for_base(base_asset: str) -> Optional[str]:
+    """Return a market symbol like "BASE/USDT" that exists on the exchange."""
+    if not exchange_client:
+        return None
+    try:
+        markets = getattr(exchange_client, "markets", {}) or {}
+        if not markets:
+            exchange_client.load_markets()
+            markets = getattr(exchange_client, "markets", {}) or {}
+        for quote in PREFERRED_QUOTES:
+            candidate = f"{base_asset}/{quote}"
+            if candidate in markets:
+                return candidate
+        return None
+    except Exception:
+        return None
+
 def initialize_real_exchange():
     """Initialize REAL exchange connection with live trading"""
     global exchange_client
@@ -64,6 +84,10 @@ def initialize_real_exchange():
             'sandbox': not use_live_trading,  # False for live trading
             'enableRateLimit': True,
         })
+        try:
+            exchange_client.options['warnOnFetchOpenOrdersWithoutSymbol'] = False
+        except Exception:
+            pass
         
         # Test connection
         exchange_client.load_markets()
@@ -94,8 +118,11 @@ def get_real_balance():
         for symbol, amount in balance['total'].items():
             if symbol != 'USDT' and amount > 0:
                 try:
-                    ticker = exchange_client.fetch_ticker(f"{symbol}/USDT")
-                    total_usdt += amount * ticker['last']
+                    tradable = _find_tradable_symbol_for_base(symbol)
+                    if not tradable:
+                        continue
+                    ticker = exchange_client.fetch_ticker(tradable)
+                    total_usdt += amount * (ticker.get('last') or ticker.get('close') or 0)
                 except:
                     pass  # Skip if price not available
         
@@ -126,8 +153,11 @@ def get_real_positions():
                 # Get current price
                 try:
                     if symbol != 'USDT':
-                        ticker = exchange_client.fetch_ticker(f"{symbol}/USDT")
-                        current_price = ticker['last']
+                        tradable = _find_tradable_symbol_for_base(symbol)
+                        if not tradable:
+                            continue
+                        ticker = exchange_client.fetch_ticker(tradable)
+                        current_price = ticker.get('last') or ticker.get('close') or 0
                         
                         # Calculate PnL (simplified - would need trade history for exact entry price)
                         positions[f"{symbol}USDT"] = {
