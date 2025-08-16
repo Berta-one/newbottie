@@ -4,222 +4,8 @@
 <meta charset="UTF-8">
 <title>Bottie Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="style.css">
 <style>
-  * { box-sizing: border-box; }
-  body { 
-    font-family: Arial, sans-serif; 
-    background: #0c1426; 
-    color: #ffffff;
-    margin: 0; 
-    padding: 0; 
-    font-size: 14px;
-  }
-  
-  header { 
-    background: #1a2332; 
-    color: #fff; 
-    padding: 12px 20px; 
-    font-size: 18px; 
-    border-bottom: 1px solid #2a3441;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  
-  .header-status {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-  }
-  
-  .connection-status {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    font-weight: normal;
-  }
-  
-  .connection-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #f44336;
-    animation: pulse 2s infinite;
-  }
-  
-  .connection-dot.connected {
-    background: #4CAF50;
-    animation: none;
-  }
-  
-  .connection-dot.connecting {
-    background: #ff9800;
-    animation: pulse 1s infinite;
-  }
-  
-  @keyframes pulse {
-    0% { opacity: 1; }
-    50% { opacity: 0.5; }
-    100% { opacity: 1; }
-  }
-  
-  .user-info {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 12px;
-  }
-  
-  .user-badge {
-    background: #64ffda;
-    color: #0c1426;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-weight: 600;
-    text-transform: uppercase;
-  }
-  
-  .logout-btn {
-    background: #f44336;
-    color: #ffffff;
-    border: none;
-    padding: 6px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 11px;
-  }
-
-  /* Tab Navigation */
-  .dashboard-tabs {
-    background: #1a2332;
-    border-bottom: 1px solid #2a3441;
-    padding: 0 20px;
-    display: flex;
-    gap: 0;
-  }
-  
-  .tab-btn {
-    background: none;
-    border: none;
-    color: #8892b0;
-    padding: 12px 20px;
-    cursor: pointer;
-    border-bottom: 3px solid transparent;
-    transition: all 0.2s ease;
-    font-size: 14px;
-    font-weight: 500;
-  }
-  
-  .tab-btn:hover {
-    color: #64ffda;
-    background: rgba(100, 255, 218, 0.05);
-  }
-  
-  .tab-btn.active {
-    color: #64ffda;
-    border-bottom-color: #64ffda;
-    background: rgba(100, 255, 218, 0.1);
-  }
-  
-  .tab-content {
-    display: none;
-  }
-  
-  .tab-content.active {
-    display: block;
-  }
-  
-  main { 
-    max-width: 1600px; 
-    margin: auto; 
-    padding: 20px; 
-  }
-  
-  /* Login Modal Styles */
-  .login-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(12, 20, 38, 0.95);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 3000;
-  }
-  
-  .login-form {
-    background: #1a2332;
-    border: 1px solid #2a3441;
-    border-radius: 8px;
-    padding: 30px;
-    min-width: 400px;
-    text-align: center;
-  }
-  
-  .login-form h2 {
-    color: #64ffda;
-    margin-bottom: 20px;
-  }
-  
-  .form-group {
-    margin-bottom: 15px;
-    text-align: left;
-  }
-  
-  .form-label {
-    display: block;
-    color: #ffffff;
-    margin-bottom: 5px;
-    font-size: 12px;
-  }
-  
-  .form-input {
-    width: 100%;
-    background: #0f1419;
-    border: 1px solid #2a3441;
-    border-radius: 4px;
-    padding: 10px;
-    color: #ffffff;
-    font-size: 14px;
-  }
-  
-  .form-input:focus {
-    outline: none;
-    border-color: #64ffda;
-  }
-  
-  .login-btn {
-    width: 100%;
-    background: #64ffda;
-    color: #0c1426;
-    border: none;
-    padding: 12px;
-    border-radius: 4px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    margin-top: 10px;
-  }
-  
-  .login-btn:hover {
-    opacity: 0.8;
-  }
-  
-  .login-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-  
-  .login-error {
-    color: #f44336;
-    font-size: 12px;
-    margin-top: 10px;
-  }
-  
   /* Debug Panel */
   .debug-panel {
     position: fixed;
@@ -241,6 +27,22 @@
     transform: translateX(0);
   }
   
+  /* Mobile-specific debug panel fixes */
+  @media (max-width: 768px) {
+    .debug-panel {
+      /* Ensure debug panel is properly hidden on mobile */
+      transform: translateX(100%) !important;
+      right: -10px; /* Move further off-screen on mobile */
+      min-width: 250px;
+      max-width: 90vw;
+    }
+    
+    .debug-panel.open {
+      transform: translateX(0) !important;
+      right: 10px;
+    }
+  }
+  
   .debug-toggle {
     position: fixed;
     top: 10px;
@@ -254,6 +56,27 @@
     font-weight: 600;
     font-size: 12px;
     z-index: 1001;
+  }
+  
+  .debug-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: transparent;
+    color: #64ffda;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+  }
+  
+  .debug-close:hover {
+    background: rgba(100, 255, 218, 0.1);
   }
   
   .debug-header {
@@ -300,6 +123,25 @@
   .k { color: #8892b0; }
   .v { font-weight: 600; color: #ffffff; }
   
+  .equity-display {
+    font-size: 24px;
+    font-weight: bold;
+    color: #64ffda;
+    text-align: center;
+    padding: 10px;
+    border: 1px solid #2a3441;
+    border-radius: 4px;
+    margin-bottom: 15px;
+    background: rgba(100, 255, 218, 0.1);
+  }
+
+  /* Canvas overflow fix */
+  canvas {
+    max-width: 100%;
+    height: auto;
+    display: block;
+  }
+  
   .data-table {
     width: 100%;
     border-collapse: collapse;
@@ -327,6 +169,63 @@
     background: rgba(100, 255, 218, 0.05);
   }
   
+  /* P&L Summary Styles */
+  .period-btn {
+    background: #3a4553;
+    color: #fff;
+    border: 1px solid #64ffda;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 12px;
+  }
+  
+  .period-btn:hover {
+    background: #64ffda;
+    color: #0c1426;
+  }
+  
+  .period-btn.active {
+    background: #64ffda;
+    color: #0c1426;
+    font-weight: bold;
+  }
+  
+  .summary-metric {
+    background: #2a3441;
+    border: 1px solid #3a4553;
+    border-radius: 6px;
+    padding: 12px;
+    text-align: center;
+  }
+  
+  .metric-label {
+    font-size: 11px;
+    color: #8892b0;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+  
+  .metric-value {
+    font-size: 18px;
+    font-weight: bold;
+  }
+  
+  .pnl-positive { color: #4ade80; }
+  .pnl-negative { color: #f87171; }
+  .pnl-neutral { color: #64ffda; }
+  
+  /* Trade row styling */
+  .trade-buy { 
+    background: rgba(74, 222, 128, 0.1); 
+    border-left: 3px solid #4ade80;
+  }
+  .trade-sell { 
+    background: rgba(248, 113, 113, 0.1); 
+    border-left: 3px solid #f87171;
+  }
+  
   .symbol {
     font-family: monospace;
     font-weight: 600;
@@ -339,7 +238,121 @@
   .positive { color: #4caf50; }
   .negative { color: #f44336; }
   
-  /* Grid Styles */
+  /* Enhanced Trades Table */
+  .trades-container {
+    max-height: 500px;
+    overflow-y: auto;
+    border: 1px solid #3a4553;
+    border-radius: 6px;
+    background: #1e2730;
+  }
+  
+  .trades-container::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  .trades-container::-webkit-scrollbar-track {
+    background: #2a3441;
+    border-radius: 4px;
+  }
+  
+  .trades-container::-webkit-scrollbar-thumb {
+    background: #64ffda;
+    border-radius: 4px;
+  }
+  
+  .trades-container::-webkit-scrollbar-thumb:hover {
+    background: #4db6ac;
+  }
+  
+  #trades-table {
+    width: 100%;
+    position: relative;
+  }
+  
+  #trades-table thead {
+    position: sticky;
+    top: 0;
+    background: #2a3441;
+    z-index: 10;
+  }
+  
+  #trades-table thead th {
+    background: #2a3441;
+    border-bottom: 2px solid #64ffda;
+    padding: 8px 12px;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  #trades-table tbody tr:hover {
+    background: rgba(100, 255, 218, 0.1);
+    cursor: pointer;
+  }
+  
+  .trade-buy {
+    color: #4caf50 !important;
+    font-weight: 600;
+  }
+  
+  .trade-sell {
+    color: #f44336 !important;
+    font-weight: 600;
+  }
+  
+  .trade-pnl-positive {
+    color: #4caf50;
+    font-weight: 600;
+  }
+  
+  .trade-pnl-negative {
+    color: #f44336;
+    font-weight: 600;
+  }
+  
+  .trade-pnl-neutral {
+    color: #8892b0;
+  }
+  
+  /* Trade Summary Box */
+  .trade-summary {
+    background: linear-gradient(135deg, #2a3441 0%, #1e2730 100%);
+    border: 1px solid #64ffda;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+  }
+  
+  .trade-summary-item {
+    text-align: center;
+  }
+  
+  .trade-summary-label {
+    font-size: 10px;
+    color: #8892b0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+  
+  .trade-summary-value {
+    font-size: 16px;
+    font-weight: 600;
+    color: #ffffff;
+  }
+  
+  .trade-summary-value.positive {
+    color: #4caf50;
+  }
+  
+  .trade-summary-value.negative {
+    color: #f44336;
+  }
   .maxi-grid-card {
     grid-column: 1 / -1;
     max-width: 100%;
@@ -517,6 +530,97 @@
     color: #64ffda;
     font-weight: 600;
     font-size: 16px;
+  }
+
+  /* Atomic Swap Opportunities */
+  .atomic-swap-item {
+    background: rgba(100, 255, 218, 0.1);
+    border: 1px solid #64ffda;
+    border-radius: 4px;
+    padding: 8px;
+    margin: 5px 0;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+  
+  .atomic-swap-item:hover {
+    background: rgba(100, 255, 218, 0.2);
+  }
+  
+  .swap-route {
+    font-weight: 600;
+    color: #64ffda;
+    margin-bottom: 4px;
+  }
+  
+  .swap-details {
+    display: flex;
+    gap: 12px;
+    font-size: 11px;
+  }
+  
+  .swap-confidence {
+    color: #4caf50;
+  }
+  
+  .swap-gain {
+    color: #64ffda;
+  }
+  
+  .swap-time {
+    color: #8892b0;
+  }
+
+  /* Trade Modal */
+  .trade-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+  }
+  
+  .modal-content {
+    background: #0f1419;
+    border: 1px solid #2a3441;
+    border-radius: 8px;
+    padding: 20px;
+    max-width: 400px;
+    width: 90%;
+  }
+  
+  .trade-details {
+    margin: 15px 0;
+  }
+  
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 20px;
+  }
+  
+  .btn-execute {
+    background: #4caf50;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  .btn-cancel {
+    background: #f44336;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
   }
 
   /* Endpoint Grid */
@@ -730,111 +834,102 @@
     font-size: 10px;
   }
 
+  /* WebSocket Status Indicator */
+  .ws-status-indicator {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-left: 8px;
+    border: 1px solid transparent;
+    transition: all 0.3s ease;
+  }
+  
+  .ws-status-connected {
+    background: rgba(76, 175, 80, 0.2);
+    color: #4caf50;
+    border-color: #4caf50;
+  }
+  
+  .ws-status-connecting {
+    background: rgba(255, 152, 0, 0.2);
+    color: #ff9800;
+    border-color: #ff9800;
+    animation: pulse 1.5s infinite;
+  }
+  
+  .ws-status-disconnected {
+    background: rgba(158, 158, 158, 0.2);
+    color: #9e9e9e;
+    border-color: #9e9e9e;
+  }
+  
+  .ws-status-error {
+    background: rgba(244, 67, 54, 0.2);
+    color: #f44336;
+    border-color: #f44336;
+  }
+  
+  .ws-status-reconnecting {
+    background: rgba(255, 152, 0, 0.2);
+    color: #ff9800;
+    border-color: #ff9800;
+    animation: pulse 1s infinite;
+  }
+  
+  .ws-status-failed {
+    background: rgba(244, 67, 54, 0.3);
+    color: #f44336;
+    border-color: #f44336;
+    animation: blink 2s infinite;
+  }
+  
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  
+  @keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0.3; }
+  }
+
   /* Grid Controls */
   #grid-controls .chip { padding: 2px 8px; font-size: 10px; }
   .grid-buy { background: rgba(76, 175, 80, 0.3); color: #4caf50; }
   .grid-hold { background: rgba(255, 152, 0, 0.3); color: #ff9800; }
   .grid-sell { background: rgba(244, 67, 54, 0.3); color: #f44336; }
   .grid-na { background: rgba(158, 158, 158, 0.2); color: #9e9e9e; }
-
-  /* Signal and Trade Styles */
-  .signal {
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-  }
-  
-  .signal--buy { background: #4caf50; color: #ffffff; }
-  .signal--sell { background: #f44336; color: #ffffff; }
-  .signal--hold { background: #ff9800; color: #ffffff; }
-  
-  .trade-side {
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-  }
-  
-  .trade-side--buy { background: #4caf50; color: #ffffff; }
-  .trade-side--sell { background: #f44336; color: #ffffff; }
-  
-  .profit { color: #4caf50; font-weight: 600; }
-  .loss { color: #f44336; font-weight: 600; }
-
-  /* Position Cards */
-  .position-card {
-    background: #1a2332;
-    border: 1px solid #2a3441;
-    border-radius: 4px;
-    padding: 10px;
-    margin-bottom: 8px;
-  }
-  
-  .position-symbol {
-    color: #64ffda;
-    font-weight: 600;
-    margin-bottom: 4px;
-  }
-  
-  .position-details {
-    font-size: 11px;
-    color: #8892b0;
-  }
-  
-  .position-qty,
-  .position-price,
-  .position-last {
-    margin: 2px 0;
-  }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-
-<!-- Login Modal - HIDDEN (Authentication Bypassed) -->
-<div id="login-modal" class="login-modal" style="display: none !important;">
-  <div class="login-form">
-    <h2>🔓 Auto Login Enabled</h2>
-    <form id="login-form">
-      <div class="form-group">
-        <label class="form-label">Username</label>
-        <input type="text" id="username" class="form-input" value="auto-user" required>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Password</label>
-        <input type="password" id="password" class="form-input" value="bypass" required>
-      </div>
-      <button type="submit" id="login-btn" class="login-btn">Auto Login</button>
-      <div id="login-error" class="login-error"></div>
-    </form>
-  </div>
-</div>
 
 <header>
   <div>Bottie Live Dashboard</div>
   <div class="header-status">
-    <div class="connection-status" id="connection-status">
-      <span class="connection-dot" id="connection-dot"></span>
-      <span class="connection-text" id="connection-text">Connecting...</span>
-    </div>
-    <div class="api-endpoint" id="api-endpoint" style="font-size: 11px; color: #8892b0;">—</div>
+    <div id="health-status" class="status-badge">—</div>
+    <div id="health-time" class="status-time">—</div>
+    <div id="health-quantum" class="status-quantum">—</div>
+    <div id="websocket-status" class="ws-status-indicator ws-status-disconnected">WS: Disconnected</div>
   </div>
-  <div class="user-info" id="user-info">
-    <span id="current-user" class="user-badge">Auto-User</span>
+  <div class="user-info" id="user-info" style="display: none;">
+    <span id="user-name" class="user-badge">—</span>
     <button id="logout-btn" class="logout-btn">Logout</button>
   </div>
 </header>
 
 <!-- Tab Navigation -->
-<div class="dashboard-tabs" id="dashboard-tabs">
+<div class="dashboard-tabs" id="dashboard-tabs" style="display: none;">
   <button class="tab-btn active" data-tab="trading">📊 Trading</button>
   <button class="tab-btn" data-tab="ml-monitor">🧠 ML Learning</button>
   <button class="tab-btn" data-tab="quantum">⚡ Quantum Analysis</button>
+  <button class="tab-btn" data-tab="sentiment">📰 Sentiment Analysis</button>
 </div>
 
-<main id="main-content">
+<main id="main-content" style="display: none;">
   
   <!-- Trading Tab -->
   <div id="trading-tab" class="tab-content active">
@@ -871,19 +966,19 @@
         </div>
         <div class="kv">
           <span class="k">Sentiment Chip:</span>
-          <span class="v" id="sentiment-chip">—</span>
+          <span class="v" id="sent-chip">—</span>
         </div>
         <div class="kv">
           <span class="k">Sentiment Enabled:</span>
-          <span class="v" id="sentiment-enabled">—</span>
+          <span class="v" id="sent-enabled">—</span>
         </div>
         <div class="kv">
           <span class="k">Sentiment Source:</span>
-          <span class="v" id="sentiment-source">—</span>
+          <span class="v" id="sent-source">—</span>
         </div>
         <div class="kv">
           <span class="k">Sentiment Window:</span>
-          <span class="v" id="sentiment-window">—</span>
+          <span class="v" id="sent-window">—</span>
         </div>
       </div>
 
@@ -903,33 +998,13 @@
             <div class="ml-quick-value" id="ml-quick-confidence">—</div>
           </div>
           <div class="ml-quick-metric">
+            <div class="ml-quick-label">Brier Score</div>
+            <div class="ml-quick-value" id="ml-quick-brier" title="Lower is better (0=perfect, 0.25=random)">—</div>
+          </div>
+          <div class="ml-quick-metric">
             <div class="ml-quick-label">Predictions</div>
             <div class="ml-quick-value" id="ml-quick-predictions">—</div>
           </div>
-        </div>
-      </div>
-
-      <!-- Brier Score Performance -->
-      <div class="card">
-        <div class="card-header">
-          <h3>🎯 Brier Score Performance</h3>
-          <span id="brier-score-chip" class="chip">—</span>
-        </div>
-        <div class="kv">
-          <span class="k">Brier Score:</span>
-          <span class="v" id="brier-score-value">—</span>
-        </div>
-        <div class="kv">
-          <span class="k">Prediction Accuracy:</span>
-          <span class="v" id="brier-accuracy">—</span>
-        </div>
-        <div class="kv">
-          <span class="k">Total Predictions:</span>
-          <span class="v" id="brier-predictions">—</span>
-        </div>
-        <div class="kv">
-          <span class="k">Performance Rating:</span>
-          <span class="v" id="brier-rating">—</span>
         </div>
       </div>
 
@@ -987,37 +1062,13 @@
         <div class="card-header">
           <h3>💼 Current Positions</h3>
         </div>
-        <div id="positions-container">
-          <!-- Filled by JS -->
-        </div>
-      </div>
-
-      <!-- Equity Chart -->
-      <div class="card">
-        <div class="card-header">
-          <h3>📈 Equity Performance</h3>
-        </div>
-        <canvas id="equity-canvas" width="400" height="200"></canvas>
-        <div id="chart-stats" style="margin-top: 10px; font-size: 12px; color: #8892b0;">
-          <!-- Chart statistics -->
-        </div>
-      </div>
-
-      <!-- Recent Trades -->
-      <div class="card">
-        <div class="card-header">
-          <h3>🔄 Recent Trades</h3>
-        </div>
-        <div id="trades-panel">
-          <table id="trades-table" class="data-table">
+        <div style="overflow-x: auto;">
+          <table id="positionsTable" class="data-table">
             <thead>
               <tr>
-                <th>Time</th>
                 <th>Symbol</th>
-                <th>Side</th>
                 <th>Quantity</th>
-                <th>Price</th>
-                <th>Value</th>
+                <th>Avg Price</th>
               </tr>
             </thead>
             <tbody>
@@ -1027,12 +1078,164 @@
         </div>
       </div>
 
-      <!-- MAXI GRID: Portfolio (rows) × Scan (columns) -->
+      <!-- Equity Chart -->
+      <div class="card">
+        <div class="card-header">
+          <h3>📈 Equity Performance</h3>
+        </div>
+        <div id="equity" class="equity-display">$0.00</div>
+        <canvas id="equity-canvas" width="400" height="200"></canvas>
+        <div id="chart-stats" style="margin-top: 10px; font-size: 12px; color: #8892b0;">
+          <!-- Chart statistics -->
+        </div>
+      </div>
+
+      <!-- P&L Trading Summary -->
+      <div class="card" style="grid-column: 1 / -1;">
+        <div class="card-header">
+          <h3>📊 Trading Performance Summary</h3>
+          <div style="display: flex; gap: 8px;">
+            <button class="period-btn active" data-period="1d">1D</button>
+            <button class="period-btn" data-period="7d">7D</button>
+            <button class="period-btn" data-period="30d">1M</button>
+            <button class="period-btn" data-period="90d">3M</button>
+            <button class="period-btn" data-period="180d">6M</button>
+            <button class="period-btn" data-period="all">All</button>
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; margin-bottom: 20px;">
+          <div class="summary-metric">
+            <div class="metric-label">Total P&L</div>
+            <div class="metric-value pnl-neutral" id="summary-total-pnl">$0.00</div>
+          </div>
+          <div class="summary-metric">
+            <div class="metric-label">Win Rate</div>
+            <div class="metric-value" id="summary-win-rate">0%</div>
+          </div>
+          <div class="summary-metric">
+            <div class="metric-label">Total Trades</div>
+            <div class="metric-value" id="summary-total-trades">0</div>
+          </div>
+          <div class="summary-metric">
+            <div class="metric-label">Avg Trade Size</div>
+            <div class="metric-value" id="summary-avg-size">$0.00</div>
+          </div>
+          <div class="summary-metric">
+            <div class="metric-label">Best Trade</div>
+            <div class="metric-value pnl-positive" id="summary-best-trade">$0.00</div>
+          </div>
+          <div class="summary-metric">
+            <div class="metric-label">Worst Trade</div>
+            <div class="metric-value pnl-negative" id="summary-worst-trade">$0.00</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Trades -->
+      <div class="card" style="grid-column: 1 / -1;">
+        <div class="card-header">
+          <h3>🔄 Complete Trade History</h3>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <select id="symbol-filter" style="background: #2a3441; color: #fff; border: 1px solid #64ffda; padding: 4px 8px; border-radius: 4px;">
+              <option value="">All Symbols</option>
+            </select>
+            <select id="side-filter" style="background: #2a3441; color: #fff; border: 1px solid #64ffda; padding: 4px 8px; border-radius: 4px;">
+              <option value="">All Sides</option>
+              <option value="BUY">Buy Only</option>
+              <option value="SELL">Sell Only</option>
+            </select>
+            <input type="text" id="search-filter" placeholder="Search..." style="background: #2a3441; color: #fff; border: 1px solid #64ffda; padding: 4px 8px; border-radius: 4px; font-size: 12px;">
+          </div>
+        </div>
+        
+        <!-- Trade Summary Box -->
+        <div class="trade-summary" id="trade-summary">
+          <div class="trade-summary-item">
+            <div class="trade-summary-label">Total Trades</div>
+            <div class="trade-summary-value" id="summary-total-trades">0</div>
+          </div>
+          <div class="trade-summary-item">
+            <div class="trade-summary-label">Realized P&L</div>
+            <div class="trade-summary-value" id="summary-realized-pnl">$0.00</div>
+          </div>
+          <div class="trade-summary-item">
+            <div class="trade-summary-label">Win Rate</div>
+            <div class="trade-summary-value" id="summary-win-rate">0%</div>
+          </div>
+          <div class="trade-summary-item">
+            <div class="trade-summary-label">Total Volume</div>
+            <div class="trade-summary-value" id="summary-total-volume">$0.00</div>
+          </div>
+          <div class="trade-summary-item">
+            <div class="trade-summary-label">Avg Trade Size</div>
+            <div class="trade-summary-value" id="summary-avg-trade">$0.00</div>
+          </div>
+          <div class="trade-summary-item">
+            <div class="trade-summary-label">Net P&L</div>
+            <div class="trade-summary-value" id="summary-net-pnl">$0.00</div>
+          </div>
+        </div>
+        
+        <div class="trades-container">
+          <table id="trades-table" class="data-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Symbol</th>
+                <th>Side</th>
+                <th>Quantity</th>
+                <th>Price</th>
+                <th>Value</th>
+                <th>Confidence</th>
+                <th>P&L Impact</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Filled by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- MAXI GRID: Portfolio (rows) × Top 50 Volume Leaders (columns) -->
       <div class="card maxi-grid-card">
-        <h3>Cross-Pair Maxi Grid (Portfolio × Market)</h3>
+        <h3>🏛️ Professional Trading Grid (Portfolio × Top 50 Volume)</h3>
         <div class="grid-header">
-          <span class="grid-subtitle">Hover a cell for details</span>
+          <span class="grid-subtitle">Portfolio holdings (Y) vs Top 50 volume cryptos (X) • Max 300 pairs • WebSocket-powered</span>
           <span id="grid-last-ts" class="grid-timestamp">—</span>
+        </div>
+        
+        <!-- Grid Stats -->
+        <div style="display: flex; gap: 16px; margin-bottom: 12px; font-size: 11px; flex-wrap: wrap;">
+          <div style="color: #64ffda;">
+            <span style="color: #8892b0;">Portfolio Holdings:</span> 
+            <span id="grid-portfolio-count">—</span>
+          </div>
+          <div style="color: #64ffda;">
+            <span style="color: #8892b0;">Volume Leaders:</span> 
+            <span id="grid-volume-count">—</span>
+          </div>
+          <div style="color: #64ffda;">
+            <span style="color: #8892b0;">Opportunities:</span> 
+            <span id="grid-total-pairs">—</span>
+          </div>
+          <div style="color: #4caf50;">
+            <span style="color: #8892b0;">High Confidence:</span> 
+            <span id="grid-high-conf-pairs">—</span>
+          </div>
+          <div style="color: #4caf50;">
+            <span style="color: #8892b0;">Buy Signals:</span> 
+            <span id="grid-buy-signals">—</span>
+          </div>
+          <div style="color: #f44336;">
+            <span style="color: #8892b0;">Sell Signals:</span> 
+            <span id="grid-sell-signals">—</span>
+          </div>
+          <div style="color: #64ffda;">
+            <span style="color: #8892b0;">Avg Confidence:</span> 
+            <span id="grid-avg-confidence">—</span>
+          </div>
         </div>
 
         <!-- Grid Controls -->
@@ -1066,6 +1269,11 @@
             </tbody>
           </table>
         </div>
+        
+        <!-- Atomic Swap Opportunities -->
+        <div id="atomic-swap-opportunities" class="atomic-swap-container" style="margin-top: 15px; padding: 10px; border: 1px solid #2a3441; border-radius: 6px; background: rgba(100, 255, 218, 0.05);">
+          <!-- Filled by JS -->
+        </div>
       </div>
 
       <!-- System Logs -->
@@ -1096,6 +1304,10 @@
         <div class="kv">
           <span class="k">Accuracy:</span>
           <span class="v" id="ml-accuracy">—</span>
+        </div>
+        <div class="kv">
+          <span class="k">Brier Score:</span>
+          <span class="v" id="ml-brier-score" title="Lower is better (0=perfect, 0.25=random)">—</span>
         </div>
         <div class="kv">
           <span class="k">Confidence:</span>
@@ -1204,11 +1416,224 @@
     </div>
   </div>
 </main>
+  <!-- Sentiment Analysis Tab -->
+  <div id="sentiment-tab" class="tab-content">
+    <div class="main-grid">
+      <!-- Market Sentiment Overview -->
+      <div class="card" style="grid-column: 1 / -1;">
+        <div class="card-header">
+          <h3>📊 Overall Market Sentiment</h3>
+          <span class="chip" id="overall-sentiment-chip">LOADING...</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px;">
+          <div style="text-align: center; background: #1a2332; padding: 16px; border-radius: 6px;">
+            <div style="font-size: 32px; font-weight: 700; color: #4caf50;" id="overall-sentiment-score">+72</div>
+            <div style="color: #8892b0; font-size: 12px;">Overall Score</div>
+          </div>
+          <div style="text-align: center; background: #1a2332; padding: 16px; border-radius: 6px;">
+            <div style="font-size: 18px; font-weight: 600; color: #4caf50;" id="bullish-percentage">68%</div>
+            <div style="color: #8892b0; font-size: 12px;">Bullish</div>
+          </div>
+          <div style="text-align: center; background: #1a2332; padding: 16px; border-radius: 6px;">
+            <div style="font-size: 18px; font-weight: 600; color: #f44336;" id="bearish-percentage">18%</div>
+            <div style="color: #8892b0; font-size: 12px;">Bearish</div>
+          </div>
+          <div style="text-align: center; background: #1a2332; padding: 16px; border-radius: 6px;">
+            <div style="font-size: 18px; font-weight: 600; color: #64ffda;" id="neutral-percentage">14%</div>
+            <div style="color: #8892b0; font-size: 12px;">Neutral</div>
+          </div>
+          <div style="text-align: center; background: #1a2332; padding: 16px; border-radius: 6px;">
+            <div style="font-size: 18px; font-weight: 600; color: #ff9800;" id="confidence-score">85%</div>
+            <div style="color: #8892b0; font-size: 12px;">Confidence</div>
+          </div>
+        </div>
+      </div>
+      <!-- Real-time News Feed -->
+      <div class="card">
+        <div class="card-header">
+          <h3>📡 Recent News & Analysis</h3>
+          <button style="background: #64ffda; color: #0c1426; border: none; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer;" onclick="refreshSentimentNews()">🔄 Refresh</button>
+        </div>
+        <div style="max-height: 400px; overflow-y: auto;" id="sentiment-news-feed">
+          <div style="background: #1a2332; border: 1px solid #3a4553; border-radius: 6px; padding: 12px; margin-bottom: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+              <div style="font-weight: 600; color: #ffffff; font-size: 13px; flex: 1;">Bitcoin ETF sees massive inflow as institutions buy the dip</div>
+              <span class="chip--ok" style="margin-left: 10px; padding: 2px 6px; border-radius: 3px; font-size: 10px; background: rgba(76, 175, 80, 0.2); color: #4caf50;">+0.82</span>
+            </div>
+            <div style="font-size: 11px; color: #8892b0; margin-bottom: 6px;">
+              <span style="background: #2a3441; color: #64ffda; padding: 2px 6px; border-radius: 3px; font-size: 10px;">COINDESK</span> • 2 hours ago • Mentions: BTC, ETH
+            </div>
+            <div style="font-size: 12px; color: #ccd6f6; line-height: 1.4;">
+              Major institutional investors continue showing strong confidence in Bitcoin's long-term potential despite market volatility...
+            </div>
+          </div>
+          <div style="background: #1a2332; border: 1px solid #3a4553; border-radius: 6px; padding: 12px; margin-bottom: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+              <div style="font-weight: 600; color: #ffffff; font-size: 13px; flex: 1;">Ethereum network upgrade reduces gas fees significantly</div>
+              <span class="chip--ok" style="margin-left: 10px; padding: 2px 6px; border-radius: 3px; font-size: 10px; background: rgba(76, 175, 80, 0.2); color: #4caf50;">+0.65</span>
+            </div>
+            <div style="font-size: 11px; color: #8892b0; margin-bottom: 6px;">
+              <span style="background: #2a3441; color: #64ffda; padding: 2px 6px; border-radius: 3px; font-size: 10px;">REDDIT</span> • 4 hours ago • Mentions: ETH
+            </div>
+            <div style="font-size: 12px; color: #ccd6f6; line-height: 1.4;">
+              Community reports substantial improvements in transaction costs following the latest network upgrade...
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Asset Sentiment Breakdown -->
+      <div class="card">
+        <div class="card-header">
+          <h3>💰 Asset Sentiment Scores</h3>
+          <div style="display: flex; gap: 6px;">
+            <button class="period-btn active" data-period="1h" style="padding: 4px 8px; font-size: 11px;">1H</button>
+            <button class="period-btn" data-period="24h" style="padding: 4px 8px; font-size: 11px;">24H</button>
+            <button class="period-btn" data-period="7d" style="padding: 4px 8px; font-size: 11px;">7D</button>
+          </div>
+        </div>
+        <div style="overflow-x: auto;">
+          <table class="data-table" id="sentiment-assets-table">
+            <thead>
+              <tr>
+                <th>Asset</th>
+                <th>Score</th>
+                <th>Trend</th>
+                <th>Volume</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>BTC</strong></td>
+                <td style="color: #4caf50; font-weight: 600;">+0.78</td>
+                <td><span style="color: #4caf50;">↗ +0.12</span></td>
+                <td>2.4K mentions</td>
+              </tr>
+              <tr>
+                <td><strong>ETH</strong></td>
+                <td style="color: #4caf50; font-weight: 600;">+0.65</td>
+                <td><span style="color: #4caf50;">↗ +0.08</span></td>
+                <td>1.8K mentions</td>
+              </tr>
+              <tr>
+                <td><strong>SOL</strong></td>
+                <td style="color: #4caf50; font-weight: 600;">+0.58</td>
+                <td><span style="color: #ff9800;">→ +0.02</span></td>
+                <td>945 mentions</td>
+              </tr>
+              <tr>
+                <td><strong>ADA</strong></td>
+                <td style="color: #64ffda; font-weight: 600;">+0.12</td>
+                <td><span style="color: #ff9800;">→ -0.01</span></td>
+                <td>673 mentions</td>
+              </tr>
+              <tr>
+                <td><strong>XRP</strong></td>
+                <td style="color: #f44336; font-weight: 600;">-0.23</td>
+                <td><span style="color: #f44336;">↘ -0.15</span></td>
+                <td>1.2K mentions</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <!-- Social Media Activity -->
+      <div class="card">
+        <div class="card-header">
+          <h3>🌐 Social Media Buzz</h3>
+          <span class="chip--warn">HIGH ACTIVITY</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+          <div style="text-align: center; background: #1a2332; padding: 12px; border-radius: 6px;">
+            <div style="font-size: 20px; font-weight: 600; color: #1da1f2;" id="twitter-mentions">2.4K</div>
+            <div style="color: #8892b0; font-size: 11px;">Twitter Mentions</div>
+          </div>
+          <div style="text-align: center; background: #1a2332; padding: 12px; border-radius: 6px;">
+            <div style="font-size: 20px; font-weight: 600; color: #ff4500;" id="reddit-posts">892</div>
+            <div style="color: #8892b0; font-size: 11px;">Reddit Posts</div>
+          </div>
+          <div style="text-align: center; background: #1a2332; padding: 12px; border-radius: 6px;">
+            <div style="font-size: 20px; font-weight: 600; color: #0088cc;" id="telegram-messages">1.8K</div>
+            <div style="color: #8892b0; font-size: 11px;">Telegram Messages</div>
+          </div>
+          <div style="text-align: center; background: #1a2332; padding: 12px; border-radius: 6px;">
+            <div style="font-size: 20px; font-weight: 600; color: #ff9800;" id="influencer-score">87</div>
+            <div style="color: #8892b0; font-size: 11px;">Influencer Score</div>
+          </div>
+        </div>
+      </div>
+      <!-- Fear & Greed Index -->
+      <div class="card">
+        <div class="card-header">
+          <h3>😱 Fear & Greed Index</h3>
+          <span class="chip--ok">GREED</span>
+        </div>
+        <div style="text-align: center;">
+          <div style="font-size: 48px; font-weight: 700; color: #4caf50; margin: 20px 0;" id="fng-score">72</div>
+          <div style="color: #8892b0; margin-bottom: 15px; font-size: 12px;">Scale: 0 (Extreme Fear) - 100 (Extreme Greed)</div>
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+            <div style="text-align: center; background: #1a2332; padding: 12px; border-radius: 6px;">
+              <div style="font-size: 16px; font-weight: 600; color: #64ffda;">23%</div>
+              <div style="color: #8892b0; font-size: 11px;">Volatility</div>
+            </div>
+            <div style="text-align: center; background: #1a2332; padding: 12px; border-radius: 6px;">
+              <div style="font-size: 16px; font-weight: 600; color: #4caf50;">+15%</div>
+              <div style="color: #8892b0; font-size: 11px;">Momentum</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Sentiment Sources -->
+      <div class="card">
+        <div class="card-header">
+          <h3>📊 Data Sources</h3>
+        </div>
+        <div style="overflow-x: auto;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th>Status</th>
+                <th>Last Update</th>
+                <th>Articles</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Finnhub News</strong></td>
+                <td><span class="chip--ok">ACTIVE</span></td>
+                <td>2 min ago</td>
+                <td>47</td>
+              </tr>
+              <tr>
+                <td><strong>Reddit r/cryptocurrency</strong></td>
+                <td><span class="chip--ok">ACTIVE</span></td>
+                <td>5 min ago</td>
+                <td>124</td>
+              </tr>
+              <tr>
+                <td><strong>Twitter/X Feed</strong></td>
+                <td><span class="chip--warn">LIMITED</span></td>
+                <td>1 hour ago</td>
+                <td>89</td>
+              </tr>
+              <tr>
+                <td><strong>Binance Live Feed</strong></td>
+                <td><span class="chip--ok">ACTIVE</span></td>
+                <td>binance_live_feed</td>
+                <td>Real-time</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
 
 <!-- Debug Panel -->
 <button class="debug-toggle" id="debug-toggle">🔧 Debug</button>
 
 <div class="debug-panel" id="debug-panel">
+  <button class="debug-close" id="debug-close" title="Close Debug Panel">×</button>
   <div class="debug-header">🔧 API Debug Panel</div>
   
   <!-- System Status -->
@@ -1303,6 +1728,16 @@
       <div class="endpoint-url">/grid/matrix</div>
       <div class="endpoint-status">Ready</div>
     </div>
+    <div class="endpoint-box" data-endpoint="/portfolio/assets">
+      <div class="endpoint-name">Portfolio</div>
+      <div class="endpoint-url">/portfolio/assets</div>
+      <div class="endpoint-status">Ready</div>
+    </div>
+    <div class="endpoint-box" data-endpoint="/scan/assets">
+      <div class="endpoint-name">Scan Assets</div>
+      <div class="endpoint-url">/scan/assets</div>
+      <div class="endpoint-status">Ready</div>
+    </div>
   </div>
   
   <!-- Refresh Controls -->
@@ -1339,8 +1774,6 @@
   </div>
 </div>
 
-<!-- Chart.js CDN -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="app.js"></script>
+<script src="app_netlify.js"></script>
 </body>
 </html>
