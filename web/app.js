@@ -2233,6 +2233,180 @@ async function authFetch(url, options = {}) {
     addCredentialTestButton();
   }, 100);
 
+  // Auto-start dashboard without authentication
+  currentUser = { username: 'admin', role: 'admin' };
+  updateUI();
+  if (typeof initializeDashboard === 'function') {
+    initializeDashboard();
+  }
+
+  // Mobile Touch Enhancement Functions
+  function initMobileTouchSupport() {
+    console.log('🔧 Initializing mobile touch support...');
+    
+    // Add touch feedback to all interactive elements
+    const interactiveElements = document.querySelectorAll('button, .tab-btn, .period-btn, .control-btn, .endpoint-box, .grid-cell, .data-table tr');
+    
+    interactiveElements.forEach(element => {
+      // Add touch start/end events for better feedback
+      element.addEventListener('touchstart', function() {
+        this.style.opacity = '0.7';
+        this.style.transform = 'scale(0.98)';
+      }, { passive: true });
+      
+      element.addEventListener('touchend', function() {
+        this.style.opacity = '';
+        this.style.transform = '';
+      }, { passive: true });
+      
+      element.addEventListener('touchcancel', function() {
+        this.style.opacity = '';
+        this.style.transform = '';
+      }, { passive: true });
+    });
+    
+    // Prevent zoom on double tap for better UX
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', function(event) {
+      const now = (new Date()).getTime();
+      if (now - lastTouchEnd <= 300) {
+        event.preventDefault();
+      }
+      lastTouchEnd = now;
+    }, false);
+    
+    // Improve scrolling on mobile
+    document.addEventListener('touchmove', function(e) {
+      // Allow scrolling in scrollable containers
+      const scrollableParent = e.target.closest('.data-table, .debug-panel, .response-modal, .trades-container');
+      if (!scrollableParent) {
+        // Prevent bounce scrolling on the body
+        if (e.target === document.body || e.target === document.documentElement) {
+          e.preventDefault();
+        }
+      }
+    }, { passive: false });
+    
+    // Handle orientation change
+    window.addEventListener('orientationchange', function() {
+      setTimeout(function() {
+        // Force layout recalculation
+        document.body.style.height = window.innerHeight + 'px';
+        
+        // Refresh any charts or dynamic content
+        if (typeof refreshAllData === 'function') {
+          refreshAllData();
+        }
+        
+        // Close any open panels that might be mispositioned
+        const debugPanel = document.getElementById('debug-panel');
+        if (debugPanel && debugPanel.classList.contains('open')) {
+          debugPanel.classList.remove('open');
+        }
+      }, 100);
+    });
+    
+    // Add swipe gesture support for tabs
+    let startX = null;
+    let startY = null;
+    
+    document.addEventListener('touchstart', function(e) {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+    }, { passive: true });
+    
+    document.addEventListener('touchmove', function(e) {
+      if (!startX || !startY) return;
+      
+      const diffX = startX - e.touches[0].clientX;
+      const diffY = startY - e.touches[0].clientY;
+      
+      // Only handle horizontal swipes on tab area
+      if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+        const tabContainer = e.target.closest('.dashboard-tabs');
+        if (tabContainer) {
+          const activeTab = document.querySelector('.tab-btn.active');
+          const allTabs = Array.from(document.querySelectorAll('.tab-btn'));
+          const currentIndex = allTabs.indexOf(activeTab);
+          
+          if (diffX > 0 && currentIndex < allTabs.length - 1) {
+            // Swipe left - next tab
+            allTabs[currentIndex + 1].click();
+          } else if (diffX < 0 && currentIndex > 0) {
+            // Swipe right - previous tab
+            allTabs[currentIndex - 1].click();
+          }
+          
+          startX = null;
+          startY = null;
+        }
+      }
+    }, { passive: true });
+    
+    console.log('✅ Mobile touch support initialized');
+  }
+
+  // Enhanced mobile detection
+  function isMobileDevice() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+           window.innerWidth <= 768 ||
+           ('ontouchstart' in window);
+  }
+
+  // Mobile-specific initialization
+  function initMobileOptimizations() {
+    if (!isMobileDevice()) return;
+    
+    console.log('📱 Mobile device detected, applying optimizations...');
+    
+    // Add mobile class to body for CSS targeting
+    document.body.classList.add('mobile-device');
+    
+    // Optimize viewport for mobile
+    let viewport = document.querySelector('meta[name="viewport"]');
+    if (viewport) {
+      viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+    }
+    
+    // Initialize touch support
+    initMobileTouchSupport();
+    
+    // Adjust refresh intervals for mobile (less frequent to save battery)
+    if (typeof refreshIntervals === 'object') {
+      Object.keys(refreshIntervals).forEach(key => {
+        if (refreshIntervals[key] < 10000) {
+          refreshIntervals[key] = Math.max(refreshIntervals[key] * 2, 10000);
+        }
+      });
+    }
+    
+    // Add mobile-specific event listeners
+    document.addEventListener('visibilitychange', function() {
+      if (document.hidden) {
+        // Pause updates when app is in background
+        console.log('📱 App backgrounded, pausing updates');
+        Object.values(refreshIntervals).forEach(interval => {
+          if (interval) clearInterval(interval);
+        });
+      } else {
+        // Resume updates when app becomes visible
+        console.log('📱 App foregrounded, resuming updates');
+        if (typeof initializeDashboard === 'function') {
+          initializeDashboard();
+        }
+      }
+    });
+    
+    console.log('✅ Mobile optimizations applied');
+  }
+
+  // Initialize mobile support when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initMobileOptimizations);
+  } else {
+    initMobileOptimizations();
+  }
+
 })();
 
 // Global jQuery-like selector function (moved outside closure)
@@ -2446,10 +2620,3 @@ function startGridPolling() {
 setInterval(ping, 2000);
 ping();
 startGridPolling();
-
-// Auto-start dashboard without authentication
-currentUser = { username: 'admin', role: 'admin' };
-updateUI();
-if (typeof initializeDashboard === 'function') {
-  initializeDashboard();
-}
