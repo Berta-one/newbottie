@@ -1207,62 +1207,57 @@ async function authFetch(url, options = {}) {
   async function refreshHealth() {
     try {
       const data = await fetchJSON('/health');
-      console.log('Health data:', data);
+      setHealth(data.ok, data.time, data.quantum);
       
-      // Update quantum info with null checks
-      const qChip = document.getElementById('quantum-chip');
-      const qBackend = document.getElementById('quantum-backend');
-      const qEnabled = document.getElementById('quantum-enabled');
+      // Update WebSocket status indicator
+      updateWebSocketStatus(data);
       
-      if (qChip && qBackend && qEnabled) {
-        const q = data.quantum || {};
-        setChip(qChip, q.enabled);
-        qBackend.textContent = q.backend || '—';
-        qEnabled.textContent = q.enabled ? 'Yes' : 'No';
+      // Update any system status indicators
+      if (data.system_health) {
+        updateSystemStatus(data);
       }
-      
-      // Update ML info with null checks
-      const mlChip = document.getElementById('ml-chip');
-      const mlEnabled = document.getElementById('ml-enabled');
-      const mlLoaded = document.getElementById('ml-loaded');
-      const mlPath = document.getElementById('ml-path');
-      
-      if (mlChip && mlEnabled && mlLoaded && mlPath) {
-        const ml = data.ml || {};
-        // Show green if enabled (even if model not loaded for cloud deployment)
-        setChip(mlChip, ml.enabled || ml.loaded);
-        mlEnabled.textContent = ml.enabled ? 'Yes' : 'No';
-        mlLoaded.textContent = ml.loaded ? 'Yes' : 'No';
-        mlPath.textContent = ml.model_path || '—';
-      }
-      
-      // Update sentiment info with null checks
-      const sentChip = document.getElementById('sent-chip');
-      const sentEnabled = document.getElementById('sent-enabled');
-      const sentSource = document.getElementById('sent-source');
-      const sentWindow = document.getElementById('sent-window');
-      
-      if (sentChip && sentEnabled && sentSource && sentWindow) {
-        const sent = data.sentiment || {};
-        setChip(sentChip, sent.enabled);
-        sentEnabled.textContent = sent.enabled ? 'Yes' : 'No';
-        sentSource.textContent = sent.source || '—';
-        sentWindow.textContent = sent.window_hours ? sent.window_hours + 'h' : '—';
-      }
-      
-      console.log('Health display updated');
     } catch (error) {
       console.error('Health refresh failed:', error);
+      setHealth(false, 0, {});
       
-      // Set error states
-      const elements = ['quantum-chip', 'ml-chip', 'sent-chip'];
-      elements.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-          setChip(el, 'err');
-          el.textContent = 'Error';
-        }
-      });
+      // Set WebSocket as disconnected on error
+      updateWebSocketStatus({ websocket_status: 'DISCONNECTED' });
+    }
+  }
+
+  function updateWebSocketStatus(data) {
+    const wsStatusEl = document.getElementById('websocket-status');
+    if (!wsStatusEl) return;
+    
+    // Get WebSocket status from various possible sources
+    let wsStatus = data.websocket_status || 
+                   (data.quantum && data.quantum.websocket_status) ||
+                   (data.system_health ? 'CONNECTED' : 'DISCONNECTED');
+    
+    // Update the status text and CSS class
+    wsStatusEl.textContent = `WS: ${wsStatus}`;
+    
+    // Remove all status classes
+    wsStatusEl.classList.remove('ws-status-connected', 'ws-status-disconnected', 
+                               'ws-status-connecting', 'ws-status-error', 
+                               'ws-status-reconnecting', 'ws-status-failed');
+    
+    // Add appropriate status class
+    switch(wsStatus.toLowerCase()) {
+      case 'connected':
+      case 'active':
+        wsStatusEl.classList.add('ws-status-connected');
+        break;
+      case 'connecting':
+      case 'reconnecting':
+        wsStatusEl.classList.add('ws-status-reconnecting');
+        break;
+      case 'error':
+      case 'failed':
+        wsStatusEl.classList.add('ws-status-error');
+        break;
+      default:
+        wsStatusEl.classList.add('ws-status-disconnected');
     }
   }
 
