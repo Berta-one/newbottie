@@ -9,7 +9,7 @@ import json
 import random
 import logging
 from typing import Dict, Any, List, Optional
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from passlib.context import CryptContext
@@ -905,44 +905,52 @@ def positions():
 
 # Trades endpoint
 @app.get("/trades")
-def recent_trades():
-    """Get real trade history from Binance - NO DEMO DATA"""
+def recent_trades(since_ts: Optional[float] = Query(default=None, description="Return trades with timestamp greater than this UNIX ts"),
+                  limit: Optional[int] = Query(default=200, ge=1, le=1000, description="Max trades to return")):
+    """Return recent trades using WebSocket when available, persisted to a local file cache.
+    Supports incremental sync via since_ts and size limiting. No REST polling to avoid bans."""
     positions = get_real_positions()
-    
-    # If no real positions/exchange connection, return empty
+
+    # Always try to read existing cache first (serves when disconnected)
+    cached = _load_json_file_safe(TRADES_CACHE_FILE, [])
+
+    # If no exchange connection or no positions, return from cache only
     if not positions or not exchange_client:
-        print("❌ No exchange connection - no trade history available")
+        trades = _filter_trades(cached, since_ts, limit)
+        # Compute summary
+        total_trades = len(trades)
+        realized_pnl = sum(t.get('pnl', 0) for t in trades)
+        profitable_trades = len([t for t in trades if t.get('pnl', 0) > 0])
+        win_rate = (profitable_trades / total_trades) * 100 if total_trades > 0 else 0
+        total_volume = sum(t.get('value', 0) for t in trades)
+        avg_trade_size = total_volume / total_trades if total_trades > 0 else 0
         return {
-            "trades": [],
+            "trades": trades,
             "summary": {
-                "total_trades": 0,
-                "realized_pnl": 0,
-                "win_rate": 0,
-                "total_volume": 0,
-                "avg_trade_size": 0,
-                "best_trade": 0,
-                "worst_trade": 0,
-                "avg_pnl_per_trade": 0
-            }
+                "total_trades": total_trades,
+                "realized_pnl": realized_pnl,
+                "win_rate": win_rate,
+                "total_volume": total_volume,
+                "avg_trade_size": avg_trade_size,
+                "net_pnl": realized_pnl
+            },
+            "source": "cache"
         }
-    
-    # Try to get real trade history - WebSocket first, then REST API
-    trades = []
-    
-    # Try WebSocket first (real-time trades)
+
+    # Try to get real trade history via WebSocket
+    new_trades: List[Dict[str, Any]] = []
+
     if WEBSOCKET_AVAILABLE and websocket_manager:
         ws_trades = get_websocket_trades()
         if ws_trades:
-            trades.extend(ws_trades)
-            print(f"✅ Got {len(ws_trades)} trades from WebSocket")
-    
-    # NO REST API calls for trades - only WebSocket to avoid rate limits
-    if not trades and ws_manager and ws_manager.running:
+            new_trades.extend(ws_trades)
+
+    if not new_trades and ws_manager and ws_manager.running:
         try:
             ws_trades = ws_manager.get_recent_trades()
             if ws_trades:
                 for trade in ws_trades:
-                    trades.append({
+                    new_trades.append({
                         "timestamp": trade.get('timestamp', time.time()),
                         "symbol": trade.get('symbol', ''),
                         "side": trade.get('side', '').upper(),
@@ -951,55 +959,29 @@ def recent_trades():
                         "pnl": trade.get('pnl', 0),
                         "trade_id": str(trade.get('timestamp', time.time())),
                         "value": trade.get('quantity', 0) * trade.get('price', 0),
-                        "confidence": 1.0,  # Real trade = 100% confidence
+                        "confidence": 1.0,
                         "status": "completed",
                         "datetime": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(trade.get('timestamp', time.time()))),
                         "source": "binance_websocket"
                     })
-                print(f"✅ Got {len(trades)} trades from WebSocket")
         except Exception as e:
-            print(f"❌ WebSocket trades error: {e}")
-    
-    # If no WebSocket trades, API is likely rate limited
-    elif not trades:
-        print("❌ No WebSocket trades - API rate limited or no recent trades")
-    
-    # If no real trades found, return empty (NO DEMO DATA)
-    if not trades:
-        print("❌ No real trades found")
-        return {
-            "trades": [],
-            "summary": {
-                "total_trades": 0,
-                "realized_pnl": 0,
-                "win_rate": 0,
-                "total_volume": 0,
-                "avg_trade_size": 0,
-                "best_trade": 0,
-                "worst_trade": 0,
-                "avg_pnl_per_trade": 0
-            }
-        }
-    
-    # Sort by timestamp (most recent first)
-    trades.sort(key=lambda x: x['timestamp'], reverse=True)
-    trades = trades[:50]  # Keep last 50 trades
-    
-    # Calculate summary statistics
-    if trades:
-        total_trades = len(trades)
-        realized_pnl = sum(trade.get('pnl', 0) for trade in trades)
-        profitable_trades = len([t for t in trades if t.get('pnl', 0) > 0])
-        win_rate = (profitable_trades / total_trades) * 100 if total_trades > 0 else 0
-        total_volume = sum(trade.get('value', 0) for trade in trades)
-        avg_trade_size = total_volume / total_trades if total_trades > 0 else 0
-    else:
-        total_trades = 0
-        realized_pnl = 0
-        win_rate = 0
-        total_volume = 0
-        avg_trade_size = 0
-    
+            system_logger.add_log(LogLevel.ERROR, f"WebSocket trades error: {e}", "WEBSOCKET")
+
+    # Merge with cache and persist
+    merged = _append_trades_to_cache(new_trades)
+
+    # Final list sorted & filtered
+    merged.sort(key=lambda x: x.get('timestamp', 0), reverse=True)
+    trades = _filter_trades(merged, since_ts, limit)
+
+    # Calculate summary
+    total_trades = len(trades)
+    realized_pnl = sum(trade.get('pnl', 0) for trade in trades)
+    profitable_trades = len([t for t in trades if t.get('pnl', 0) > 0])
+    win_rate = (profitable_trades / total_trades) * 100 if total_trades > 0 else 0
+    total_volume = sum(trade.get('value', 0) for trade in trades)
+    avg_trade_size = total_volume / total_trades if total_trades > 0 else 0
+
     return {
         "trades": trades,
         "summary": {
@@ -1009,15 +991,23 @@ def recent_trades():
             "total_volume": total_volume,
             "avg_trade_size": avg_trade_size,
             "net_pnl": realized_pnl
-        }
+        },
+        "source": "websocket+cache" if new_trades else "cache"
     }
 
 # Old basic logs endpoint removed - replaced with advanced logging system above
 
 # ML Status endpoint
 @app.get("/ml/status")
-def ml_status():
-    """ML status with realistic performance metrics including Brier Score"""
+def ml_status(force_refresh: bool = Query(default=False, description="Ignore cache and recompute status")):
+    """ML status with realistic performance metrics including Brier Score.
+    Persists last response to disk and serves cached when not forced."""
+    # Try cache first
+    if not force_refresh:
+        cached = _load_ml_status_cache()
+        if cached and (time.time() - cached.get("_cached_at", 0)) < 300:
+            return cached
+
     positions = get_real_positions()
     balance = get_real_balance()
     
@@ -1031,22 +1021,16 @@ def ml_status():
     overall_score = (accuracy + confidence + data_quality) / 3
     
     # Calculate Brier Score using EXACT formula: BS = 1.0 - (accuracy_percent / 100.0)
-    # With 87.5% accuracy, Brier Score should be 0.1250 (EXCELLENT)
-    # Convert accuracy to percentage for calculation
     accuracy_percent = accuracy * 100
     brier_score = 1.0 - (accuracy_percent / 100.0)
-    
-    # Ensure Brier Score is in valid range [0.0, 1.0]
     brier_score = max(0.0, min(1.0, brier_score))
     
-    # Calculate calibration score (how well predicted probabilities match actual outcomes)
     calibration_error = abs(confidence - accuracy) + random.uniform(-0.05, 0.05)
     calibration_error = max(0.01, min(0.15, calibration_error))
     
     total_predictions = len(positions) * 100 + random.randint(50, 200)
     successful_predictions = int(total_predictions * accuracy)
     
-    # Determine Brier Score rating based on your scale
     if brier_score <= 0.25:
         brier_rating = "EXCELLENT"
         brier_emoji = "🟢"
@@ -1060,8 +1044,7 @@ def ml_status():
         brier_rating = "POOR"
         brier_emoji = "🔴"
     
-    # Real ML metrics based on your actual data
-    return {
+    result = {
         "enabled": DATA_AVAILABLE,
         "loaded": True,
         "model_path": "/models/trading_model_v4.pkl",
@@ -1098,8 +1081,12 @@ def ml_status():
             {"timestamp": time.time() - 600, "message": f"Processed {len(positions)} active positions"},
             {"timestamp": time.time() - 900, "message": "Feature importance updated"}
         ],
-        "mode": "LIVE" if (exchange_client and not exchange_client.sandbox) else "TESTNET"
+        "mode": "LIVE" if (ws_manager and ws_manager.running) else "TESTNET",
+        "_cached_at": time.time()
     }
+
+    _save_ml_status_cache(result)
+    return result
 
 @app.get("/ml/interpretation")
 def ml_interpretation():
@@ -2217,6 +2204,81 @@ def api_usage_stats():
         system_logger.add_log(LogLevel.WARNING, f"High API usage: {utilization}%", "API_THROTTLE")
     
     return stats
+
+TRADES_CACHE_FILE = os.getenv("TRADES_CACHE_FILE", "trades_cache.json")
+ML_STATUS_CACHE_FILE = os.getenv("ML_STATUS_CACHE_FILE", "ml_status_cache.json")
+TRADES_CACHE_MAX = int(os.getenv("TRADES_CACHE_MAX", "1000"))
+
+_cache_fs_lock = threading.RLock()
+
+def _load_json_file_safe(path: str, default):
+	try:
+		with _cache_fs_lock:
+			if not os.path.exists(path):
+				return default
+			with open(path, "r") as f:
+				return json.load(f)
+	except Exception:
+		return default
+
+
+def _save_json_file_safe(path: str, data) -> bool:
+	try:
+		with _cache_fs_lock:
+			with open(path, "w") as f:
+				json.dump(data, f)
+		return True
+	except Exception as e:
+		try:
+			system_logger.add_log(LogLevel.ERROR, f"Failed to save {path}: {e}", "CACHE")
+		except Exception:
+			pass
+		return False
+
+
+def _append_trades_to_cache(new_trades: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+	"""Append new trades to on-disk cache, de-duplicate by trade_id+timestamp, cap size."""
+	if not new_trades:
+		return _load_json_file_safe(TRADES_CACHE_FILE, [])
+
+	existing: List[Dict[str, Any]] = _load_json_file_safe(TRADES_CACHE_FILE, [])
+	seen = set()
+	merged: List[Dict[str, Any]] = []
+	# Build key set from existing
+	for t in existing:
+		key = f"{t.get('trade_id','')}|{int(t.get('timestamp', 0))}"
+		if key not in seen:
+			seen.add(key)
+			merged.append(t)
+	# Append new
+	for t in new_trades:
+		key = f"{t.get('trade_id','')}|{int(t.get('timestamp', 0))}"
+		if key not in seen:
+			seen.add(key)
+			merged.append(t)
+	# Sort and cap
+	merged.sort(key=lambda x: x.get('timestamp', 0), reverse=True)
+	if len(merged) > TRADES_CACHE_MAX:
+		merged = merged[:TRADES_CACHE_MAX]
+	_save_json_file_safe(TRADES_CACHE_FILE, merged)
+	return merged
+
+
+def _filter_trades(trades: List[Dict[str, Any]], since_ts: Optional[float], limit: Optional[int]) -> List[Dict[str, Any]]:
+	result = trades
+	if since_ts:
+		result = [t for t in result if t.get('timestamp', 0) > since_ts]
+	if limit and limit > 0:
+		result = result[:limit]
+	return result
+
+
+def _load_ml_status_cache() -> Dict[str, Any]:
+	return _load_json_file_safe(ML_STATUS_CACHE_FILE, {})
+
+
+def _save_ml_status_cache(data: Dict[str, Any]) -> None:
+	_save_json_file_safe(ML_STATUS_CACHE_FILE, data)
 
 if __name__ == "__main__":
     import uvicorn
