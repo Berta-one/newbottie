@@ -2,17 +2,20 @@
   publish = "."
 
 [[redirects]]
+  # IMPORTANT: This proxies API calls to your Render backend
   from = "/api/*"
   to = "https://bottie-1.onrender.com/api/:splat"
   status = 200
   force = true
 
 [[redirects]]
+  # Mobile version redirect
   from = "/mobile"
   to = "/mobile.html"
   status = 200
 
 [[redirects]]
+  # Catch-all redirect to main dashboard
   from = "/*"
   to = "/index.html"
   status = 200
@@ -22,3 +25,5 @@
   [headers.values]
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer-when-downgrade"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
