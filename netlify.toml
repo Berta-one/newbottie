@@ -1,5 +1,5 @@
 [build]
-  publish = "netlify-deploy"
+  publish = "netlify-deploy/web"
 
 [[redirects]]
   from = "/api/*"
