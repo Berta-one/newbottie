@@ -1,7 +1,7 @@
 [tool.black]
 line-length = 100
 target-version = ["py311"]
-exclude = """
+exclude = '''
 /(
     \.git
   | \.venv
@@ -9,7 +9,7 @@ exclude = """
   | build
   | node_modules
 )/
-"""
+'''
 
 [tool.ruff]
 target-version = "py311"
@@ -48,7 +48,8 @@ pretty = true
 show_error_codes = true
 exclude = '(build|dist|\.venv|node_modules)'
 
-[mypy-api.*]
+[[tool.mypy.overrides]]
+module = "api.*"
 ignore_missing_imports = false
 
 [tool.pydantic-mypy]

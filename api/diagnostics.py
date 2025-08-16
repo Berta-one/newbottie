@@ -1,7 +1,9 @@
-from fastapi import APIRouter
 from pathlib import Path
 
+from fastapi import APIRouter
+
 router = APIRouter()
+
 
 @router.get("/__version")
 def version():

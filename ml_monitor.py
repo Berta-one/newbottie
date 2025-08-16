@@ -222,7 +222,7 @@ class MLMonitor:
             f"Rank: #{metrics.quantum_rank or 'N/A'}\n"
             f"Importance: {metrics.quantum_importance:.3f if metrics.quantum_importance else 'N/A'}\n"
             f"Mode: {metrics.quantum_mode}\n"
-            f"Weight: {metrics.quantum_weight:.1%} if metrics.quantum_weight else 'N/A'}\n\n"
+            f"Weight: {metrics.quantum_weight:.1% if metrics.quantum_weight else 'N/A'}\n\n"
             f"{quantum_analysis['interpretation']}",
             title="⚡ Quantum Analysis", 
             border_style=quantum_color
