@@ -790,23 +790,24 @@
     margin: 2px 0;
   }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
-<!-- Login Modal - HIDDEN (Authentication Bypassed) -->
-<div id="login-modal" class="login-modal" style="display: none !important;">
+<!-- Login Modal -->
+<div id="login-modal" class="login-modal">
   <div class="login-form">
-    <h2>🔓 Auto Login Enabled</h2>
+    <h2>🔐 Bottie Access</h2>
     <form id="login-form">
       <div class="form-group">
         <label class="form-label">Username</label>
-        <input type="text" id="username" class="form-input" value="auto-user" required>
+        <input type="text" id="username" class="form-input" value="admin" required>
       </div>
       <div class="form-group">
         <label class="form-label">Password</label>
-        <input type="password" id="password" class="form-input" value="bypass" required>
+        <input type="password" id="password" class="form-input" value="Diego1234!" required>
       </div>
-      <button type="submit" id="login-btn" class="login-btn">Auto Login</button>
+      <button type="submit" id="login-btn" class="login-btn">Login</button>
       <div id="login-error" class="login-error"></div>
     </form>
   </div>
@@ -815,52 +816,25 @@
 <header>
   <div>Bottie Live Dashboard</div>
   <div class="header-status">
-    <div class="connection-status" id="connection-status">
-      <span class="connection-dot" id="connection-dot"></span>
-      <span class="connection-text" id="connection-text">Connecting...</span>
-    </div>
-    <div class="api-endpoint" id="api-endpoint" style="font-size: 11px; color: #8892b0;">—</div>
+    <div id="health-status" class="status-badge">—</div>
+    <div id="health-time" class="status-time">—</div>
+    <div id="health-quantum" class="status-quantum">—</div>
   </div>
-  <div class="user-info" id="user-info">
-    <span id="current-user" class="user-badge">Auto-User</span>
+  <div class="user-info" id="user-info" style="display: none;">
+    <span id="user-name" class="user-badge">—</span>
     <button id="logout-btn" class="logout-btn">Logout</button>
   </div>
 </header>
 
 <!-- Tab Navigation -->
-<div class="dashboard-tabs" id="dashboard-tabs">
+<div class="dashboard-tabs" id="dashboard-tabs" style="display: flex;">
   <button class="tab-btn active" data-tab="trading">📊 Trading</button>
   <button class="tab-btn" data-tab="ml-monitor">🧠 ML Learning</button>
-  <button class="tab-btn" data-tab="sentiment">📰 Sentiment</button>
-  <!-- Sentiment Analysis Tab -->
-  <div id="sentiment-tab" class="tab-content">
-    <div class="main-grid">
-      <!-- Left Panel: Sentiment Overview -->
-      <div class="card" style="min-width:350px;max-width:500px;display:inline-block;vertical-align:top;">
-        <div class="card-header">
-          <h3>📊 Sentiment Overview</h3>
-          <span id="sentiment-status-chip" class="chip">—</span>
-        </div>
-        <div class="kv"><span class="k">Data Source:</span><span class="v" id="sentiment-source">Finnhub</span></div>
-        <div class="kv"><span class="k">Update Frequency:</span><span class="v" id="sentiment-update-frequency">5 min</span></div>
-        <div class="kv"><span class="k">Last Updated:</span><span class="v" id="sentiment-last-updated">—</span></div>
-        <div id="sentiment-summary-cards"></div>
-        <div id="sentiment-asset-scores"></div>
-      </div>
-      <!-- Right Panel: News Articles -->
-      <div class="card" style="min-width:350px;max-width:700px;display:inline-block;vertical-align:top;">
-        <div class="card-header">
-          <h3>📰 News Articles</h3>
-        </div>
-        <div id="sentiment-articles"></div>
-      </div>
-    </div>
-  </div>
   <button class="tab-btn" data-tab="quantum">⚡ Quantum Analysis</button>
+  <button class="tab-btn" data-tab="sentiment">📰 Sentiment Analysis</button>
 </div>
 
-<main id="main-content">
-  
+<main id="main-content" style="display: block;">
   <!-- Trading Tab -->
   <div id="trading-tab" class="tab-content active">
     <div class="main-grid">
@@ -896,19 +870,19 @@
         </div>
         <div class="kv">
           <span class="k">Sentiment Chip:</span>
-          <span class="v" id="sentiment-chip">—</span>
+          <span class="v" id="sent-chip">—</span>
         </div>
         <div class="kv">
           <span class="k">Sentiment Enabled:</span>
-          <span class="v" id="sentiment-enabled">—</span>
+          <span class="v" id="sent-enabled">—</span>
         </div>
         <div class="kv">
           <span class="k">Sentiment Source:</span>
-          <span class="v" id="sentiment-source">—</span>
+          <span class="v" id="sent-source">—</span>
         </div>
         <div class="kv">
           <span class="k">Sentiment Window:</span>
-          <span class="v" id="sentiment-window">—</span>
+          <span class="v" id="sent-window">—</span>
         </div>
       </div>
 
@@ -1052,46 +1026,7 @@
         </div>
       </div>
 
-      <!-- MAXI GRID: Portfolio (rows) × Scan (columns) -->
-      <div class="card maxi-grid-card">
-        <h3>Cross-Pair Maxi Grid (Portfolio × Market)</h3>
-        <div class="grid-header">
-          <span class="grid-subtitle">Hover a cell for details</span>
-          <span id="grid-last-ts" class="grid-timestamp">—</span>
-        </div>
-
-        <!-- Grid Controls -->
-        <div id="grid-controls" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:0 0 10px 0;">
-          <label style="font-size:12px;color:#8892b0;">
-            Min confidence:
-            <input id="grid-min-conf" type="range" min="0" max="1" step="0.05" value="0" style="vertical-align:middle;margin-left:6px;">
-            <span id="grid-min-conf-val" style="margin-left:6px;color:#64ffda;">0%</span>
-          </label>
-
-          <label style="font-size:12px;color:#8892b0;">
-            Show only tradable cells
-            <input id="grid-only-tradable" type="checkbox" style="margin-left:6px;">
-          </label>
-
-          <div style="margin-left:auto;display:flex;align-items:center;gap:10px;">
-            <span style="font-size:12px;color:#8892b0;">Legend:</span>
-            <span class="chip grid-buy" style="border:none;">BUY</span>
-            <span class="chip grid-hold" style="border:none;">HOLD</span>
-            <span class="chip grid-sell" style="border:none;">SELL</span>
-          </div>
-        </div>
-
-        <div class="grid-container">
-          <table id="maxi-grid" class="data-table">
-            <thead id="maxi-grid-thead">
-              <!-- filled by JS -->
-            </thead>
-            <tbody id="maxi-grid-tbody">
-              <!-- filled by JS -->
-            </tbody>
-          </table>
-        </div>
-      </div>
+  <!-- System Logs -->
 
       <!-- System Logs -->
       <div class="card">
@@ -1103,6 +1038,112 @@
         </div>
       </div>
     </div>
+    <!-- Atomic Swap Trading Grid Start -->
+    <div class="maxi-grid-container">
+      <!-- Grid Header with Stats -->
+      <div class="grid-header">
+        <div>
+          <div class="grid-title">🏛️ Atomic Swap Trading Grid</div>
+          <div class="grid-subtitle">Portfolio Assets × Market Leaders - Complete Crypto-to-Crypto Trading Matrix</div>
+        </div>
+        <div class="grid-stats">
+          <div class="stat-item">
+            <div id="portfolio-count" class="stat-value">0</div>
+            <div class="stat-label">Portfolio Assets</div>
+          </div>
+          <div class="stat-item">
+            <div id="crypto-pairs-count" class="stat-value">0</div>
+            <div class="stat-label">Crypto-Crypto Pairs</div>
+          </div>
+          <div class="stat-item">
+            <div id="total-opportunities" class="stat-value">0</div>
+            <div class="stat-label">Total Opportunities</div>
+          </div>
+          <div class="stat-item">
+            <div id="active-signals" class="stat-value">0</div>
+            <div class="stat-label">Active Signals</div>
+          </div>
+          <div class="stat-item">
+            <div class="connection-status">
+              <div id="connection-dot" class="status-dot connecting"></div>
+              <span id="connection-text">Connecting</span>
+            </div>
+            <div class="stat-label">Connection</div>
+          </div>
+        </div>
+      </div>
+      <!-- Grid Controls with Filters -->
+      <div class="grid-controls">
+        <div class="control-group">
+          <label class="control-label">Min Confidence:</label>
+          <input type="range" id="confidence-slider" class="confidence-slider" min="0" max="100" value="50" step="5">
+          <span id="confidence-value" class="confidence-value">50%</span>
+        </div>
+        <div class="control-group">
+          <input type="checkbox" id="crypto-only-filter" class="filter-checkbox">
+          <label for="crypto-only-filter" class="control-label">Crypto-to-Crypto Only</label>
+        </div>
+        <div class="control-group">
+          <input type="checkbox" id="portfolio-only-filter" class="filter-checkbox">
+          <label for="portfolio-only-filter" class="control-label">Portfolio Assets Only</label>
+        </div>
+        <div class="control-group">
+          <input type="checkbox" id="high-confidence-filter" class="filter-checkbox">
+          <label for="high-confidence-filter" class="control-label">High Confidence Only (>70%)</label>
+        </div>
+        <div class="legend">
+          <div class="legend-item">
+            <div class="legend-color buy"></div>
+            <span>BUY</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color hold"></div>
+            <span>HOLD</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color sell"></div>
+            <span>SELL</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color na"></div>
+            <span>N/A</span>
+          </div>
+        </div>
+        <div class="refresh-controls">
+          <button id="manual-refresh" class="refresh-btn">🔄 Refresh</button>
+          <div class="auto-refresh-indicator">
+            Auto: <span id="refresh-countdown">15</span>s
+          </div>
+        </div>
+      </div>
+      <!-- Trading Grid -->
+      <div class="trading-grid">
+        <!-- Loading State -->
+        <div id="grid-loading" class="grid-loading">
+          <div class="loading-spinner"></div>
+          <div class="loading-text">Loading atomic swap opportunities...</div>
+          <div class="loading-details">
+            Fetching portfolio assets, market data, and trading signals for crypto-to-crypto pairs
+          </div>
+        </div>
+        <!-- Error State -->
+        <div id="grid-error" class="grid-error" style="display: none;">
+          <div class="error-icon">⚠️</div>
+          <div class="error-message">Failed to Load Trading Grid</div>
+          <div id="error-details" class="error-details">Unknown error occurred</div>
+          <button id="retry-btn" class="retry-btn">Retry Loading</button>
+        </div>
+        <!-- Grid Table Container -->
+        <div id="grid-scroll-container" class="grid-scroll-container" style="display: none;">
+          <table id="grid-table" class="grid-table">
+            <!-- Dynamic content will be populated here -->
+          </table>
+        </div>
+      </div>
+    </div>
+    <!-- Enhanced Tooltip -->
+    <div id="grid-tooltip" class="grid-tooltip" style="display: none;"></div>
+    <!-- Atomic Swap Trading Grid End -->
   </div>
 
   <!-- ML Monitor Tab -->
@@ -1231,7 +1272,7 @@
 </main>
 
 <!-- Debug Panel -->
-<button class="debug-toggle" id="debug-toggle">🔧 Debug</button>
+<button class="debug-toggle" id="debug-toggle" style="display: none;">🔧 Debug</button>
 
 <div class="debug-panel" id="debug-panel">
   <div class="debug-header">🔧 API Debug Panel</div>
@@ -1364,8 +1405,6 @@
   </div>
 </div>
 
-<!-- Chart.js CDN -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
