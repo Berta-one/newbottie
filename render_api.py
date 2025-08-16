@@ -132,7 +132,9 @@ class BinanceWebSocketManager:
         
     def start_streams(self):
         """Start WebSocket streams for real-time data"""
-        if not BINANCE_API_KEY or not BINANCE_API_SECRET:
+        api_key = os.getenv('BINANCE_API_KEY', '')
+        api_secret = os.getenv('BINANCE_API_SECRET', '')
+        if not api_key or not api_secret:
             print("❌ No Binance credentials - WebSocket disabled")
             return False
             
@@ -259,7 +261,8 @@ def initialize_websocket_only():
     """Initialize WebSocket-only data streams"""
     global ws_manager
     
-    if not BINANCE_API_KEY:
+    api_key = os.getenv('BINANCE_API_KEY', '')
+    if not api_key:
         print("❌ No Binance API key - WebSocket disabled")
         return False
     

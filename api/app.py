@@ -55,6 +55,7 @@ exchange_client = None
 real_positions = {}
 real_balance = {}
 last_update = 0
+startup_logs = []
 
 # Preferred quote currencies when building market symbols dynamically
 PREFERRED_QUOTES = ["USDT", "FDUSD", "USDC", "BUSD", "TUSD"]
@@ -83,20 +84,33 @@ def _find_tradable_symbol_for_base(base_asset: str) -> Optional[str]:
 
 def initialize_real_exchange():
     """Initialize REAL exchange connection with live trading"""
-    global exchange_client
+    global exchange_client, startup_logs
+    
+    def log_startup(message):
+        startup_logs.append(f"{time.strftime('%Y-%m-%d %H:%M:%S')} - {message}")
+        print(message)
+    
     if not EXCHANGE_AVAILABLE:
+        log_startup("❌ EXCHANGE_AVAILABLE is False - ccxt not available")
         return False
     
     try:
         # REAL TRADING MODE - Use your existing TRADE_ENABLED variable
         trade_enabled = os.getenv('TRADE_ENABLED', '0') == '1'
         use_live_trading = trade_enabled and os.getenv('ENVIRONMENT', '') == 'production'
+        api_key = os.getenv('BINANCE_API_KEY', '')
+        api_secret = os.getenv('BINANCE_API_SECRET', '')
         
-        print(f"🔍 Exchange init: trade_enabled={trade_enabled}, use_live_trading={use_live_trading}")
+        log_startup(f"🔍 Exchange init: trade_enabled={trade_enabled}, use_live_trading={use_live_trading}")
+        log_startup(f"🔍 API Key length: {len(api_key)}, Secret length: {len(api_secret)}")
+        
+        if not api_key or not api_secret:
+            log_startup(f"❌ Missing API credentials: key={'SET' if api_key else 'MISSING'}, secret={'SET' if api_secret else 'MISSING'}")
+            return False
         
         exchange_client = ccxt.binance({
-            'apiKey': os.getenv('BINANCE_API_KEY', ''),
-            'secret': os.getenv('BINANCE_API_SECRET', ''),  # Fixed variable name
+            'apiKey': api_key,
+            'secret': api_secret,
             'sandbox': not use_live_trading,  # False for live trading
             'enableRateLimit': True,
         })
@@ -107,16 +121,32 @@ def initialize_real_exchange():
         except Exception:
             pass
         
+        log_startup(f"🔍 Exchange client created, testing connection...")
+        
         # Test connection
-        exchange_client.load_markets()
+        try:
+            exchange_client.load_markets()
+            log_startup(f"✅ Markets loaded successfully")
+        except Exception as market_error:
+            log_startup(f"❌ Failed to load markets: {market_error}")
+            # Try a simpler test
+            try:
+                exchange_client.fetch_status()
+                log_startup(f"✅ Exchange status check passed")
+            except Exception as status_error:
+                log_startup(f"❌ Exchange status check failed: {status_error}")
+                return False
         
         mode = "LIVE TRADING" if use_live_trading else "TESTNET"
-        print(f"✅ Exchange connected: {mode}")
-        print(f"🔍 Exchange sandbox property: {getattr(exchange_client, 'sandbox', 'UNKNOWN')}")
+        log_startup(f"✅ Exchange connected: {mode}")
+        log_startup(f"🔍 Exchange sandbox property: {getattr(exchange_client, 'sandbox', 'UNKNOWN')}")
         return True
         
     except Exception as e:
-        print(f"❌ Exchange initialization failed: {e}")
+        log_startup(f"❌ Exchange initialization failed: {e}")
+        log_startup(f"❌ Error type: {type(e).__name__}")
+        import traceback
+        log_startup(f"❌ Traceback: {traceback.format_exc()}")
         return False
 
 def get_real_balance():
@@ -595,6 +625,36 @@ def debug_auth():
         "status": "real_trading_mode"
     }
 
+@app.get("/debug/env")
+def debug_env():
+    """Debug endpoint to check environment variables and exchange status"""
+    return {
+        "environment_vars": {
+            "TRADE_ENABLED": os.getenv('TRADE_ENABLED', 'NOT_SET'),
+            "ENVIRONMENT": os.getenv('ENVIRONMENT', 'NOT_SET'),
+            "BINANCE_API_KEY": "SET" if os.getenv('BINANCE_API_KEY') else "NOT_SET",
+            "BINANCE_API_SECRET": "SET" if os.getenv('BINANCE_API_SECRET') else "NOT_SET"
+        },
+        "exchange_status": {
+            "EXCHANGE_AVAILABLE": EXCHANGE_AVAILABLE,
+            "exchange_client_exists": exchange_client is not None,
+            "exchange_client_type": type(exchange_client).__name__ if exchange_client else None,
+            "sandbox_mode": getattr(exchange_client, 'sandbox', 'UNKNOWN') if exchange_client else 'NO_CLIENT'
+        },
+        "computed_flags": {
+            "trade_enabled": os.getenv('TRADE_ENABLED', '0') == '1',
+            "use_live_trading": (os.getenv('TRADE_ENABLED', '0') == '1') and (os.getenv('ENVIRONMENT', '') == 'production')
+        }
+    }
+
+@app.get("/debug/startup")
+def debug_startup():
+    """Get startup logs to debug initialization issues"""
+    return {
+        "startup_logs": startup_logs,
+        "total_logs": len(startup_logs)
+    }
+
 @app.post("/auth/login")
 def auth_login(request: dict):
     username = request.get("username", "")
@@ -947,11 +1007,17 @@ def brier_score():
 # Startup
 @app.on_event("startup")
 async def startup_event():
+    global startup_logs
+    startup_logs.append(f"{time.strftime('%Y-%m-%d %H:%M:%S')} - 🚀 Starting Bottie API initialization...")
+    
     if EXCHANGE_AVAILABLE:
+        startup_logs.append(f"{time.strftime('%Y-%m-%d %H:%M:%S')} - ✅ CCXT libraries available")
         success = initialize_real_exchange()
         mode = "LIVE TRADING" if success and exchange_client and not exchange_client.sandbox else "TESTNET"
+        startup_logs.append(f"{time.strftime('%Y-%m-%d %H:%M:%S')} - 🚀 Real trading initialization: {mode}")
         print(f"🚀 Real trading initialization: {mode}")
     else:
+        startup_logs.append(f"{time.strftime('%Y-%m-%d %H:%M:%S')} - ⚠️ Exchange libraries not available - simulation mode")
         print("⚠️ Exchange libraries not available - simulation mode")
 
 if __name__ == "__main__":
