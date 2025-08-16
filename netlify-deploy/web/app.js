@@ -67,7 +67,79 @@
           refreshQuantumDetails();
         } else if (targetTab === 'grid') {
           refreshGrid();
+        } else if (targetTab === 'sentiment') {
+          initSentimentTab();
         }
+  // Sentiment Analysis Tab Initialization
+  function initSentimentTab() {
+    refreshSentimentTab();
+    if (refreshIntervals.sentimentTab) clearInterval(refreshIntervals.sentimentTab);
+    refreshIntervals.sentimentTab = setInterval(refreshSentimentTab, 300000); // 5 min
+  }
+
+  async function refreshSentimentTab() {
+    try {
+      const data = await fetchJSON('/sentiment');
+      renderSentimentOverview(data);
+      renderSentimentArticles(data);
+    } catch (error) {
+      console.error('Sentiment tab refresh failed:', error);
+      document.getElementById('sentiment-status-chip').textContent = 'Error';
+    }
+  }
+
+  function renderSentimentOverview(data) {
+    // Status chip
+    setChip(document.getElementById('sentiment-status-chip'), data.enabled);
+    updateElementText('sentiment-source', data.source || 'Finnhub');
+    updateElementText('sentiment-update-frequency', data.update_frequency || '5 min');
+    updateElementText('sentiment-last-updated', data.last_updated || '—');
+
+    // Summary cards
+    const summary = data.summary || { positive: 0, negative: 0, neutral: 0 };
+    document.getElementById('sentiment-summary-cards').innerHTML = `
+      <div class="kv"><span style="color:#4caf50">Positive:</span> <span>${summary.positive}</span></div>
+      <div class="kv"><span style="color:#f44336">Negative:</span> <span>${summary.negative}</span></div>
+      <div class="kv"><span style="color:#ff9800">Neutral:</span> <span>${summary.neutral}</span></div>
+    `;
+
+    // Asset sentiment scores
+    const assetScores = data.assets || {};
+    let scoresHtml = '';
+    Object.entries(assetScores).forEach(([asset, score]) => {
+      const color = score > 0.6 ? '#4caf50' : score < 0.4 ? '#f44336' : '#ff9800';
+      scoresHtml += `<div class="kv"><span>${asset}</span>
+        <span style="display:inline-block;width:120px;background:${color}33;border-radius:4px;overflow:hidden;vertical-align:middle;">
+          <span style="display:inline-block;width:${(score*100).toFixed(0)}%;background:${color};height:8px;"></span>
+        </span>
+        <span style="color:${color};font-weight:600;">${(score*100).toFixed(1)}%</span></div>`;
+    });
+    document.getElementById('sentiment-asset-scores').innerHTML = scoresHtml;
+  }
+
+  function renderSentimentArticles(data) {
+    const articles = data.articles || [];
+    let html = '';
+    articles.forEach(article => {
+      const color = article.sentiment === 'positive' ? '#4caf50' : article.sentiment === 'negative' ? '#f44336' : '#ff9800';
+      html += `<div class="sent-article" style="border-bottom:1px solid #222;padding:10px 0;">
+        <a href="${article.url}" target="_blank" style="color:${color};font-weight:600;text-decoration:none;">${article.headline}</a>
+        <div style="color:#bbb;font-size:12px;">${article.summary}</div>
+        <div style="color:${color};font-size:13px;">${article.sentiment.toUpperCase()} • ${article.score ? (article.score*100).toFixed(1)+'%' : ''} • ${formatSmartTime(article.datetime)}</div>
+      </div>`;
+    });
+    document.getElementById('sentiment-articles').innerHTML = html;
+  }
+
+  function formatSmartTime(ts) {
+    if (!ts) return '';
+    const now = Date.now()/1000;
+    const diff = now - ts;
+    if (diff < 60) return `${Math.floor(diff)}s ago`;
+    if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+    return `${Math.floor(diff/86400)}d ago`;
+  }
       });
     });
   }
@@ -293,11 +365,32 @@
       const data = await fetchJSON('/ml/status');
       console.log('🧠 ML Status received:', data); // Debug log
       mlData = data;
-      updateMLHealthIndicators(data);
-      updateFeatureImportance(data);
-      updateQuickMLStatus(data);
-      updatePerformanceChart(data);
-      updateActivityLog(data);
+  updateMLHealthIndicators(data);
+  updateFeatureImportance(data);
+  updateQuickMLStatus(data);
+  updatePerformanceChart(data);
+  updateActivityLog(data);
+  updateMLInterpretation(data);
+  // Display ML interpretation insights in dashboard
+  function updateMLInterpretation(data) {
+    const container = document.getElementById('ml-interpretation-content');
+    if (!container || !data.interpretation) return;
+    const interp = data.interpretation;
+    let html = `<div class="ml-interpretation">
+      <div class="ml-interpretation-title">${interp.health_emoji || ''} ${interp.health || 'Unknown'}</div>
+      <div class="ml-interpretation-desc" style="color:${interp.color || '#333'}">${interp.description || ''}</div>
+      <div class="ml-interpretation-details">
+        <strong>Brier Rating:</strong> ${interp.brier_rating || '—'}<br>
+        <strong>Reliability:</strong> ${interp.reliability || '—'}<br>
+        <strong>Feature Insights:</strong> <ul>`;
+    if (interp.feature_insights && Array.isArray(interp.feature_insights)) {
+      interp.feature_insights.forEach(f => {
+        html += `<li>${f}</li>`;
+      });
+    }
+    html += '</ul></div></div>';
+    container.innerHTML = html;
+  }
     } catch (error) {
       console.error('Failed to refresh ML status:', error);
       // Show error in ML chips
