@@ -12,6 +12,8 @@ from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, HTTPException, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from passlib.context import CryptContext
 import jwt
 from datetime import datetime, timedelta
@@ -57,6 +59,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount static files
+app.mount("/static", StaticFiles(directory="web"), name="static")
 
 # Authentication setup
 security = HTTPBearer(auto_error=False)
@@ -596,12 +601,8 @@ def calculate_real_pnl(trades, positions):
 # Root endpoint
 @app.get("/")
 def root():
-    return {
-        "status": "ok",
-        "service": "bottie-render-api",
-        "time": time.time(),
-        "version": "1.0.0"
-    }
+    """Serve the main index.html file"""
+    return FileResponse("web/index.html")
 
 # Health endpoint
 @app.get("/health")
