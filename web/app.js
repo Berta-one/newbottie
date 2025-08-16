@@ -654,6 +654,7 @@ async function refreshSentimentNews() {
   // Debug panel functionality
   const debugToggle = document.getElementById('debug-toggle');
   const debugPanel = document.getElementById('debug-panel');
+  const debugClose = document.getElementById('debug-close');
   const responseModal = document.getElementById('response-modal');
   const responseTitle = document.getElementById('response-title');
   const responseData = document.getElementById('response-data');
@@ -661,6 +662,10 @@ async function refreshSentimentNews() {
 
   debugToggle.addEventListener('click', () => {
     debugPanel.classList.toggle('open');
+  });
+
+  debugClose.addEventListener('click', () => {
+    debugPanel.classList.remove('open');
   });
 
   closeModal.addEventListener('click', () => {
@@ -2370,6 +2375,13 @@ async function authFetch(url, options = {}) {
     
     // Initialize touch support
     initMobileTouchSupport();
+    
+    // Ensure debug panel is closed on mobile by default
+    const debugPanel = document.getElementById('debug-panel');
+    if (debugPanel) {
+      debugPanel.classList.remove('open');
+      console.log('🔧 Debug panel closed on mobile initialization');
+    }
     
     // Adjust refresh intervals for mobile (less frequent to save battery)
     if (typeof refreshIntervals === 'object') {
