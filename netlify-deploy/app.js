@@ -234,30 +234,36 @@
     const debugToggle = document.getElementById('debug-toggle');
     const userName = document.getElementById('user-name');
     
+    // Always show dashboard content for mobile compatibility
+    if (loginModal) loginModal.style.display = 'none';
+    if (mainContent) mainContent.style.display = 'block';
+    if (dashboardTabs) dashboardTabs.style.display = 'flex';
+    if (debugToggle) debugToggle.style.display = 'block';
+    
     if (currentUser && authToken) {
-      loginModal.style.display = 'none';
-      mainContent.style.display = 'block';
-      dashboardTabs.style.display = 'flex';
-      userInfo.style.display = 'flex';
-      debugToggle.style.display = 'block';
-      userName.textContent = currentUser.username || 'User';
+      if (userInfo) userInfo.style.display = 'flex';
+      if (userName) userName.textContent = currentUser.username || 'User';
       
       // Show audit section for superusers
       if (currentUser.role === 'superuser') {
-        document.getElementById('audit-section').style.display = 'block';
+        const auditSection = document.getElementById('audit-section');
+        if (auditSection) auditSection.style.display = 'block';
       }
       
       // Update debug info
-      document.getElementById('debug-api-base').textContent = API;
-      document.getElementById('debug-user').textContent = currentUser.username;
-      document.getElementById('debug-role').textContent = currentUser.role;
-      document.getElementById('debug-session').textContent = authToken.slice(0, 8) + '...';
+      const debugApiBase = document.getElementById('debug-api-base');
+      const debugUser = document.getElementById('debug-user');
+      const debugRole = document.getElementById('debug-role');
+      const debugSession = document.getElementById('debug-session');
+      
+      if (debugApiBase) debugApiBase.textContent = API;
+      if (debugUser) debugUser.textContent = currentUser.username;
+      if (debugRole) debugRole.textContent = currentUser.role;
+      if (debugSession) debugSession.textContent = authToken.slice(0, 8) + '...';
     } else {
-      loginModal.style.display = 'flex';
-      mainContent.style.display = 'none';
-      dashboardTabs.style.display = 'none';
-      userInfo.style.display = 'none';
-      debugToggle.style.display = 'none';
+      // Set guest mode by default
+      if (userInfo) userInfo.style.display = 'flex';
+      if (userName) userName.textContent = 'Guest';
     }
   }
 
@@ -1819,6 +1825,10 @@ function startGridPolling() {
 setInterval(ping, 2000);
 ping();
 startGridPolling();
+
+// Initialize UI state and show dashboard immediately
+updateUIState();
+loadAllData();
 
 // Initialize auto-login when page loads
 autoLogin();
