@@ -609,6 +609,9 @@ def health():
     """Enhanced health check with comprehensive system status"""
     balance = get_real_balance()
     
+    # Check WebSocket status
+    ws_status = "CONNECTED" if (ws_manager and ws_manager.running) else "DISCONNECTED"
+    
     return {
         "ok": True,
         "service": "bottie-real-trading",
@@ -616,10 +619,12 @@ def health():
         "exchange": "binance",
         "mode": "LIVE" if (exchange_client and not exchange_client.sandbox) else "TESTNET",
         "equity": balance['total_usdt'],
+        "websocket_status": ws_status,
         "quantum": {
             "enabled": True,
             "backend": "binance_live_data",
-            "status": "active"
+            "status": "active",
+            "websocket_status": ws_status
         },
         "ml": {
             "enabled": True,
@@ -1672,7 +1677,7 @@ def ml_status(force_refresh: bool = Query(default=False, description="Ignore cac
             "error_details": str(e),
             "_cached_at": time.time()
         }
-            _save_ml_status_cache(result)
+        _save_ml_status_cache(result)
     return result
 
 @app.get("/ml/pair-analysis/{symbol}")
