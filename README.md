@@ -1,329 +1,320 @@
-# 🤖 Headless AI Trading Bot
+# 🤖 Bottie - Autonomous Crypto Trading Bot
 
-A production-ready, headless cryptocurrency trading bot powered by AI/ML models with quantum computing capabilities and automated email reporting.
+**Advanced AI-powered cryptocurrency trading system with adaptive machine learning, quantum-inspired algorithms, and real-time sentiment analysis.**
 
-## ✨ Features
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
 
-- **🧠 Hybrid AI Models**: LSTM + XGBoost + Quantum ML ensemble
-- **⚡ Real-time Trading**: Live market data processing via CCXT/Binance
-- **🔮 Quantum Computing**: Self-learning quantum circuits with IBM Quantum integration
-- **🧬 Adaptive AI**: Multi-agent reinforcement learning with quantum coordination
-- **📊 Quantum Advantage**: Real quantum hardware access with classical fallback
-- **📊 Comprehensive Logging**: CSV-based trade and signal tracking
-- **🐳 Containerized**: Docker deployment ready
-- **⚙️ Paper/Live Trading**: Switch between simulation and real trading
+## 🚀 **Key Features**
 
-## 🚀 Quick Start
+### 🧠 **Adaptive Machine Learning**
+- **Per-pair learning**: Individual ML models for each trading pair
+- **Dynamic thresholds**: Automatically adjusts buy/sell thresholds based on performance
+- **Confidence-based trading**: Only executes trades when confidence is high enough
+- **Autonomous decision making**: No human intervention required once trained
 
-### 1. Clone and Setup
+### 💰 **Fee-Inclusive P&L Calculations**
+- **True profitability**: All P&L calculations include trading fees
+- **Fee transparency**: Complete breakdown of fees paid per pair
+- **Historical fee tracking**: Cumulative fee analysis across all trades
+- **Risk-adjusted returns**: Real performance metrics after all costs
+
+### 📊 **Real-Time Data Integration**
+- **Binance WebSocket streams**: Live account updates and price feeds
+- **Sentiment analysis**: Real news sentiment from Finnhub API
+- **Technical indicators**: Advanced price momentum and volume analysis
+- **Quantum-inspired algorithms**: Portfolio optimization using quantum concepts
+
+### 🎯 **Professional Analytics**
+- **Risk metrics**: Sharpe ratio, Sortino ratio, VaR, max drawdown
+- **Portfolio optimization**: Quantum-inspired rebalancing recommendations
+- **Cross-pair arbitrage**: Grid matrix for trading opportunities
+- **Performance tracking**: Complete trade history with ML insights
+
+## 🏗️ **System Architecture**
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Frontend      │    │   Backend API   │    │   Data Sources  │
+│   (Netlify)     │◄───┤   (Render)      │◄───┤   (Live Feeds)  │
+│                 │    │                 │    │                 │
+│ • Dashboard     │    │ • FastAPI       │    │ • Binance API   │
+│ • Analytics     │    │ • WebSocket     │    │ • WebSocket     │
+│ • ML Insights   │    │ • Adaptive ML   │    │ • Finnhub API   │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+## 🛠️ **Installation & Setup**
+
+### **Prerequisites**
+- Python 3.8+
+- Binance account with API access
+- Finnhub API key (for sentiment analysis)
+
+### **Local Development**
 ```bash
-git clone https://github.com/luigipascal/Bottie.git
-cd Bottie
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Clone repository
+git clone <repository-url>
+cd bottie-trading-bot
 
 # Install dependencies
 pip install -r requirements.txt
+
+# Set environment variables
+export BINANCE_API_KEY="your_binance_api_key"
+export BINANCE_API_SECRET="your_binance_secret"
+export FINNHUB_API_KEY="your_finnhub_key"
+
+# Run locally
+python render_api.py
 ```
 
-### 2. Configure Environment
+### **Render Deployment**
+1. Connect GitHub repository to Render
+2. Set environment variables in Render dashboard:
+   - `BINANCE_API_KEY`
+   - `BINANCE_API_SECRET` 
+   - `FINNHUB_API_KEY`
+3. Deploy using `render.yaml` configuration
+
+## 📡 **API Endpoints**
+
+### **Core Trading**
+- `GET /status` - Main dashboard with fee-inclusive P&L
+- `GET /positions` - All positions with net profitability
+- `GET /trades` - Complete trade history (hundreds of trades)
+- `GET /signals` - Adaptive ML trading signals
+
+### **Machine Learning**
+- `GET /ml/status` - Real ML performance metrics
+- `GET /ml/pair-analysis/{symbol}` - Detailed per-pair analysis
+- `GET /ml/learning-summary` - System-wide learning status
+- `GET /ml/brier-score` - Prediction accuracy metrics
+
+### **Advanced Analytics**
+- `GET /analytics/advanced` - Professional risk metrics
+- `GET /quantum/analysis` - Quantum-inspired portfolio optimization
+- `GET /grid/matrix` - Cross-pair arbitrage opportunities
+- `GET /sentiment` - Real-time news sentiment analysis
+
+## 🧠 **Adaptive ML System**
+
+### **How It Works**
+1. **Individual Pair Learning**: Each trading pair (BTC/USDT, ETH/USDT, etc.) has its own ML model
+2. **Performance Tracking**: Win rate, P&L, and confidence calculated per pair
+3. **Dynamic Thresholds**: Buy/sell thresholds adjust based on historical performance
+4. **Autonomous Execution**: System decides when to trade based on confidence levels
+
+### **Threshold Adaptation**
+```python
+# High confidence pairs (>80% confidence, >70% win rate)
+buy_threshold = 0.55   # More aggressive
+sell_threshold = 0.45
+
+# Medium confidence pairs
+buy_threshold = 0.65   # Balanced
+sell_threshold = 0.35
+
+# Low confidence pairs (<50% confidence)
+buy_threshold = 0.80   # Very conservative  
+sell_threshold = 0.20
+```
+
+### **Autonomous Readiness**
+- **Per-pair ready**: Confidence > 0.7 + minimum 20 trades
+- **System ready**: >80% of pairs meet readiness criteria
+- **Full autonomy**: No human intervention needed
+
+## 💰 **Fee Management**
+
+### **Comprehensive Fee Tracking**
+- **Trading fees**: 0.1% standard Binance rate
+- **Round-trip estimates**: 0.2% for position calculations
+- **Historical tracking**: All fees paid per trading pair
+- **Impact analysis**: How fees affect profitability
+
+### **Fee-Inclusive Calculations**
+```json
+{
+  "equity": {
+    "gross": 1500.00,      // Raw balance
+    "net": 1485.50,        // After fees
+    "display_value": 1485.50  // What users see
+  },
+  "positions": {
+    "BTC/USDT": {
+      "gross_pnl": 150.00,
+      "net_pnl": 147.50,     // After fees
+      "estimated_fees": 2.50,
+      "total_fees_impact": 7.70
+    }
+  }
+}
+```
+
+## 📊 **Data Sources**
+
+### **Real-Time Feeds**
+- **Binance WebSocket**: Account updates, trade executions, price feeds
+- **Finnhub API**: News sentiment analysis for major cryptocurrencies
+- **Technical Indicators**: Price momentum, volume analysis, volatility
+
+### **Persistent Storage**
+- `ml_pair_performance.json` - ML learning data
+- `stored_trades.json` - Complete trade history
+- `trades_cache.json` - Recent trade cache
+
+## 🎯 **Performance Metrics**
+
+### **Trading Performance**
+- **Win Rate**: Percentage of profitable trades per pair
+- **Profit Factor**: Ratio of winning to losing trades
+- **Sharpe Ratio**: Risk-adjusted returns
+- **Maximum Drawdown**: Largest loss from peak
+- **Calmar Ratio**: Return vs. maximum drawdown
+
+### **ML Performance**
+- **Brier Score**: Prediction accuracy (0.0 = perfect, 1.0 = worst)
+- **Confidence Evolution**: How confidence changes over time
+- **Learning Progress**: Accuracy improvement trends
+- **Feature Importance**: Which factors drive decisions
+
+## 🚨 **Risk Management**
+
+### **Position Limits**
+- Maximum 30% portfolio exposure per position
+- Fee-adjusted stop losses and take profits
+- Confidence-based position sizing
+- Cross-pair correlation analysis
+
+### **Autonomous Safeguards**
+- Only trades when ML confidence > 70%
+- Minimum 20 trades required for autonomy
+- Fee impact considered in all decisions
+- Real-time risk monitoring
+
+## 🔧 **Configuration**
+
+### **Environment Variables**
 ```bash
-# Copy and edit configuration
-cp .env.example .env
-# Edit .env with your API keys and email settings
+# Required
+BINANCE_API_KEY=your_api_key
+BINANCE_API_SECRET=your_secret_key
+FINNHUB_API_KEY=your_finnhub_key
+
+# Optional
+SENTIMENT_ENABLED=1
+SENTIMENT_WINDOW_S=900
+SENTIMENT_ASSETS=BTC,ETH,BNB,SOL,ADA
 ```
 
-### 3. Run the Bot
+### **ML Configuration**
+- **Confidence Threshold**: 0.7 (70% confidence required)
+- **Minimum Trades**: 20 trades per pair for autonomy
+- **Learning Window**: Last 1000 predictions per pair
+- **Fee Rate**: 0.1% standard, 0.2% round-trip estimate
+
+## 📈 **Usage Examples**
+
+### **Check System Status**
 ```bash
-# Start headless trading bot
-python headless_bot.py
-
-# Or run with Docker
-docker build -t trading-bot .
-docker run -d --name bot --env-file .env trading-bot
+curl https://your-render-app.onrender.com/status
 ```
 
-## 📁 Project Structure
-
-```
-├── headless_bot.py          # 🎯 Main entry point
-├── engine/                  # ⚙️ Core trading logic
-│   ├── trading_core.py      #    Market data & execution
-│   ├── decision_engine.py   #    AI signal generation
-│   ├── portfolio_manager.py #    Position management
-│   └── risk_manager.py      #    Risk controls
-├── ml/                      # 🧠 Machine learning models
-│   ├── lstm_model.py        #    LSTM price predictor
-│   ├── xgb_model.py         #    XGBoost classifier
-│   └── decision_engine.py   #    Ensemble logic
-├── quantum/                 # 🔮 IBM Quantum computing
-│   ├── hybrid_models.py     #    Self-learning quantum ensemble
-│   ├── qml_models.py        #    Variational quantum circuits
-│   ├── portfolio_optimizer.py # QAOA portfolio optimization
-│   ├── quantum_features.py #    Quantum feature encoding  
-│   ├── backends.py          #    IBM Quantum backend management
-│   └── healthcheck.py       #    Quantum system monitoring
-├── agent_core/              # 🤖 Multi-agent architecture
-│   ├── memory.py            #    Persistent learning memory
-│   ├── planner.py           #    Strategic decision planning
-│   └── reflector.py         #    Performance self-analysis
-├── sentiment/               # 📰 News sentiment analysis
-├── reporting/               # 📧 Email reports & logging
-│   ├── email_reporter.py    #    HTML email generation
-│   └── metrics_logger.py    #    CSV data logging
-├── models/                  # 💾 Trained model files
-├── training/                # 🎓 Model training scripts
-└── logs/                    # 📋 Trading logs (auto-created)
-```
-
-## ⚙️ Configuration
-
-### Required Environment Variables (.env)
+### **Get Trading Signals**
 ```bash
-# Trading Configuration
-BINANCE_API_KEY=your_binance_api_key
-BINANCE_SECRET_KEY=your_binance_secret
-MODE=paper  # or 'live' for real trading
-
-# Email Reporting
-BOT_EMAIL=your.bot.email@gmail.com
-BOT_EMAIL_PASSWORD=your_app_password
-REPORT_RECIPIENT_EMAIL=alerts@yourdomain.com
-SMTP_SERVER=smtp.gmail.com
-SMTP_PORT=587
-
-# Trading Parameters
-INITIAL_CAPITAL=10000
-RISK_PER_TRADE=0.02
-MAX_POSITIONS=3
+curl https://your-render-app.onrender.com/signals
 ```
 
-### Binance API Setup
-1. Create API key at [Binance API Management](https://www.binance.com/en/my/settings/api-management)
-2. Enable "Enable Trading" for live trading
-3. Restrict to your server IP for security
-4. **Disable withdrawal permissions**
-
-### Email Setup (Gmail)
-1. Enable 2FA on your Gmail account
-2. Generate App Password: Account Settings → Security → App passwords
-3. Use the app password (not your regular password) in `.env`
-
-## 📊 Monitoring & Reports
-
-### Daily Email Reports Include:
-- 📈 Portfolio performance summary
-- 💰 Daily P&L and win rate
-- 🎯 Recent trading signals
-- ⚠️ Error alerts and system status
-
-### Log Files Generated:
-- `logs/trades.csv` - Executed trades with P&L
-- `logs/signals.csv` - All trading signals generated
-- `logs/bot.log` - System logs and errors
-- `logs/daily_metrics.jsonl` - Daily performance metrics
-
-## 🧠 Advanced AI/Quantum Architecture
-
-### 🎯 **Self-Learning Ensemble**:
-1. **Quantum VQC** (30% weight) - Self-adapting quantum circuits with parameter evolution
-2. **LSTM Model** (35% weight) - Deep learning with quantum-enhanced features  
-3. **XGBoost Model** (35% weight) - Gradient boosting with quantum preprocessing
-
-### 🔄 **Adaptive Learning Process**:
-- **Real-time Model Updates**: Quantum parameters adjust based on trading performance
-- **Multi-Agent Architecture**: Trend, mean-reversion, and risk agents with quantum coordination
-- **Walk-Forward Optimization**: Continuous retraining with quantum-enhanced backtesting
-- **Regime Detection**: Quantum classifiers identify market regime changes
-
-### 🧬 **Quantum Signal Generation**:
-- **BUY**: Quantum ensemble confidence > 60% with positive entanglement
-- **SELL**: Quantum ensemble confidence < 40% with negative correlation patterns
-- **HOLD**: Quantum uncertainty state (40-60% confidence)
-- **QUANTUM BOOST**: Special high-confidence signals when quantum advantage is detected
-
-### 📈 **Performance Tracking**:
+### **Analyze Specific Pair**
 ```bash
-# Monitor quantum vs classical performance
-python quantum/healthcheck.py
-
-# View quantum circuit evolution
-python dashboard/pages/quantum_featuremap_viewer.py
-
-# Compare model performance
-tail -f logs/quantum_metrics.jsonl
+curl https://your-render-app.onrender.com/ml/pair-analysis/BTC/USDT
 ```
 
-## 🔮 Advanced Quantum Computing Features
-
-This bot leverages **IBM Quantum's cutting-edge technology** for superior market prediction and portfolio optimization:
-
-### 🧬 **Quantum Machine Learning**
-- **Variational Quantum Classifiers (VQC)**: Self-learning quantum neural networks
-- **Quantum Feature Maps**: ZZ, Pauli, and RealAmplitudes encodings for complex price patterns
-- **Quantum Kernel Methods**: Advanced pattern recognition in high-dimensional market data
-- **Hybrid Quantum-Classical Ensemble**: 30% quantum weight in decision making
-
-### 🎯 **Quantum Portfolio Optimization**
-- **QAOA Algorithm**: Quantum Approximate Optimization for asset selection
-- **Quantum Annealing**: Optimal portfolio weights using quantum superposition
-- **Risk-Return Optimization**: Quantum-enhanced Markowitz optimization
-- **Dynamic Rebalancing**: Real-time quantum portfolio adjustments
-
-### 🔄 **Self-Learning Quantum Systems**
-- **Adaptive Circuit Depth**: Automatically adjusts quantum circuit complexity
-- **Parameter Evolution**: Quantum weights evolve based on market performance
-- **Quantum Memory**: Stores successful trading patterns in quantum states
-- **Online Learning**: Continuous quantum model updates with new market data
-
-### 🌐 **IBM Quantum Integration**
-- **Real Quantum Hardware**: Access to IBM's quantum computers (when available)
-- **Quantum Simulators**: High-fidelity quantum simulation fallback
-- **Backend Selection**: Automatic selection of best available quantum backend
-- **Error Mitigation**: Advanced quantum error correction techniques
-
-### 📊 **Quantum Advantage Metrics**
-- **Circuit Visualization**: Real-time quantum circuit inspection
-- **Quantum Metrics Tracking**: Quantum vs classical performance comparison
-- **Entanglement Analysis**: Quantum correlation measurements
-- **Coherence Monitoring**: Quantum state quality assessment
-
-### Quantum Dependencies & Setup:
+### **View Advanced Analytics**
 ```bash
-# Install IBM Quantum libraries
-pip install qiskit qiskit-machine-learning qiskit-optimization qiskit-ibm-provider
-
-# Set up IBM Quantum credentials
-export IBMQ_API_KEY="your_ibm_quantum_api_key"
-
-# Test quantum backend access
-python scripts/verify_ibmq.py
+curl https://your-render-app.onrender.com/analytics/advanced
 ```
 
-### Quantum Configuration:
-```bash
-# Add to .env file
-IBMQ_API_KEY=your_ibm_quantum_api_key
-QUANTUM_BACKEND=ibmq_qasm_simulator  # or real hardware
-QUANTUM_SHOTS=1024
-ENABLE_QUANTUM=true
-```
+## 🔍 **Monitoring & Debugging**
 
-## 🐳 Docker Deployment
+### **Key Logs to Monitor**
+- WebSocket connection status
+- ML learning progress per pair
+- Fee calculation accuracy
+- Trade execution results
 
-### Build and Run:
-```bash
-# Build image
-docker build -t headless-trading-bot .
+### **Health Checks**
+- `/health` - System status
+- `/debug/exchange` - Exchange connection
+- `/debug/sentiment` - Sentiment service status
 
-# Run container
-docker run -d \
-  --name trading-bot \
-  --env-file .env \
-  --restart unless-stopped \
-  -v $(pwd)/logs:/app/logs \
-  -v $(pwd)/models:/app/models \
-  headless-trading-bot
-```
+## 🚀 **Deployment Checklist**
 
-### Monitor Container:
-```bash
-# View logs
-docker logs -f trading-bot
+### **Pre-Deployment**
+- [ ] Set all environment variables in Render
+- [ ] Verify Binance API permissions (trading enabled)
+- [ ] Test Finnhub API key
+- [ ] Review risk management settings
 
-# Check status
-docker stats trading-bot
+### **Post-Deployment**
+- [ ] Verify WebSocket connections
+- [ ] Check ML learning initialization
+- [ ] Monitor first trades for fee calculations
+- [ ] Validate sentiment data integration
 
-# Access container
-docker exec -it trading-bot bash
-```
+## 📚 **Advanced Features**
 
-## 🛡️ Security Best Practices
+### **Quantum-Inspired Algorithms**
+- **Superposition**: Price probability distributions
+- **Entanglement**: Asset correlation analysis  
+- **Interference**: Market pattern detection
+- **Portfolio Optimization**: Quantum-enhanced rebalancing
 
-- ✅ Use paper trading mode initially
-- ✅ Restrict Binance API to specific IPs
-- ✅ Disable withdrawal permissions on API key
-- ✅ Store API keys in environment variables only
-- ✅ Regular monitoring of trading activity
-- ✅ Set reasonable position sizing limits
+### **Sentiment Integration**
+- **Real-time news**: Finnhub API integration
+- **Multi-asset analysis**: BTC, ETH, SOL, ADA, etc.
+- **Sentiment scoring**: VADER sentiment analysis
+- **Market correlation**: Sentiment vs. performance
 
-## 📈 Performance Optimization
+### **Grid Matrix Trading**
+- **Cross-pair opportunities**: Find arbitrage between pairs
+- **Atomic swaps**: Direct crypto-to-crypto trades
+- **Risk scoring**: Confidence-based opportunity ranking
+- **Execution recommendations**: When and how to trade
 
-### Recommended VPS Specs:
-- **CPU**: 2+ cores
-- **RAM**: 4GB minimum (8GB recommended)
-- **Storage**: 20GB SSD
-- **Network**: Stable internet connection
+## 🤝 **Contributing**
 
-### Monitoring Commands:
-```bash
-# Check bot status
-ps aux | grep headless_bot
-
-# Monitor resource usage
-htop
-
-# Check recent trades
-tail -f logs/trades.csv
-
-# View email reports
-cat logs/daily_metrics.jsonl | tail -1 | jq
-```
-
-## 🔧 Troubleshooting
-
-### Common Issues:
-
-**Bot not starting:**
-```bash
-# Check Python path and dependencies
-python --version
-pip list | grep -E "(ccxt|pandas|tensorflow)"
-```
-
-**No email reports:**
-```bash
-# Test email configuration
-python -c "from reporting.email_reporter import EmailReporter; EmailReporter().send_error_alert('Test')"
-```
-
-**Trading errors:**
-```bash
-# Check API connectivity
-python -c "import ccxt; print(ccxt.binance({'apiKey': 'test'}).fetch_ticker('BTC/USDT'))"
-```
-
-### Log Locations:
-- System logs: `logs/bot.log`
-- Trading activity: `logs/trades.csv`
-- Error details: Check email alerts
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create feature branch: `git checkout -b feature-name`
-3. Commit changes: `git commit -am 'Add feature'`
-4. Push branch: `git push origin feature-name`
+### **Development Workflow**
+1. Fork repository
+2. Create feature branch
+3. Implement changes with tests
+4. Update documentation
 5. Submit pull request
 
-## ⚠️ Disclaimer
+### **Code Standards**
+- Fee-inclusive calculations required
+- ML confidence tracking mandatory
+- WebSocket error handling essential
+- Comprehensive logging for debugging
 
-This software is for educational and research purposes. Cryptocurrency trading involves substantial risk of loss. The authors are not responsible for any financial losses incurred through the use of this software.
+## 📄 **License**
 
-**Always test thoroughly in paper trading mode before using real funds.**
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 📄 License
+## ⚠️ **Disclaimer**
 
-MIT License - see LICENSE file for details.
+**IMPORTANT**: This is an autonomous trading system that can execute real trades with real money. 
 
-## 🌟 Support
+- **Use at your own risk**: Cryptocurrency trading involves substantial risk
+- **Test thoroughly**: Use testnet/sandbox mode before live trading
+- **Monitor actively**: Even autonomous systems need supervision
+- **Understand fees**: All trading involves costs that affect profitability
+- **Start small**: Begin with small amounts to verify system behavior
 
-- 📧 Email: support@rondaninipublishing.com
-- 🐛 Issues: [GitHub Issues](https://github.com/luigipascal/Bottie/issues)
-- 📖 Documentation: [Wiki](https://github.com/luigipascal/Bottie/wiki)
+**Past performance does not guarantee future results. Only trade with money you can afford to lose.**
 
 ---
 
-**Made with ❤️ by Rondanini Publishing Ltd** 
+**🤖 Bottie - Where AI meets autonomous crypto trading** 
+
+*Built with adaptive machine learning, quantum-inspired algorithms, and complete fee transparency.* 
