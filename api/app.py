@@ -11,6 +11,7 @@ import logging
 from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from . import diagnostics
 
 # Load environment variables from .env file
 try:
@@ -40,6 +41,9 @@ except Exception as e:
 
 # FastAPI app for real trading
 app = FastAPI(title="Bottie API (Real Trading)", version="4.0.0")
+
+# include version diagnostics
+app.include_router(diagnostics.router)
 
 # CORS setup
 app.add_middleware(

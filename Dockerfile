@@ -21,9 +21,7 @@ COPY . .
 
 # Render provides $PORT; default to 10000
 ENV PORT=10000
-
-# Expose for clarity (Render doesn’t require EXPOSE, but it’s fine)
 EXPOSE 10000
 
-# Start API (uses $PORT from Render)
-CMD ["sh", "-c", "uvicorn api.app:app --host 0.0.0.0 --port ${PORT}"] 
+# Stamp the image with Render commit SHA and start API
+CMD ["sh", "-c", "v=${RENDER_GIT_COMMIT:-unknown}; echo $v > /app/VERSION; echo \"Running commit: $v\"; uvicorn api.app:app --host 0.0.0.0 --port ${PORT}"] 
