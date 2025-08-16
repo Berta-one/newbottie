@@ -32,9 +32,7 @@ function autoLogin() {
     return;
   }
   
-  // Auto-login as admin with correct credentials (fallback)
-  currentUser = { username: 'admin', role: 'admin' };
-  authToken = 'auto-login-token';
+    // Removed fake token and user logic. Only real authentication is allowed.
   
   // Update UI immediately
   updateUI();

@@ -922,14 +922,14 @@
 </header>
 
 <!-- Tab Navigation -->
-<div class="dashboard-tabs" id="dashboard-tabs" style="display: none;">
+<div class="dashboard-tabs" id="dashboard-tabs" style="display: flex;">
   <button class="tab-btn active" data-tab="trading">📊 Trading</button>
   <button class="tab-btn" data-tab="ml-monitor">🧠 ML Learning</button>
   <button class="tab-btn" data-tab="quantum">⚡ Quantum Analysis</button>
   <button class="tab-btn" data-tab="sentiment">📰 Sentiment Analysis</button>
 </div>
 
-<main id="main-content" style="display: none;">
+<main id="main-content" style="display: block;">
   
   <!-- Trading Tab -->
   <div id="trading-tab" class="tab-content active">
@@ -960,81 +960,7 @@
           <span class="k">ML Loaded:</span>
           <span class="v" id="ml-loaded">—</span>
         </div>
-        <div class="kv">
-          <span class="k">ML Path:</span>
-          <span class="v" id="ml-path">—</span>
-        </div>
-        <div class="kv">
-          <span class="k">Sentiment Chip:</span>
-          <span class="v" id="sent-chip">—</span>
-        </div>
-        <div class="kv">
-          <span class="k">Sentiment Enabled:</span>
-          <span class="v" id="sent-enabled">—</span>
-        </div>
-        <div class="kv">
-          <span class="k">Sentiment Source:</span>
-          <span class="v" id="sent-source">—</span>
-        </div>
-        <div class="kv">
-          <span class="k">Sentiment Window:</span>
-          <span class="v" id="sent-window">—</span>
-        </div>
-      </div>
-
-      <!-- Quick ML Status -->
-      <div class="card">
-        <div class="card-header">
-          <h3>🧠 ML Quick Status</h3>
-          <span id="ml-health-chip" class="ml-health-indicator">Unknown</span>
-        </div>
-        <div class="ml-quick-status">
-          <div class="ml-quick-metric">
-            <div class="ml-quick-label">Accuracy</div>
-            <div class="ml-quick-value" id="ml-quick-accuracy">—</div>
-          </div>
-          <div class="ml-quick-metric">
-            <div class="ml-quick-label">Confidence</div>
-            <div class="ml-quick-value" id="ml-quick-confidence">—</div>
-          </div>
-          <div class="ml-quick-metric">
-            <div class="ml-quick-label">Brier Score</div>
-            <div class="ml-quick-value" id="ml-quick-brier" title="Lower is better (0=perfect, 0.25=random)">—</div>
-          </div>
-          <div class="ml-quick-metric">
-            <div class="ml-quick-label">Predictions</div>
-            <div class="ml-quick-value" id="ml-quick-predictions">—</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Current Signals -->
-      <div class="card">
-        <div class="card-header">
-          <h3>📡 Current Signals</h3>
-        </div>
-        <div style="overflow-x: auto;">
-          <table id="signals-table" class="data-table">
-            <thead>
-              <tr>
-                <th>Symbol</th>
-                <th>Signal</th>
-                <th>Final Prob</th>
-                <th>EMA</th>
-                <th>ML</th>
-                <th>Quantum</th>
-                <th>Sentiment</th>
-                <th>Weights</th>
-                <th>Thresholds</th>
-                <th>Age</th>
-              </tr>
-            </thead>
-            <tbody>
-              <!-- Filled by JS -->
-            </tbody>
-          </table>
-        </div>
-      </div>
+  ...existing code...
 
       <!-- Sentiment Analysis -->
       <div class="card">
@@ -1198,83 +1124,6 @@
         </div>
       </div>
 
-      <!-- MAXI GRID: Portfolio (rows) × Top 50 Volume Leaders (columns) -->
-      <div class="card maxi-grid-card">
-        <h3>🏛️ Professional Trading Grid (Portfolio × Top 50 Volume)</h3>
-        <div class="grid-header">
-          <span class="grid-subtitle">Portfolio holdings (Y) vs Top 50 volume cryptos (X) • Max 300 pairs • WebSocket-powered</span>
-          <span id="grid-last-ts" class="grid-timestamp">—</span>
-        </div>
-        
-        <!-- Grid Stats -->
-        <div style="display: flex; gap: 16px; margin-bottom: 12px; font-size: 11px; flex-wrap: wrap;">
-          <div style="color: #64ffda;">
-            <span style="color: #8892b0;">Portfolio Holdings:</span> 
-            <span id="grid-portfolio-count">—</span>
-          </div>
-          <div style="color: #64ffda;">
-            <span style="color: #8892b0;">Volume Leaders:</span> 
-            <span id="grid-volume-count">—</span>
-          </div>
-          <div style="color: #64ffda;">
-            <span style="color: #8892b0;">Opportunities:</span> 
-            <span id="grid-total-pairs">—</span>
-          </div>
-          <div style="color: #4caf50;">
-            <span style="color: #8892b0;">High Confidence:</span> 
-            <span id="grid-high-conf-pairs">—</span>
-          </div>
-          <div style="color: #4caf50;">
-            <span style="color: #8892b0;">Buy Signals:</span> 
-            <span id="grid-buy-signals">—</span>
-          </div>
-          <div style="color: #f44336;">
-            <span style="color: #8892b0;">Sell Signals:</span> 
-            <span id="grid-sell-signals">—</span>
-          </div>
-          <div style="color: #64ffda;">
-            <span style="color: #8892b0;">Avg Confidence:</span> 
-            <span id="grid-avg-confidence">—</span>
-          </div>
-        </div>
-
-        <!-- Grid Controls -->
-        <div id="grid-controls" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:0 0 10px 0;">
-          <label style="font-size:12px;color:#8892b0;">
-            Min confidence:
-            <input id="grid-min-conf" type="range" min="0" max="1" step="0.05" value="0" style="vertical-align:middle;margin-left:6px;">
-            <span id="grid-min-conf-val" style="margin-left:6px;color:#64ffda;">0%</span>
-          </label>
-
-          <label style="font-size:12px;color:#8892b0;">
-            Show only tradable cells
-            <input id="grid-only-tradable" type="checkbox" style="margin-left:6px;">
-          </label>
-
-          <div style="margin-left:auto;display:flex;align-items:center;gap:10px;">
-            <span style="font-size:12px;color:#8892b0;">Legend:</span>
-            <span class="chip grid-buy" style="border:none;">BUY</span>
-            <span class="chip grid-hold" style="border:none;">HOLD</span>
-            <span class="chip grid-sell" style="border:none;">SELL</span>
-          </div>
-        </div>
-
-        <div class="grid-container">
-          <table id="maxi-grid" class="data-table">
-            <thead id="maxi-grid-thead">
-              <!-- filled by JS -->
-            </thead>
-            <tbody id="maxi-grid-tbody">
-              <!-- filled by JS -->
-            </tbody>
-          </table>
-        </div>
-        
-        <!-- Atomic Swap Opportunities -->
-        <div id="atomic-swap-opportunities" class="atomic-swap-container" style="margin-top: 15px; padding: 10px; border: 1px solid #2a3441; border-radius: 6px; background: rgba(100, 255, 218, 0.05);">
-          <!-- Filled by JS -->
-        </div>
-      </div>
 
       <!-- System Logs -->
       <div class="card">
@@ -1502,36 +1351,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td><strong>BTC</strong></td>
-                <td style="color: #4caf50; font-weight: 600;">+0.78</td>
-                <td><span style="color: #4caf50;">↗ +0.12</span></td>
-                <td>2.4K mentions</td>
-              </tr>
-              <tr>
-                <td><strong>ETH</strong></td>
-                <td style="color: #4caf50; font-weight: 600;">+0.65</td>
-                <td><span style="color: #4caf50;">↗ +0.08</span></td>
-                <td>1.8K mentions</td>
-              </tr>
-              <tr>
-                <td><strong>SOL</strong></td>
-                <td style="color: #4caf50; font-weight: 600;">+0.58</td>
-                <td><span style="color: #ff9800;">→ +0.02</span></td>
-                <td>945 mentions</td>
-              </tr>
-              <tr>
-                <td><strong>ADA</strong></td>
-                <td style="color: #64ffda; font-weight: 600;">+0.12</td>
-                <td><span style="color: #ff9800;">→ -0.01</span></td>
-                <td>673 mentions</td>
-              </tr>
-              <tr>
-                <td><strong>XRP</strong></td>
-                <td style="color: #f44336; font-weight: 600;">-0.23</td>
-                <td><span style="color: #f44336;">↘ -0.15</span></td>
-                <td>1.2K mentions</td>
-              </tr>
+              <!-- Filled by JS with real data -->
             </tbody>
           </table>
         </div>
