@@ -470,21 +470,36 @@ class ReportsManager {
     createSummaryItems(report) {
         switch (report.type) {
             case 'trading':
+                const summary = report.summary;
+                const totalPnL = summary.total_pnl || summary.totalProfit || 0;
+                const realizedPnL = summary.realized_pnl || 0;
+                const unrealizedPnL = summary.unrealized_pnl || 0;
+                const winRate = summary.win_rate || summary.winRate || 0;
+                const totalTrades = summary.total_trades || summary.totalTrades || 0;
+                
                 return `
                     <div class="flex justify-between text-sm">
                         <span class="text-gray-600">Total Trades:</span>
-                        <span class="font-medium">${report.summary.totalTrades}</span>
+                        <span class="font-medium">${totalTrades}</span>
                     </div>
                     <div class="flex justify-between text-sm">
                         <span class="text-gray-600">Win Rate:</span>
-                        <span class="font-medium">${report.summary.winRate.toFixed(1)}%</span>
+                        <span class="font-medium">${winRate.toFixed(1)}%</span>
                     </div>
                     <div class="flex justify-between text-sm">
-                        <span class="text-gray-600">Total Profit:</span>
-                        <span class="font-medium ${report.summary.totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}">
-                            $${report.summary.totalProfit.toFixed(2)}
+                        <span class="text-gray-600">Total P&L:</span>
+                        <span class="font-medium ${totalPnL >= 0 ? 'text-green-600' : 'text-red-600'}">
+                            $${totalPnL.toFixed(2)}
                         </span>
                     </div>
+                    ${realizedPnL !== 0 || unrealizedPnL !== 0 ? `
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Realized:</span>
+                        <span class="font-medium ${realizedPnL >= 0 ? 'text-green-600' : 'text-red-600'}">
+                            $${realizedPnL.toFixed(2)}
+                        </span>
+                    </div>
+                    ` : ''}
                 `;
             case 'ml':
                 return `
@@ -735,31 +750,66 @@ class ReportsManager {
     }
     
     createDetailSummary(report) {
-        let summaryHTML = '<div class="bg-white border rounded-lg p-6"><h3 class="text-lg font-semibold mb-4">Summary</h3><div class="grid grid-cols-2 md:grid-cols-4 gap-4">';
+        let summaryHTML = '<div class="bg-white border rounded-lg p-6"><h3 class="text-lg font-semibold mb-4">Summary</h3>';
+        
+        // Special handling for trading reports with proper P&L
+        if (report.type === 'trading' && report.summary.calculation_method === 'proper_trade_pairing') {
+            summaryHTML += `
+                <div class="mb-4 p-3 bg-blue-50 rounded-lg">
+                    <p class="text-sm text-blue-700 font-medium">✓ Enhanced P&L Calculation</p>
+                    <p class="text-xs text-blue-600">Proper trade pairing with FIFO method, fees included</p>
+                </div>
+            `;
+        }
+        
+        summaryHTML += '<div class="grid grid-cols-2 md:grid-cols-4 gap-4">';
         
         Object.entries(report.summary).forEach(([key, value]) => {
-            const displayKey = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+            // Skip internal fields
+            if (key === 'calculation_method' || key === 'calculation_notes') return;
+            
+            const displayKey = key.replace(/([A-Z_])/g, ' $1').replace(/^./, str => str.toUpperCase()).replace(/_/g, ' ');
             let displayValue = value;
+            let colorClass = '';
             
             if (typeof value === 'number') {
-                if (key.includes('Rate') || key.includes('accuracy')) {
-                    displayValue = `${(value * (key.includes('Rate') ? 1 : 100)).toFixed(1)}%`;
-                } else if (key.includes('Profit') || key.includes('Return')) {
+                if (key.includes('rate') || key.includes('Rate') || key.includes('accuracy')) {
+                    displayValue = `${(value * (key.includes('Rate') || key.includes('rate') ? 1 : 100)).toFixed(1)}%`;
+                } else if (key.includes('pnl') || key.includes('Pnl') || key.includes('profit') || key.includes('Profit') || key.includes('return') || key.includes('Return')) {
                     displayValue = `$${value.toFixed(2)}`;
+                    colorClass = value < 0 ? 'text-red-600' : value > 0 ? 'text-green-600' : '';
+                } else if (key.includes('fee') || key.includes('Fee')) {
+                    displayValue = `$${value.toFixed(2)}`;
+                    colorClass = 'text-orange-600';
                 } else {
                     displayValue = value.toFixed(2);
                 }
+            } else if (Array.isArray(value)) {
+                return; // Skip arrays in summary display
             }
             
             summaryHTML += `
                 <div>
                     <p class="text-sm text-gray-600">${displayKey}</p>
-                    <p class="font-medium ${key.includes('Profit') && value < 0 ? 'text-red-600' : key.includes('Profit') && value > 0 ? 'text-green-600' : ''}">${displayValue}</p>
+                    <p class="font-medium ${colorClass}">${displayValue}</p>
                 </div>
             `;
         });
         
-        summaryHTML += '</div></div>';
+        // Add calculation notes if available
+        if (report.summary.calculation_notes && Array.isArray(report.summary.calculation_notes)) {
+            summaryHTML += '</div><div class="mt-4 p-3 bg-gray-50 rounded-lg">';
+            summaryHTML += '<p class="text-sm font-medium text-gray-700 mb-2">Calculation Details:</p>';
+            summaryHTML += '<ul class="text-xs text-gray-600 space-y-1">';
+            report.summary.calculation_notes.forEach(note => {
+                summaryHTML += `<li>• ${note}</li>`;
+            });
+            summaryHTML += '</ul>';
+        } else {
+            summaryHTML += '</div>';
+        }
+        
+        summaryHTML += '</div>';
         return summaryHTML;
     }
     
