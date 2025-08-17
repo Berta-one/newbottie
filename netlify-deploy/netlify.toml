@@ -1,10 +1,11 @@
-[build]
+﻿[build]
   publish = "."
-  command = "echo 'Static site - no build required'"
+  command = "echo 'Pure static site deployment'"
 
 [build.environment]
-  PYTHON_VERSION = "3.11"
-
+  # Prevent Python detection
+  PYTHON_VERSION = ""
+  
 [[redirects]]
   from = "/api/*"
   to = "https://bottie-1.onrender.com/:splat"
@@ -13,15 +14,5 @@
 
 [[redirects]]
   from = "/"
-  to = "/dashboard.html"
-  status = 200
-
-[[redirects]]
-  from = "/reports"
-  to = "/dashboard.html"
-  status = 200
-
-[[redirects]]
-  from = "/*"
-  to = "/dashboard.html"
+  to = "/reports.html"
   status = 200

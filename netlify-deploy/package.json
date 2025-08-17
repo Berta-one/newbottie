@@ -1,9 +1,10 @@
-{
+﻿{
   "name": "bottie-reports-static",
   "version": "1.0.0",
-  "description": "Static HTML site",
+  "description": "Pure static HTML/CSS/JS site",
+  "main": "reports.html",
   "scripts": {
-    "build": "echo 'No build needed'"
+    "build": "echo Static site - no build needed"
   },
   "dependencies": {},
   "devDependencies": {}
