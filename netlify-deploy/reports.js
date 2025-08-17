@@ -986,7 +986,9 @@ class ReportsManager {
                 
                 <div class="bg-white border rounded-lg p-6">
                     <h3 class="text-lg font-semibold mb-4">Data Visualization</h3>
-                    <canvas id="reportChart_${report.id}" width="400" height="200"></canvas>
+                    <div class="h-64 w-full">
+                        <canvas id="reportChart_${report.id}" class="max-h-64"></canvas>
+                    </div>
                 </div>
                 
                 ${this.createDetailData(report)}
@@ -1116,22 +1118,50 @@ class ReportsManager {
         let chartData = {};
         let chartOptions = {
             responsive: true,
-            maintainAspectRatio: false
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        boxWidth: 12,
+                        font: {
+                            size: 11
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: {
+                        maxTicksLimit: 10,
+                        font: {
+                            size: 10
+                        }
+                    }
+                },
+                y: {
+                    ticks: {
+                        font: {
+                            size: 10
+                        }
+                    }
+                }
+            }
         };
         
         switch (report.type) {
             case 'trading':
                 if (Array.isArray(report.data)) {
                     const profits = report.data.map(t => t.profit);
-                    const labels = report.data.map((t, i) => `Trade ${i + 1}`);
+                    const labels = report.data.map((t, i) => `T${i + 1}`);  // Shorter labels
                     
                     chartData = {
-                        labels: labels.slice(0, 20),
+                        labels: labels.slice(0, 15),  // Fewer data points
                         datasets: [{
-                            label: 'Profit/Loss',
-                            data: profits.slice(0, 20),
-                            backgroundColor: profits.slice(0, 20).map(p => p >= 0 ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.5)'),
-                            borderColor: profits.slice(0, 20).map(p => p >= 0 ? 'rgba(34, 197, 94, 1)' : 'rgba(239, 68, 68, 1)'),
+                            label: 'P&L',  // Shorter label
+                            data: profits.slice(0, 15),
+                            backgroundColor: profits.slice(0, 15).map(p => p >= 0 ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.5)'),
+                            borderColor: profits.slice(0, 15).map(p => p >= 0 ? 'rgba(34, 197, 94, 1)' : 'rgba(239, 68, 68, 1)'),
                             borderWidth: 1
                         }]
                     };
@@ -1170,15 +1200,16 @@ class ReportsManager {
                 
             default:
                 // Simple line chart for other types
-                const randomData = Array.from({length: 10}, () => Math.random() * 100);
+                const randomData = Array.from({length: 8}, () => Math.random() * 100);
                 chartData = {
-                    labels: Array.from({length: 10}, (_, i) => `Point ${i + 1}`),
+                    labels: Array.from({length: 8}, (_, i) => `P${i + 1}`),
                     datasets: [{
-                        label: 'Data Points',
+                        label: 'Data',
                         data: randomData,
                         borderColor: 'rgba(59, 130, 246, 1)',
                         backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        tension: 0.4
+                        tension: 0.4,
+                        pointRadius: 3
                     }]
                 };
                 
