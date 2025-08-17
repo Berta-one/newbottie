@@ -4,7 +4,7 @@ vaderSentiment
 numpy
 pandas
 joblib
-scikit-learn==1.4.2
+scikit-learn==1.3.2
 xgboost==1.7.6
 qiskit
 qiskit-aer
