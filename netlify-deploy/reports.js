@@ -71,13 +71,20 @@ class ReportsManager {
     
     async fetchTradingReports() {
         try {
-            const response = await fetch(`${this.apiUrl}/trading/history`);
-            if (!response.ok) throw new Error('Failed to fetch trading reports');
+            // Try the main trades endpoint first
+            const response = await fetch(`${this.apiUrl}/trades`);
+            if (!response.ok) {
+                // Fallback to trading history endpoint
+                const historyResponse = await fetch(`${this.apiUrl}/trading/history`);
+                if (!historyResponse.ok) throw new Error('Failed to fetch trading reports');
+                const data = await historyResponse.json();
+                return this.processTradingData(data);
+            }
             
             const data = await response.json();
             return this.processTradingData(data);
         } catch (error) {
-            console.warn('Trading reports not available:', error);
+            console.info('API endpoints not available, using sample data for demonstration');
             return this.generateSampleTradingReports();
         }
     }
@@ -90,7 +97,7 @@ class ReportsManager {
             const data = await response.json();
             return this.processMLData(data);
         } catch (error) {
-            console.warn('ML reports not available:', error);
+            console.info('ML performance endpoint not available, using sample data');
             return this.generateSampleMLReports();
         }
     }
@@ -103,7 +110,7 @@ class ReportsManager {
             const data = await response.json();
             return this.processBacktestData(data);
         } catch (error) {
-            console.warn('Backtest reports not available:', error);
+            console.info('Backtest endpoint not available, using sample data');
             return this.generateSampleBacktestReports();
         }
     }
