@@ -75,9 +75,9 @@ class ReportsManager {
             const response = await fetch(`${this.apiUrl}/trades`);
             if (!response.ok) {
                 // Fallback to trading history endpoint
-                const historyResponse = await fetch(`${this.apiUrl}/trading/history`);
-                if (!historyResponse.ok) throw new Error('Failed to fetch trading reports');
-                const data = await historyResponse.json();
+                // Trading history endpoint not available - skipping
+                // Skipped trading history
+                // No trading history data
                 return this.processTradingData(data);
             }
             
@@ -91,7 +91,7 @@ class ReportsManager {
     
     async fetchMLReports() {
         try {
-            const response = await fetch(`${this.apiUrl}/ml/performance`);
+            const response = await fetch(`${this.apiUrl}/ml/status`);
             if (!response.ok) throw new Error('Failed to fetch ML reports');
             
             const data = await response.json();
@@ -104,7 +104,7 @@ class ReportsManager {
     
     async fetchBacktestReports() {
         try {
-            const response = await fetch(`${this.apiUrl}/backtest/results`);
+            const response = await fetch(`${this.apiUrl}/backtest/run`);
             if (!response.ok) throw new Error('Failed to fetch backtest reports');
             
             const data = await response.json();
@@ -923,7 +923,7 @@ class ReportsManager {
                     break;
                     
                 case 'ml':
-                    const mlResponse = await fetch(`${this.apiUrl}/ml/performance`);
+                    const mlResponse = await fetch(`${this.apiUrl}/ml/status`);
                     if (mlResponse.ok) {
                         apiData = await mlResponse.json();
                         summary = {
@@ -960,7 +960,7 @@ class ReportsManager {
                     break;
                     
                 case 'sentiment':
-                    const sentimentResponse = await fetch(`${this.apiUrl}/sentiment/analysis`);
+                    const sentimentResponse = await fetch(`${this.apiUrl}/sentiment`);
                     if (sentimentResponse.ok) {
                         apiData = await sentimentResponse.json();
                         summary = {
