@@ -1,11 +1,16 @@
 [build]
-  publish = "netlify-deploy/web"
+  publish = "netlify-deploy"
 
 [[redirects]]
   from = "/api/*"
   to = "https://bottie-1.onrender.com/api/:splat"
   status = 200
   force = true
+
+[[redirects]]
+  from = "/reports"
+  to = "/reports.html"
+  status = 200
 
 [[redirects]]
   from = "/*"
@@ -17,3 +22,6 @@
   [headers.values]
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"
