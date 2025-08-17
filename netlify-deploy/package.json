@@ -1,0 +1,15 @@
+{
+  "name": "bottie-reports-dashboard",
+  "version": "1.0.0",
+  "description": "Trading Reports Dashboard - Static Site",
+  "main": "reports.html",
+  "scripts": {
+    "build": "echo 'Static HTML/JS/CSS - no build required'",
+    "start": "python -m http.server 8080"
+  },
+  "keywords": ["trading", "reports", "dashboard", "static"],
+  "author": "Bottie Team",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {}
+}

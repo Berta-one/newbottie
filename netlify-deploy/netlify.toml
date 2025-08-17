@@ -1,5 +1,9 @@
 [build]
-  publish = "netlify-deploy"
+  publish = "."
+  command = "echo 'Static site - no build required'"
+
+[build.environment]
+  NODE_VERSION = "18"
 
 [[redirects]]
   from = "/api/*"
@@ -8,8 +12,18 @@
   force = true
 
 [[redirects]]
+  from = "/reports"
+  to = "/reports.html"
+  status = 200
+
+[[redirects]]
+  from = "/"
+  to = "/reports.html"
+  status = 200
+
+[[redirects]]
   from = "/*"
-  to = "/index.html"
+  to = "/reports.html"
   status = 200
 
 [[headers]]
@@ -17,3 +31,6 @@
   [headers.values]
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"

@@ -1,0 +1,15 @@
+{
+  "name": "bottie-reports-dashboard",
+  "version": "1.0.0",
+  "description": "Trading Reports Dashboard for Bottie",
+  "main": "netlify-deploy/reports.html",
+  "scripts": {
+    "build": "echo 'Static site - no build required'",
+    "start": "echo 'Static site - no start required'"
+  },
+  "keywords": ["trading", "reports", "dashboard", "netlify"],
+  "author": "Bottie Team",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {}
+}
