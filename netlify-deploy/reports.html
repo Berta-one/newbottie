@@ -65,7 +65,7 @@
     <!-- Main Content -->
     <div class="container mx-auto px-4 py-8">
         <!-- Stats Overview -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-6 mb-8">
             <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
                 <div class="flex items-center justify-between">
                     <div>
@@ -81,11 +81,12 @@
             <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
                 <div class="flex items-center justify-between">
                     <div>
-                        <p class="text-gray-500 text-sm">Recent Reports</p>
-                        <p class="text-3xl font-bold text-gray-800" id="recentReports">0</p>
+                        <p class="text-gray-500 text-sm">Total P&L</p>
+                        <p class="text-3xl font-bold text-gray-800" id="totalProfit">$0</p>
+                        <p class="text-xs text-gray-500 mt-1" id="realizedUnrealized">-</p>
                     </div>
-                    <div class="bg-green-100 p-3 rounded-full">
-                        <i class="fas fa-clock text-green-600 text-xl"></i>
+                    <div class="bg-yellow-100 p-3 rounded-full">
+                        <i class="fas fa-dollar-sign text-yellow-600 text-xl"></i>
                     </div>
                 </div>
             </div>
@@ -95,6 +96,7 @@
                     <div>
                         <p class="text-gray-500 text-sm">Avg Win Rate</p>
                         <p class="text-3xl font-bold text-gray-800" id="avgWinRate">0%</p>
+                        <p class="text-xs text-gray-500 mt-1" id="totalTrades">0 trades</p>
                     </div>
                     <div class="bg-purple-100 p-3 rounded-full">
                         <i class="fas fa-trophy text-purple-600 text-xl"></i>
@@ -105,12 +107,73 @@
             <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
                 <div class="flex items-center justify-between">
                     <div>
-                        <p class="text-gray-500 text-sm">Total Profit</p>
-                        <p class="text-3xl font-bold text-gray-800" id="totalProfit">$0</p>
+                        <p class="text-gray-500 text-sm">ML Accuracy</p>
+                        <p class="text-3xl font-bold text-gray-800" id="avgAccuracy">0%</p>
+                        <p class="text-xs text-gray-500 mt-1" id="brierScore">Brier: -</p>
                     </div>
-                    <div class="bg-yellow-100 p-3 rounded-full">
-                        <i class="fas fa-dollar-sign text-yellow-600 text-xl"></i>
+                    <div class="bg-green-100 p-3 rounded-full">
+                        <i class="fas fa-brain text-green-600 text-xl"></i>
                     </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Sentiment Score</p>
+                        <p class="text-3xl font-bold text-gray-800" id="avgSentiment">0.0</p>
+                        <p class="text-xs text-gray-500 mt-1" id="sentimentTrend">-</p>
+                    </div>
+                    <div class="bg-pink-100 p-3 rounded-full">
+                        <i class="fas fa-heart text-pink-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Recent Reports</p>
+                        <p class="text-3xl font-bold text-gray-800" id="recentReports">0</p>
+                        <p class="text-xs text-gray-500 mt-1" id="lastReportTime">-</p>
+                    </div>
+                    <div class="bg-indigo-100 p-3 rounded-full">
+                        <i class="fas fa-clock text-indigo-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Advanced Metrics Section -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                <i class="fas fa-chart-bar text-blue-600 mr-2"></i>
+                Advanced Analytics Overview
+            </h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                <div class="text-center p-4 bg-gray-50 rounded-lg">
+                    <p class="text-2xl font-bold text-gray-800" id="profitFactor">0.0</p>
+                    <p class="text-sm text-gray-600">Profit Factor</p>
+                </div>
+                <div class="text-center p-4 bg-gray-50 rounded-lg">
+                    <p class="text-2xl font-bold text-gray-800" id="sharpeRatio">0.0</p>
+                    <p class="text-sm text-gray-600">Sharpe Ratio</p>
+                </div>
+                <div class="text-center p-4 bg-gray-50 rounded-lg">
+                    <p class="text-2xl font-bold text-gray-800" id="maxDrawdown">0%</p>
+                    <p class="text-sm text-gray-600">Max Drawdown</p>
+                </div>
+                <div class="text-center p-4 bg-gray-50 rounded-lg">
+                    <p class="text-2xl font-bold text-gray-800" id="quantumImportance">0%</p>
+                    <p class="text-sm text-gray-600">Quantum Factor</p>
+                </div>
+                <div class="text-center p-4 bg-gray-50 rounded-lg">
+                    <p class="text-2xl font-bold text-gray-800" id="volatility">0.0</p>
+                    <p class="text-sm text-gray-600">Volatility</p>
+                </div>
+                <div class="text-center p-4 bg-gray-50 rounded-lg">
+                    <p class="text-2xl font-bold text-gray-800" id="correlationScore">0.0</p>
+                    <p class="text-sm text-gray-600">Price Correlation</p>
                 </div>
             </div>
         </div>

@@ -502,35 +502,116 @@ class ReportsManager {
                     ` : ''}
                 `;
             case 'ml':
+                const accuracy = report.summary.accuracy || 0;
+                const brierScore = report.summary.brierScore || report.summary.brier_score || 0;
+                const sampleCount = report.summary.sampleCount || report.summary.sample_count || 0;
+                const quantumImportance = report.summary.quantumImportance || report.summary.quantum_importance || 0;
+                const precision = report.summary.precision || 0;
+                const f1Score = report.summary.f1_score || 0;
+                
                 return `
                     <div class="flex justify-between text-sm">
                         <span class="text-gray-600">Accuracy:</span>
-                        <span class="font-medium">${(report.summary.accuracy * 100).toFixed(1)}%</span>
+                        <span class="font-medium ${accuracy >= 0.7 ? 'text-green-600' : accuracy >= 0.5 ? 'text-yellow-600' : 'text-red-600'}">${(accuracy * 100).toFixed(1)}%</span>
                     </div>
                     <div class="flex justify-between text-sm">
                         <span class="text-gray-600">Brier Score:</span>
-                        <span class="font-medium">${report.summary.brierScore.toFixed(3)}</span>
+                        <span class="font-medium ${brierScore <= 0.15 ? 'text-green-600' : brierScore <= 0.25 ? 'text-yellow-600' : 'text-red-600'}">${brierScore.toFixed(3)}</span>
                     </div>
                     <div class="flex justify-between text-sm">
-                        <span class="text-gray-600">Samples:</span>
-                        <span class="font-medium">${report.summary.sampleCount.toLocaleString()}</span>
+                        <span class="text-gray-600">Quantum Factor:</span>
+                        <span class="font-medium text-purple-600">${(quantumImportance * 100).toFixed(1)}%</span>
                     </div>
+                    ${precision > 0 ? `
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Precision:</span>
+                        <span class="font-medium">${(precision * 100).toFixed(1)}%</span>
+                    </div>
+                    ` : `
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Samples:</span>
+                        <span class="font-medium">${sampleCount.toLocaleString()}</span>
+                    </div>
+                    `}
                 `;
             case 'backtest':
+                const totalReturn = report.summary.totalReturn || report.summary.total_return || 0;
+                const sharpeRatio = report.summary.sharpeRatio || report.summary.sharpe_ratio || 0;
+                const maxDrawdown = report.summary.maxDrawdown || report.summary.max_drawdown || 0;
+                const winRate = report.summary.winRate || report.summary.win_rate || 0;
+                const profitFactor = report.summary.profitFactor || report.summary.profit_factor || 0;
+                
                 return `
                     <div class="flex justify-between text-sm">
                         <span class="text-gray-600">Total Return:</span>
-                        <span class="font-medium ${report.summary.totalReturn >= 0 ? 'text-green-600' : 'text-red-600'}">
-                            ${report.summary.totalReturn.toFixed(2)}%
+                        <span class="font-medium ${totalReturn >= 0 ? 'text-green-600' : 'text-red-600'}">
+                            ${totalReturn.toFixed(2)}%
                         </span>
                     </div>
                     <div class="flex justify-between text-sm">
                         <span class="text-gray-600">Sharpe Ratio:</span>
-                        <span class="font-medium">${report.summary.sharpeRatio.toFixed(2)}</span>
+                        <span class="font-medium ${sharpeRatio >= 1.0 ? 'text-green-600' : sharpeRatio >= 0.5 ? 'text-yellow-600' : 'text-red-600'}">${sharpeRatio.toFixed(2)}</span>
                     </div>
                     <div class="flex justify-between text-sm">
                         <span class="text-gray-600">Max Drawdown:</span>
-                        <span class="font-medium text-red-600">${report.summary.maxDrawdown.toFixed(2)}%</span>
+                        <span class="font-medium ${Math.abs(maxDrawdown) <= 10 ? 'text-green-600' : Math.abs(maxDrawdown) <= 20 ? 'text-yellow-600' : 'text-red-600'}">${maxDrawdown.toFixed(1)}%</span>
+                    </div>
+                    ${profitFactor > 0 ? `
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Profit Factor:</span>
+                        <span class="font-medium ${profitFactor >= 1.5 ? 'text-green-600' : profitFactor >= 1.0 ? 'text-yellow-600' : 'text-red-600'}">${profitFactor.toFixed(2)}</span>
+                    </div>
+                    ` : ''}
+                `;
+            case 'sentiment':
+                const avgSentiment = report.summary.avg_sentiment || report.summary.avgSentiment || 0;
+                const positiveSignals = report.summary.positive_signals || report.summary.positiveSignals || 0;
+                const negativeSignals = report.summary.negative_signals || report.summary.negativeSignals || 0;
+                const correlation = report.summary.correlation_with_price || 0;
+                const dataSources = report.summary.data_sources || report.summary.dataSources || 0;
+                
+                return `
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Sentiment Score:</span>
+                        <span class="font-medium ${avgSentiment > 0.2 ? 'text-green-600' : avgSentiment < -0.2 ? 'text-red-600' : 'text-gray-600'}">${avgSentiment.toFixed(3)}</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Positive Signals:</span>
+                        <span class="font-medium text-green-600">${positiveSignals}</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Negative Signals:</span>
+                        <span class="font-medium text-red-600">${negativeSignals}</span>
+                    </div>
+                    ${correlation !== 0 ? `
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Price Correlation:</span>
+                        <span class="font-medium ${Math.abs(correlation) >= 0.5 ? 'text-green-600' : Math.abs(correlation) >= 0.2 ? 'text-yellow-600' : 'text-gray-600'}">${correlation.toFixed(3)}</span>
+                    </div>
+                    ` : ''}
+                `;
+            case 'portfolio':
+                const portfolioPnL = report.summary.total_pnl || report.summary.totalPnL || 0;
+                const pnlPercentage = report.summary.pnl_percentage || report.summary.pnlPercentage || 0;
+                const activePositions = report.summary.active_positions || report.summary.activePositions || 0;
+                const topPerformer = report.summary.top_performer || report.summary.topPerformer || 'N/A';
+                
+                return `
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Portfolio P&L:</span>
+                        <span class="font-medium ${portfolioPnL >= 0 ? 'text-green-600' : 'text-red-600'}">$${portfolioPnL.toFixed(2)}</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Return %:</span>
+                        <span class="font-medium ${pnlPercentage >= 0 ? 'text-green-600' : 'text-red-600'}">${pnlPercentage.toFixed(2)}%</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Active Positions:</span>
+                        <span class="font-medium">${activePositions}</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Top Performer:</span>
+                        <span class="font-medium text-green-600">${topPerformer}</span>
                     </div>
                 `;
             default:
@@ -578,16 +659,167 @@ class ReportsManager {
             return reportDate >= weekAgo;
         }).length;
         
+        // Trading metrics
         const tradingReports = this.reports.filter(r => r.type === 'trading');
-        const totalWinRate = tradingReports.length > 0 ? 
-            tradingReports.reduce((sum, r) => sum + r.summary.winRate, 0) / tradingReports.length : 0;
+        let totalWinRate = 0;
+        let totalProfit = 0;
+        let realizedProfit = 0;
+        let unrealizedProfit = 0;
+        let totalTrades = 0;
+        let profitFactor = 0;
+        let volatility = 0;
         
-        const totalProfit = tradingReports.reduce((sum, r) => sum + r.summary.totalProfit, 0);
+        if (tradingReports.length > 0) {
+            tradingReports.forEach(r => {
+                const winRate = r.summary.win_rate || r.summary.winRate || 0;
+                const profit = r.summary.total_pnl || r.summary.totalProfit || 0;
+                const realized = r.summary.realized_pnl || 0;
+                const unrealized = r.summary.unrealized_pnl || 0;
+                const trades = r.summary.total_trades || r.summary.totalTrades || 0;
+                const pf = r.summary.profit_factor || 0;
+                const vol = r.summary.volatility || r.data?.performance_metrics?.volatility || 0;
+                
+                totalWinRate += winRate;
+                totalProfit += profit;
+                realizedProfit += realized;
+                unrealizedProfit += unrealized;
+                totalTrades += trades;
+                profitFactor += pf;
+                volatility += vol;
+            });
+            
+            totalWinRate /= tradingReports.length;
+            profitFactor /= tradingReports.length;
+            volatility /= tradingReports.length;
+        }
         
+        // ML metrics
+        const mlReports = this.reports.filter(r => r.type === 'ml');
+        let avgAccuracy = 0;
+        let avgBrierScore = 0;
+        let quantumImportance = 0;
+        
+        if (mlReports.length > 0) {
+            mlReports.forEach(r => {
+                const accuracy = r.summary.accuracy || 0;
+                const brier = r.summary.brierScore || r.summary.brier_score || 0;
+                const quantum = r.summary.quantumImportance || r.summary.quantum_importance || 0;
+                
+                avgAccuracy += accuracy;
+                avgBrierScore += brier;
+                quantumImportance += quantum;
+            });
+            
+            avgAccuracy = (avgAccuracy / mlReports.length) * 100;
+            avgBrierScore /= mlReports.length;
+            quantumImportance = (quantumImportance / mlReports.length) * 100;
+        }
+        
+        // Sentiment metrics
+        const sentimentReports = this.reports.filter(r => r.type === 'sentiment');
+        let avgSentiment = 0;
+        let sentimentTrend = 'Neutral';
+        let correlationScore = 0;
+        
+        if (sentimentReports.length > 0) {
+            sentimentReports.forEach(r => {
+                const sentiment = r.summary.avg_sentiment || r.summary.avgSentiment || 0;
+                const correlation = r.summary.correlation_with_price || 0;
+                
+                avgSentiment += sentiment;
+                correlationScore += correlation;
+            });
+            
+            avgSentiment /= sentimentReports.length;
+            correlationScore /= sentimentReports.length;
+            
+            if (avgSentiment > 0.3) sentimentTrend = 'Bullish';
+            else if (avgSentiment < -0.3) sentimentTrend = 'Bearish';
+            else sentimentTrend = 'Neutral';
+        }
+        
+        // Backtest metrics
+        const backtestReports = this.reports.filter(r => r.type === 'backtest');
+        let avgSharpeRatio = 0;
+        let avgMaxDrawdown = 0;
+        
+        if (backtestReports.length > 0) {
+            backtestReports.forEach(r => {
+                const sharpe = r.summary.sharpe_ratio || r.summary.sharpeRatio || 0;
+                const drawdown = r.summary.max_drawdown || r.summary.maxDrawdown || 0;
+                
+                avgSharpeRatio += sharpe;
+                avgMaxDrawdown += Math.abs(drawdown);
+            });
+            
+            avgSharpeRatio /= backtestReports.length;
+            avgMaxDrawdown /= backtestReports.length;
+        }
+        
+        // Get last report time
+        const lastReport = this.reports.length > 0 ? 
+            new Date(Math.max(...this.reports.map(r => new Date(r.createdAt).getTime()))) : null;
+        const lastReportTime = lastReport ? 
+            this.getTimeAgo(lastReport) : '-';
+        
+        // Update main stats
         document.getElementById('totalReports').textContent = totalReports;
         document.getElementById('recentReports').textContent = recentReports;
+        document.getElementById('lastReportTime').textContent = lastReportTime;
+        
+        // Trading stats
         document.getElementById('avgWinRate').textContent = `${totalWinRate.toFixed(1)}%`;
+        document.getElementById('totalTrades').textContent = `${totalTrades} trades`;
         document.getElementById('totalProfit').textContent = `$${totalProfit.toFixed(2)}`;
+        document.getElementById('totalProfit').className = `text-3xl font-bold ${totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`;
+        
+        // Realized/Unrealized breakdown
+        if (realizedProfit !== 0 || unrealizedProfit !== 0) {
+            document.getElementById('realizedUnrealized').textContent = 
+                `R: $${realizedProfit.toFixed(0)} | U: $${unrealizedProfit.toFixed(0)}`;
+        }
+        
+        // ML stats
+        document.getElementById('avgAccuracy').textContent = `${avgAccuracy.toFixed(1)}%`;
+        document.getElementById('avgAccuracy').className = `text-3xl font-bold ${avgAccuracy >= 70 ? 'text-green-600' : avgAccuracy >= 50 ? 'text-yellow-600' : 'text-red-600'}`;
+        document.getElementById('brierScore').textContent = `Brier: ${avgBrierScore.toFixed(3)}`;
+        
+        // Sentiment stats
+        document.getElementById('avgSentiment').textContent = avgSentiment.toFixed(2);
+        document.getElementById('avgSentiment').className = `text-3xl font-bold ${avgSentiment > 0.2 ? 'text-green-600' : avgSentiment < -0.2 ? 'text-red-600' : 'text-gray-800'}`;
+        document.getElementById('sentimentTrend').textContent = sentimentTrend;
+        
+        // Advanced metrics
+        document.getElementById('profitFactor').textContent = profitFactor.toFixed(2);
+        document.getElementById('profitFactor').className = `text-2xl font-bold ${profitFactor >= 1.5 ? 'text-green-600' : profitFactor >= 1.0 ? 'text-yellow-600' : 'text-red-600'}`;
+        
+        document.getElementById('sharpeRatio').textContent = avgSharpeRatio.toFixed(2);
+        document.getElementById('sharpeRatio').className = `text-2xl font-bold ${avgSharpeRatio >= 1.0 ? 'text-green-600' : avgSharpeRatio >= 0.5 ? 'text-yellow-600' : 'text-red-600'}`;
+        
+        document.getElementById('maxDrawdown').textContent = `${avgMaxDrawdown.toFixed(1)}%`;
+        document.getElementById('maxDrawdown').className = `text-2xl font-bold ${avgMaxDrawdown <= 10 ? 'text-green-600' : avgMaxDrawdown <= 20 ? 'text-yellow-600' : 'text-red-600'}`;
+        
+        document.getElementById('quantumImportance').textContent = `${quantumImportance.toFixed(1)}%`;
+        document.getElementById('quantumImportance').className = `text-2xl font-bold ${quantumImportance >= 50 ? 'text-purple-600' : quantumImportance >= 25 ? 'text-blue-600' : 'text-gray-600'}`;
+        
+        document.getElementById('volatility').textContent = volatility.toFixed(2);
+        document.getElementById('volatility').className = `text-2xl font-bold ${volatility <= 20 ? 'text-green-600' : volatility <= 50 ? 'text-yellow-600' : 'text-red-600'}`;
+        
+        document.getElementById('correlationScore').textContent = correlationScore.toFixed(2);
+        document.getElementById('correlationScore').className = `text-2xl font-bold ${Math.abs(correlationScore) >= 0.5 ? 'text-green-600' : Math.abs(correlationScore) >= 0.2 ? 'text-yellow-600' : 'text-gray-600'}`;
+    }
+    
+    getTimeAgo(date) {
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+        
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        if (diffDays < 7) return `${diffDays}d ago`;
+        return date.toLocaleDateString();
     }
     
     showNewReportModal() {
