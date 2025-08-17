@@ -84,8 +84,8 @@ class ReportsManager {
             const data = await response.json();
             return this.processTradingData(data);
         } catch (error) {
-            console.info('API endpoints not available, using sample data for demonstration');
-            return this.generateSampleTradingReports();
+            console.info('Trading API endpoint not available');
+            return []; // Return empty array instead of sample data
         }
     }
     
@@ -97,8 +97,8 @@ class ReportsManager {
             const data = await response.json();
             return this.processMLData(data);
         } catch (error) {
-            console.info('ML performance endpoint not available, using sample data');
-            return this.generateSampleMLReports();
+            console.info('ML performance endpoint not available');
+            return []; // Return empty array instead of sample data
         }
     }
     
@@ -110,8 +110,8 @@ class ReportsManager {
             const data = await response.json();
             return this.processBacktestData(data);
         } catch (error) {
-            console.info('Backtest endpoint not available, using sample data');
-            return this.generateSampleBacktestReports();
+            console.info('Backtest endpoint not available');
+            return []; // Return empty array instead of sample data
         }
     }
     
@@ -865,88 +865,149 @@ class ReportsManager {
         
         try {
             const newReport = await this.generateNewReport(reportType, timeRange, reportName);
-            this.reports.unshift(newReport);
-            this.applyFilters();
-            this.updateStats();
-            
-            this.showSuccess('Report generated successfully!');
+            if (newReport && newReport.summary && Object.keys(newReport.summary).length > 1) {
+                this.reports.unshift(newReport);
+                this.applyFilters();
+                this.updateStats();
+                this.showSuccess('Report generated successfully!');
+            } else {
+                this.showError('No data available for the selected time range. Please ensure your trading system is active.');
+            }
         } catch (error) {
             console.error('Error generating report:', error);
-            this.showError('Failed to generate report. Please try again.');
+            this.showError('Failed to generate report. Please check if your API endpoints are available.');
         } finally {
             this.setLoading(false);
         }
     }
     
     async generateNewReport(type, timeRange, name) {
-        // Simulate API call to generate report
-        await this.delay(2000);
-        
         const now = new Date();
         const reportId = `${type}_${now.getTime()}`;
         const title = name || `${type.charAt(0).toUpperCase() + type.slice(1)} Report - ${now.toLocaleDateString()}`;
         
-        let summary = {};
-        let data = {};
-        
-        switch (type) {
-            case 'trading':
-                const trades = this.generateSampleTrades(15 + Math.floor(Math.random() * 25));
-                summary = {
-                    totalTrades: trades.length,
-                    winRate: this.calculateWinRate(trades),
-                    totalProfit: this.calculateTotalProfit(trades),
-                    avgProfit: this.calculateAvgProfit(trades)
-                };
-                data = trades;
-                break;
-                
-            case 'ml':
-                summary = {
-                    accuracy: 0.7 + Math.random() * 0.25,
-                    brierScore: 0.1 + Math.random() * 0.15,
-                    sampleCount: 500 + Math.floor(Math.random() * 3000),
-                    quantumImportance: Math.random()
-                };
-                data = {
-                    feature_importance: {
-                        'price_momentum': Math.random(),
-                        'volume_trend': Math.random(),
-                        'sentiment_score': Math.random(),
-                        'technical_indicators': Math.random(),
-                        'quantum_features': Math.random()
+        try {
+            let apiData = null;
+            let summary = {};
+            let data = {};
+            
+            switch (type) {
+                case 'trading':
+                    // Call the real API to generate report
+                    const tradingResponse = await fetch(`${this.apiUrl}/trades`, {
+                        method: 'GET',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    
+                    if (tradingResponse.ok) {
+                        apiData = await tradingResponse.json();
+                        const trades = apiData.trades || [];
+                        
+                        if (trades.length > 0) {
+                            summary = {
+                                total_trades: trades.length,
+                                total_pnl: apiData.summary?.total_pnl || this.calculateTotalProfit(trades),
+                                realized_pnl: apiData.summary?.realized_pnl || 0,
+                                unrealized_pnl: apiData.summary?.unrealized_pnl || 0,
+                                win_rate: apiData.summary?.win_rate || this.calculateWinRate(trades),
+                                total_fees: apiData.summary?.total_fees || 0,
+                                calculation_method: 'proper_trade_pairing'
+                            };
+                            data = { trades: trades };
+                        } else {
+                            throw new Error('No trading data available');
+                        }
+                    } else {
+                        throw new Error('Trading API not available');
                     }
-                };
-                break;
-                
-            case 'backtest':
-                summary = {
-                    totalReturn: (Math.random() - 0.2) * 150,
-                    sharpeRatio: Math.random() * 4,
-                    maxDrawdown: -Math.random() * 25,
-                    winRate: 0.35 + Math.random() * 0.5
-                };
-                data = {
-                    strategy: 'Custom Strategy',
-                    period: timeRange,
-                    initial_capital: 10000
-                };
-                break;
-                
-            default:
-                summary = { status: 'Generated successfully' };
-                data = { message: 'Report data generated' };
+                    break;
+                    
+                case 'ml':
+                    const mlResponse = await fetch(`${this.apiUrl}/ml/performance`);
+                    if (mlResponse.ok) {
+                        apiData = await mlResponse.json();
+                        summary = {
+                            accuracy: apiData.accuracy || 0,
+                            brier_score: apiData.brier_score || 0,
+                            sample_count: apiData.sample_count || 0,
+                            quantum_importance: apiData.quantum_importance || 0
+                        };
+                        data = apiData;
+                    } else {
+                        throw new Error('ML performance API not available');
+                    }
+                    break;
+                    
+                case 'backtest':
+                    const backtestResponse = await fetch(`${this.apiUrl}/backtest/run`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ time_range: timeRange })
+                    });
+                    
+                    if (backtestResponse.ok) {
+                        apiData = await backtestResponse.json();
+                        summary = {
+                            total_return: apiData.total_return || 0,
+                            sharpe_ratio: apiData.sharpe_ratio || 0,
+                            max_drawdown: apiData.max_drawdown || 0,
+                            win_rate: apiData.win_rate || 0
+                        };
+                        data = apiData;
+                    } else {
+                        throw new Error('Backtest API not available');
+                    }
+                    break;
+                    
+                case 'sentiment':
+                    const sentimentResponse = await fetch(`${this.apiUrl}/sentiment/analysis`);
+                    if (sentimentResponse.ok) {
+                        apiData = await sentimentResponse.json();
+                        summary = {
+                            avg_sentiment: apiData.avg_sentiment || 0,
+                            positive_signals: apiData.positive_signals || 0,
+                            negative_signals: apiData.negative_signals || 0,
+                            correlation_with_price: apiData.correlation_with_price || 0
+                        };
+                        data = apiData;
+                    } else {
+                        throw new Error('Sentiment API not available');
+                    }
+                    break;
+                    
+                case 'portfolio':
+                    const portfolioResponse = await fetch(`${this.apiUrl}/portfolio/overview`);
+                    if (portfolioResponse.ok) {
+                        apiData = await portfolioResponse.json();
+                        summary = {
+                            total_pnl: apiData.total_pnl || 0,
+                            total_value: apiData.total_value || 0,
+                            active_positions: apiData.active_positions || 0
+                        };
+                        data = apiData;
+                    } else {
+                        throw new Error('Portfolio API not available');
+                    }
+                    break;
+                    
+                default:
+                    throw new Error(`Unknown report type: ${type}`);
+            }
+            
+            return {
+                id: reportId,
+                type,
+                title,
+                createdAt: now.toISOString(),
+                summary,
+                data,
+                status: 'completed'
+            };
+            
+        } catch (error) {
+            console.error(`Failed to generate ${type} report:`, error.message);
+            throw error; // Re-throw to be handled by caller
         }
-        
-        return {
-            id: reportId,
-            type,
-            title,
-            createdAt: now.toISOString(),
-            summary,
-            data,
-            status: 'completed'
-        };
     }
     
     showReportDetail(reportId) {
