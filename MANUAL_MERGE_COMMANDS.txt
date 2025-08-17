@@ -1,0 +1,27 @@
+MANUAL MERGE COMMANDS
+====================
+
+Run these commands in your terminal:
+
+1. git checkout main
+2. git pull origin main  
+3. git merge cursor/build-a-netlify-report-visualization-tool-879b
+4. git push origin main
+
+After running these, Netlify should auto-deploy successfully!
+
+JAVASCRIPT FIXES APPLIED:
+- Fixed duplicate 'winRate' variable declarations
+- Renamed variables to avoid conflicts
+- Reports dashboard should now work without console errors
+
+WHAT YOU'LL HAVE AFTER MERGE:
+✅ Enhanced reports dashboard with advanced analytics
+✅ P&L validation system with accuracy checking
+✅ Brier scores, sentiment scores, quantum factors
+✅ Proper P&L calculations with FIFO method
+✅ Static site configuration (no Python dependency errors)
+✅ All console errors fixed
+
+ACCESS YOUR DASHBOARD:
+https://your-site.netlify.app/reports

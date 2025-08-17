@@ -551,7 +551,7 @@ class ReportsManager {
                 const totalReturn = report.summary.totalReturn || report.summary.total_return || 0;
                 const sharpeRatio = report.summary.sharpeRatio || report.summary.sharpe_ratio || 0;
                 const maxDrawdown = report.summary.maxDrawdown || report.summary.max_drawdown || 0;
-                const winRate = report.summary.winRate || report.summary.win_rate || 0;
+                const backtestWinRate = report.summary.winRate || report.summary.win_rate || 0;
                 const profitFactor = report.summary.profitFactor || report.summary.profit_factor || 0;
                 
                 return `
@@ -684,7 +684,7 @@ class ReportsManager {
         
         if (tradingReports.length > 0) {
             tradingReports.forEach(r => {
-                const winRate = r.summary.win_rate || r.summary.winRate || 0;
+                const reportWinRate = r.summary.win_rate || r.summary.winRate || 0;
                 const profit = r.summary.total_pnl || r.summary.totalProfit || 0;
                 const realized = r.summary.realized_pnl || 0;
                 const unrealized = r.summary.unrealized_pnl || 0;
@@ -692,7 +692,7 @@ class ReportsManager {
                 const pf = r.summary.profit_factor || 0;
                 const vol = r.summary.volatility || r.data?.performance_metrics?.volatility || 0;
                 
-                totalWinRate += winRate;
+                totalWinRate += reportWinRate;
                 totalProfit += profit;
                 realizedProfit += realized;
                 unrealizedProfit += unrealized;
