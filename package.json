@@ -2,7 +2,7 @@
   "name": "bottie-reports-dashboard",
   "version": "1.0.0",
   "description": "Trading Reports Dashboard for Bottie",
-  "main": "netlify-deploy/reports.html",
+  "main": "index.html",
   "scripts": {
     "build": "echo 'Static site - no build required'",
     "start": "echo 'Static site - no start required'"
