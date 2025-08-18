@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Reports Dashboard</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>var exports = {};</script>
+    <style>
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .report-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        @media (max-width: 768px) {
+            .report-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="gradient-bg text-white shadow-lg">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-4">
+                    <i class="fas fa-chart-line text-2xl"></i>
+                    <h1 class="text-xl font-bold">Trading Reports Dashboard</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button id="refreshBtn" class="bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg transition-all duration-200">
+                        <i class="fas fa-sync-alt mr-2"></i>Refresh
+                    </button>
+                    <button id="newReportBtn" class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-lg transition-all duration-200">
+                        <i class="fas fa-plus mr-2"></i>New Report
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container mx-auto px-4 py-8">
+        <!-- Stats Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                <div class="flex items-center">
+                    <div class="bg-blue-100 p-3 rounded-full">
+                        <i class="fas fa-file-alt text-blue-600 text-xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-gray-600 text-sm">Total Reports</p>
+                        <p class="text-2xl font-bold text-gray-800" id="totalReports">-</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                <div class="flex items-center">
+                    <div class="bg-green-100 p-3 rounded-full">
+                        <i class="fas fa-chart-line text-green-600 text-xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-gray-600 text-sm">Active Trades</p>
+                        <p class="text-2xl font-bold text-gray-800" id="activeTrades">-</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                <div class="flex items-center">
+                    <div class="bg-purple-100 p-3 rounded-full">
+                        <i class="fas fa-brain text-purple-600 text-xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-gray-600 text-sm">ML Accuracy</p>
+                        <p class="text-2xl font-bold text-gray-800" id="mlAccuracy">-</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                <div class="flex items-center">
+                    <div class="bg-yellow-100 p-3 rounded-full">
+                        <i class="fas fa-clock text-yellow-600 text-xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-gray-600 text-sm">Last Update</p>
+                        <p class="text-sm font-medium text-gray-800" id="lastUpdate">-</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Message -->
+        <div id="statusMessage" class="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded mb-6">
+            <div class="flex items-center">
+                <i class="fas fa-info-circle mr-2"></i>
+                <span>Loading trading data from API...</span>
+            </div>
+        </div>
+
+        <!-- Reports Grid -->
+        <div id="reportsContainer" class="report-grid">
+            <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                <div class="text-center py-8">
+                    <i class="fas fa-chart-bar text-4xl text-gray-400 mb-4"></i>
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">No Reports Yet</h3>
+                    <p class="text-gray-600 mb-4">Generate your first trading report to get started</p>
+                    <button class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg transition-all duration-200">
+                        <i class="fas fa-plus mr-2"></i>Create Report
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class ReportsManager {
+            constructor() {
+                this.apiUrl = 'https://bottie-1.onrender.com'; // Direct API calls to working endpoints
+                this.reports = [];
+                this.version = 'v2024-01-17-fixed-direct';
+                
+                console.log('🚀 ReportsManager initialized, version:', this.version, 'API URL:', this.apiUrl);
+                this.init();
+            }
+            
+            async init() {
+                this.bindEvents();
+                await this.loadData();
+                this.startAutoRefresh();
+            }
+            
+            bindEvents() {
+                document.getElementById('refreshBtn').addEventListener('click', () => this.loadData());
+                document.getElementById('newReportBtn').addEventListener('click', () => this.generateReport());
+            }
+            
+            async loadData() {
+                const statusEl = document.getElementById('statusMessage');
+                statusEl.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Loading trading data...';
+                
+                try {
+                    // Test the working /trades endpoint
+                    const response = await fetch(`${this.apiUrl}/trades`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        this.updateStats(data);
+                        statusEl.innerHTML = '<i class="fas fa-check-circle mr-2"></i>Successfully connected to trading API!';
+                        statusEl.className = 'bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-6';
+                    } else {
+                        throw new Error(`API returned ${response.status}`);
+                    }
+                } catch (error) {
+                    console.error('API Error:', error);
+                    statusEl.innerHTML = '<i class="fas fa-exclamation-triangle mr-2"></i>Unable to connect to trading API. Please check your connection.';
+                    statusEl.className = 'bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6';
+                }
+            }
+            
+            updateStats(data) {
+                document.getElementById('totalReports').textContent = data.summary?.total_trades || '0';
+                document.getElementById('activeTrades').textContent = data.trades?.length || '0';
+                document.getElementById('mlAccuracy').textContent = '85%'; // Placeholder
+                document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+            }
+            
+            async generateReport() {
+                alert('Report generation feature coming soon! API is now connected and working.');
+            }
+            
+            startAutoRefresh() {
+                setInterval(() => this.loadData(), 30000); // Refresh every 30 seconds
+            }
+        }
+        
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new ReportsManager();
+        });
+    </script>
+</body>
+</html>
