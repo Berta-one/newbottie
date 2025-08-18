@@ -147,16 +147,24 @@ class ReportsManager {
     processTradingData(data) {
         if (!data || !Array.isArray(data.trades)) return [];
         
+        // Use backend summary if available, otherwise calculate
+        const backendSummary = data.summary || {};
+        
         const report = {
             id: `trading_${Date.now()}`,
             type: 'trading',
             title: 'Trading Performance Report',
             createdAt: new Date().toISOString(),
             summary: {
-                totalTrades: data.trades.length,
-                winRate: this.calculateWinRate(data.trades),
-                totalProfit: this.calculateTotalProfit(data.trades),
-                avgProfit: this.calculateAvgProfit(data.trades)
+                totalTrades: backendSummary.total_trades || data.trades.length,
+                winRate: backendSummary.win_rate || this.calculateWinRate(data.trades),
+                totalProfit: backendSummary.net_pnl || backendSummary.realized_pnl || this.calculateTotalProfit(data.trades),
+                avgProfit: backendSummary.avg_trade_size || this.calculateAvgProfit(data.trades),
+                totalVolume: backendSummary.total_volume || 0,
+                profitFactor: this.calculateProfitFactor(data.trades),
+                sharpeRatio: this.calculateSharpeRatio(data.trades),
+                maxDrawdown: this.calculateMaxDrawdown(data.trades),
+                volatility: this.calculateVolatility(data.trades)
             },
             data: data.trades,
             status: 'completed'
@@ -173,9 +181,13 @@ class ReportsManager {
             createdAt: new Date().toISOString(),
             summary: {
                 accuracy: data.accuracy || 0,
-                brierScore: data.brier_score || 0,
-                sampleCount: data.sample_count || 0,
-                quantumImportance: data.quantum_importance || 0
+                brierScore: data.brier_score || this.calculateBrierScore(data) || 0,
+                sampleCount: data.total_predictions || data.data_points || 0,
+                quantumImportance: data.overall_score || data.confidence || 0,
+                confidence: data.confidence || 0,
+                dataQuality: data.data_quality || 0,
+                totalPredictions: data.total_predictions || 0,
+                successfulPredictions: data.successful_predictions || 0
             },
             data: data,
             status: 'completed'
@@ -1546,6 +1558,56 @@ class ReportsManager {
                 document.body.removeChild(modal);
             }
         });
+    }
+    
+    // Additional calculation methods for trading metrics
+    calculateProfitFactor(trades) {
+        const profits = trades.filter(t => t.pnl > 0).reduce((sum, t) => sum + t.pnl, 0);
+        const losses = Math.abs(trades.filter(t => t.pnl < 0).reduce((sum, t) => sum + t.pnl, 0));
+        return losses > 0 ? profits / losses : 0;
+    }
+    
+    calculateSharpeRatio(trades) {
+        if (trades.length < 2) return 0;
+        const returns = trades.map(t => t.pnl);
+        const avgReturn = returns.reduce((sum, r) => sum + r, 0) / returns.length;
+        const variance = returns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / returns.length;
+        const stdDev = Math.sqrt(variance);
+        return stdDev > 0 ? avgReturn / stdDev : 0;
+    }
+    
+    calculateMaxDrawdown(trades) {
+        if (trades.length === 0) return 0;
+        let peak = 0;
+        let maxDrawdown = 0;
+        let runningPnL = 0;
+        
+        for (const trade of trades) {
+            runningPnL += trade.pnl;
+            if (runningPnL > peak) peak = runningPnL;
+            const drawdown = (peak - runningPnL) / Math.abs(peak);
+            if (drawdown > maxDrawdown) maxDrawdown = drawdown;
+        }
+        
+        return maxDrawdown;
+    }
+    
+    calculateVolatility(trades) {
+        if (trades.length < 2) return 0;
+        const returns = trades.map(t => t.pnl);
+        const avgReturn = returns.reduce((sum, r) => sum + r, 0) / returns.length;
+        const variance = returns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / returns.length;
+        return Math.sqrt(variance);
+    }
+    
+    calculateBrierScore(mlData) {
+        // Calculate Brier score from accuracy if not provided
+        if (mlData.accuracy && mlData.total_predictions) {
+            const accuracy = mlData.accuracy;
+            // Approximate Brier score: lower is better, perfect score is 0
+            return (1 - accuracy) * 0.25; // Rough approximation
+        }
+        return 0;
     }
 }
 
