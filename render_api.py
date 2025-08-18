@@ -49,7 +49,7 @@ except Exception as e:
     print(f"⚠️ Data processing not available: {e}")
 
 # FastAPI app
-app = FastAPI(title="Bottie Render API", version="1.0.0")
+app = FastAPI(title="Bottie Render API", version="1.0.1")
 
 # CORS setup - Allow all origins for Netlify
 app.add_middleware(
