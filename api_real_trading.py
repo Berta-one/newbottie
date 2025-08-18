@@ -509,6 +509,74 @@ def api_recent_trades(since_ts: Optional[float] = Query(default=None, descriptio
         "incremental_sync": True
     }
 
+@api_router.get("/trading/history")
+def api_trading_history():
+    """Trading history endpoint for reports"""
+    return {
+        "trades": [],
+        "summary": {
+            "total_trades": 0,
+            "win_rate": 0,
+            "total_pnl": 0,
+            "avg_trade_duration": 0
+        },
+        "last_update": time.time()
+    }
+
+@api_router.get("/ml/status") 
+def api_ml_status():
+    """ML performance status endpoint"""
+    return {
+        "accuracy": 0.0,
+        "brier_score": 0.0,
+        "sample_count": 0,
+        "quantum_importance": 0.0,
+        "last_update": time.time(),
+        "status": "no_data"
+    }
+
+@api_router.get("/ml/performance")
+def api_ml_performance():
+    """ML performance endpoint"""
+    return {
+        "accuracy": 0.0,
+        "brier_score": 0.0,
+        "sample_count": 0,
+        "quantum_importance": 0.0,
+        "last_update": time.time(),
+        "status": "no_data"
+    }
+
+@api_router.get("/backtest/run")
+def api_backtest_run():
+    """Backtest run endpoint"""
+    return {
+        "results": [],
+        "summary": {
+            "total_return": 0.0,
+            "max_drawdown": 0.0,
+            "sharpe_ratio": 0.0,
+            "win_rate": 0.0
+        },
+        "last_update": time.time(),
+        "status": "no_data"
+    }
+
+@api_router.get("/backtest/results")
+def api_backtest_results():
+    """Backtest results endpoint"""
+    return {
+        "results": [],
+        "summary": {
+            "total_return": 0.0,
+            "max_drawdown": 0.0,
+            "sharpe_ratio": 0.0,
+            "win_rate": 0.0
+        },
+        "last_update": time.time(),
+        "status": "no_data"
+    }
+
 # Include the API router
 app.include_router(api_router)
 
