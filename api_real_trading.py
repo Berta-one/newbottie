@@ -577,6 +577,29 @@ def api_backtest_results():
         "status": "no_data"
     }
 
+# Root endpoint for testing
+@app.get("/")
+def root():
+    return {"message": "Bottie API is running", "version": "4.0.1", "status": "ok"}
+
+# Health check endpoint
+@app.get("/health")
+def health_check():
+    return {"status": "healthy", "timestamp": time.time()}
+
+# Debug endpoint to list all routes
+@app.get("/debug/routes")
+def list_routes():
+    routes = []
+    for route in app.routes:
+        if hasattr(route, 'path') and hasattr(route, 'methods'):
+            routes.append({
+                "path": route.path,
+                "methods": list(route.methods) if route.methods else [],
+                "name": getattr(route, 'name', 'unnamed')
+            })
+    return {"routes": routes}
+
 # Include the API router
 app.include_router(api_router)
 
