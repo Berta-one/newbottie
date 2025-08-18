@@ -9,7 +9,7 @@ import json
 import random
 import logging
 from typing import Dict, Any, List, Optional
-from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi import FastAPI, HTTPException, Depends, Query, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
@@ -62,6 +62,9 @@ app.add_middleware(
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="web"), name="static")
+
+# Create API router with /api prefix
+api_router = APIRouter(prefix="/api")
 
 # Authentication setup
 security = HTTPBearer(auto_error=False)
@@ -4816,6 +4819,87 @@ class AdaptiveMLSystem:
 
 # Global adaptive ML system instance
 adaptive_ml = AdaptiveMLSystem()
+
+# API Trades endpoint
+@api_router.get("/trades")
+def api_recent_trades(since_ts: Optional[float] = Query(default=None, description="Return trades with timestamp greater than this UNIX ts"),
+                      limit: Optional[int] = Query(default=200, ge=1, le=1000, description="Max trades to return")):
+    """Return recent trades using WebSocket when available, persisted to a local file cache.
+    Supports incremental sync via since_ts and size limiting. No REST polling to avoid bans."""
+    positions = get_real_positions()
+
+    # Always try to read existing cache first (serves when disconnected)
+    cached = _load_json_file_safe(TRADES_CACHE_FILE, [])
+
+    # Load stored trades from persistent storage
+    stored_trades = _load_stored_trades()
+    
+    # Get the timestamp of the most recent stored trade for incremental sync
+    last_trade_time = 0
+    if stored_trades:
+        last_trade_time = max(trade.get('timestamp', 0) for trade in stored_trades)
+    
+    # Fetch new trades since last stored trade
+    new_trades = []
+    if exchange_client:
+        new_trades = _fetch_new_trades_since(last_trade_time)
+        
+        if new_trades:
+            # Store new trades permanently
+            _store_new_trades(new_trades)
+            print(f"✅ Stored {len(new_trades)} new trades")
+            
+            # Add to our working set
+            stored_trades.extend(new_trades)
+    
+    # Sort all trades by timestamp (newest first)
+    all_trades = sorted(stored_trades, key=lambda x: x.get('timestamp', 0), reverse=True)
+    
+    # Filter and limit trades based on request parameters
+    trades = _filter_trades(all_trades, since_ts, limit)
+    
+    # Compute summary from ALL stored trades (not just the filtered ones)
+    total_trades = len(all_trades)
+    realized_pnl = sum(t.get('pnl', 0) for t in all_trades)
+    profitable_trades = len([t for t in all_trades if t.get('pnl', 0) > 0])
+    win_rate = (profitable_trades / total_trades) * 100 if total_trades > 0 else 0
+    total_volume = sum(t.get('value', 0) for t in all_trades)
+    avg_trade_size = total_volume / total_trades if total_trades > 0 else 0
+    
+    source = "persistent_storage"
+    if new_trades:
+        source += f"_updated_with_{len(new_trades)}_new"
+    
+    return {
+        "trades": trades,
+        "summary": {
+            "total_trades": total_trades,
+            "realized_pnl": realized_pnl,
+            "win_rate": win_rate,
+            "total_volume": total_volume,
+            "avg_trade_size": avg_trade_size,
+            "net_pnl": realized_pnl,
+            "stored_trades_count": len(all_trades),
+            "returned_trades_count": len(trades),
+            "new_trades_fetched": len(new_trades)
+        },
+        "source": source,
+        "last_update": time.time(),
+        "incremental_sync": True
+    }
+
+# Include the API router
+app.include_router(api_router)
+
+# Debug: Print all available routes on startup
+@app.on_event("startup")
+async def startup_event():
+    print("\n🚀 Available Routes:")
+    for route in app.routes:
+        if hasattr(route, 'path') and hasattr(route, 'methods'):
+            methods = getattr(route, 'methods', 'N/A')
+            print(f"  {route.path} - Methods: {methods}")
+    print()
 
 if __name__ == "__main__":
     import uvicorn
