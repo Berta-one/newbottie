@@ -15,6 +15,8 @@ class ReportsManager {
         this.version = 'v2024-01-17-direct-endpoints';
         
         console.log('🚀 ReportsManager initialized, version:', this.version, 'API URL:', this.apiUrl);
+        console.log('🌐 Current hostname:', window.location.hostname);
+        console.log('📍 Current origin:', window.location.origin);
         this.init();
     }
     
