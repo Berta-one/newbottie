@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Reports Dashboard - FIXED</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .report-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        @media (max-width: 768px) {
+            .report-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="gradient-bg text-white shadow-lg">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-4">
+                    <i class="fas fa-chart-line text-2xl"></i>
+                    <h1 class="text-2xl font-bold">Trading Reports Dashboard - FIXED VERSION</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button id="refreshBtn" class="bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg transition-all">
+                        <i class="fas fa-sync-alt mr-2"></i>Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container mx-auto px-4 py-8">
+        <!-- Stats Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Total Reports</p>
+                        <p class="text-3xl font-bold text-gray-800" id="totalReports">0</p>
+                    </div>
+                    <div class="bg-blue-100 p-3 rounded-full">
+                        <i class="fas fa-file-alt text-blue-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Total P&L</p>
+                        <p class="text-3xl font-bold text-gray-800" id="totalProfit">$0</p>
+                    </div>
+                    <div class="bg-yellow-100 p-3 rounded-full">
+                        <i class="fas fa-dollar-sign text-yellow-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">Avg Win Rate</p>
+                        <p class="text-3xl font-bold text-gray-800" id="avgWinRate">0%</p>
+                    </div>
+                    <div class="bg-purple-100 p-3 rounded-full">
+                        <i class="fas fa-trophy text-purple-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-500 text-sm">ML Accuracy</p>
+                        <p class="text-3xl font-bold text-gray-800" id="avgAccuracy">0%</p>
+                    </div>
+                    <div class="bg-green-100 p-3 rounded-full">
+                        <i class="fas fa-brain text-green-600 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reports Grid -->
+        <div id="reportsContainer" class="report-grid">
+            <!-- Reports will be dynamically loaded here -->
+        </div>
+
+        <!-- Loading Spinner -->
+        <div id="loadingSpinner" class="flex justify-center items-center py-12">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="hidden text-center py-12">
+            <div class="bg-white rounded-xl shadow-lg p-12">
+                <i class="fas fa-file-alt text-6xl text-gray-400 mb-4"></i>
+                <h3 class="text-xl font-semibold text-gray-700 mb-2">No Reports Found</h3>
+                <p class="text-gray-500 mb-6">Loading reports from API...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // FIXED VERSION - Direct API calls, no cache issues
+        class ReportsManager {
+            constructor() {
+                // ALWAYS use direct Render API - NO /api prefix
+                this.apiUrl = 'https://bottie-1.onrender.com';
+                
+                this.reports = [];
+                this.filteredReports = [];
+                this.isLoading = false;
+                this.version = 'v2024-01-17-CACHE-BYPASS-FIXED';
+                
+                console.log('🚀 FIXED ReportsManager initialized, version:', this.version);
+                console.log('📡 API URL:', this.apiUrl);
+                console.log('🌐 Hostname:', window.location.hostname);
+                
+                this.init();
+            }
+            
+            init() {
+                this.bindEvents();
+                this.loadReports();
+            }
+            
+            async fetchWithFallback(endpoint, options = {}) {
+                const url = `${this.apiUrl}${endpoint}`;
+                console.log(`🔍 Fetching: ${url}`);
+                
+                try {
+                    const response = await fetch(url, {
+                        ...options,
+                        mode: 'cors',
+                        credentials: 'omit',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            ...options.headers
+                        }
+                    });
+                    
+                    console.log(`📊 Response: ${response.status} ${response.statusText}`);
+                    
+                    if (response.ok) {
+                        console.log(`✅ SUCCESS!`);
+                        return response;
+                    } else {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                } catch (error) {
+                    console.log(`💥 ERROR:`, error.message);
+                    throw error;
+                }
+            }
+            
+            bindEvents() {
+                document.getElementById('refreshBtn').addEventListener('click', () => this.loadReports());
+            }
+            
+            async loadReports() {
+                this.setLoading(true);
+                try {
+                    console.log('🔄 Loading reports...');
+                    
+                    const [tradingReports, mlReports] = await Promise.all([
+                        this.fetchTradingReports(),
+                        this.fetchMLReports()
+                    ]);
+                    
+                    this.reports = [...tradingReports, ...mlReports];
+                    this.renderReports();
+                    this.updateStats();
+                    
+                    console.log('✅ Reports loaded successfully:', this.reports.length);
+                    
+                } catch (error) {
+                    console.error('❌ Error loading reports:', error);
+                    this.showError('Failed to load reports: ' + error.message);
+                } finally {
+                    this.setLoading(false);
+                }
+            }
+            
+            async fetchTradingReports() {
+                try {
+                    const response = await this.fetchWithFallback('/trades');
+                    const data = await response.json();
+                    console.log('📈 Trading data:', data);
+                    
+                    if (data && data.trades) {
+                        return [{
+                            id: `trading_${Date.now()}`,
+                            type: 'trading',
+                            title: 'Trading Performance Report',
+                            createdAt: new Date().toISOString(),
+                            summary: {
+                                totalTrades: data.trades.length,
+                                totalProfit: data.summary?.net_pnl || 0,
+                                winRate: this.calculateWinRate(data.trades)
+                            },
+                            data: data.trades,
+                            status: 'completed'
+                        }];
+                    }
+                    return [];
+                } catch (error) {
+                    console.warn('⚠️ Trading endpoint not available:', error.message);
+                    return [];
+                }
+            }
+            
+            async fetchMLReports() {
+                try {
+                    const response = await this.fetchWithFallback('/ml/status');
+                    const data = await response.json();
+                    console.log('🧠 ML data:', data);
+                    
+                    return [{
+                        id: `ml_${Date.now()}`,
+                        type: 'ml',
+                        title: 'ML Performance Analysis',
+                        createdAt: new Date().toISOString(),
+                        summary: {
+                            accuracy: data.accuracy || 0,
+                            confidence: data.confidence || 0,
+                            totalPredictions: data.total_predictions || 0
+                        },
+                        data: data,
+                        status: 'completed'
+                    }];
+                } catch (error) {
+                    console.warn('⚠️ ML endpoint not available:', error.message);
+                    return [];
+                }
+            }
+            
+            calculateWinRate(trades) {
+                if (!trades || trades.length === 0) return 0;
+                const wins = trades.filter(t => (t.profit || t.pnl || 0) > 0).length;
+                return (wins / trades.length) * 100;
+            }
+            
+            renderReports() {
+                const container = document.getElementById('reportsContainer');
+                const emptyState = document.getElementById('emptyState');
+                
+                if (this.reports.length === 0) {
+                    container.innerHTML = '';
+                    emptyState.classList.remove('hidden');
+                    return;
+                }
+                
+                emptyState.classList.add('hidden');
+                container.innerHTML = this.reports.map(report => this.createReportCard(report)).join('');
+            }
+            
+            createReportCard(report) {
+                const createdAt = new Date(report.createdAt).toLocaleDateString();
+                const typeIcon = report.type === 'trading' ? 'fa-chart-line' : 'fa-brain';
+                
+                return `
+                    <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center space-x-2">
+                                <i class="fas ${typeIcon} text-blue-600"></i>
+                                <span class="text-sm font-medium text-gray-600 uppercase">${report.type}</span>
+                            </div>
+                            <span class="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                ${report.status}
+                            </span>
+                        </div>
+                        
+                        <h3 class="text-lg font-semibold text-gray-800 mb-2">${report.title}</h3>
+                        <p class="text-gray-600 text-sm mb-4">Created: ${createdAt}</p>
+                        
+                        <div class="space-y-2">
+                            ${this.createSummaryItems(report)}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            createSummaryItems(report) {
+                if (report.type === 'trading') {
+                    const s = report.summary;
+                    return `
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Total Trades:</span>
+                            <span class="font-medium">${s.totalTrades || 0}</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Win Rate:</span>
+                            <span class="font-medium">${(s.winRate || 0).toFixed(1)}%</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Total P&L:</span>
+                            <span class="font-medium ${(s.totalProfit || 0) >= 0 ? 'text-green-600' : 'text-red-600'}">
+                                $${(s.totalProfit || 0).toFixed(2)}
+                            </span>
+                        </div>
+                    `;
+                } else if (report.type === 'ml') {
+                    const s = report.summary;
+                    return `
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Accuracy:</span>
+                            <span class="font-medium">${((s.accuracy || 0) * 100).toFixed(1)}%</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Confidence:</span>
+                            <span class="font-medium">${((s.confidence || 0) * 100).toFixed(1)}%</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Predictions:</span>
+                            <span class="font-medium">${s.totalPredictions || 0}</span>
+                        </div>
+                    `;
+                }
+                return '';
+            }
+            
+            updateStats() {
+                document.getElementById('totalReports').textContent = this.reports.length;
+                
+                const tradingReports = this.reports.filter(r => r.type === 'trading');
+                if (tradingReports.length > 0) {
+                    const totalProfit = tradingReports.reduce((sum, r) => sum + (r.summary.totalProfit || 0), 0);
+                    const avgWinRate = tradingReports.reduce((sum, r) => sum + (r.summary.winRate || 0), 0) / tradingReports.length;
+                    
+                    document.getElementById('totalProfit').textContent = `$${totalProfit.toFixed(2)}`;
+                    document.getElementById('totalProfit').className = `text-3xl font-bold ${totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`;
+                    document.getElementById('avgWinRate').textContent = `${avgWinRate.toFixed(1)}%`;
+                }
+                
+                const mlReports = this.reports.filter(r => r.type === 'ml');
+                if (mlReports.length > 0) {
+                    const avgAccuracy = mlReports.reduce((sum, r) => sum + ((r.summary.accuracy || 0) * 100), 0) / mlReports.length;
+                    document.getElementById('avgAccuracy').textContent = `${avgAccuracy.toFixed(1)}%`;
+                    document.getElementById('avgAccuracy').className = `text-3xl font-bold ${avgAccuracy >= 70 ? 'text-green-600' : avgAccuracy >= 50 ? 'text-yellow-600' : 'text-red-600'}`;
+                }
+            }
+            
+            setLoading(loading) {
+                this.isLoading = loading;
+                const spinner = document.getElementById('loadingSpinner');
+                if (loading) {
+                    spinner.classList.remove('hidden');
+                } else {
+                    spinner.classList.add('hidden');
+                }
+            }
+            
+            showError(message) {
+                console.error('❌', message);
+                const container = document.getElementById('reportsContainer');
+                container.innerHTML = `
+                    <div class="col-span-full bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+                        <i class="fas fa-exclamation-triangle text-red-500 text-4xl mb-4"></i>
+                        <h3 class="text-lg font-semibold text-red-800 mb-2">Error Loading Reports</h3>
+                        <p class="text-red-600">${message}</p>
+                        <button onclick="window.reportsManager.loadReports()" class="mt-4 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg">
+                            Try Again
+                        </button>
+                    </div>
+                `;
+            }
+        }
+        
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🌟 Starting FIXED Reports Dashboard...');
+            window.reportsManager = new ReportsManager();
+        });
+    </script>
+</body>
+</html>
