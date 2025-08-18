@@ -31,7 +31,7 @@ except Exception as e:
     print(f"⚠️ Data processing not available: {e}")
 
 # FastAPI app for real trading
-app = FastAPI(title="Bottie API (Real Trading)", version="4.0.1")
+app = FastAPI(title="Bottie API (Real Trading)", version="4.0.2")
 
 # CORS setup
 app.add_middleware(
