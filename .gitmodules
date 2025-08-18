@@ -1,1 +1,2 @@
-# Intentionally empty - removing problematic submodule references
+# No submodules configured
+# This file exists to prevent Git submodule errors during deployment
