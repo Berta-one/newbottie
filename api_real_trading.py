@@ -9,7 +9,7 @@ import json
 import random
 import logging
 from typing import Dict, Any, List, Optional
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, APIRouter, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 # Try to import real trading dependencies
@@ -41,6 +41,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Create API router with /api prefix
+api_router = APIRouter(prefix="/api")
 
 # Global variables for real trading
 exchange_client = None
@@ -480,6 +483,34 @@ def performance_analysis():
         "metrics": {"based_on": "real_trading_data"},
         "brier_score": 0.85
     }
+
+# API Routes with /api prefix
+@api_router.get("/trades")
+def api_recent_trades(since_ts: Optional[float] = Query(default=None, description="Return trades with timestamp greater than this UNIX ts"),
+                      limit: Optional[int] = Query(default=200, ge=1, le=1000, description="Max trades to return")):
+    """API version of recent trades endpoint"""
+    # For now, return the same as the main trades endpoint
+    # This can be enhanced to use the full logic from render_api.py if needed
+    return {
+        "trades": [],
+        "summary": {
+            "total_trades": 0,
+            "realized_pnl": 0,
+            "win_rate": 0,
+            "total_volume": 0,
+            "avg_trade_size": 0,
+            "net_pnl": 0,
+            "stored_trades_count": 0,
+            "returned_trades_count": 0,
+            "new_trades_fetched": 0
+        },
+        "source": "api_real_trading",
+        "last_update": time.time(),
+        "incremental_sync": True
+    }
+
+# Include the API router
+app.include_router(api_router)
 
 # Startup
 @app.on_event("startup")
