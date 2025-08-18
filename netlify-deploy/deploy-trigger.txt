@@ -1,0 +1,2 @@
+Deploy trigger - August 18, 2025
+This file was created to force a Netlify deployment with all the latest fixes.
