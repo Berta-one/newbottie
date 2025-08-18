@@ -1,11 +1,11 @@
 class ReportsManager {
     constructor() {
-        this.apiUrl = '/api';
+        this.apiUrl = 'https://bottie-1.onrender.com'; // Direct API calls to working endpoints
         this.reports = [];
         this.filteredReports = [];
         this.currentView = 'grid';
         this.isLoading = false;
-        this.version = 'v2024-01-17-fixed'; // Version identifier for debugging
+        this.version = 'v2024-01-17-fallback'; // Version identifier for debugging
         
         console.log('🚀 ReportsManager initialized, version:', this.version, 'API URL:', this.apiUrl);
         this.init();
@@ -73,14 +73,11 @@ class ReportsManager {
     
     async fetchTradingReports() {
         try {
-            // Try the main trades endpoint first
+            // Use the working /trades endpoint directly
             const response = await fetch(`${this.apiUrl}/trades`);
             if (!response.ok) {
-                // Fallback to trading history endpoint
-                // Trading history endpoint not available - skipping
-                // Skipped trading history
-                // No trading history data
-                return this.processTradingData(data);
+                console.info('Trading API endpoint not available');
+                return [];
             }
             
             const data = await response.json();
@@ -93,7 +90,8 @@ class ReportsManager {
     
     async fetchMLReports() {
         try {
-            const response = await fetch(`${this.apiUrl}/ml/status`);
+            // Use the working /status endpoint for now
+            const response = await fetch(`${this.apiUrl}/status`);
             if (!response.ok) throw new Error('Failed to fetch ML reports');
             
             const data = await response.json();
@@ -106,11 +104,9 @@ class ReportsManager {
     
     async fetchBacktestReports() {
         try {
-            const response = await fetch(`${this.apiUrl}/backtest/run`);
-            if (!response.ok) throw new Error('Failed to fetch backtest reports');
-            
-            const data = await response.json();
-            return this.processBacktestData(data);
+            // Backtest endpoint not available yet, return empty data
+            console.info('Backtest endpoint not available - using placeholder');
+            return this.processBacktestData({results: [], summary: {}});
         } catch (error) {
             console.info('Backtest endpoint not available');
             return []; // Return empty array instead of sample data
@@ -925,7 +921,7 @@ class ReportsManager {
                     break;
                     
                 case 'ml':
-                    const mlResponse = await fetch(`${this.apiUrl}/ml/status`);
+                    const mlResponse = await fetch(`${this.apiUrl}/status`);
                     if (mlResponse.ok) {
                         apiData = await mlResponse.json();
                         summary = {
@@ -941,24 +937,14 @@ class ReportsManager {
                     break;
                     
                 case 'backtest':
-                    const backtestResponse = await fetch(`${this.apiUrl}/backtest/run`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ time_range: timeRange })
-                    });
-                    
-                    if (backtestResponse.ok) {
-                        apiData = await backtestResponse.json();
-                        summary = {
-                            total_return: apiData.total_return || 0,
-                            sharpe_ratio: apiData.sharpe_ratio || 0,
-                            max_drawdown: apiData.max_drawdown || 0,
-                            win_rate: apiData.win_rate || 0
-                        };
-                        data = apiData;
-                    } else {
-                        throw new Error('Backtest API not available');
-                    }
+                    // Backtest endpoint not available yet, use placeholder data
+                    summary = {
+                        total_return: 0,
+                        sharpe_ratio: 0,
+                        max_drawdown: 0,
+                        win_rate: 0
+                    };
+                    data = { message: 'Backtest functionality coming soon', status: 'placeholder' };
                     break;
                     
                 case 'sentiment':
