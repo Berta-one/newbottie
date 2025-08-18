@@ -1,6 +1,6 @@
 class ReportsManager {
     constructor() {
-        this.apiUrl = 'https://bottie-1.onrender.com/api';
+        this.apiUrl = '/api';
         this.reports = [];
         this.filteredReports = [];
         this.currentView = 'grid';
