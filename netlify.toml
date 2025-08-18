@@ -1,15 +1,19 @@
 [build]
-  publish = "."
-  command = ""
+  publish = "netlify-deploy"
 
 [[redirects]]
   from = "/api/*"
-  to = "https://bottie-1.onrender.com/api/:splat"
+  to = "https://bottie-1.onrender.com/:splat"
   status = 200
   force = true
-  headers = {X-From = "Netlify"}
 
 [[redirects]]
-  from = "/"
-  to = "/reports.html"
+  from = "/*"
+  to = "/index.html"
   status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
