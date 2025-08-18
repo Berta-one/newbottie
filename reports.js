@@ -12,7 +12,7 @@ class ReportsManager {
         this.filteredReports = [];
         this.currentView = 'grid';
         this.isLoading = false;
-        this.version = 'v2024-01-17-fallback';
+        this.version = 'v2024-01-17-trading-fix';
         
         console.log('🚀 ReportsManager initialized, version:', this.version, 'API URL:', this.apiUrl);
         this.init();
