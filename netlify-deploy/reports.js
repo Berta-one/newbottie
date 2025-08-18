@@ -5,7 +5,9 @@ class ReportsManager {
         this.filteredReports = [];
         this.currentView = 'grid';
         this.isLoading = false;
+        this.version = 'v2024-01-17-fixed'; // Version identifier for debugging
         
+        console.log('🚀 ReportsManager initialized, version:', this.version, 'API URL:', this.apiUrl);
         this.init();
     }
     
