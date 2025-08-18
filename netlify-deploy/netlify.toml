@@ -1,4 +1,4 @@
-﻿[build]
+[build]
   publish = "."
   command = "echo 'Pure static site deployment'"
 
@@ -8,9 +8,10 @@
   
 [[redirects]]
   from = "/api/*"
-  to = "https://bottie-1.onrender.com/:splat"
+  to = "https://bottie-1.onrender.com/api/:splat"
   status = 200
   force = true
+  headers = {X-From = "Netlify"}
 
 [[redirects]]
   from = "/"

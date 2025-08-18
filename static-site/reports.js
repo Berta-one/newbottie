@@ -1,11 +1,20 @@
 class ReportsManager {
     constructor() {
-        this.apiUrl = '/api';
+        // Check if we're on Netlify and use direct API calls if redirects aren't working
+        const hostname = window.location.hostname;
+        if (hostname.includes('netlify.app') || hostname.includes('sntax.netlify.app')) {
+            this.apiUrl = 'https://bottie-1.onrender.com/api';
+        } else {
+            this.apiUrl = '/api';
+        }
+        
         this.reports = [];
         this.filteredReports = [];
         this.currentView = 'grid';
         this.isLoading = false;
+        this.version = 'v2024-01-17-fallback';
         
+        console.log('🚀 ReportsManager initialized, version:', this.version, 'API URL:', this.apiUrl);
         this.init();
     }
     
@@ -13,6 +22,37 @@ class ReportsManager {
         this.bindEvents();
         this.loadReports();
         this.startAutoRefresh();
+    }
+    
+    // Robust API fetch with fallback URLs
+    async fetchWithFallback(endpoint, options = {}) {
+        const urls = [
+            `${this.apiUrl}${endpoint}`,
+            `https://bottie-1.onrender.com/api${endpoint}`,
+            `https://bottie-1.onrender.com${endpoint}`
+        ];
+        
+        for (const url of urls) {
+            try {
+                const response = await fetch(url, {
+                    ...options,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        ...options.headers
+                    }
+                });
+                
+                if (response.ok) {
+                    return response;
+                }
+            } catch (error) {
+                console.debug(`Failed to fetch from ${url}:`, error.message);
+                continue;
+            }
+        }
+        
+        throw new Error(`All API endpoints failed for ${endpoint}`);
     }
     
     bindEvents() {
@@ -71,16 +111,7 @@ class ReportsManager {
     
     async fetchTradingReports() {
         try {
-            // Try the main trades endpoint first
-            const response = await fetch(`${this.apiUrl}/trades`);
-            if (!response.ok) {
-                // Fallback to trading history endpoint
-                // Trading history endpoint not available - skipping
-                // Skipped trading history
-                // No trading history data
-                return this.processTradingData(data);
-            }
-            
+            const response = await this.fetchWithFallback('/trades');
             const data = await response.json();
             return this.processTradingData(data);
         } catch (error) {
@@ -91,9 +122,7 @@ class ReportsManager {
     
     async fetchMLReports() {
         try {
-            const response = await fetch(`${this.apiUrl}/ml/status`);
-            if (!response.ok) throw new Error('Failed to fetch ML reports');
-            
+            const response = await this.fetchWithFallback('/ml/status');
             const data = await response.json();
             return this.processMLData(data);
         } catch (error) {
