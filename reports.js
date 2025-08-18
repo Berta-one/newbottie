@@ -3,7 +3,7 @@ class ReportsManager {
         // Check if we're on Netlify and use direct API calls if redirects aren't working
         const hostname = window.location.hostname;
         if (hostname.includes('netlify.app') || hostname.includes('sntax.netlify.app')) {
-            this.apiUrl = 'https://bottie-1.onrender.com/api';
+            this.apiUrl = 'https://bottie-1.onrender.com';  // Remove /api since backend doesn't use it
         } else {
             this.apiUrl = '/api';
         }
@@ -12,7 +12,7 @@ class ReportsManager {
         this.filteredReports = [];
         this.currentView = 'grid';
         this.isLoading = false;
-        this.version = 'v2024-01-17-trading-fix';
+        this.version = 'v2024-01-17-endpoint-fix';
         
         console.log('🚀 ReportsManager initialized, version:', this.version, 'API URL:', this.apiUrl);
         this.init();
@@ -28,8 +28,8 @@ class ReportsManager {
     async fetchWithFallback(endpoint, options = {}) {
         const urls = [
             `${this.apiUrl}${endpoint}`,
-            `https://bottie-1.onrender.com/api${endpoint}`,
-            `https://bottie-1.onrender.com${endpoint}`
+            `https://bottie-1.onrender.com${endpoint}`,
+            `https://bottie-1.onrender.com/api${endpoint}`
         ];
         
         for (const url of urls) {
