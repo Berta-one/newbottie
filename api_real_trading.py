@@ -580,12 +580,17 @@ def api_backtest_results():
 # Root endpoint for testing
 @app.get("/")
 def root():
-    return {"message": "Bottie API is running", "version": "4.0.1", "status": "ok"}
+    return {"message": "Bottie API is running", "version": "4.0.2", "status": "ok"}
 
 # Health check endpoint
 @app.get("/health")
 def health_check():
-    return {"status": "healthy", "timestamp": time.time()}
+    return {
+        "status": "healthy", 
+        "timestamp": time.time(),
+        "deployment_id": "deploy-20250117-final",
+        "endpoints_available": ["trades", "ml/status", "backtest/results", "trading/history"]
+    }
 
 # Debug endpoint to list all routes
 @app.get("/debug/routes")
