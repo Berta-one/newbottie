@@ -1,0 +1,19 @@
+[build]
+  publish = "."
+  command = "echo 'Pure static site deployment'"
+
+[build.environment]
+  # Prevent Python detection
+  PYTHON_VERSION = ""
+  
+[[redirects]]
+  from = "/api/*"
+  to = "https://bottie-1.onrender.com/api/:splat"
+  status = 200
+  force = true
+  headers = {X-From = "Netlify"}
+
+[[redirects]]
+  from = "/"
+  to = "/reports.html"
+  status = 200
