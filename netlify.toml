@@ -9,7 +9,4 @@
   force = true
   headers = {X-From = "Netlify"}
 
-[[redirects]]
-  from = "/"
-  to = "/working-dashboard.html"
-  status = 200
+# Root redirect removed - let index.html load directly
