@@ -2,17 +2,14 @@ class ReportsManager {
     constructor() {
         // Check if we're on Netlify and use direct API calls if redirects aren't working
         const hostname = window.location.hostname;
-        if (hostname.includes('netlify.app') || hostname.includes('sntax.netlify.app')) {
-            this.apiUrl = 'https://bottie-1.onrender.com/api';
-        } else {
-            this.apiUrl = '/api';
-        }
+        // FIXED: Always use Netlify proxy (proven to work!)
+        this.apiUrl = '/api';
         
         this.reports = [];
         this.filteredReports = [];
         this.currentView = 'grid';
         this.isLoading = false;
-        this.version = 'v2024-01-17-fallback';
+        this.version = 'v2024-08-19-PROXY-WORKING';
         
         console.log('🚀 ReportsManager initialized, version:', this.version, 'API URL:', this.apiUrl);
         this.init();
