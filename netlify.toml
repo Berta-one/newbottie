@@ -1,32 +1,15 @@
-[[redirects]]
-  from = "/api/trades"
-  to = "https://bottie-1.onrender.com/trades"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/api/ml/status"
-  to = "https://bottie-1.onrender.com/ml/status"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/api/status"
-  to = "https://bottie-1.onrender.com/status"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/api/health"
-  to = "https://bottie-1.onrender.com/health"
-  status = 200
-  force = true
+[build]
+  publish = "."
+  command = ""
 
 [[redirects]]
   from = "/api/*"
-  to = "https://bottie-1.onrender.com/:splat"
+  to = "https://bottie-1.onrender.com/api/:splat"
   status = 200
   force = true
+  headers = {X-From = "Netlify"}
 
-[build]
-  publish = "."
+[[redirects]]
+  from = "/"
+  to = "/reports.html"
+  status = 200
