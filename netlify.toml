@@ -31,8 +31,3 @@
   to = "https://bottie-1.onrender.com/:splat"
   status = 200
   force = true
-
-[[redirects]]
-  from = "/"
-  to = "/simple-test.html"
-  status = 200

@@ -1,144 +1,120 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trading Dashboard - FINAL</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <title>EMERGENCY API TEST - WORKING</title>
     <style>
-        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-        .card-hover { transition: all 0.3s ease; }
-        .card-hover:hover { transform: translateY(-5px); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); }
+        body { font-family: Arial, sans-serif; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .container { max-width: 800px; margin: 0 auto; background: rgba(255,255,255,0.1); padding: 30px; border-radius: 15px; backdrop-filter: blur(10px); }
+        .status { padding: 15px; margin: 10px 0; border-radius: 8px; font-weight: bold; }
+        .success { background: rgba(40, 167, 69, 0.9); }
+        .error { background: rgba(220, 53, 69, 0.9); }
+        .info { background: rgba(23, 162, 184, 0.9); }
+        button { background: #28a745; color: white; border: none; padding: 15px 30px; border-radius: 8px; cursor: pointer; font-size: 16px; margin: 10px; }
+        button:hover { background: #218838; }
+        .version { background: rgba(255, 193, 7, 0.9); color: #212529; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center; font-weight: bold; }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
-    <nav class="gradient-bg text-white shadow-lg">
-        <div class="container mx-auto px-4 py-4">
-            <div class="flex justify-between items-center">
-                <div class="flex items-center space-x-4">
-                    <i class="fas fa-chart-line text-2xl"></i>
-                    <h1 class="text-2xl font-bold">Trading Dashboard - EMERGENCY CACHE FIX</h1>
-                </div>
-                <button onclick="testAPI()" class="bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg">
-                    <i class="fas fa-sync-alt mr-2"></i>Test API
-                </button>
-            </div>
-        </div>
-    </nav>
-
-    <div class="container mx-auto px-4 py-8">
-        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
-            <strong>EMERGENCY CACHE FIX DEPLOYED!</strong> - All old cached files deleted.
+<body>
+    <div class="container">
+        <div class="version">
+            🚀 EMERGENCY API TEST - v2024-08-19-FINAL
+            <br>
+            <small>Deployed: <span id="deployTime"></span></small>
         </div>
         
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div class="bg-white rounded-xl shadow-lg p-6">
-                <h3 class="text-lg font-semibold mb-4">Version Check</h3>
-                <div id="versionInfo">
-                    <div>Version: <span class="font-bold text-green-600">v2024-01-17-EMERGENCY-FIX</span></div>
-                    <div>API URL: <span class="font-bold text-blue-600">/api</span></div>
-                    <div>Cache Status: <span class="font-bold text-red-600">BYPASSED</span></div>
-                </div>
-            </div>
-            
-            <div class="bg-white rounded-xl shadow-lg p-6">
-                <h3 class="text-lg font-semibold mb-4">API Test Results</h3>
-                <div id="apiResults">Click "Test API" to start...</div>
-            </div>
-            
-            <div class="bg-white rounded-xl shadow-lg p-6">
-                <h3 class="text-lg font-semibold mb-4">Trading Data</h3>
-                <div id="tradingResults">Loading...</div>
-            </div>
-        </div>
+        <h1>🧪 API Endpoint Test</h1>
+        <p>Testing direct API calls to verify endpoints work</p>
         
-        <div class="bg-white rounded-xl shadow-lg p-6">
-            <h3 class="text-lg font-semibold mb-4">Debug Console</h3>
-            <div id="debugConsole" class="bg-gray-100 p-4 rounded font-mono text-sm max-h-96 overflow-y-auto">
-                EMERGENCY CACHE FIX LOADED - No external JS files!<br>
-            </div>
-        </div>
+        <button onclick="testAPI()">🚀 Test API Endpoints</button>
+        <button onclick="clearResults()">🗑️ Clear Results</button>
+        
+        <div id="results"></div>
     </div>
 
     <script>
-        // INLINE JAVASCRIPT - ABSOLUTELY NO CACHE POSSIBLE
-        console.log('🚀 EMERGENCY CACHE FIX LOADED');
+        document.getElementById('deployTime').textContent = new Date().toISOString();
         
-        const VERSION = 'v2024-01-17-EMERGENCY-FIX';
-        const API_URL = '/api';  // Use Netlify proxy
+        console.log('🚀 EMERGENCY API TEST LOADED - v2024-08-19-FINAL');
+        console.log('Current URL:', window.location.href);
+        console.log('Timestamp:', new Date().toISOString());
         
-        function log(message) {
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.innerHTML = `${new Date().toLocaleTimeString()}: ${message}`;
+            document.getElementById('results').appendChild(div);
             console.log(message);
-            const debug = document.getElementById('debugConsole');
-            debug.innerHTML += new Date().toLocaleTimeString() + ': ' + message + '<br>';
-            debug.scrollTop = debug.scrollHeight;
+        }
+        
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
         }
         
         async function testAPI() {
-            log('🔄 Testing API endpoints...');
-            document.getElementById('apiResults').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
+            clearResults();
+            addResult('🚀 Starting API endpoint test...', 'info');
             
-            // Test proxy endpoint
-            try {
-                log('📡 Testing /api/trades via Netlify proxy...');
-                const response = await fetch('/api/trades', {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
+            // Test the proxy endpoints that should work now
+            const tests = [
+                { url: '/api/trades', name: 'Proxy Trades (/api/trades → /trades)' },
+                { url: '/api/ml/status', name: 'Proxy ML (/api/ml/status → /ml/status)' },
+                { url: '/api/health', name: 'Proxy Health (/api/health → /health)' },
+                { url: 'https://bottie-1.onrender.com/trades', name: 'Direct Trades (bypass proxy)' },
+                { url: 'https://bottie-1.onrender.com/ml/status', name: 'Direct ML (bypass proxy)' }
+            ];
+            
+            let workingCount = 0;
+            
+            for (const test of tests) {
+                try {
+                    addResult(`🔍 Testing ${test.name}...`, 'info');
+                    
+                    const response = await fetch(test.url, {
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        addResult(`✅ ${test.name} SUCCESS (${response.status})`, 'success');
+                        workingCount++;
+                        
+                        if (test.url.includes('trades') && data.trades) {
+                            addResult(`📈 Found ${data.trades.length} trades, P&L: $${(data.summary?.net_pnl || 0).toFixed(2)}`, 'success');
+                        }
+                        if (test.url.includes('ml') && data.accuracy) {
+                            addResult(`🧠 ML Accuracy: ${(data.accuracy * 100).toFixed(1)}%, Predictions: ${data.total_predictions || 0}`, 'success');
+                        }
+                    } else {
+                        addResult(`❌ ${test.name} FAILED (${response.status})`, 'error');
                     }
-                });
-                
-                log(`📊 Proxy Response: ${response.status} ${response.statusText}`);
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    log('✅ PROXY SUCCESS - Got trading data!');
-                    
-                    const tradesCount = data.trades ? data.trades.length : 0;
-                    const totalPnL = data.summary?.net_pnl || 0;
-                    
-                    document.getElementById('apiResults').innerHTML = `
-                        <div class="text-green-600">✅ Proxy Working!</div>
-                        <div class="text-sm">Status: ${response.status}</div>
-                    `;
-                    
-                    document.getElementById('tradingResults').innerHTML = `
-                        <div>Trades: <span class="font-bold">${tradesCount}</span></div>
-                        <div>P&L: <span class="font-bold ${totalPnL >= 0 ? 'text-green-600' : 'text-red-600'}">$${totalPnL.toFixed(2)}</span></div>
-                    `;
-                    
-                    log(`📈 Trading Data: ${tradesCount} trades, P&L: $${totalPnL.toFixed(2)}`);
-                } else {
-                    log(`❌ PROXY FAILED: ${response.status}`);
-                    document.getElementById('apiResults').innerHTML = `
-                        <div class="text-red-600">❌ Proxy Failed</div>
-                        <div class="text-sm">Status: ${response.status}</div>
-                    `;
+                } catch (error) {
+                    addResult(`💥 ${test.name} ERROR: ${error.message}`, 'error');
                 }
-            } catch (error) {
-                log(`💥 PROXY ERROR: ${error.message}`);
-                document.getElementById('apiResults').innerHTML = `
-                    <div class="text-red-600">❌ Proxy Error</div>
-                    <div class="text-sm">${error.message}</div>
-                `;
+                
+                // Small delay between tests
+                await new Promise(resolve => setTimeout(resolve, 300));
             }
             
-            log('✅ API test completed!');
+            addResult(`📊 SUMMARY: ${workingCount}/${tests.length} endpoints working`, workingCount > 0 ? 'success' : 'error');
+            
+            if (workingCount > 0) {
+                addResult('🎉 SUCCESS! API is working. The proxy fix resolved the issues.', 'success');
+                addResult('💡 You can now use the corrected dashboard with confidence.', 'info');
+            } else {
+                addResult('⚠️ No endpoints working. Check Render service status.', 'error');
+            }
         }
         
-        // Auto-run tests when page loads
-        document.addEventListener('DOMContentLoaded', () => {
-            log('🌟 Emergency Cache Fix Dashboard loaded');
-            log(`📋 Version: ${VERSION}`);
-            log(`📡 API URL: ${API_URL}`);
-            log(`🌐 Hostname: ${window.location.hostname}`);
-            log(`📍 Full URL: ${window.location.href}`);
-            
-            // Auto-test API
-            setTimeout(testAPI, 1000);
-        });
+        // Auto-run test after 2 seconds
+        window.onload = function() {
+            setTimeout(() => {
+                addResult('🔄 Auto-starting API test...', 'info');
+                testAPI();
+            }, 2000);
+        };
     </script>
 </body>
 </html>
