@@ -1,6 +1,26 @@
-[build]
-  publish = "."
-  command = ""
+[[redirects]]
+  from = "/api/trades"
+  to = "https://bottie-1.onrender.com/trades"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/ml/status"
+  to = "https://bottie-1.onrender.com/ml/status"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/status"
+  to = "https://bottie-1.onrender.com/status"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/health"
+  to = "https://bottie-1.onrender.com/health"
+  status = 200
+  force = true
 
 [[redirects]]
   from = "/api/*"
@@ -8,13 +28,5 @@
   status = 200
   force = true
 
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-
-[[headers]]
-  for = "/*"
-  [headers.values]
-    X-Frame-Options = "DENY"
-    X-Content-Type-Options = "nosniff"
+[build]
+  publish = "."

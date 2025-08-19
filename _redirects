@@ -1,1 +1,5 @@
-/api/*  https://bottie-1.onrender.com/api/:splat  200
+/api/trades https://bottie-1.onrender.com/trades 200
+/api/ml/status https://bottie-1.onrender.com/ml/status 200
+/api/status https://bottie-1.onrender.com/status 200
+/api/health https://bottie-1.onrender.com/health 200
+/api/* https://bottie-1.onrender.com/:splat 200
