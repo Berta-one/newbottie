@@ -122,11 +122,14 @@ class ReportsManager {
             );
             
             if (hasDemoTradeIds) {
-                console.warn('🚫 Filtered out demo trading data with pattern T1755...');
-                return false;
+                console.warn('⚠️ Trade IDs suggest demo mode - displaying for verification');
+                console.warn('📋 To verify: Check if these trades appear in your Binance portfolio');
+                // Mark as demo but still display for user verification
+                report.isDemoData = true;
+                report.title = report.title + ' (VERIFY: Demo or Real?)';
             }
             
-            // Only include if we have real trade data
+            // Include if we have trade data (let user verify if real)
             return report.data.length > 0;
         });
     }
@@ -460,7 +463,9 @@ class ReportsManager {
                     <div class="flex items-center space-x-2">
                         <i class="${typeIcon} text-blue-600"></i>
                         <span class="text-sm font-medium text-gray-600 uppercase">${report.type}</span>
-                        <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">REAL DATA</span>
+                        <span class="text-xs ${report.isDemoData ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'} px-2 py-1 rounded">
+                            ${report.isDemoData ? 'VERIFY DATA' : 'REAL DATA'}
+                        </span>
                     </div>
                     <span class="px-2 py-1 rounded-full text-xs font-medium ${statusColor}">
                         ${report.status}
@@ -780,28 +785,76 @@ class ReportsManager {
     }
     
     showNewReportModal() {
-        console.log('📊 Generating new real data report...');
-        this.generateNewReport();
+        console.log('📊 Generating all report types...');
+        this.generateAllReports();
     }
     
-    async generateNewReport() {
+    async generateAllReports() {
         try {
             this.setLoading(true);
-            console.log('🔄 Generating fresh report with real data only...');
+            console.log('🔄 Generating comprehensive reports (Trading + ML)...');
             
+            // Reset retry count and load fresh data
             this.retryCount = 0;
             await this.loadReports();
             
+            // Update all dashboard stats
+            this.updateStats();
+            
+            const tradingReports = this.reports.filter(r => r.type === 'trading');
+            const mlReports = this.reports.filter(r => r.type === 'ml');
+            
+            let message = 'Reports generated: ';
+            if (tradingReports.length > 0) message += `✅ Trading (${tradingReports[0].summary.total_trades} trades)`;
+            if (mlReports.length > 0) message += `✅ ML (${(mlReports[0].summary.accuracy * 100).toFixed(1)}% accuracy)`;
+            
             if (this.reports.length > 0) {
-                this.showSuccess('New report generated with latest real data!');
+                this.showSuccess(message);
+                console.log('✅ All reports generated successfully');
+                
+                // Update the top row stats
+                this.refreshTopRowStats();
             } else {
-                this.showError('No real data available for report generation.');
+                this.showError('No data available. Check if live trading is enabled.');
+                console.log('⚠️ No reports generated - no data available');
             }
         } catch (error) {
-            console.error('❌ Error generating report:', error);
-            this.showError('Failed to generate report: ' + error.message);
+            console.error('❌ Error generating reports:', error);
+            this.showError('Failed to generate reports: ' + error.message);
         } finally {
             this.setLoading(false);
+        }
+    }
+    
+    refreshTopRowStats() {
+        console.log('📊 Refreshing top row statistics...');
+        
+        // Force update all stats with current data
+        const tradingReports = this.reports.filter(r => r.type === 'trading');
+        const mlReports = this.reports.filter(r => r.type === 'ml');
+        
+        if (tradingReports.length > 0) {
+            const s = tradingReports[0].summary;
+            console.log('📈 Trading stats updated:', {
+                trades: s.total_trades,
+                pnl: s.net_pnl,
+                winRate: s.win_rate,
+                profitFactor: s.profit_factor
+            });
+        }
+        
+        if (mlReports.length > 0) {
+            const s = mlReports[0].summary;
+            console.log('🧠 ML stats updated:', {
+                accuracy: (s.accuracy * 100).toFixed(1) + '%',
+                confidence: (s.confidence * 100).toFixed(1) + '%',
+                predictions: s.total_predictions
+            });
+        }
+        
+        // Update recent reports count
+        if (document.getElementById('recentReports')) {
+            document.getElementById('recentReports').textContent = this.reports.length;
         }
     }
 }
