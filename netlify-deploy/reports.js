@@ -141,6 +141,9 @@ class ReportsManager {
     processTradingData(data) {
         if (!data || !Array.isArray(data.trades)) return [];
         
+        // Use backend summary if available, otherwise calculate
+        const backendSummary = data.summary || {};
+        
         const report = {
             id: `trading_${Date.now()}`,
             type: 'trading',
@@ -148,9 +151,11 @@ class ReportsManager {
             createdAt: new Date().toISOString(),
             summary: {
                 totalTrades: data.trades.length,
-                winRate: this.calculateWinRate(data.trades),
-                totalProfit: this.calculateTotalProfit(data.trades),
-                avgProfit: this.calculateAvgProfit(data.trades)
+                winRate: backendSummary.win_rate || this.calculateWinRate(data.trades),
+                totalProfit: backendSummary.net_pnl || this.calculateTotalProfit(data.trades),
+                avgProfit: backendSummary.avg_trade_size || this.calculateAvgProfit(data.trades),
+                realizedPnL: backendSummary.realized_pnl || 0,
+                unrealizedPnL: backendSummary.unrealized_pnl || 0
             },
             data: data.trades,
             status: 'completed'
@@ -168,8 +173,10 @@ class ReportsManager {
             summary: {
                 accuracy: data.accuracy || 0,
                 brierScore: data.brier_score || 0,
-                sampleCount: data.sample_count || 0,
-                quantumImportance: data.quantum_importance || 0
+                sampleCount: data.total_predictions || data.sample_count || 0,
+                quantumImportance: data.overall_score || data.quantum_importance || 0,
+                confidence: data.confidence || 0,
+                successfulPredictions: data.successful_predictions || 0
             },
             data: data,
             status: 'completed'
