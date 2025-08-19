@@ -3,10 +3,33 @@
   command = ""
 
 [[redirects]]
-  from = "/api/*"
-  to = "https://bottie-1.onrender.com/api/:splat"
+  from = "/api/trades"
+  to = "https://bottie-1.onrender.com/trades"
   status = 200
   force = true
-  headers = {X-From = "Netlify"}
+
+[[redirects]]
+  from = "/api/ml/status"
+  to = "https://bottie-1.onrender.com/ml/status"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/status"
+  to = "https://bottie-1.onrender.com/status"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/health"
+  to = "https://bottie-1.onrender.com/health"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/*"
+  to = "https://bottie-1.onrender.com/:splat"
+  status = 200
+  force = true
 
 # Root redirect removed - let index.html load directly
