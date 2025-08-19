@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple API Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f0f0f0; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; overflow: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Simple API Test</h1>
+        <p><strong>Version:</strong> v2024-08-19-SIMPLE</p>
+        <p><strong>Purpose:</strong> Test if API endpoints work with minimal code</p>
+        
+        <button onclick="runTest()">🚀 Run API Test</button>
+        <button onclick="clearResults()">🗑️ Clear</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        console.log('🚀 Simple API Test Loaded');
+        
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = message;
+            document.getElementById('results').appendChild(div);
+            console.log(message);
+        }
+        
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+        
+        async function testEndpoint(url, name) {
+            try {
+                addResult(`🔍 Testing ${name}: ${url}`, 'info');
+                
+                const response = await fetch(url);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult(`✅ ${name} SUCCESS (${response.status})`, 'success');
+                    
+                    if (url.includes('/trades') && data.trades) {
+                        addResult(`📈 Found ${data.trades.length} trades`, 'success');
+                        if (data.summary && data.summary.net_pnl !== undefined) {
+                            addResult(`💰 P&L: $${data.summary.net_pnl.toFixed(2)}`, 'success');
+                        }
+                    }
+                    
+                    if (url.includes('/ml/status') && data.accuracy) {
+                        addResult(`🧠 ML Accuracy: ${(data.accuracy * 100).toFixed(1)}%`, 'success');
+                        addResult(`🔮 Predictions: ${data.total_predictions || 0}`, 'success');
+                    }
+                    
+                    return true;
+                } else {
+                    addResult(`❌ ${name} FAILED (${response.status})`, 'error');
+                    return false;
+                }
+            } catch (error) {
+                addResult(`💥 ${name} ERROR: ${error.message}`, 'error');
+                return false;
+            }
+        }
+        
+        async function runTest() {
+            clearResults();
+            addResult('🚀 Starting API endpoint tests...', 'info');
+            
+            const endpoints = [
+                'https://bottie-1.onrender.com/health',
+                'https://bottie-1.onrender.com/trades',
+                'https://bottie-1.onrender.com/ml/status',
+                'https://bottie-1.onrender.com/status'
+            ];
+            
+            let working = 0;
+            
+            for (const url of endpoints) {
+                const name = url.split('/').pop();
+                const success = await testEndpoint(url, name);
+                if (success) working++;
+                
+                // Small delay between tests
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            addResult(`📊 Summary: ${working}/${endpoints.length} endpoints working`, working > 0 ? 'success' : 'error');
+            
+            if (working > 0) {
+                addResult('🎉 API is working! The issue was just browser cache.', 'success');
+            } else {
+                addResult('⚠️ API endpoints not responding. Check Render service.', 'error');
+            }
+        }
+        
+        // Auto-run test on page load
+        window.onload = function() {
+            setTimeout(runTest, 1000);
+        };
+    </script>
+</body>
+</html>
