@@ -9,7 +9,7 @@ class ReportsManager {
         this.filteredReports = [];
         this.currentView = 'grid';
         this.isLoading = false;
-        this.version = 'v2024-08-19-PROXY-WORKING';
+        this.version = 'v2024-08-19-PROXY-ONLY';
         
         console.log('🚀 ReportsManager initialized, version:', this.version, 'API URL:', this.apiUrl);
         this.init();
@@ -23,10 +23,9 @@ class ReportsManager {
     
     // Robust API fetch with fallback URLs
     async fetchWithFallback(endpoint, options = {}) {
+        // FIXED: Only use proxy (proven to work!)
         const urls = [
-            `${this.apiUrl}${endpoint}`,
-            `https://bottie-1.onrender.com/api${endpoint}`,
-            `https://bottie-1.onrender.com${endpoint}`
+            `${this.apiUrl}${endpoint}`
         ];
         
         for (const url of urls) {
