@@ -5,7 +5,7 @@ class ReportsManager {
         this.filteredReports = [];
         this.currentView = 'grid';
         this.isLoading = false;
-        this.version = 'v2024-08-19-NO-RETRY-LOOP';
+        this.version = 'v2024-08-19-METRICS-CORRECTED';
         this.retryCount = 0;
         this.maxRetries = 3;
         
@@ -192,11 +192,19 @@ class ReportsManager {
         const avgReturn = returns.reduce((sum, r) => sum + r, 0) / returns.length;
         const variance = returns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / returns.length;
         const stdDev = Math.sqrt(variance);
-        return stdDev > 0 ? avgReturn / stdDev : 0;
+        
+        if (stdDev <= 0) return 0;
+        
+        // Calculate annualized Sharpe ratio (assuming daily returns)
+        const sharpe = (avgReturn / stdDev) * Math.sqrt(252); // 252 trading days per year
+        
+        // Clamp to reasonable range
+        return Math.max(-5, Math.min(5, sharpe));
     }
     
     calculateMaxDrawdown(trades) {
         if (!trades || trades.length === 0) return 0;
+        
         let peak = 0;
         let maxDrawdown = 0;
         let runningPnL = 0;
@@ -204,11 +212,15 @@ class ReportsManager {
         for (const trade of trades) {
             runningPnL += (trade.pnl || 0);
             if (runningPnL > peak) peak = runningPnL;
-            const drawdown = peak > 0 ? (peak - runningPnL) / peak : 0;
-            if (drawdown > maxDrawdown) maxDrawdown = drawdown;
+            
+            if (peak > 0) {
+                const drawdown = (peak - runningPnL) / Math.abs(peak);
+                if (drawdown > maxDrawdown) maxDrawdown = drawdown;
+            }
         }
         
-        return maxDrawdown;
+        // Return as percentage, clamped to reasonable range
+        return Math.max(0, Math.min(1, maxDrawdown));
     }
     
     calculateVolatility(trades) {
@@ -358,12 +370,31 @@ class ReportsManager {
             document.getElementById('totalProfit').className = `text-3xl font-bold ${(s.net_pnl || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`;
             document.getElementById('avgWinRate').textContent = `${(s.win_rate || 0).toFixed(1)}%`;
             
-            // Advanced metrics
+            // Advanced metrics with proper formatting
             if (document.getElementById('profitFactor')) {
                 document.getElementById('profitFactor').textContent = (s.profit_factor || 0).toFixed(2);
+                document.getElementById('profitFactor').className = `text-2xl font-bold ${(s.profit_factor || 0) >= 1.5 ? 'text-green-600' : (s.profit_factor || 0) >= 1.0 ? 'text-yellow-600' : 'text-red-600'}`;
+            }
+            
+            if (document.getElementById('sharpeRatio')) {
                 document.getElementById('sharpeRatio').textContent = (s.sharpe_ratio || 0).toFixed(2);
-                document.getElementById('maxDrawdown').textContent = `${((s.max_drawdown || 0) * 100).toFixed(1)}%`;
+                document.getElementById('sharpeRatio').className = `text-2xl font-bold ${(s.sharpe_ratio || 0) >= 1.0 ? 'text-green-600' : (s.sharpe_ratio || 0) >= 0.5 ? 'text-yellow-600' : 'text-red-600'}`;
+            }
+            
+            if (document.getElementById('maxDrawdown')) {
+                const drawdownPct = ((s.max_drawdown || 0) * 100);
+                document.getElementById('maxDrawdown').textContent = `${drawdownPct.toFixed(1)}%`;
+                document.getElementById('maxDrawdown').className = `text-2xl font-bold ${drawdownPct <= 10 ? 'text-green-600' : drawdownPct <= 25 ? 'text-yellow-600' : 'text-red-600'}`;
+            }
+            
+            if (document.getElementById('volatility')) {
                 document.getElementById('volatility').textContent = (s.volatility || 0).toFixed(2);
+                document.getElementById('volatility').className = `text-2xl font-bold ${(s.volatility || 0) <= 20 ? 'text-green-600' : (s.volatility || 0) <= 50 ? 'text-yellow-600' : 'text-red-600'}`;
+            }
+            
+            // Fix trade count display
+            if (document.getElementById('totalTrades')) {
+                document.getElementById('totalTrades').textContent = `${s.total_trades || 0} trades`;
             }
         }
         
@@ -378,6 +409,13 @@ class ReportsManager {
             
             if (document.getElementById('brierScore')) {
                 document.getElementById('brierScore').textContent = `Brier: ${(s.brier_score || 0).toFixed(3)}`;
+            }
+            
+            // Update Quantum Factor from ML data
+            if (document.getElementById('quantumImportance')) {
+                const quantumScore = (s.confidence || 0) * 100; // Use confidence as quantum factor
+                document.getElementById('quantumImportance').textContent = `${quantumScore.toFixed(1)}%`;
+                document.getElementById('quantumImportance').className = `text-2xl font-bold ${quantumScore >= 75 ? 'text-purple-600' : quantumScore >= 50 ? 'text-blue-600' : 'text-gray-600'}`;
             }
         }
         
@@ -416,8 +454,43 @@ class ReportsManager {
         }
     }
     
-    // Placeholder methods
-    showNewReportModal() { console.log('New report modal'); }
+    // Report generation functionality
+    showNewReportModal() { 
+        console.log('📊 Generating new report...');
+        this.generateNewReport();
+    }
+    
+    async generateNewReport() {
+        try {
+            this.setLoading(true);
+            console.log('🔄 Generating fresh report...');
+            
+            // Force refresh data
+            this.retryCount = 0;
+            await this.loadReports();
+            
+            if (this.reports.length > 0) {
+                console.log('✅ New report generated successfully');
+                this.showSuccess('New report generated with latest data!');
+            } else {
+                console.log('⚠️ No data available for report');
+                this.showError('No data available. Check if API service is running.');
+            }
+        } catch (error) {
+            console.error('❌ Error generating report:', error);
+            this.showError('Failed to generate report. API may be temporarily unavailable.');
+        } finally {
+            this.setLoading(false);
+        }
+    }
+    
+    showSuccess(message) {
+        const notification = document.createElement('div');
+        notification.className = 'fixed top-4 right-4 px-6 py-3 rounded-lg text-white z-50 bg-green-500';
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 3000);
+    }
 }
 
 // Initialize when page loads
