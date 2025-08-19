@@ -9,7 +9,7 @@ class ReportsManager {
         this.filteredReports = [];
         this.currentView = 'grid';
         this.isLoading = false;
-        this.version = 'v2024-08-19-PROXY-ONLY';
+        this.version = 'v2024-08-19-METRICS-FIXED';
         
         console.log('🚀 ReportsManager initialized, version:', this.version, 'API URL:', this.apiUrl);
         this.init();
@@ -150,12 +150,17 @@ class ReportsManager {
             title: 'Trading Performance Report',
             createdAt: new Date().toISOString(),
             summary: {
-                totalTrades: data.trades.length,
-                winRate: backendSummary.win_rate || this.calculateWinRate(data.trades),
-                totalProfit: backendSummary.net_pnl || this.calculateTotalProfit(data.trades),
-                avgProfit: backendSummary.avg_trade_size || this.calculateAvgProfit(data.trades),
-                realizedPnL: backendSummary.realized_pnl || 0,
-                unrealizedPnL: backendSummary.unrealized_pnl || 0
+                total_trades: data.trades.length,
+                win_rate: backendSummary.win_rate || this.calculateWinRate(data.trades),
+                net_pnl: backendSummary.net_pnl || this.calculateTotalProfit(data.trades),
+                realized_pnl: backendSummary.realized_pnl || 0,
+                unrealized_pnl: backendSummary.unrealized_pnl || 0,
+                total_volume: backendSummary.total_volume || 0,
+                avg_trade_size: backendSummary.avg_trade_size || this.calculateAvgProfit(data.trades),
+                profit_factor: this.calculateProfitFactor(data.trades),
+                sharpe_ratio: this.calculateSharpeRatio(data.trades),
+                max_drawdown: this.calculateMaxDrawdown(data.trades),
+                volatility: this.calculateVolatility(data.trades)
             },
             data: data.trades,
             status: 'completed'
@@ -172,11 +177,13 @@ class ReportsManager {
             createdAt: new Date().toISOString(),
             summary: {
                 accuracy: data.accuracy || 0,
-                brierScore: data.brier_score || 0,
-                sampleCount: data.total_predictions || data.sample_count || 0,
-                quantumImportance: data.overall_score || data.quantum_importance || 0,
+                brier_score: data.brier_score || this.calculateBrierScore(data) || 0,
+                sample_count: data.total_predictions || data.sample_count || 0,
+                quantum_importance: data.overall_score || data.quantum_importance || 0,
                 confidence: data.confidence || 0,
-                successfulPredictions: data.successful_predictions || 0
+                total_predictions: data.total_predictions || 0,
+                successful_predictions: data.successful_predictions || 0,
+                data_quality: data.data_quality || 0
             },
             data: data,
             status: 'completed'
