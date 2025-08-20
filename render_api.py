@@ -17,7 +17,6 @@ from fastapi.responses import FileResponse
 from passlib.context import CryptContext
 import jwt
 from datetime import datetime, timedelta
-import websocket
 import threading
 from collections import defaultdict
 from enum import Enum
