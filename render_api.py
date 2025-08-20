@@ -184,8 +184,10 @@ def get_real_balance():
 @app.get("/")
 def root():
     """Serve dashboard or return API info"""
-    # Check if reports-dashboard.html exists and serve it
-    if os.path.exists('reports-dashboard.html'):
+    # Check if working-dashboard.html exists and serve it
+    if os.path.exists('working-dashboard.html'):
+        return FileResponse('working-dashboard.html')
+    elif os.path.exists('reports-dashboard.html'):
         return FileResponse('reports-dashboard.html')
     elif os.path.exists('index.html'):
         return FileResponse('index.html')
