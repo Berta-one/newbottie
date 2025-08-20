@@ -59,6 +59,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount static files directory if it exists
+try:
+    if os.path.exists('static'):
+        app.mount("/static", StaticFiles(directory="static"), name="static")
+        print("✅ Static files directory mounted")
+except Exception as e:
+    print(f"⚠️ Could not mount static files: {e}")
+
 # Global variables
 exchange_client = None
 websocket_manager = None
@@ -175,7 +183,20 @@ def get_real_balance():
 # Root endpoint
 @app.get("/")
 def root():
-    """Health check endpoint"""
+    """Serve dashboard or return API info"""
+    # Check if reports-dashboard.html exists and serve it
+    if os.path.exists('reports-dashboard.html'):
+        return FileResponse('reports-dashboard.html')
+    elif os.path.exists('index.html'):
+        return FileResponse('index.html')
+    else:
+        # Fallback to API info
+        return {"status": "ok", "service": "bottie-render-api", "version": "1.0.1"}
+
+# API info endpoint
+@app.get("/api-info")
+def api_info():
+    """API information endpoint"""
     return {"status": "ok", "service": "bottie-render-api", "version": "1.0.1"}
 
 # Health endpoint
