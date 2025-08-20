@@ -150,7 +150,9 @@
             // Test ML data via proxy
             const ml = await testEndpoint('/ml/status', 'ML Status (via proxy)', true);
             if (ml.success && ml.data) {
-                const accuracy = (ml.data.accuracy * 100).toFixed(1);
+                // Check if accuracy is already a percentage or decimal
+                const accuracyValue = ml.data.accuracy > 1 ? ml.data.accuracy : ml.data.accuracy * 100;
+                const accuracy = accuracyValue.toFixed(1);
                 const predictions = ml.data.total_predictions || 0;
                 document.getElementById('mlData').innerHTML = `
                     <div class="space-y-2">
@@ -258,7 +260,7 @@
                 return `
                     <div class="flex justify-between text-sm">
                         <span class="text-gray-600">Accuracy:</span>
-                        <span class="font-medium">${((s.accuracy || 0) * 100).toFixed(1)}%</span>
+                        <span class="font-medium">${(s.accuracy > 1 ? s.accuracy : s.accuracy * 100).toFixed(1)}%</span>
                     </div>
                     <div class="flex justify-between text-sm">
                         <span class="text-gray-600">Confidence:</span>
