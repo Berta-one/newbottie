@@ -27,164 +27,155 @@ import threading
 from collections import defaultdict
 from enum import Enum
 
-# Load environment variables
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-    print("✅ Environment variables loaded from .env")
-except ImportError:
-    print("⚠️ python-dotenv not available, using system environment")
+    return HTMLResponse(content="""<!DOCTYPE html>
+<html lang='en'>
+<head>
+    <meta charset='UTF-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <title>Trading Reports Dashboard</title>
+    <link href='https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css' rel='stylesheet'>
+    <link href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css' rel='stylesheet'>
+</head>
+<body class='bg-gray-50 min-h-screen'>
+    <nav class='bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 shadow-lg'>
+        <div class='container mx-auto'>
+            <h1 class='text-2xl font-bold'>
+                <i class='fas fa-chart-line mr-2'></i>Trading Reports Dashboard
+            </h1>
+        </div>
+    </nav>
 
-# Try to import trading dependencies
-try:
-    import ccxt
-    EXCHANGE_AVAILABLE = True
-    print("✅ Exchange libraries available")
-except Exception as e:
-    EXCHANGE_AVAILABLE = False
-    print(f"⚠️ Exchange libraries not available: {e}")
-
-try:
-    import pandas as pd
-    import numpy as np
-    DATA_AVAILABLE = True
-    print("✅ Data processing available")
-except Exception as e:
-    DATA_AVAILABLE = False
-    print(f"⚠️ Data processing not available: {e}")
-
-# FastAPI app
-app = FastAPI(title="Bottie Render API", version="1.0.1")
-
-# CORS setup - Allow all origins for Netlify
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Mount static files
-app.mount("/static", StaticFiles(directory="web"), name="static")
-
-# Create API router with /api prefix
-api_router = APIRouter(prefix="/api")
-
-# Authentication setup
-security = HTTPBearer(auto_error=False)
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "bottie-render-secret-key-2024")
-
-# Global variables
-exchange_client = None
-websocket_manager = None
-real_time_data = {
-    'positions': {},
-    'trades': [],
-    'balance': {'total_usdt': 0},
-    'prices': {},
-    'last_update': 0
-}
-
-# Import WebSocket manager
-try:
-    import asyncio
-    from engine.websocket_data_manager import get_websocket_manager, initialize_websocket_data
-    WEBSOCKET_AVAILABLE = True
-    print("✅ WebSocket manager available")
-except ImportError as e:
-    WEBSOCKET_AVAILABLE = False
-    print(f"❌ WebSocket manager not available: {e}")
-
-# No more demo data - all data is real or empty
-
-# Initialize exchange if possible
-def initialize_exchange():
-    global exchange_client
-    if not EXCHANGE_AVAILABLE:
-        return False
-    
-    try:
-        api_key = os.getenv('BINANCE_API_KEY', '')
-        api_secret = os.getenv('BINANCE_API_SECRET', '')
-        
-        if not api_key or not api_secret:
-            print("⚠️ No exchange credentials provided")
-            return False
+    <div class='container mx-auto px-4 py-8'>
+        <div class='grid grid-cols-1 md:grid-cols-4 gap-6 mb-8'>
+            <div class='bg-white rounded-xl shadow-lg p-6'>
+                <div class='flex items-center justify-between'>
+                    <div>
+                        <p class='text-gray-500 text-sm'>Current Equity</p>
+                        <p class='text-3xl font-bold text-green-600' id='equity'>$6,786.37</p>
+                    </div>
+                    <div class='bg-green-100 p-3 rounded-full'>
+                        <i class='fas fa-dollar-sign text-green-600 text-xl'></i>
+                    </div>
+                </div>
+            </div>
             
-        exchange_client = ccxt.binance({
-            'apiKey': api_key,
-            'secret': api_secret,
-            'sandbox': False,  # Use LIVE trading (not testnet)
-            'enableRateLimit': True,
-        })
-        
-        # exchange_client.load_markets()  # DISABLED - causes API abuse and bans
-        print("✅ Exchange client created (no API calls to prevent bans)")
-        return True
-        
-    except Exception as e:
-        print(f"❌ Exchange initialization failed: {e}")
-        return False
+            <div class='bg-white rounded-xl shadow-lg p-6'>
+                <div class='flex items-center justify-between'>
+                    <div>
+                        <p class='text-gray-500 text-sm'>Trading Mode</p>
+                        <p class='text-3xl font-bold text-blue-600' id='mode'>LIVE</p>
+                    </div>
+                    <div class='bg-blue-100 p-3 rounded-full'>
+                        <i class='fas fa-robot text-blue-600 text-xl'></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class='bg-white rounded-xl shadow-lg p-6'>
+                <div class='flex items-center justify-between'>
+                    <div>
+                        <p class='text-gray-500 text-sm'>ML Status</p>
+                        <p class='text-3xl font-bold text-purple-600' id='mlStatus'>Active</p>
+                    </div>
+                    <div class='bg-purple-100 p-3 rounded-full'>
+                        <i class='fas fa-brain text-purple-600 text-xl'></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class='bg-white rounded-xl shadow-lg p-6'>
+                <div class='flex items-center justify-between'>
+                    <div>
+                        <p class='text-gray-500 text-sm'>Quantum</p>
+                        <p class='text-3xl font-bold text-indigo-600' id='quantum'>Active</p>
+                    </div>
+                    <div class='bg-indigo-100 p-3 rounded-full'>
+                        <i class='fas fa-atom text-indigo-600 text-xl'></i>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-class BinanceWebSocketManager:
-    """WebSocket-only manager for Binance data - minimal REST API usage"""
-    
-    def __init__(self):
-        self.ws = None
-        self.running = False
-        self.data = {
-            'tickers': {},
-            'user_data': {},
-            'trades': [],
-            'account': {},
-            'positions': {}
+        <div class='bg-white rounded-xl shadow-lg p-6'>
+            <div class='flex justify-between items-center mb-4'>
+                <h2 class='text-xl font-semibold'>System Status & Trading Data</h2>
+                <button onclick='loadData()' class='bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-all'>
+                    <i class='fas fa-sync-alt mr-2'></i>Refresh Data
+                </button>
+            </div>
+            <div id='systemData'>
+                <div class='text-center py-8'>
+                    <i class='fas fa-spinner fa-spin text-4xl text-gray-400 mb-4'></i>
+                    <p class='text-gray-600'>Loading system data...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function loadData() {
+            try {
+                const response = await fetch('/health');
+                const data = await response.json();
+                
+                // Update stats with correct data structure
+                document.getElementById('equity').textContent = '$' + (data.equity || 0).toFixed(2);
+                document.getElementById('mode').textContent = data.mode || 'Unknown';
+                document.getElementById('mlStatus').textContent = data.ml?.status || 'Unknown';
+                document.getElementById('quantum').textContent = data.quantum?.status || 'Unknown';
+                
+                // Display detailed system info
+                let html = '<div class="grid grid-cols-1 md:grid-cols-2 gap-6">';
+                
+                // System Status
+                html += '<div class="bg-green-50 rounded-lg p-4">';
+                html += '<h3 class="font-semibold text-green-800 mb-3">System Status</h3>';
+                html += '<div class="space-y-2 text-sm">';
+                html += `<div class="flex justify-between"><span>Service:</span><span class="font-medium">${data.service}</span></div>`;
+                html += `<div class="flex justify-between"><span>Mode:</span><span class="font-medium">${data.mode}</span></div>`;
+                html += `<div class="flex justify-between"><span>Exchange:</span><span class="font-medium">${data.exchange}</span></div>`;
+                html += `<div class="flex justify-between"><span>Equity:</span><span class="font-medium ${data.equity > 0 ? 'text-green-600' : 'text-yellow-600'}">$${(data.equity || 0).toFixed(2)}</span></div>`;
+                html += `<div class="flex justify-between"><span>WebSocket:</span><span class="font-medium ${data.websocket_status === 'CONNECTED' ? 'text-green-600' : 'text-red-600'}">${data.websocket_status}</span></div>`;
+                html += '</div></div>';
+                
+                // Features Status  
+                html += '<div class="bg-blue-50 rounded-lg p-4">';
+                html += '<h3 class="font-semibold text-blue-800 mb-3">Active Features</h3>';
+                html += '<div class="space-y-2 text-sm">';
+                html += `<div class="flex justify-between"><span>Quantum:</span><span class="font-medium text-purple-600">${data.quantum?.status || 'Unknown'}</span></div>`;
+                html += `<div class="flex justify-between"><span>ML Model:</span><span class="font-medium text-green-600">${data.ml?.status || 'Unknown'}</span></div>`;
+                html += `<div class="flex justify-between"><span>Sentiment:</span><span class="font-medium text-yellow-600">${data.sentiment?.status || 'Unknown'}</span></div>`;
+                html += `<div class="flex justify-between"><span>Real Trading:</span><span class="font-medium text-blue-600">${data.features?.real_trading?.enabled ? 'Enabled' : 'Disabled'}</span></div>`;
+                html += '</div></div>';
+                html += '</div>';
+                
+                // Add connection status
+                if (data.websocket_status === 'DISCONNECTED') {
+                    html += '<div class="mt-4 bg-red-50 border border-red-200 rounded-lg p-4">';
+                    html += '<h3 class="font-semibold text-red-800 mb-2">⚠️ WebSocket Disconnected</h3>';
+                    html += '<p class="text-red-700 text-sm">The WebSocket connection to Binance is disconnected. This may affect live data updates and equity reporting.</p>';
+                    html += '<p class="text-red-600 text-xs mt-1">Check your API keys and network connection.</p>';
+                    html += '</div>';
+                }
+                
+                document.getElementById('systemData').innerHTML = html;
+                
+            } catch (error) {
+                document.getElementById('systemData').innerHTML = `
+                    <div class="text-center py-8">
+                        <i class="fas fa-exclamation-triangle text-4xl text-red-400 mb-4"></i>
+                        <h3 class="text-lg font-semibold text-gray-700 mb-2">Error Loading Data</h3>
+                        <p class="text-gray-500">${error.message}</p>
+                    </div>
+                `;
+            }
         }
-        self.streams = []
         
-    def start_streams(self):
-        """Start enhanced WebSocket streams: user data + essential ticker data"""
-        api_key = os.getenv('BINANCE_API_KEY', '')
-        api_secret = os.getenv('BINANCE_API_SECRET', '')
-        if not api_key or not api_secret:
-            print("❌ No Binance credentials - WebSocket disabled")
-            return False
-            
-        try:
-            # Get listen key for user data stream
-            if not self._get_listen_key():
-                print("❌ Cannot get listen key for user data stream")
-                return False
-            
-            # Start user data stream (most important - account updates)
-            self._start_user_data_stream()
-            
-            # Start ticker streams for major pairs (essential for signals/grid)
-            self._start_ticker_streams()
-            
-            print("✅ Enhanced WebSocket streams started (user data + ticker feeds)")
-            return True
-            
-        except Exception as e:
-            print(f"❌ WebSocket initialization failed: {e}")
-            return False
-    
-    def _start_user_data_stream(self):
-        """Start user data stream for account updates"""
-        if WEBSOCKET_AVAILABLE:
-            stream_url = f"wss://stream.binance.com:9443/ws/{self.listen_key}"
-            self.user_ws = websocket.WebSocketApp(
-                stream_url,
-                on_message=self._on_user_message,
-                on_error=self._on_error,
-                on_close=self._on_close,
-                on_open=self._on_user_open
-            )
-            # Start user data stream in background
-            self.running = True
-            user_thread = threading.Thread(target=self.user_ws.run_forever, name="UserDataStream")
-            user_thread.daemon = True
+        // Load data on page load
+        document.addEventListener('DOMContentLoaded', loadData);
+    </script>
+</body>
+</html>""")
             user_thread.start()
             print("✅ User data stream started")
         else:
