@@ -92,12 +92,15 @@ class ReportsManager {
         try {
             console.log('🔄 Loading reports...');
             // Load existing reports from various sources
-            const [tradingReports, mlReports] = await Promise.all([
+            const [tradingReports, mlReports, quantumReports, dailyReports, sentimentReports] = await Promise.all([
                 this.fetchTradingReports(),
-                this.fetchMLReports()
+                this.fetchMLReports(),
+                this.fetchQuantumReports(),
+                this.fetchDailyReports(),
+                this.fetchSentimentReports()
             ]);
             
-            this.reports = [...tradingReports, ...mlReports];
+            this.reports = [...tradingReports, ...mlReports, ...quantumReports, ...dailyReports, ...sentimentReports];
             this.applyFilters();
             this.updateStats();
             console.log('✅ Reports loaded successfully:', this.reports.length);
@@ -136,6 +139,45 @@ class ReportsManager {
         }
     }
     
+    async fetchQuantumReports() {
+        try {
+            console.log('🔮 Fetching quantum analysis from /quantum/analysis...');
+            const response = await this.fetchWithFallback('/quantum/analysis');
+            const data = await response.json();
+            console.log('🔮 Quantum data received:', data);
+            return this.processQuantumData(data);
+        } catch (error) {
+            console.info('⚠️ Quantum analysis endpoint not available:', error.message);
+            return [];
+        }
+    }
+    
+    async fetchDailyReports() {
+        try {
+            console.log('📊 Fetching daily reports from /reports/daily...');
+            const response = await this.fetchWithFallback('/reports/daily');
+            const data = await response.json();
+            console.log('📊 Daily reports received:', data);
+            return this.processDailyReports(data);
+        } catch (error) {
+            console.info('⚠️ Daily reports endpoint not available:', error.message);
+            return [];
+        }
+    }
+    
+    async fetchSentimentReports() {
+        try {
+            console.log('😀 Fetching sentiment data from /sentiment...');
+            const response = await this.fetchWithFallback('/sentiment');
+            const data = await response.json();
+            console.log('😀 Sentiment data received:', data);
+            return this.processSentimentData(data);
+        } catch (error) {
+            console.info('⚠️ Sentiment endpoint not available:', error.message);
+            return [];
+        }
+    }
+    
     processTradingData(data) {
         if (!data || !Array.isArray(data.trades)) return [];
         
@@ -169,6 +211,121 @@ class ReportsManager {
                 totalPredictions: data.total_predictions || 0
             },
             data: data,
+            explanation: `This report analyzes the performance of the machine learning model used for trading predictions. The model currently shows an accuracy of ${(data.accuracy * 100).toFixed(1)}% with a confidence level of ${(data.confidence * 100).toFixed(1)}%. The model is running in ${data.mode} mode and has made ${data.total_predictions || 0} predictions. The current equity value is $${data.equity?.toFixed(2) || 0}.`,
+            status: 'completed'
+        };
+        
+        return [report];
+    }
+    
+    processQuantumData(data) {
+        if (!data || !data.predictions || !Array.isArray(data.predictions)) {
+            return [];
+        }
+        
+        // Create a summary of quantum predictions
+        const buyCount = data.predictions.filter(p => p.prediction === 'BUY').length;
+        const sellCount = data.predictions.filter(p => p.prediction === 'SELL').length;
+        const holdCount = data.predictions.filter(p => p.prediction === 'HOLD').length;
+        
+        // Calculate average confidence
+        const avgConfidence = data.predictions.reduce((sum, p) => sum + p.confidence, 0) / data.predictions.length;
+        
+        const report = {
+            id: `quantum_${Date.now()}`,
+            type: 'quantum',
+            title: 'Quantum Analysis Report',
+            createdAt: new Date().toISOString(),
+            summary: {
+                totalPredictions: data.predictions.length,
+                buySignals: buyCount,
+                sellSignals: sellCount,
+                holdSignals: holdCount,
+                avgConfidence: avgConfidence
+            },
+            data: data,
+            explanation: `This report contains quantum computing analysis of ${data.predictions.length} trading pairs. The quantum engine used ${data.qubits_used} qubits with a decoherence rate of ${data.decoherence_rate}. The analysis resulted in ${buyCount} BUY signals, ${sellCount} SELL signals, and ${holdCount} HOLD signals with an average confidence of ${(avgConfidence * 100).toFixed(1)}%. Each prediction is based on quantum probability calculations and entanglement scores that measure the correlation between different market factors.`,
+            status: 'completed'
+        };
+        
+        return [report];
+    }
+    
+    processDailyReports(data) {
+        if (!data || !data.reports || !Array.isArray(data.reports)) {
+            return [];
+        }
+        
+        return data.reports.map(report => {
+            const createdAt = new Date(report.created_at);
+            
+            return {
+                id: report.id,
+                type: 'daily',
+                title: report.title,
+                createdAt: report.created_at,
+                summary: {
+                    totalTrades: report.summary.total_trades,
+                    winRate: report.summary.win_rate,
+                    profitLoss: report.summary.profit_loss,
+                    topPerformer: report.summary.top_performer
+                },
+                data: report,
+                explanation: `Daily trading report generated on ${createdAt.toLocaleDateString()} at 18:00 UTC. This report summarizes the trading activity for the day, showing a total of ${report.summary.total_trades} trades with a win rate of ${report.summary.win_rate.toFixed(1)}%. The overall profit/loss for the day was $${report.summary.profit_loss.toFixed(2)}. The top performing asset was ${report.summary.top_performer}. This report is automatically generated at the end of each trading day to provide a comprehensive overview of trading performance.`,
+                status: report.status
+            };
+        });
+    }
+    
+    processSentimentData(data) {
+        if (!data || !data.scores || Object.keys(data.scores).length === 0) {
+            return [];
+        }
+        
+        // Extract sentiment scores
+        const scores = data.scores;
+        const symbols = Object.keys(scores);
+        
+        // Calculate average sentiment
+        let totalSentiment = 0;
+        let count = 0;
+        
+        for (const symbol of symbols) {
+            if (scores[symbol] && typeof scores[symbol] === 'number') {
+                totalSentiment += scores[symbol];
+                count++;
+            }
+        }
+        
+        const avgSentiment = count > 0 ? totalSentiment / count : 0;
+        
+        // Find most positive and negative assets
+        let mostPositive = { symbol: null, score: -Infinity };
+        let mostNegative = { symbol: null, score: Infinity };
+        
+        for (const symbol of symbols) {
+            const score = scores[symbol];
+            if (score > mostPositive.score) {
+                mostPositive = { symbol, score };
+            }
+            if (score < mostNegative.score) {
+                mostNegative = { symbol, score };
+            }
+        }
+        
+        const report = {
+            id: `sentiment_${Date.now()}`,
+            type: 'sentiment',
+            title: 'Market Sentiment Analysis',
+            createdAt: new Date().toISOString(),
+            summary: {
+                avgSentiment: avgSentiment,
+                mostPositive: mostPositive,
+                mostNegative: mostNegative,
+                totalAssets: symbols.length
+            },
+            data: data,
+            explanation: `This report analyzes market sentiment across ${symbols.length} assets based on social media, news, and market data. The average sentiment score is ${avgSentiment.toFixed(2)} (range: -1 to +1). The most positive asset is ${mostPositive.symbol || 'none'} with a score of ${mostPositive.score?.toFixed(2) || 0}, while the most negative is ${mostNegative.symbol || 'none'} with a score of ${mostNegative.score?.toFixed(2) || 0}. Sentiment analysis helps identify market trends and potential trading opportunities based on public perception and news impact. The data was collected over a ${data.window_sec || 0} second window.`,
             status: 'completed'
         };
         
@@ -322,6 +479,7 @@ class ReportsManager {
                             $${(summary.totalProfit || 0).toFixed(2)}
                         </span>
                     </div>
+                    ${report.explanation ? `<div class="mt-3 text-xs text-gray-500">${report.explanation}</div>` : ''}
                 `;
             case 'ml':
                 const accuracy = report.summary.accuracy || 0;
@@ -341,9 +499,80 @@ class ReportsManager {
                         <span class="text-gray-600">Predictions:</span>
                         <span class="font-medium">${totalPredictions.toLocaleString()}</span>
                     </div>
+                    ${report.explanation ? `<div class="mt-3 text-xs text-gray-500">${report.explanation}</div>` : ''}
+                `;
+            case 'quantum':
+                const qSummary = report.summary;
+                return `
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Predictions:</span>
+                        <span class="font-medium">${qSummary.totalPredictions || 0}</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Signals:</span>
+                        <span class="font-medium">
+                            <span class="text-green-600">${qSummary.buySignals || 0} Buy</span> / 
+                            <span class="text-red-600">${qSummary.sellSignals || 0} Sell</span> / 
+                            <span class="text-gray-600">${qSummary.holdSignals || 0} Hold</span>
+                        </span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Confidence:</span>
+                        <span class="font-medium text-purple-600">${((qSummary.avgConfidence || 0) * 100).toFixed(1)}%</span>
+                    </div>
+                    ${report.explanation ? `<div class="mt-3 text-xs text-gray-500">${report.explanation}</div>` : ''}
+                `;
+            case 'daily':
+                const dSummary = report.summary;
+                return `
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Total Trades:</span>
+                        <span class="font-medium">${dSummary.totalTrades || 0}</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Win Rate:</span>
+                        <span class="font-medium">${(dSummary.winRate || 0).toFixed(1)}%</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">P&L:</span>
+                        <span class="font-medium ${(dSummary.profitLoss || 0) >= 0 ? 'text-green-600' : 'text-red-600'}">
+                            $${(dSummary.profitLoss || 0).toFixed(2)}
+                        </span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Top Asset:</span>
+                        <span class="font-medium text-blue-600">${dSummary.topPerformer || 'None'}</span>
+                    </div>
+                    ${report.explanation ? `<div class="mt-3 text-xs text-gray-500">${report.explanation}</div>` : ''}
+                `;
+            case 'sentiment':
+                const sSummary = report.summary;
+                return `
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Assets:</span>
+                        <span class="font-medium">${sSummary.totalAssets || 0}</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Avg Sentiment:</span>
+                        <span class="font-medium ${(sSummary.avgSentiment || 0) >= 0 ? 'text-green-600' : 'text-red-600'}">
+                            ${(sSummary.avgSentiment || 0).toFixed(2)}
+                        </span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Most Positive:</span>
+                        <span class="font-medium text-green-600">${sSummary.mostPositive?.symbol || 'None'}</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Most Negative:</span>
+                        <span class="font-medium text-red-600">${sSummary.mostNegative?.symbol || 'None'}</span>
+                    </div>
+                    ${report.explanation ? `<div class="mt-3 text-xs text-gray-500">${report.explanation}</div>` : ''}
                 `;
             default:
-                return '<div class="text-sm text-gray-600">No summary available</div>';
+                return `
+                    <div class="text-sm text-gray-600">No summary available</div>
+                    ${report.explanation ? `<div class="mt-3 text-xs text-gray-500">${report.explanation}</div>` : ''}
+                `;
         }
     }
     
@@ -360,6 +589,9 @@ class ReportsManager {
         switch (type) {
             case 'trading': return 'fas fa-chart-line';
             case 'ml': return 'fas fa-brain';
+            case 'quantum': return 'fas fa-atom';
+            case 'daily': return 'fas fa-calendar-day';
+            case 'sentiment': return 'fas fa-comment-dots';
             case 'backtest': return 'fas fa-history';
             default: return 'fas fa-file-alt';
         }
