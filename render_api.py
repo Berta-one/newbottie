@@ -4913,6 +4913,11 @@ def get_trades():
     except Exception as e:
         return {"error": str(e)}
 
+@app.get("/test")
+def test_endpoint():
+    import time
+    return {"message": "Test endpoint working!", "timestamp": time.time()}
+
 @app.get("/reports")
 def serve_reports():
     """Serve reports dashboard"""
