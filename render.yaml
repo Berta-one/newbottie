@@ -9,7 +9,7 @@ services:
       python -m pip install --upgrade pip
       pip install --no-cache-dir -r requirements.txt
       echo "Build completed for render_api deployment"
-    startCommand: uvicorn api_real_trading:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn render_api:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PORT
         value: "10000"
