@@ -3,18 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trading Reports Dashboard</title>
+    <title>Trading Reports Dashboard - NUCLEAR FIX</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>var exports = {};</script>
     <style>
-        .glass-effect {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        
         .gradient-bg {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
@@ -48,7 +41,7 @@
             <div class="flex justify-between items-center">
                 <div class="flex items-center space-x-4">
                     <i class="fas fa-chart-line text-2xl"></i>
-                    <h1 class="text-2xl font-bold">Trading Reports Dashboard</h1>
+                    <h1 class="text-2xl font-bold">Trading Reports Dashboard - NUCLEAR FIX</h1>
                 </div>
                 <div class="flex items-center space-x-4">
                     <button id="refreshBtn" class="bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg transition-all">
@@ -65,7 +58,7 @@
     <!-- Main Content -->
     <div class="container mx-auto px-4 py-8">
         <!-- Stats Overview -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
                 <div class="flex items-center justify-between">
                     <div>
@@ -83,7 +76,6 @@
                     <div>
                         <p class="text-gray-500 text-sm">Total P&L</p>
                         <p class="text-3xl font-bold text-gray-800" id="totalProfit">$0</p>
-                        <p class="text-xs text-gray-500 mt-1" id="realizedUnrealized">-</p>
                     </div>
                     <div class="bg-yellow-100 p-3 rounded-full">
                         <i class="fas fa-dollar-sign text-yellow-600 text-xl"></i>
@@ -96,7 +88,6 @@
                     <div>
                         <p class="text-gray-500 text-sm">Avg Win Rate</p>
                         <p class="text-3xl font-bold text-gray-800" id="avgWinRate">0%</p>
-                        <p class="text-xs text-gray-500 mt-1" id="totalTrades">0 trades</p>
                     </div>
                     <div class="bg-purple-100 p-3 rounded-full">
                         <i class="fas fa-trophy text-purple-600 text-xl"></i>
@@ -109,71 +100,10 @@
                     <div>
                         <p class="text-gray-500 text-sm">ML Accuracy</p>
                         <p class="text-3xl font-bold text-gray-800" id="avgAccuracy">0%</p>
-                        <p class="text-xs text-gray-500 mt-1" id="brierScore">Brier: -</p>
                     </div>
                     <div class="bg-green-100 p-3 rounded-full">
                         <i class="fas fa-brain text-green-600 text-xl"></i>
                     </div>
-                </div>
-            </div>
-            
-            <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-gray-500 text-sm">Sentiment Score</p>
-                        <p class="text-3xl font-bold text-gray-800" id="avgSentiment">0.0</p>
-                        <p class="text-xs text-gray-500 mt-1" id="sentimentTrend">-</p>
-                    </div>
-                    <div class="bg-pink-100 p-3 rounded-full">
-                        <i class="fas fa-heart text-pink-600 text-xl"></i>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-gray-500 text-sm">Recent Reports</p>
-                        <p class="text-3xl font-bold text-gray-800" id="recentReports">0</p>
-                        <p class="text-xs text-gray-500 mt-1" id="lastReportTime">-</p>
-                    </div>
-                    <div class="bg-indigo-100 p-3 rounded-full">
-                        <i class="fas fa-clock text-indigo-600 text-xl"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Advanced Metrics Section -->
-        <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
-            <h3 class="text-lg font-semibold text-gray-800 mb-4">
-                <i class="fas fa-chart-bar text-blue-600 mr-2"></i>
-                Advanced Analytics Overview
-            </h3>
-            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                <div class="text-center p-4 bg-gray-50 rounded-lg">
-                    <p class="text-2xl font-bold text-gray-800" id="profitFactor">0.0</p>
-                    <p class="text-sm text-gray-600">Profit Factor</p>
-                </div>
-                <div class="text-center p-4 bg-gray-50 rounded-lg">
-                    <p class="text-2xl font-bold text-gray-800" id="sharpeRatio">0.0</p>
-                    <p class="text-sm text-gray-600">Sharpe Ratio</p>
-                </div>
-                <div class="text-center p-4 bg-gray-50 rounded-lg">
-                    <p class="text-2xl font-bold text-gray-800" id="maxDrawdown">0%</p>
-                    <p class="text-sm text-gray-600">Max Drawdown</p>
-                </div>
-                <div class="text-center p-4 bg-gray-50 rounded-lg">
-                    <p class="text-2xl font-bold text-gray-800" id="quantumImportance">0%</p>
-                    <p class="text-sm text-gray-600">Quantum Factor</p>
-                </div>
-                <div class="text-center p-4 bg-gray-50 rounded-lg">
-                    <p class="text-2xl font-bold text-gray-800" id="volatility">0.0</p>
-                    <p class="text-sm text-gray-600">Volatility</p>
-                </div>
-                <div class="text-center p-4 bg-gray-50 rounded-lg">
-                    <p class="text-2xl font-bold text-gray-800" id="correlationScore">0.0</p>
-                    <p class="text-sm text-gray-600">Price Correlation</p>
                 </div>
             </div>
         </div>
@@ -199,8 +129,6 @@
                             <option value="all">All Types</option>
                             <option value="trading">Trading</option>
                             <option value="ml">ML Performance</option>
-                            <option value="backtest">Backtesting</option>
-                            <option value="sentiment">Sentiment Analysis</option>
                         </select>
                     </div>
                     
@@ -214,7 +142,7 @@
                 </div>
                 
                 <div class="flex items-center space-x-2">
-                    <button id="gridView" class="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded-lg transition-all">
+                    <button id="gridView" class="bg-blue-500 text-white px-3 py-2 rounded-lg transition-all">
                         <i class="fas fa-th-large"></i>
                     </button>
                     <button id="listView" class="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded-lg transition-all">
@@ -239,10 +167,7 @@
             <div class="bg-white rounded-xl shadow-lg p-12">
                 <i class="fas fa-file-alt text-6xl text-gray-400 mb-4"></i>
                 <h3 class="text-xl font-semibold text-gray-700 mb-2">No Reports Found</h3>
-                <p class="text-gray-500 mb-6">Create your first report to get started with analysis</p>
-                <button class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition-all">
-                    <i class="fas fa-plus mr-2"></i>Create First Report
-                </button>
+                <p class="text-gray-500 mb-6">Loading reports from API...</p>
             </div>
         </div>
     </div>
@@ -263,28 +188,7 @@
                     <select id="reportType" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                         <option value="trading">Trading Performance</option>
                         <option value="ml">ML Performance Analysis</option>
-                        <option value="backtest">Backtesting Results</option>
-                        <option value="sentiment">Sentiment Analysis</option>
-                        <option value="portfolio">Portfolio Overview</option>
                     </select>
-                </div>
-                
-                <div class="mb-4">
-                    <label class="block text-gray-700 font-medium mb-2">Time Range</label>
-                    <select id="reportTimeRange" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                        <option value="1h">Last Hour</option>
-                        <option value="24h">Last 24 Hours</option>
-                        <option value="7d">Last 7 Days</option>
-                        <option value="30d">Last 30 Days</option>
-                        <option value="90d">Last 90 Days</option>
-                        <option value="1y">Last Year</option>
-                    </select>
-                </div>
-                
-                <div class="mb-6">
-                    <label class="block text-gray-700 font-medium mb-2">Report Name (Optional)</label>
-                    <input type="text" id="reportName" placeholder="Auto-generated if empty" 
-                           class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 </div>
                 
                 <div class="flex space-x-4">
@@ -294,13 +198,6 @@
                     <button type="submit" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-all">
                         <i class="fas fa-cog mr-2"></i>Generate Report
                     </button>
-                </div>
-                
-                <div class="mt-4 p-3 bg-blue-50 rounded-lg">
-                    <div class="flex items-center">
-                        <i class="fas fa-shield-alt text-blue-600 mr-2"></i>
-                        <span class="text-sm text-blue-700">All reports include automatic P&L validation and accuracy checks</span>
-                    </div>
                 </div>
             </form>
         </div>
@@ -322,6 +219,6 @@
         </div>
     </div>
 
-    <script src="reports.js"></script>
+    <script src="dashboard.js"></script>
 </body>
 </html>

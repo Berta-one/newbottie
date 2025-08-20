@@ -79,6 +79,27 @@ def status():
     }
 
 
+
+@app.get("/reports")
+def serve_reports():
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(content="""<!DOCTYPE html>
+<html><head><title>Trading Reports</title>
+<link href='https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css' rel='stylesheet'>
+</head><body class='bg-gray-50'>
+<nav class='bg-blue-600 text-white p-4'><h1>Trading Reports Dashboard</h1></nav>
+<div class='container mx-auto p-8'>
+<button onclick='loadData()' class='bg-blue-500 text-white px-4 py-2 rounded mb-4'>Load Trading Data</button>
+<div id='data'>Click button to load</div>
+</div>
+<script>
+async function loadData() {
+const response = await fetch('/api/trades');
+const data = await response.json();
+document.getElementById('data').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+}
+</script></body></html>""")
+
 @app.get("/logs/last")
 def logs_last():
     return {"logs": _logs[-300:]}
