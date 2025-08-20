@@ -4891,15 +4891,88 @@ def api_recent_trades(since_ts: Optional[float] = Query(default=None, descriptio
 # Include the API router
 app.include_router(api_router)
 
-# Debug: Print all available routes on startup
-@app.on_event("startup")
-async def startup_event():
-    print("\n🚀 Available Routes:")
-    for route in app.routes:
-        if hasattr(route, 'path') and hasattr(route, 'methods'):
-            methods = getattr(route, 'methods', 'N/A')
-            print(f"  {route.path} - Methods: {methods}")
-    print()
+
+# Basic Trading Reports Endpoints
+@app.get("/api/trades")
+def get_trades():
+    """Get trading data for reports dashboard"""
+    try:
+        # Return current equity and basic info for now
+        return {
+            "trades": [],
+            "summary": {
+                "total_trades": 0,
+                "realized_pnl": 0.0,
+                "win_rate": 0.0,
+                "current_equity": 6786.37,
+                "message": "Trading system is active but no historical trades endpoint configured yet"
+            },
+            "status": "active",
+            "equity": 6786.37
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get("/reports")
+def serve_reports():
+    """Serve reports dashboard"""
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(content="""<!DOCTYPE html>
+<html><head><title>Trading Reports</title>
+<link href='https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css' rel='stylesheet'>
+</head><body class='bg-gray-50'>
+<nav class='bg-blue-600 text-white p-4'><h1 class='text-2xl font-bold'>Trading Reports Dashboard</h1></nav>
+<div class='container mx-auto p-8'>
+<div class='grid grid-cols-2 gap-6 mb-8'>
+<div class='bg-white rounded-lg shadow p-6'>
+<h3 class='text-lg font-semibold'>Current Equity</h3>
+<p class='text-3xl font-bold text-green-600' id='equity'>$6,786.37</p>
+</div>
+<div class='bg-white rounded-lg shadow p-6'>
+<h3 class='text-lg font-semibold'>System Status</h3>
+<p class='text-3xl font-bold text-green-600'>LIVE</p>
+</div>
+</div>
+<div class='bg-white rounded-lg shadow p-6'>
+<button onclick='loadData()' class='bg-blue-500 text-white px-4 py-2 rounded mb-4'>Check Trading System</button>
+<div id='systemData'>Click to check your trading system status</div>
+</div>
+</div>
+<script>
+async function loadData() {
+try {
+const [healthResponse, tradesResponse] = await Promise.all([
+fetch('/health'),
+fetch('/api/trades')
+]);
+const health = await healthResponse.json();
+const trades = await tradesResponse.json();
+
+document.getElementById('equity').textContent = '$' + (health.equity || 0).toFixed(2);
+
+let html = '<div class="space-y-4">';
+html += '<div class="p-4 bg-green-50 rounded"><h4 class="font-semibold text-green-800">System Status</h4>';
+html += '<p>Equity: $' + (health.equity || 0).toFixed(2) + '</p>';
+html += '<p>Mode: ' + (health.mode || 'Unknown') + '</p>';
+html += '<p>Quantum: ' + (health.quantum?.status || 'Unknown') + '</p>';
+html += '<p>ML: ' + (health.ml?.status || 'Unknown') + '</p>';
+html += '<p>Sentiment: ' + (health.sentiment?.status || 'Unknown') + '</p>';
+html += '</div>';
+
+if (trades.summary) {
+html += '<div class="p-4 bg-blue-50 rounded"><h4 class="font-semibold text-blue-800">Trading Data</h4>';
+html += '<p>' + (trades.summary.message || 'No message') + '</p>';
+html += '</div>';
+}
+
+html += '</div>';
+document.getElementById('systemData').innerHTML = html;
+} catch (error) {
+document.getElementById('systemData').innerHTML = '<p class="text-red-500">Error: ' + error.message + '</p>';
+}
+}
+</script>
+</body></html>""")
 
 if __name__ == "__main__":
     import uvicorn
