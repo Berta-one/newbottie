@@ -30,91 +30,86 @@ from fastapi.responses import HTMLResponse
         return HTMLResponse(content="""<!DOCTYPE html>
 <html lang='en'>
 <head>
-    <meta charset='UTF-8'>
-    def serve_reports():
-        """Serve reports dashboard"""
-        return HTMLResponse(content="""<!DOCTYPE html>
-    <html lang='en'>
+    @app.get("/reports")
+    def reports_dashboard():
+        from fastapi.responses import HTMLResponse
+        html_content = """<!DOCTYPE html>
+    <html lang="en">
     <head>
-        <meta charset='UTF-8'>
-        <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Trading Reports Dashboard</title>
-        <link href='https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css' rel='stylesheet'>
-        <link href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css' rel='stylesheet'>
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     </head>
-    <body class='bg-gray-50 min-h-screen'>
-        <nav class='bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 shadow-lg'>
-            <div class='container mx-auto'>
-                <h1 class='text-2xl font-bold'>
-                    <i class='fas fa-chart-line mr-2'></i>Trading Reports Dashboard
+    <body class="bg-gray-50 min-h-screen">
+        <nav class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 shadow-lg">
+            <div class="container mx-auto">
+                <h1 class="text-2xl font-bold">
+                    <i class="fas fa-chart-line mr-2"></i>Trading Reports Dashboard
                 </h1>
             </div>
         </nav>
 
-        <div class='container mx-auto px-4 py-8'>
-            <div class='grid grid-cols-1 md:grid-cols-4 gap-6 mb-8'>
-                <div class='bg-white rounded-xl shadow-lg p-6'>
-                    <div class='flex items-center justify-between'>
+        <div class="container mx-auto px-4 py-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center justify-between">
                         <div>
-                            <p class='text-gray-500 text-sm'>Current Equity</p>
-                            <p class='text-3xl font-bold text-green-600' id='equity'>$6,786.37</p>
+                            <p class="text-gray-500 text-sm">Current Equity</p>
+                            <p class="text-3xl font-bold" id="equity">$0</p>
                         </div>
-                        <div class='bg-green-100 p-3 rounded-full'>
-                            <i class='fas fa-dollar-sign text-green-600 text-xl'></i>
+                        <div class="bg-green-100 p-3 rounded-full">
+                            <i class="fas fa-dollar-sign text-green-600 text-xl"></i>
                         </div>
                     </div>
                 </div>
             
-                <div class='bg-white rounded-xl shadow-lg p-6'>
-                    <div class='flex items-center justify-between'>
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center justify-between">
                         <div>
-                            <p class='text-gray-500 text-sm'>Trading Mode</p>
-                            <p class='text-3xl font-bold text-blue-600' id='mode'>LIVE</p>
+                            <p class="text-gray-500 text-sm">Trading Mode</p>
+                            <p class="text-3xl font-bold" id="mode">-</p>
                         </div>
-                        <div class='bg-blue-100 p-3 rounded-full'>
-                            <i class='fas fa-robot text-blue-600 text-xl'></i>
+                        <div class="bg-blue-100 p-3 rounded-full">
+                            <i class="fas fa-robot text-blue-600 text-xl"></i>
                         </div>
                     </div>
                 </div>
             
-                <div class='bg-white rounded-xl shadow-lg p-6'>
-                    <div class='flex items-center justify-between'>
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center justify-between">
                         <div>
-                            <p class='text-gray-500 text-sm'>ML Status</p>
-                            <p class='text-3xl font-bold text-purple-600' id='mlStatus'>Active</p>
+                            <p class="text-gray-500 text-sm">ML Status</p>
+                            <p class="text-3xl font-bold" id="mlStatus">-</p>
                         </div>
-                        <div class='bg-purple-100 p-3 rounded-full'>
-                            <i class='fas fa-brain text-purple-600 text-xl'></i>
+                        <div class="bg-purple-100 p-3 rounded-full">
+                            <i class="fas fa-brain text-purple-600 text-xl"></i>
                         </div>
                     </div>
                 </div>
             
-                <div class='bg-white rounded-xl shadow-lg p-6'>
-                    <div class='flex items-center justify-between'>
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center justify-between">
                         <div>
-                            <p class='text-gray-500 text-sm'>Quantum</p>
-                            <p class='text-3xl font-bold text-indigo-600' id='quantum'>Active</p>
+                            <p class="text-gray-500 text-sm">Quantum</p>
+                            <p class="text-3xl font-bold" id="quantum">-</p>
                         </div>
-                        <div class='bg-indigo-100 p-3 rounded-full'>
-                            <i class='fas fa-atom text-indigo-600 text-xl'></i>
+                        <div class="bg-indigo-100 p-3 rounded-full">
+                            <i class="fas fa-atom text-indigo-600 text-xl"></i>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class='bg-white rounded-xl shadow-lg p-6'>
-                <div class='flex justify-between items-center mb-4'>
-                    <h2 class='text-xl font-semibold'>System Status & Trading Data</h2>
-                    <button onclick='loadData()' class='bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-all'>
-                        <i class='fas fa-sync-alt mr-2'></i>Refresh Data
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold">System Status</h2>
+                    <button onclick="loadData()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+                        <i class="fas fa-sync-alt mr-2"></i>Refresh
                     </button>
                 </div>
-                <div id='systemData'>
-                    <div class='text-center py-8'>
-                        <i class='fas fa-spinner fa-spin text-4xl text-gray-400 mb-4'></i>
-                        <p class='text-gray-600'>Loading system data...</p>
-                    </div>
-                </div>
+                <div id="systemData">Loading...</div>
             </div>
         </div>
 
@@ -124,64 +119,40 @@ from fastapi.responses import HTMLResponse
                     const response = await fetch('/health');
                     const data = await response.json();
                 
-                    // Update stats with correct data structure
                     document.getElementById('equity').textContent = '$' + (data.equity || 0).toFixed(2);
-                    document.getElementById('mode').textContent = data.mode || 'Unknown';
-                    document.getElementById('mlStatus').textContent = data.ml?.status || 'Unknown';
-                    document.getElementById('quantum').textContent = data.quantum?.status || 'Unknown';
+                    document.getElementById('mode').textContent = data.mode || '-';
+                    document.getElementById('mlStatus').textContent = data.ml?.status || '-';
+                    document.getElementById('quantum').textContent = data.quantum?.status || '-';
                 
-                    // Display detailed system info
                     let html = '<div class="grid grid-cols-1 md:grid-cols-2 gap-6">';
-                
-                    // System Status
                     html += '<div class="bg-green-50 rounded-lg p-4">';
                     html += '<h3 class="font-semibold text-green-800 mb-3">System Status</h3>';
                     html += '<div class="space-y-2 text-sm">';
-                    html += `<div class="flex justify-between"><span>Service:</span><span class="font-medium">${data.service}</span></div>`;
-                    html += `<div class="flex justify-between"><span>Mode:</span><span class="font-medium">${data.mode}</span></div>`;
-                    html += `<div class="flex justify-between"><span>Exchange:</span><span class="font-medium">${data.exchange}</span></div>`;
-                    html += `<div class="flex justify-between"><span>Equity:</span><span class="font-medium ${data.equity > 0 ? 'text-green-600' : 'text-yellow-600'}">$${(data.equity || 0).toFixed(2)}</span></div>`;
-                    html += `<div class="flex justify-between"><span>WebSocket:</span><span class="font-medium ${data.websocket_status === 'CONNECTED' ? 'text-green-600' : 'text-red-600'}">${data.websocket_status}</span></div>`;
+                    html += '<div class="flex justify-between"><span>Equity:</span><span class="font-medium">$' + (data.equity || 0).toFixed(2) + '</span></div>';
+                    html += '<div class="flex justify-between"><span>Mode:</span><span class="font-medium">' + (data.mode || 'Unknown') + '</span></div>';
+                    html += '<div class="flex justify-between"><span>WebSocket:</span><span class="font-medium">' + (data.websocket_status || 'Unknown') + '</span></div>';
                     html += '</div></div>';
                 
-                    // Features Status  
                     html += '<div class="bg-blue-50 rounded-lg p-4">';
-                    html += '<h3 class="font-semibold text-blue-800 mb-3">Active Features</h3>';
+                    html += '<h3 class="font-semibold text-blue-800 mb-3">Features</h3>';
                     html += '<div class="space-y-2 text-sm">';
-                    html += `<div class="flex justify-between"><span>Quantum:</span><span class="font-medium text-purple-600">${data.quantum?.status || 'Unknown'}</span></div>`;
-                    html += `<div class="flex justify-between"><span>ML Model:</span><span class="font-medium text-green-600">${data.ml?.status || 'Unknown'}</span></div>`;
-                    html += `<div class="flex justify-between"><span>Sentiment:</span><span class="font-medium text-yellow-600">${data.sentiment?.status || 'Unknown'}</span></div>`;
-                    html += `<div class="flex justify-between"><span>Real Trading:</span><span class="font-medium text-blue-600">${data.features?.real_trading?.enabled ? 'Enabled' : 'Disabled'}</span></div>`;
+                    html += '<div class="flex justify-between"><span>Quantum:</span><span class="font-medium">' + (data.quantum?.status || 'Unknown') + '</span></div>';
+                    html += '<div class="flex justify-between"><span>ML:</span><span class="font-medium">' + (data.ml?.status || 'Unknown') + '</span></div>';
+                    html += '<div class="flex justify-between"><span>Sentiment:</span><span class="font-medium">' + (data.sentiment?.status || 'Unknown') + '</span></div>';
                     html += '</div></div>';
                     html += '</div>';
                 
-                    // Add connection status
-                    if (data.websocket_status === 'DISCONNECTED') {
-                        html += '<div class="mt-4 bg-red-50 border border-red-200 rounded-lg p-4">';
-                        html += '<h3 class="font-semibold text-red-800 mb-2">⚠️ WebSocket Disconnected</h3>';
-                        html += '<p class="text-red-700 text-sm">The WebSocket connection to Binance is disconnected. This may affect live data updates and equity reporting.</p>';
-                        html += '<p class="text-red-600 text-xs mt-1">Check your API keys and network connection.</p>';
-                        html += '</div>';
-                    }
-                
                     document.getElementById('systemData').innerHTML = html;
-                
                 } catch (error) {
-                    document.getElementById('systemData').innerHTML = `
-                        <div class="text-center py-8">
-                            <i class="fas fa-exclamation-triangle text-4xl text-red-400 mb-4"></i>
-                            <h3 class="text-lg font-semibold text-gray-700 mb-2">Error Loading Data</h3>
-                            <p class="text-gray-500">${error.message}</p>
-                        </div>
-                    `;
+                    document.getElementById('systemData').innerHTML = '<p class="text-red-500">Error: ' + error.message + '</p>';
                 }
             }
         
-            // Load data on page load
             document.addEventListener('DOMContentLoaded', loadData);
         </script>
     </body>
-    </html>""")
+    </html>"""
+        return HTMLResponse(content=html_content)
                 trade_side = data.get('S', '')
                 print(f"🔄 Trade execution: {trade_symbol} {trade_side}")
                 # New trade
