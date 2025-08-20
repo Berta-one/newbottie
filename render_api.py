@@ -27,17 +27,14 @@ import threading
 from collections import defaultdict
 from enum import Enum
 from fastapi.responses import HTMLResponse
-        return HTMLResponse(content="""<!DOCTYPE html>
-<html lang='en'>
+@app.get("/reports")
+def reports_dashboard():
+    from fastapi.responses import HTMLResponse
+    html_content = """<!DOCTYPE html>
+<html lang="en">
 <head>
-    @app.get("/reports")
-    def reports_dashboard():
-        from fastapi.responses import HTMLResponse
-        html_content = """<!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Trading Reports Dashboard</title>
         <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
         <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
