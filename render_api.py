@@ -26,7 +26,7 @@ except ImportError:
 import threading
 from collections import defaultdict
 from enum import Enum
-
+    from fastapi.responses import HTMLResponse
     return HTMLResponse(content="""<!DOCTYPE html>
 <html lang='en'>
 <head>
