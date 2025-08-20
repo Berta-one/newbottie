@@ -17,7 +17,12 @@ from fastapi.responses import FileResponse
 from passlib.context import CryptContext
 import jwt
 from datetime import datetime, timedelta
-import websocket
+try:
+    import websocket
+    WEBSOCKET_AVAILABLE = True
+except ImportError:
+    WEBSOCKET_AVAILABLE = False
+    print("⚠️ websocket not available, continuing without WebSocket features")
 import threading
 from collections import defaultdict
 from enum import Enum
@@ -167,51 +172,49 @@ class BinanceWebSocketManager:
     
     def _start_user_data_stream(self):
         """Start user data stream for account updates"""
-        stream_url = f"wss://stream.binance.com:9443/ws/{self.listen_key}"
-        
-        self.user_ws = websocket.WebSocketApp(
-            stream_url,
-            on_message=self._on_user_message,
-            on_error=self._on_error,
-            on_close=self._on_close,
-            on_open=self._on_user_open
-        )
-        
-        # Start user data stream in background
-        self.running = True
-        user_thread = threading.Thread(target=self.user_ws.run_forever, name="UserDataStream")
-        user_thread.daemon = True
-        user_thread.start()
-        
-        print("✅ User data stream started")
+        if WEBSOCKET_AVAILABLE:
+            stream_url = f"wss://stream.binance.com:9443/ws/{self.listen_key}"
+            self.user_ws = websocket.WebSocketApp(
+                stream_url,
+                on_message=self._on_user_message,
+                on_error=self._on_error,
+                on_close=self._on_close,
+                on_open=self._on_user_open
+            )
+            # Start user data stream in background
+            self.running = True
+            user_thread = threading.Thread(target=self.user_ws.run_forever, name="UserDataStream")
+            user_thread.daemon = True
+            user_thread.start()
+            print("✅ User data stream started")
+        else:
+            print("⚠️ websocket not available, user data stream not started")
     
     def _start_ticker_streams(self):
         """Start ticker streams for essential trading pairs"""
-        # Essential pairs for signals and grid calculations
-        essential_pairs = [
-            'btcusdt', 'ethusdt', 'bnbusdt', 'solusdt', 'adausdt', 'dotusdt', 
-            'maticusdt', 'avaxusdt', 'linkusdt', 'uniusdt'
-        ]
-        
-        # Create combined ticker stream
-        streams = [f"{pair}@ticker" for pair in essential_pairs]
-        stream_names = '/'.join(streams)
-        ticker_url = f"wss://stream.binance.com:9443/stream?streams={stream_names}"
-        
-        self.ticker_ws = websocket.WebSocketApp(
-            ticker_url,
-            on_message=self._on_ticker_message,
-            on_error=self._on_error,
-            on_close=self._on_close,
-            on_open=self._on_ticker_open
-        )
-        
-        # Start ticker stream in background
-        ticker_thread = threading.Thread(target=self.ticker_ws.run_forever, name="TickerStream")
-        ticker_thread.daemon = True
-        ticker_thread.start()
-        
-        print("✅ Ticker streams started for essential pairs")
+        if WEBSOCKET_AVAILABLE:
+            essential_pairs = [
+                'btcusdt', 'ethusdt', 'bnbusdt', 'solusdt', 'adausdt', 'dotusdt', 
+                'maticusdt', 'avaxusdt', 'linkusdt', 'uniusdt'
+            ]
+            # Create combined ticker stream
+            streams = [f"{pair}@ticker" for pair in essential_pairs]
+            stream_names = '/'.join(streams)
+            ticker_url = f"wss://stream.binance.com:9443/stream?streams={stream_names}"
+            self.ticker_ws = websocket.WebSocketApp(
+                ticker_url,
+                on_message=self._on_ticker_message,
+                on_error=self._on_error,
+                on_close=self._on_close,
+                on_open=self._on_ticker_open
+            )
+            # Start ticker stream in background
+            ticker_thread = threading.Thread(target=self.ticker_ws.run_forever, name="TickerStream")
+            ticker_thread.daemon = True
+            ticker_thread.start()
+            print("✅ Ticker streams started for essential pairs")
+        else:
+            print("⚠️ websocket not available, ticker streams not started")
     
     def _on_user_open(self, ws):
         """User data stream opened"""
