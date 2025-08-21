@@ -8,7 +8,14 @@ services:
     buildCommand: |
       python -m pip install --upgrade pip
       pip install --no-cache-dir -r requirements.txt
-      echo "Build completed for render_api deployment"
+      echo "Installing Node.js dependencies for frontend..."
+      npm install
+      echo "Building enhanced dashboard..."
+      npm run build
+      echo "Copying enhanced dashboard to root for serving..."
+      cp index.html ./
+      cp style.css ./
+      echo "Build completed for render_api deployment with enhanced dashboard"
     startCommand: uvicorn render_api:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PORT
