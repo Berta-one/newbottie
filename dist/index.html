@@ -1,134 +1,397 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>API TEST - NO REDIRECTS</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bottie Enhanced Dashboard</title>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; background: #e3f2fd; }
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .result { padding: 10px; margin: 10px 0; border-radius: 5px; }
-        .success { background: #d4edda; color: #155724; }
-        .error { background: #f8d7da; color: #721c24; }
-        .info { background: #d1ecf1; color: #0c5460; }
-        .warning { background: #fff3cd; color: #856404; }
-        button { background: #007bff; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer; margin: 5px; }
-        .timestamp { font-family: monospace; font-size: 12px; color: #666; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0f1419 0%, #1a2332 100%);
+            color: #e6fffa;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: rgba(26, 35, 50, 0.9);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(100, 255, 218, 0.2);
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(45deg, #64ffda, #4caf50);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-indicators {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .status-badge {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-online { background: rgba(76, 175, 80, 0.2); color: #4caf50; }
+        .status-offline { background: rgba(244, 67, 54, 0.2); color: #f44336; }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            padding: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .slate {
+            background: rgba(26, 35, 50, 0.7);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            border: 1px solid rgba(100, 255, 218, 0.1);
+            padding: 1.5rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .slate::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #64ffda, #4caf50);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+
+        .slate:hover::before {
+            transform: scaleX(1);
+        }
+
+        .slate:hover {
+            transform: translateY(-4px);
+            border-color: rgba(100, 255, 218, 0.3);
+            box-shadow: 0 8px 32px rgba(100, 255, 218, 0.1);
+        }
+
+        .slate-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .slate-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .slate-icon {
+            font-size: 1.5rem;
+        }
+
+        .slate-status {
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .status-excellent { background: rgba(76, 175, 80, 0.2); color: #4caf50; }
+        .status-good { background: rgba(255, 193, 7, 0.2); color: #ffc107; }
+        .status-warning { background: rgba(255, 152, 0, 0.2); color: #ff9800; }
+        .status-error { background: rgba(244, 67, 54, 0.2); color: #f44336; }
+        .status-loading { background: rgba(156, 39, 176, 0.2); color: #9c27b0; }
+
+        .slate-metrics {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .metric {
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+
+        .metric-label {
+            font-size: 0.75rem;
+            color: #8892b0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .slate-description {
+            color: #8892b0;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+
+        .report-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(4px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .report-content {
+            background: linear-gradient(135deg, #1a2332 0%, #2d3748 100%);
+            border-radius: 16px;
+            border: 1px solid rgba(100, 255, 218, 0.2);
+            max-width: 90vw;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .report-header {
+            padding: 2rem;
+            border-bottom: 1px solid rgba(100, 255, 218, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .report-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: #8892b0;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .close-btn:hover {
+            background: rgba(244, 67, 54, 0.1);
+            color: #f44336;
+        }
+
+        .report-body {
+            padding: 2rem;
+        }
+
+        .report-section {
+            margin-bottom: 2rem;
+        }
+
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #64ffda;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .data-card {
+            background: rgba(15, 20, 25, 0.5);
+            border: 1px solid rgba(100, 255, 218, 0.1);
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .data-label {
+            font-size: 0.875rem;
+            color: #8892b0;
+            margin-bottom: 0.5rem;
+        }
+
+        .data-value {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .logs-container {
+            background: rgba(15, 20, 25, 0.8);
+            border: 1px solid rgba(100, 255, 218, 0.1);
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.875rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            margin-bottom: 0.5rem;
+            padding: 0.25rem 0;
+        }
+
+        .log-timestamp {
+            color: #64ffda;
+            margin-right: 0.5rem;
+        }
+
+        .log-level-info { color: #4caf50; }
+        .log-level-warn { color: #ff9800; }
+        .log-level-error { color: #f44336; }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(100, 255, 218, 0.3);
+            border-radius: 50%;
+            border-top-color: #64ffda;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .chart-container {
+            background: rgba(15, 20, 25, 0.5);
+            border: 1px solid rgba(100, 255, 218, 0.1);
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+
+        .export-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .export-btn {
+            background: rgba(100, 255, 218, 0.1);
+            border: 1px solid rgba(100, 255, 218, 0.3);
+            color: #64ffda;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all 0.3s ease;
+        }
+
+        .export-btn:hover {
+            background: rgba(100, 255, 218, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+        }
+
+        .feature-card {
+            background: rgba(15, 20, 25, 0.5);
+            border: 1px solid rgba(100, 255, 218, 0.1);
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .feature-importance {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .feature-name {
+            font-size: 0.875rem;
+            color: #8892b0;
+        }
+
+        .positive { color: #4caf50; }
+        .negative { color: #f44336; }
+        .neutral { color: #64ffda; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🚨 EMERGENCY API TEST</h1>
-        <div class="result info">
-            <strong>Version:</strong> v2024-08-19-NO-REDIRECTS<br>
-            <strong>Purpose:</strong> Test API without any redirects or cache<br>
-            <strong>Deployed:</strong> <span id="timestamp"></span>
+    <div class="header">
+        <div class="logo">⚡ Bottie Enhanced Dashboard</div>
+        <div class="status-indicators">
+            <div class="status-badge status-online">
+                <span>🟢</span>
+                <span>System Online</span>
+            </div>
+            <div class="status-badge" id="connection-status">
+                <span class="loading-spinner"></span>
+                <span>Connecting...</span>
+            </div>
         </div>
-        
-        <button onclick="runTest()">🚀 Run API Test</button>
-        <button onclick="testProxy()">🔧 Test Proxy Only</button>
-        <button onclick="testDirect()">🔗 Test Direct Only</button>
-        <button onclick="clearResults()">🗑️ Clear</button>
-        
-        <div id="results"></div>
     </div>
 
-    <script>
-        document.getElementById('timestamp').textContent = new Date().toISOString();
-        
-        console.log('🚨 EMERGENCY API TEST LOADED');
-        console.log('Version: v2024-08-19-NO-REDIRECTS');
-        console.log('No meta redirects, no external JS files');
-        
-        function addResult(message, type = 'info') {
-            const div = document.createElement('div');
-            div.className = `result ${type}`;
-            div.innerHTML = `<span class="timestamp">${new Date().toLocaleTimeString()}</span> ${message}`;
-            document.getElementById('results').appendChild(div);
-            console.log(message);
-        }
-        
-        function clearResults() {
-            document.getElementById('results').innerHTML = '';
-        }
-        
-        async function testEndpoint(url, name) {
-            try {
-                addResult(`🔍 Testing ${name}: ${url}`, 'info');
-                
-                const response = await fetch(url, {
-                    method: 'GET',
-                    headers: { 'Accept': 'application/json' }
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    addResult(`✅ ${name} SUCCESS (${response.status})`, 'success');
-                    
-                    if (url.includes('trades') && data.trades) {
-                        addResult(`📈 Trades: ${data.trades.length}, P&L: $${(data.summary?.net_pnl || 0).toFixed(2)}`, 'success');
-                    }
-                    if (url.includes('ml') && data.accuracy) {
-                        addResult(`🧠 ML: ${(data.accuracy * 100).toFixed(1)}% accuracy, ${data.total_predictions || 0} predictions`, 'success');
-                    }
-                    return true;
-                } else {
-                    addResult(`❌ ${name} FAILED (${response.status})`, 'error');
-                    return false;
-                }
-            } catch (error) {
-                addResult(`💥 ${name} ERROR: ${error.message}`, 'error');
-                return false;
-            }
-        }
-        
-        async function testProxy() {
-            clearResults();
-            addResult('🔧 Testing Netlify proxy endpoints...', 'info');
-            
-            const proxyTests = [
-                { url: '/api/trades', name: 'Proxy Trades' },
-                { url: '/api/ml/status', name: 'Proxy ML' },
-                { url: '/api/health', name: 'Proxy Health' }
-            ];
-            
-            let working = 0;
-            for (const test of proxyTests) {
-                if (await testEndpoint(test.url, test.name)) working++;
-            }
-            
-            addResult(`📊 Proxy Summary: ${working}/${proxyTests.length} working`, working > 0 ? 'success' : 'error');
-        }
-        
-        async function testDirect() {
-            clearResults();
-            addResult('🔗 Testing direct API endpoints...', 'info');
-            
-            const directTests = [
-                { url: 'https://bottie-1.onrender.com/trades', name: 'Direct Trades' },
-                { url: 'https://bottie-1.onrender.com/ml/status', name: 'Direct ML' },
-                { url: 'https://bottie-1.onrender.com/health', name: 'Direct Health' }
-            ];
-            
-            let working = 0;
-            for (const test of directTests) {
-                if (await testEndpoint(test.url, test.name)) working++;
-            }
-            
-            addResult(`📊 Direct Summary: ${working}/${directTests.length} working`, working > 0 ? 'success' : 'error');
-        }
-        
-        async function runTest() {
-            clearResults();
-            addResult('🚀 Starting comprehensive API test...', 'info');
-            
-            await testProxy();
-            addResult('---', 'info');
-            await testDirect();
-            
-            addResult('✅ All tests completed!', 'info');
-        }
-        
-        // Show page loaded confirmation
-        addResult('🌟 Emergency API test page loaded successfully', 'success');
-    </script>
-</body>
-</html>
+    <div class="main-grid" id="slates-container">
+        <!-- Slates will be dynamically generated here -->
+    </div>
+
+    <!-- Report Modal -->
+    <div class="report-modal" id="report-modal">
+        <div class="report-content">
+            <div class="report-header">
+                <div class="report-title" id="report-title">
+                    <span id="report-icon">📊</span>
+                    <span id="report-name">Loading Report...</span>
+                </div>
+                <button class="close-btn" onclick="closeReport()">✕</button>
+            </div>
+            <div class="report-body" id="report-body">
+                <div style="text-align: center; padding: 2rem;">
+                    <div class="loading-spinner" style="width: 40px; height: 40px;"></div>
+                    <p style="margin-top: 1rem; color: #8892b0;">Generating report...</p>
+                </div>
+            </div>
+        </div>
+    </div>
