@@ -499,8 +499,10 @@
             getEndpointMetrics(name, data) {
                 switch (name) {
                     case 'equity':
+                        const equityValue = data.equity?.display_value || data.equity || 0;
+                        const numericEquity = typeof equityValue === 'number' ? equityValue : parseFloat(equityValue) || 0;
                         return [
-                            { label: 'Current Equity', value: `$${(data.equity || 0).toFixed(2)}`, class: data.equity > 0 ? 'positive' : 'neutral' },
+                            { label: 'Current Equity', value: `$${numericEquity.toFixed(2)}`, class: numericEquity > 0 ? 'positive' : 'neutral' },
                             { label: 'Positions', value: Object.keys(data.positions || {}).length }
                         ];
                     case 'trades':
@@ -510,9 +512,11 @@
                             { label: 'Status', value: data.status === 'success' ? 'Active' : 'Error', class: data.status === 'success' ? 'positive' : 'negative' }
                         ];
                     case 'health':
+                        const healthEquity = data.equity?.display_value || data.equity || 0;
+                        const healthEquityNum = typeof healthEquity === 'number' ? healthEquity : parseFloat(healthEquity) || 0;
                         return [
                             { label: 'Status', value: data.ok ? 'Healthy' : 'Issues', class: data.ok ? 'positive' : 'negative' },
-                            { label: 'Equity', value: data.equity ? `$${data.equity.toFixed(2)}` : 'N/A' }
+                            { label: 'Equity', value: healthEquityNum > 0 ? `$${healthEquityNum.toFixed(2)}` : 'N/A' }
                         ];
                     default:
                         return [
