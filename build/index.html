@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API TEST - NO REDIRECTS</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #e3f2fd; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .result { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        .warning { background: #fff3cd; color: #856404; }
+        button { background: #007bff; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer; margin: 5px; }
+        .timestamp { font-family: monospace; font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚨 EMERGENCY API TEST</h1>
+        <div class="result info">
+            <strong>Version:</strong> v2024-08-19-NO-REDIRECTS<br>
+            <strong>Purpose:</strong> Test API without any redirects or cache<br>
+            <strong>Deployed:</strong> <span id="timestamp"></span>
+        </div>
+        
+        <button onclick="runTest()">🚀 Run API Test</button>
+        <button onclick="testProxy()">🔧 Test Proxy Only</button>
+        <button onclick="testDirect()">🔗 Test Direct Only</button>
+        <button onclick="clearResults()">🗑️ Clear</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        document.getElementById('timestamp').textContent = new Date().toISOString();
+        
+        console.log('🚨 EMERGENCY API TEST LOADED');
+        console.log('Version: v2024-08-19-NO-REDIRECTS');
+        console.log('No meta redirects, no external JS files');
+        
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = `<span class="timestamp">${new Date().toLocaleTimeString()}</span> ${message}`;
+            document.getElementById('results').appendChild(div);
+            console.log(message);
+        }
+        
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+        
+        async function testEndpoint(url, name) {
+            try {
+                addResult(`🔍 Testing ${name}: ${url}`, 'info');
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult(`✅ ${name} SUCCESS (${response.status})`, 'success');
+                    
+                    if (url.includes('trades') && data.trades) {
+                        addResult(`📈 Trades: ${data.trades.length}, P&L: $${(data.summary?.net_pnl || 0).toFixed(2)}`, 'success');
+                    }
+                    if (url.includes('ml') && data.accuracy) {
+                        addResult(`🧠 ML: ${(data.accuracy * 100).toFixed(1)}% accuracy, ${data.total_predictions || 0} predictions`, 'success');
+                    }
+                    return true;
+                } else {
+                    addResult(`❌ ${name} FAILED (${response.status})`, 'error');
+                    return false;
+                }
+            } catch (error) {
+                addResult(`💥 ${name} ERROR: ${error.message}`, 'error');
+                return false;
+            }
+        }
+        
+        async function testProxy() {
+            clearResults();
+            addResult('🔧 Testing Netlify proxy endpoints...', 'info');
+            
+            const proxyTests = [
+                { url: '/api/trades', name: 'Proxy Trades' },
+                { url: '/api/ml/status', name: 'Proxy ML' },
+                { url: '/api/health', name: 'Proxy Health' }
+            ];
+            
+            let working = 0;
+            for (const test of proxyTests) {
+                if (await testEndpoint(test.url, test.name)) working++;
+            }
+            
+            addResult(`📊 Proxy Summary: ${working}/${proxyTests.length} working`, working > 0 ? 'success' : 'error');
+        }
+        
+        async function testDirect() {
+            clearResults();
+            addResult('🔗 Testing direct API endpoints...', 'info');
+            
+            const directTests = [
+                { url: 'https://bottie-1.onrender.com/trades', name: 'Direct Trades' },
+                { url: 'https://bottie-1.onrender.com/ml/status', name: 'Direct ML' },
+                { url: 'https://bottie-1.onrender.com/health', name: 'Direct Health' }
+            ];
+            
+            let working = 0;
+            for (const test of directTests) {
+                if (await testEndpoint(test.url, test.name)) working++;
+            }
+            
+            addResult(`📊 Direct Summary: ${working}/${directTests.length} working`, working > 0 ? 'success' : 'error');
+        }
+        
+        async function runTest() {
+            clearResults();
+            addResult('🚀 Starting comprehensive API test...', 'info');
+            
+            await testProxy();
+            addResult('---', 'info');
+            await testDirect();
+            
+            addResult('✅ All tests completed!', 'info');
+        }
+        
+        // Show page loaded confirmation
+        addResult('🌟 Emergency API test page loaded successfully', 'success');
+    </script>
+</body>
+</html>

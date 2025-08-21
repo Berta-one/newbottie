@@ -4,7 +4,7 @@
   "description": "Trading Reports Dashboard for Bottie",
   "main": "index.html",
   "scripts": {
-    "build": "echo 'Static site - no build required'",
+    "build": "mkdir -p build && cp -r dist/* build/ && cp style.css build/style.css",
     "start": "echo 'Static site - no start required'"
   },
   "keywords": ["trading", "reports", "dashboard", "netlify"],
