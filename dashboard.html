@@ -440,21 +440,89 @@
             async loadEndpoint(endpoint) {
                 try {
                     const response = await fetch(`${this.apiUrl}${endpoint.endpoint}`);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const contentType = response.headers.get('content-type');
+                    if (!contentType || !contentType.includes('application/json')) {
+                        throw new Error(`Expected JSON, got ${contentType}`);
+                    }
+                    
                     const data = await response.json();
                     this.endpointData[endpoint.name] = {
                         ...data,
-                        status: response.ok ? 'success' : 'error',
+                        status: 'success',
                         lastUpdate: new Date().toISOString()
                     };
                     console.log(`✅ Loaded ${endpoint.name}:`, data);
                 } catch (error) {
+                    // Provide fallback data for better UX
+                    const fallbackData = this.getFallbackData(endpoint.name);
                     this.endpointData[endpoint.name] = {
+                        ...fallbackData,
                         status: 'error',
                         error: error.message,
-                        lastUpdate: new Date().toISOString()
+                        lastUpdate: new Date().toISOString(),
+                        fallback: true
                     };
-                    console.log(`❌ Error loading ${endpoint.name}:`, error);
+                    console.log(`❌ Error loading ${endpoint.name}:`, error.message, '- Using fallback data');
                 }
+            }
+
+            getFallbackData(endpointName) {
+                const fallbackData = {
+                    equity: {
+                        equity: { display_value: 0 },
+                        positions: {},
+                        ok: false,
+                        service: 'bottie-trading-offline'
+                    },
+                    health: {
+                        ok: false,
+                        service: 'bottie-trading-offline',
+                        equity: { display_value: 0 },
+                        mode: 'OFFLINE'
+                    },
+                    trades: {
+                        trades: [],
+                        total_trades: 0
+                    },
+                    positions: {
+                        positions: {},
+                        total_positions: 0
+                    },
+                    signals: {
+                        signals: [],
+                        total_signals: 0
+                    },
+                    ml: {
+                        accuracy: 0,
+                        sample_count: 0,
+                        enabled: false
+                    },
+                    sentiment: {
+                        articles: [],
+                        overall_sentiment: 0
+                    },
+                    quantum: {
+                        enabled: false,
+                        quantum_score: 0,
+                        backend: 'offline'
+                    },
+                    reports: {
+                        reports: [],
+                        last_generated: 'Service offline'
+                    },
+                    api: {
+                        status: 'offline',
+                        service: 'bottie-api-offline',
+                        version: 'N/A'
+                    }
+                };
+                
+                return fallbackData[endpointName] || { status: 'offline', error: 'Service unavailable' };
             }
 
             renderSlates() {
@@ -528,6 +596,9 @@
 
             getEndpointStatus(data) {
                 if (data.status === 'error') {
+                    if (data.fallback) {
+                        return { class: 'status-warning', text: 'Offline' };
+                    }
                     return { class: 'status-error', text: 'Error' };
                 }
                 
@@ -615,8 +686,13 @@
                 if (!statusEl) return;
                 
                 const hasErrors = Object.values(this.endpointData).some(data => data.status === 'error');
+                const allOffline = Object.values(this.endpointData).every(data => data.fallback);
+                const hasOffline = Object.values(this.endpointData).some(data => data.fallback);
                 
-                if (hasErrors) {
+                if (allOffline) {
+                    statusEl.innerHTML = '<span>🔴</span><span>Service Offline</span>';
+                    statusEl.className = 'status-badge status-offline';
+                } else if (hasOffline || hasErrors) {
                     statusEl.innerHTML = '<span>🟡</span><span>Partial Connection</span>';
                     statusEl.className = 'status-badge status-warning';
                 } else {
