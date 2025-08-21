@@ -183,16 +183,17 @@ def get_real_balance():
 # Root endpoint
 @app.get("/")
 def root():
-    """Serve dashboard or return API info"""
-    # Check if dashboard.html exists and serve it
-    if os.path.exists('dashboard.html'):
+    """Serve enhanced dashboard or return API info"""
+    # Priority 1: Enhanced Dashboard (index.html)
+    if os.path.exists('index.html'):
+        return FileResponse('index.html')
+    # Legacy fallbacks
+    elif os.path.exists('dashboard.html'):
         return FileResponse('dashboard.html')
     elif os.path.exists('working-dashboard.html'):
         return FileResponse('working-dashboard.html')
     elif os.path.exists('reports-dashboard.html'):
         return FileResponse('reports-dashboard.html')
-    elif os.path.exists('index.html'):
-        return FileResponse('index.html')
     else:
         # Fallback to API info
         return {"status": "ok", "service": "bottie-render-api", "version": "1.0.1"}
