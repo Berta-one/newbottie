@@ -399,3 +399,261 @@
             </div>
         </div>
     </div>
+
+    <script>
+        class EnhancedDashboard {
+            constructor() {
+                this.apiUrl = 'https://bottie-1.onrender.com';
+                this.endpoints = [
+                    { name: 'equity', title: 'Portfolio Equity', icon: '💰', endpoint: '/status' },
+                    { name: 'trades', title: 'Trade History', icon: '📈', endpoint: '/trades' },
+                    { name: 'ml', title: 'ML Performance', icon: '🧠', endpoint: '/ml/status' },
+                    { name: 'quantum', title: 'Quantum Analysis', icon: '⚛️', endpoint: '/quantum/analysis' },
+                    { name: 'sentiment', title: 'Sentiment Analysis', icon: '📰', endpoint: '/sentiment' },
+                    { name: 'signals', title: 'Trading Signals', icon: '🎯', endpoint: '/signals' },
+                    { name: 'positions', title: 'Current Positions', icon: '💼', endpoint: '/positions' },
+                    { name: 'health', title: 'System Health', icon: '🔋', endpoint: '/health' },
+                    { name: 'reports', title: 'Daily Reports', icon: '📊', endpoint: '/reports/daily' },
+                    { name: 'api', title: 'API Status', icon: '🌐', endpoint: '/api-info' }
+                ];
+                this.endpointData = {};
+                this.init();
+            }
+
+            async init() {
+                console.log('🚀 Initializing Enhanced Dashboard...');
+                await this.loadAllEndpoints();
+                this.renderSlates();
+                this.updateConnectionStatus();
+                
+                setInterval(() => {
+                    this.loadAllEndpoints();
+                    this.updateSlateMetrics();
+                }, 30000);
+            }
+
+            async loadAllEndpoints() {
+                const promises = this.endpoints.map(endpoint => this.loadEndpoint(endpoint));
+                await Promise.allSettled(promises);
+            }
+
+            async loadEndpoint(endpoint) {
+                try {
+                    const response = await fetch(`${this.apiUrl}${endpoint.endpoint}`);
+                    const data = await response.json();
+                    this.endpointData[endpoint.name] = {
+                        ...data,
+                        status: response.ok ? 'success' : 'error',
+                        lastUpdate: new Date().toISOString()
+                    };
+                    console.log(`✅ Loaded ${endpoint.name}:`, data);
+                } catch (error) {
+                    this.endpointData[endpoint.name] = {
+                        status: 'error',
+                        error: error.message,
+                        lastUpdate: new Date().toISOString()
+                    };
+                    console.log(`❌ Error loading ${endpoint.name}:`, error);
+                }
+            }
+
+            renderSlates() {
+                const container = document.getElementById('slates-container');
+                if (!container) {
+                    console.error('❌ Slates container not found');
+                    return;
+                }
+                container.innerHTML = this.endpoints.map(endpoint => this.createSlate(endpoint)).join('');
+                console.log('✅ Slates rendered');
+            }
+
+            createSlate(endpoint) {
+                const data = this.endpointData[endpoint.name] || {};
+                const metrics = this.getEndpointMetrics(endpoint.name, data);
+                const status = this.getEndpointStatus(data);
+
+                return `
+                    <div class="slate" onclick="dashboard.generateReport('${endpoint.name}')">
+                        <div class="slate-header">
+                            <div class="slate-title">
+                                <span class="slate-icon">${endpoint.icon}</span>
+                                ${endpoint.title}
+                            </div>
+                            <div class="slate-status ${status.class}">${status.text}</div>
+                        </div>
+                        <div class="slate-metrics">
+                            ${metrics.map(metric => `
+                                <div class="metric">
+                                    <div class="metric-value ${metric.class || ''}">${metric.value}</div>
+                                    <div class="metric-label">${metric.label}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div class="slate-description">
+                            ${this.getEndpointDescription(endpoint.name, data)}
+                        </div>
+                    </div>
+                `;
+            }
+
+            getEndpointMetrics(name, data) {
+                switch (name) {
+                    case 'equity':
+                        return [
+                            { label: 'Current Equity', value: `$${(data.equity || 0).toFixed(2)}`, class: data.equity > 0 ? 'positive' : 'neutral' },
+                            { label: 'Positions', value: Object.keys(data.positions || {}).length }
+                        ];
+                    case 'trades':
+                        const trades = data.trades || [];
+                        return [
+                            { label: 'Total Trades', value: trades.length },
+                            { label: 'Status', value: data.status === 'success' ? 'Active' : 'Error', class: data.status === 'success' ? 'positive' : 'negative' }
+                        ];
+                    case 'health':
+                        return [
+                            { label: 'Status', value: data.ok ? 'Healthy' : 'Issues', class: data.ok ? 'positive' : 'negative' },
+                            { label: 'Equity', value: data.equity ? `$${data.equity.toFixed(2)}` : 'N/A' }
+                        ];
+                    default:
+                        return [
+                            { label: 'Status', value: data.status === 'success' ? 'OK' : 'Error', class: data.status === 'success' ? 'positive' : 'negative' },
+                            { label: 'Last Update', value: data.lastUpdate ? new Date(data.lastUpdate).toLocaleTimeString() : 'Never' }
+                        ];
+                }
+            }
+
+            getEndpointStatus(data) {
+                if (data.status === 'error') {
+                    return { class: 'status-error', text: 'Error' };
+                }
+                
+                switch (data.status) {
+                    case 'success':
+                        return { class: 'status-excellent', text: 'Active' };
+                    default:
+                        return { class: 'status-loading', text: 'Loading' };
+                }
+            }
+
+            getEndpointDescription(name, data) {
+                const descriptions = {
+                    equity: `Monitor your portfolio value and asset allocation across all trading pairs.`,
+                    trades: `Complete history of executed trades with P&L calculations and performance metrics.`,
+                    ml: `Machine learning model performance, accuracy metrics, and prediction confidence scores.`,
+                    quantum: `Quantum-inspired algorithmic analysis and portfolio optimization insights.`,
+                    sentiment: `Real-time market sentiment analysis from news sources and social media.`,
+                    signals: `Live trading signals with confidence levels and recommended actions.`,
+                    positions: `Current open positions, unrealized P&L, and risk exposure analysis.`,
+                    health: `Overall system health monitoring and component status checks.`,
+                    reports: `Daily trading reports and performance summaries.`,
+                    api: `API status and system information.`
+                };
+                
+                return descriptions[name] || 'Comprehensive data analysis and reporting for this component.';
+            }
+
+            async generateReport(endpointName) {
+                const endpoint = this.endpoints.find(e => e.name === endpointName);
+                if (!endpoint) return;
+
+                const modal = document.getElementById('report-modal');
+                const icon = document.getElementById('report-icon');
+                const name = document.getElementById('report-name');
+                const body = document.getElementById('report-body');
+
+                icon.textContent = endpoint.icon;
+                name.textContent = `${endpoint.title} Report`;
+                modal.style.display = 'flex';
+
+                body.innerHTML = `
+                    <div style="text-align: center; padding: 2rem;">
+                        <div class="loading-spinner" style="width: 40px; height: 40px;"></div>
+                        <p style="margin-top: 1rem; color: #8892b0;">Generating comprehensive report...</p>
+                    </div>
+                `;
+
+                setTimeout(() => {
+                    const data = this.endpointData[endpointName] || {};
+                    body.innerHTML = `
+                        <div style="padding: 1rem;">
+                            <h3>📊 ${endpoint.title} Details</h3>
+                            <div style="background: rgba(15, 20, 25, 0.8); border: 1px solid rgba(100, 255, 218, 0.1); border-radius: 8px; padding: 1rem; margin: 1rem 0; font-family: 'Fira Code', monospace; font-size: 0.875rem; max-height: 400px; overflow-y: auto;">
+                                <pre>${JSON.stringify(data, null, 2)}</pre>
+                            </div>
+                            <div style="margin-top: 1rem;">
+                                <button onclick="dashboard.exportData('${endpointName}')" style="background: rgba(100, 255, 218, 0.1); border: 1px solid rgba(100, 255, 218, 0.3); color: #64ffda; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; margin-right: 0.5rem;">💾 Export JSON</button>
+                                <button onclick="closeReport()" style="background: rgba(244, 67, 54, 0.1); border: 1px solid rgba(244, 67, 54, 0.3); color: #f44336; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer;">✕ Close</button>
+                            </div>
+                        </div>
+                    `;
+                }, 1500);
+            }
+
+            exportData(endpointName) {
+                const data = this.endpointData[endpointName] || {};
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const filename = `${endpointName}_report_${timestamp}.json`;
+                
+                const content = JSON.stringify(data, null, 2);
+                const blob = new Blob([content], { type: 'application/json' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }
+
+            updateConnectionStatus() {
+                const statusEl = document.getElementById('connection-status');
+                if (!statusEl) return;
+                
+                const hasErrors = Object.values(this.endpointData).some(data => data.status === 'error');
+                
+                if (hasErrors) {
+                    statusEl.innerHTML = '<span>🟡</span><span>Partial Connection</span>';
+                    statusEl.className = 'status-badge status-warning';
+                } else {
+                    statusEl.innerHTML = '<span>🟢</span><span>All Systems Online</span>';
+                    statusEl.className = 'status-badge status-online';
+                }
+            }
+
+            updateSlateMetrics() {
+                this.renderSlates();
+            }
+        }
+
+        function closeReport() {
+            const modal = document.getElementById('report-modal');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        // Initialize dashboard when page loads
+        let dashboard;
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🎯 DOM Content Loaded - Starting Dashboard');
+            dashboard = new EnhancedDashboard();
+        });
+
+        // Close modal when clicking outside
+        document.addEventListener('click', function(e) {
+            const modal = document.getElementById('report-modal');
+            if (modal && e.target === modal) {
+                closeReport();
+            }
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeReport();
+            }
+        });
+    </script>
+</body>
+</html>
