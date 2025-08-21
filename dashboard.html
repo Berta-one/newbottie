@@ -410,10 +410,11 @@
                     { name: 'ml', title: 'ML Performance', icon: '🧠', endpoint: '/ml/status' },
                     { name: 'quantum', title: 'Quantum Analysis', icon: '⚛️', endpoint: '/quantum/analysis' },
                     { name: 'sentiment', title: 'Sentiment Analysis', icon: '📰', endpoint: '/sentiment' },
+                    { name: 'brierscore', title: 'Brier Score Analysis', icon: '📊', endpoint: '/ml/performance' },
                     { name: 'signals', title: 'Trading Signals', icon: '🎯', endpoint: '/signals' },
                     { name: 'positions', title: 'Current Positions', icon: '💼', endpoint: '/positions' },
                     { name: 'health', title: 'System Health', icon: '🔋', endpoint: '/health' },
-                    { name: 'reports', title: 'Daily Reports', icon: '📊', endpoint: '/reports/daily' },
+                    { name: 'reports', title: 'Daily Reports', icon: '📋', endpoint: '/reports/daily' },
                     { name: 'api', title: 'API Status', icon: '🌐', endpoint: '/api-info' }
                 ];
                 this.endpointData = {};
@@ -511,6 +512,13 @@
                         quantum_score: 0,
                         backend: 'offline'
                     },
+                    brierscore: {
+                        brier_score: 0.25,
+                        accuracy: 0.5,
+                        total_predictions: 0,
+                        timeframe: '24h',
+                        performance_grade: 'Offline'
+                    },
                     reports: {
                         reports: [],
                         last_generated: 'Service offline'
@@ -579,12 +587,33 @@
                             { label: 'Total Trades', value: trades.length },
                             { label: 'Status', value: data.status === 'success' ? 'Active' : 'Error', class: data.status === 'success' ? 'positive' : 'negative' }
                         ];
+                    case 'ml':
+                        const mlAccuracy = (data.accuracy || 0) * (data.accuracy > 1 ? 1 : 100);
+                        return [
+                            { label: 'Accuracy', value: `${mlAccuracy.toFixed(1)}%`, class: mlAccuracy > 70 ? 'positive' : 'neutral' },
+                            { label: 'Status', value: data.enabled ? 'Active' : 'Disabled', class: data.enabled ? 'positive' : 'negative' }
+                        ];
+                    case 'sentiment':
+                        const scores = data.scores || {};
+                        const totalArticles = Object.values(scores).reduce((sum, score) => sum + (score.n || 0), 0);
+                        const avgSentiment = Object.values(scores).reduce((sum, score) => sum + (score.score || 0), 0) / Object.keys(scores).length || 0;
+                        return [
+                            { label: 'Avg Sentiment', value: avgSentiment.toFixed(2), class: avgSentiment > 0 ? 'positive' : avgSentiment < 0 ? 'negative' : 'neutral' },
+                            { label: 'Articles', value: totalArticles }
+                        ];
+                    case 'brierscore':
+                        const brierScore = data.brier_score || 0;
+                        return [
+                            { label: 'Brier Score', value: brierScore.toFixed(3), class: brierScore < 0.2 ? 'positive' : brierScore < 0.3 ? 'neutral' : 'negative' },
+                            { label: 'Performance', value: data.performance_grade || 'Unknown', class: (data.performance_grade === 'Excellent') ? 'positive' : 'neutral' }
+                        ];
                     case 'health':
                         const healthEquity = data.equity?.display_value || data.equity || 0;
                         const healthEquityNum = typeof healthEquity === 'number' ? healthEquity : parseFloat(healthEquity) || 0;
+                        const tradingEnabled = data.features?.real_trading?.enabled || data.mode === 'LIVE' || false;
                         return [
                             { label: 'Status', value: data.ok ? 'Healthy' : 'Issues', class: data.ok ? 'positive' : 'negative' },
-                            { label: 'Equity', value: healthEquityNum > 0 ? `$${healthEquityNum.toFixed(2)}` : 'N/A' }
+                            { label: 'Trading', value: tradingEnabled ? 'Enabled' : 'Disabled', class: tradingEnabled ? 'positive' : 'negative' }
                         ];
                     default:
                         return [
@@ -617,9 +646,10 @@
                     ml: `Machine learning model performance, accuracy metrics, and prediction confidence scores.`,
                     quantum: `Quantum-inspired algorithmic analysis and portfolio optimization insights.`,
                     sentiment: `Real-time market sentiment analysis from news sources and social media.`,
+                    brierscore: `Statistical accuracy measure for probabilistic predictions and model calibration.`,
                     signals: `Live trading signals with confidence levels and recommended actions.`,
                     positions: `Current open positions, unrealized P&L, and risk exposure analysis.`,
-                    health: `Overall system health monitoring and component status checks.`,
+                    health: `Overall system health monitoring and trading status checks.`,
                     reports: `Daily trading reports and performance summaries.`,
                     api: `API status and system information.`
                 };
@@ -649,19 +679,230 @@
 
                 setTimeout(() => {
                     const data = this.endpointData[endpointName] || {};
-                    body.innerHTML = `
-                        <div style="padding: 1rem;">
+                    body.innerHTML = this.createDetailedReport(endpointName, endpoint, data);
+                }, 1500);
+            }
+
+            createDetailedReport(endpointName, endpoint, data) {
+                const tableView = this.createTableView(endpointName, data);
+                const statusIndicator = data.fallback ? '🔴 Offline Data' : '🟢 Live Data';
+                
+                return `
+                    <div style="padding: 1.5rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                             <h3>📊 ${endpoint.title} Details</h3>
-                            <div style="background: rgba(15, 20, 25, 0.8); border: 1px solid rgba(100, 255, 218, 0.1); border-radius: 8px; padding: 1rem; margin: 1rem 0; font-family: 'Fira Code', monospace; font-size: 0.875rem; max-height: 400px; overflow-y: auto;">
+                            <span style="color: ${data.fallback ? '#f44336' : '#4caf50'}; font-size: 0.875rem;">${statusIndicator}</span>
+                        </div>
+                        
+                        ${tableView}
+                        
+                        <div style="margin-top: 1.5rem;">
+                            <h4 style="color: #64ffda; margin-bottom: 0.5rem;">📄 Raw JSON Data</h4>
+                            <div style="background: rgba(15, 20, 25, 0.8); border: 1px solid rgba(100, 255, 218, 0.1); border-radius: 8px; padding: 1rem; font-family: 'Fira Code', monospace; font-size: 0.875rem; max-height: 300px; overflow-y: auto;">
                                 <pre>${JSON.stringify(data, null, 2)}</pre>
                             </div>
-                            <div style="margin-top: 1rem;">
-                                <button onclick="dashboard.exportData('${endpointName}')" style="background: rgba(100, 255, 218, 0.1); border: 1px solid rgba(100, 255, 218, 0.3); color: #64ffda; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; margin-right: 0.5rem;">💾 Export JSON</button>
-                                <button onclick="closeReport()" style="background: rgba(244, 67, 54, 0.1); border: 1px solid rgba(244, 67, 54, 0.3); color: #f44336; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer;">✕ Close</button>
-                            </div>
                         </div>
-                    `;
-                }, 1500);
+                        
+                        <div style="margin-top: 1.5rem; display: flex; gap: 0.5rem;">
+                            <button onclick="dashboard.exportData('${endpointName}')" style="background: rgba(100, 255, 218, 0.1); border: 1px solid rgba(100, 255, 218, 0.3); color: #64ffda; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer;">💾 Export JSON</button>
+                            <button onclick="dashboard.exportTable('${endpointName}')" style="background: rgba(76, 175, 80, 0.1); border: 1px solid rgba(76, 175, 80, 0.3); color: #4caf50; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer;">📊 Export CSV</button>
+                            <button onclick="closeReport()" style="background: rgba(244, 67, 54, 0.1); border: 1px solid rgba(244, 67, 54, 0.3); color: #f44336; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer;">✕ Close</button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            createTableView(endpointName, data) {
+                const tableStyle = `
+                    border-collapse: collapse; 
+                    width: 100%; 
+                    background: rgba(15, 20, 25, 0.5); 
+                    border: 1px solid rgba(100, 255, 218, 0.1); 
+                    border-radius: 8px; 
+                    overflow: hidden;
+                `;
+                const headerStyle = `
+                    background: rgba(100, 255, 218, 0.1); 
+                    color: #64ffda; 
+                    padding: 0.75rem; 
+                    text-align: left; 
+                    font-weight: 600;
+                `;
+                const cellStyle = `
+                    padding: 0.75rem; 
+                    border-bottom: 1px solid rgba(100, 255, 218, 0.05); 
+                    color: #e6fffa;
+                `;
+
+                switch (endpointName) {
+                    case 'positions':
+                        const positions = data.positions || {};
+                        if (Object.keys(positions).length === 0) {
+                            return `<div style="text-align: center; padding: 2rem; color: #8892b0;">No positions data available</div>`;
+                        }
+                        return `
+                            <table style="${tableStyle}">
+                                <thead>
+                                    <tr>
+                                        <th style="${headerStyle}">Symbol</th>
+                                        <th style="${headerStyle}">Quantity</th>
+                                        <th style="${headerStyle}">Current Price</th>
+                                        <th style="${headerStyle}">Market Value</th>
+                                        <th style="${headerStyle}">P&L</th>
+                                        <th style="${headerStyle}">P&L %</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${Object.entries(positions).map(([symbol, pos]) => `
+                                        <tr>
+                                            <td style="${cellStyle}"><strong>${symbol}</strong></td>
+                                            <td style="${cellStyle}">${(pos.quantity || 0).toFixed(6)}</td>
+                                            <td style="${cellStyle}">$${(pos.current_price || 0).toFixed(2)}</td>
+                                            <td style="${cellStyle}">$${(pos.market_value || 0).toFixed(2)}</td>
+                                            <td style="${cellStyle}; color: ${(pos.pnl || 0) >= 0 ? '#4caf50' : '#f44336'}">$${(pos.pnl || 0).toFixed(2)}</td>
+                                            <td style="${cellStyle}; color: ${(pos.pnl_percentage || 0) >= 0 ? '#4caf50' : '#f44336'}">${(pos.pnl_percentage || 0).toFixed(2)}%</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        `;
+                    
+                    case 'trades':
+                        const trades = data.trades || [];
+                        if (trades.length === 0) {
+                            return `<div style="text-align: center; padding: 2rem; color: #8892b0;">No trades data available</div>`;
+                        }
+                        return `
+                            <table style="${tableStyle}">
+                                <thead>
+                                    <tr>
+                                        <th style="${headerStyle}">Time</th>
+                                        <th style="${headerStyle}">Symbol</th>
+                                        <th style="${headerStyle}">Side</th>
+                                        <th style="${headerStyle}">Quantity</th>
+                                        <th style="${headerStyle}">Price</th>
+                                        <th style="${headerStyle}">Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${trades.slice(0, 20).map(trade => `
+                                        <tr>
+                                            <td style="${cellStyle}">${new Date(trade.timestamp).toLocaleString()}</td>
+                                            <td style="${cellStyle}"><strong>${trade.symbol}</strong></td>
+                                            <td style="${cellStyle}; color: ${trade.side === 'buy' ? '#4caf50' : '#f44336'}">${trade.side?.toUpperCase()}</td>
+                                            <td style="${cellStyle}">${trade.quantity}</td>
+                                            <td style="${cellStyle}">$${trade.price}</td>
+                                            <td style="${cellStyle}">$${(trade.quantity * trade.price).toFixed(2)}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        `;
+                    
+                    case 'sentiment':
+                        const scores = data.scores || {};
+                        if (Object.keys(scores).length === 0) {
+                            return `<div style="text-align: center; padding: 2rem; color: #8892b0;">No sentiment data available</div>`;
+                        }
+                        return `
+                            <table style="${tableStyle}">
+                                <thead>
+                                    <tr>
+                                        <th style="${headerStyle}">Asset</th>
+                                        <th style="${headerStyle}">Sentiment Score</th>
+                                        <th style="${headerStyle}">Articles Count</th>
+                                        <th style="${headerStyle}">Sentiment</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${Object.entries(scores).map(([asset, score]) => {
+                                        const sentiment = (score.score || 0) > 0 ? 'Bullish' : (score.score || 0) < 0 ? 'Bearish' : 'Neutral';
+                                        const color = (score.score || 0) > 0 ? '#4caf50' : (score.score || 0) < 0 ? '#f44336' : '#64ffda';
+                                        return `
+                                            <tr>
+                                                <td style="${cellStyle}"><strong>${asset}</strong></td>
+                                                <td style="${cellStyle}">${(score.score || 0).toFixed(3)}</td>
+                                                <td style="${cellStyle}">${score.n || 0}</td>
+                                                <td style="${cellStyle}; color: ${color}">${sentiment}</td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        `;
+                    
+                    default:
+                        // For other endpoints, show key-value pairs
+                        const entries = Object.entries(data).filter(([key, value]) => 
+                            typeof value !== 'object' || value === null
+                        );
+                        return `
+                            <table style="${tableStyle}">
+                                <thead>
+                                    <tr>
+                                        <th style="${headerStyle}">Property</th>
+                                        <th style="${headerStyle}">Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${entries.map(([key, value]) => `
+                                        <tr>
+                                            <td style="${cellStyle}"><strong>${key.replace(/_/g, ' ').toUpperCase()}</strong></td>
+                                            <td style="${cellStyle}">${value}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        `;
+                }
+            }
+
+            exportTable(endpointName) {
+                const data = this.endpointData[endpointName] || {};
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const filename = `${endpointName}_table_${timestamp}.csv`;
+                
+                let csvContent = '';
+                
+                switch (endpointName) {
+                    case 'positions':
+                        const positions = data.positions || {};
+                        csvContent = 'Symbol,Quantity,Current Price,Market Value,P&L,P&L %\n';
+                        csvContent += Object.entries(positions).map(([symbol, pos]) => 
+                            `${symbol},${pos.quantity || 0},${pos.current_price || 0},${pos.market_value || 0},${pos.pnl || 0},${pos.pnl_percentage || 0}`
+                        ).join('\n');
+                        break;
+                    case 'trades':
+                        const trades = data.trades || [];
+                        csvContent = 'Time,Symbol,Side,Quantity,Price,Value\n';
+                        csvContent += trades.map(trade => 
+                            `${new Date(trade.timestamp).toISOString()},${trade.symbol},${trade.side},${trade.quantity},${trade.price},${trade.quantity * trade.price}`
+                        ).join('\n');
+                        break;
+                    case 'sentiment':
+                        const scores = data.scores || {};
+                        csvContent = 'Asset,Sentiment Score,Articles Count\n';
+                        csvContent += Object.entries(scores).map(([asset, score]) => 
+                            `${asset},${score.score || 0},${score.n || 0}`
+                        ).join('\n');
+                        break;
+                    default:
+                        const entries = Object.entries(data).filter(([key, value]) => 
+                            typeof value !== 'object' || value === null
+                        );
+                        csvContent = 'Property,Value\n';
+                        csvContent += entries.map(([key, value]) => `${key},${value}`).join('\n');
+                }
+                
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
             }
 
             exportData(endpointName) {
