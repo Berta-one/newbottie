@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bottie Server Connection Test</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            background: #1a1a1a; 
+            color: #fff; 
+            padding: 2rem; 
+        }
+        .test-result { 
+            margin: 1rem 0; 
+            padding: 1rem; 
+            border-radius: 8px; 
+            border-left: 4px solid #64ffda; 
+            background: rgba(100, 255, 218, 0.1); 
+        }
+        .success { border-left-color: #4caf50; background: rgba(76, 175, 80, 0.1); }
+        .error { border-left-color: #f44336; background: rgba(244, 67, 54, 0.1); }
+        button { 
+            padding: 1rem 2rem; 
+            background: #64ffda; 
+            border: none; 
+            border-radius: 8px; 
+            color: #000; 
+            font-weight: bold; 
+            cursor: pointer; 
+            margin: 1rem 0; 
+        }
+    </style>
+</head>
+<body>
+    <h1>🤖 Bottie Server Connection Test</h1>
+    <div id="serverInfo"></div>
+    <button onclick="testAllEndpoints()">🧪 Test All Endpoints</button>
+    <div id="results"></div>
+
+    <script>
+        const API_BASE = 'http://127.0.0.1:8000';
+
+        document.getElementById('serverInfo').innerHTML = `
+            <div class="test-result">
+                <strong>🌐 Testing Server:</strong> ${API_BASE}<br>
+                <strong>🕒 Test Time:</strong> ${new Date().toLocaleString()}<br>
+                <strong>📍 Your Location:</strong> ${window.location.href}
+            </div>
+        `;
+
+        async function testEndpoint(path, name) {
+            try {
+                const response = await fetch(`${API_BASE}${path}`);
+                const status = response.status;
+                const isSuccess = status >= 200 && status < 300;
+                
+                return {
+                    name,
+                    path,
+                    status,
+                    success: isSuccess,
+                    message: isSuccess ? 'OK' : `HTTP ${status}`
+                };
+            } catch (error) {
+                return {
+                    name,
+                    path,
+                    status: 0,
+                    success: false,
+                    message: error.message
+                };
+            }
+        }
+
+        async function testAllEndpoints() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="test-result">🧪 Testing endpoints...</div>';
+
+            const endpoints = [
+                { path: '/health', name: 'Health Check' },
+                { path: '/status', name: 'System Status' },
+                { path: '/trading/status', name: 'Trading Status' },
+                { path: '/signals', name: 'Trading Signals' },
+                { path: '/trades/recent', name: 'Recent Trades' },
+                { path: '/logs', name: 'System Logs' },
+                { path: '/arbitrage/opportunities', name: 'Arbitrage Opportunities' }
+            ];
+
+            let html = '<h2>📊 Endpoint Test Results:</h2>';
+            
+            for (const endpoint of endpoints) {
+                const result = await testEndpoint(endpoint.path, endpoint.name);
+                const cssClass = result.success ? 'success' : 'error';
+                const icon = result.success ? '✅' : '❌';
+                
+                html += `
+                    <div class="test-result ${cssClass}">
+                        ${icon} <strong>${result.name}</strong> (${endpoint.path})<br>
+                        Status: ${result.status} - ${result.message}
+                    </div>
+                `;
+            }
+
+            html += `
+                <div class="test-result">
+                    <h3>🎯 Next Steps:</h3>
+                    ${endpoints.filter(e => e.path === '/trading/status')[0] ? 
+                        '✅ Trading endpoints available - Access enhanced dashboard' : 
+                        '❌ Trading endpoints missing - Server needs restart'}
+                    <br><br>
+                    <strong>📱 Access Enhanced Dashboard:</strong><br>
+                    <a href="/index_enhanced.html" style="color: #64ffda;">http://127.0.0.1:8000/index_enhanced.html</a><br>
+                    <strong>🔑 Password:</strong> bottie2024
+                </div>
+            `;
+
+            resultsDiv.innerHTML = html;
+        }
+
+        // Auto-test on page load
+        window.onload = () => {
+            setTimeout(testAllEndpoints, 1000);
+        };
+    </script>
+</body>
+</html>
