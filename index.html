@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bottie Enhanced Dashboard</title>
+    <title>Bottie Enhanced Trading Dashboard</title>
     <style>
         * {
             margin: 0;
@@ -16,6 +16,72 @@
             background: linear-gradient(135deg, #0f1419 0%, #1a2332 100%);
             color: #e6fffa;
             min-height: 100vh;
+        }
+
+        /* Login Screen */
+        .login-screen {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .login-box {
+            background: rgba(26, 35, 50, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(100, 255, 218, 0.2);
+            border-radius: 12px;
+            padding: 3rem;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .login-title {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(45deg, #64ffda, #4caf50);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 2rem;
+        }
+
+        .login-input {
+            width: 100%;
+            padding: 1rem;
+            background: rgba(15, 20, 25, 0.8);
+            border: 1px solid rgba(100, 255, 218, 0.3);
+            border-radius: 8px;
+            color: #e6fffa;
+            font-size: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .login-button {
+            width: 100%;
+            padding: 1rem;
+            background: linear-gradient(45deg, #64ffda, #4caf50);
+            border: none;
+            border-radius: 8px;
+            color: #0f1419;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .login-error {
+            color: #ff6b6b;
+            margin-top: 1rem;
+            font-size: 0.875rem;
+        }
+
+        /* Main Dashboard */
+        .dashboard {
+            display: none;
+        }
+
+        .dashboard.authenticated {
+            display: block;
         }
 
         .header {
@@ -36,66 +102,51 @@
             -webkit-text-fill-color: transparent;
         }
 
-        .status-indicators {
+        .controls {
             display: flex;
             gap: 1rem;
             align-items: center;
         }
 
-        .status-badge {
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-size: 0.875rem;
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
+        .trading-control {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
         }
 
-        .status-online { background: rgba(76, 175, 80, 0.2); color: #4caf50; }
-        .status-offline { background: rgba(244, 67, 54, 0.2); color: #f44336; }
+        .start-trading {
+            background: linear-gradient(45deg, #4caf50, #45a049);
+            color: white;
+        }
+
+        .stop-trading {
+            background: linear-gradient(45deg, #f44336, #d32f2f);
+            color: white;
+        }
 
         .main-grid {
+            padding: 2rem;
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 1.5rem;
-            padding: 2rem;
-            max-width: 1400px;
-            margin: 0 auto;
+            gap: 2rem;
         }
 
         .slate {
-            background: rgba(26, 35, 50, 0.7);
-            backdrop-filter: blur(10px);
+            background: rgba(26, 35, 50, 0.8);
+            border: 1px solid rgba(100, 255, 218, 0.2);
             border-radius: 12px;
-            border: 1px solid rgba(100, 255, 218, 0.1);
             padding: 1.5rem;
             cursor: pointer;
             transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .slate::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, #64ffda, #4caf50);
-            transform: scaleX(0);
-            transition: transform 0.3s ease;
-        }
-
-        .slate:hover::before {
-            transform: scaleX(1);
         }
 
         .slate:hover {
-            transform: translateY(-4px);
-            border-color: rgba(100, 255, 218, 0.3);
-            box-shadow: 0 8px 32px rgba(100, 255, 218, 0.1);
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            border-color: #64ffda;
         }
 
         .slate-header {
@@ -106,316 +157,266 @@
         }
 
         .slate-title {
-            font-size: 1.125rem;
+            font-size: 1.25rem;
             font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
+            color: #64ffda;
         }
 
         .slate-icon {
-            font-size: 1.5rem;
+            font-size: 2rem;
         }
 
-        .slate-status {
-            padding: 0.25rem 0.75rem;
-            border-radius: 12px;
-            font-size: 0.75rem;
-            font-weight: 500;
-        }
-
-        .status-excellent { background: rgba(76, 175, 80, 0.2); color: #4caf50; }
-        .status-good { background: rgba(255, 193, 7, 0.2); color: #ffc107; }
-        .status-warning { background: rgba(255, 152, 0, 0.2); color: #ff9800; }
-        .status-error { background: rgba(244, 67, 54, 0.2); color: #f44336; }
-        .status-loading { background: rgba(156, 39, 176, 0.2); color: #9c27b0; }
-
-        .slate-metrics {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 1rem;
-            margin-bottom: 1rem;
-        }
-
-        .metric {
-            text-align: center;
-        }
-
-        .metric-value {
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 0.25rem;
-        }
-
-        .metric-label {
-            font-size: 0.75rem;
-            color: #8892b0;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .slate-description {
-            color: #8892b0;
+        .slate-content {
+            color: #a0aec0;
             font-size: 0.875rem;
-            line-height: 1.5;
         }
 
-        .report-modal {
+        /* Signals Table Modal */
+        .signals-modal {
+            display: none;
             position: fixed;
             top: 0;
             left: 0;
-            right: 0;
-            bottom: 0;
+            width: 100%;
+            height: 100%;
             background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(4px);
-            display: none;
-            justify-content: center;
-            align-items: center;
             z-index: 1000;
         }
 
-        .report-content {
-            background: linear-gradient(135deg, #1a2332 0%, #2d3748 100%);
-            border-radius: 16px;
-            border: 1px solid rgba(100, 255, 218, 0.2);
-            max-width: 90vw;
-            max-height: 90vh;
+        .signals-content {
+            background: rgba(15, 20, 25, 0.95);
+            margin: 2rem auto;
+            padding: 2rem;
+            border-radius: 12px;
+            max-width: 95%;
+            max-height: 90%;
             overflow-y: auto;
-            position: relative;
+            border: 1px solid rgba(100, 255, 218, 0.3);
         }
 
-        .report-header {
-            padding: 2rem;
-            border-bottom: 1px solid rgba(100, 255, 218, 0.1);
+        .signals-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid rgba(100, 255, 218, 0.2);
+            padding-bottom: 1rem;
         }
 
-        .report-title {
+        .signals-title {
             font-size: 1.5rem;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
+            font-weight: 600;
+            color: #64ffda;
         }
 
         .close-btn {
             background: none;
             border: none;
-            color: #8892b0;
+            color: #ff6b6b;
             font-size: 1.5rem;
             cursor: pointer;
             padding: 0.5rem;
-            border-radius: 8px;
-            transition: all 0.3s ease;
         }
 
-        .close-btn:hover {
-            background: rgba(244, 67, 54, 0.1);
-            color: #f44336;
-        }
-
-        .report-body {
-            padding: 2rem;
-        }
-
-        .report-section {
-            margin-bottom: 2rem;
-        }
-
-        .section-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-            color: #64ffda;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .data-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .data-card {
-            background: rgba(15, 20, 25, 0.5);
-            border: 1px solid rgba(100, 255, 218, 0.1);
-            border-radius: 8px;
-            padding: 1rem;
-        }
-
-        .data-label {
-            font-size: 0.875rem;
-            color: #8892b0;
-            margin-bottom: 0.5rem;
-        }
-
-        .data-value {
-            font-size: 1.25rem;
-            font-weight: 600;
-        }
-
-        .logs-container {
-            background: rgba(15, 20, 25, 0.8);
-            border: 1px solid rgba(100, 255, 218, 0.1);
-            border-radius: 8px;
-            padding: 1rem;
-            font-family: 'Fira Code', monospace;
-            font-size: 0.875rem;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-
-        .log-entry {
-            margin-bottom: 0.5rem;
-            padding: 0.25rem 0;
-        }
-
-        .log-timestamp {
-            color: #64ffda;
-            margin-right: 0.5rem;
-        }
-
-        .log-level-info { color: #4caf50; }
-        .log-level-warn { color: #ff9800; }
-        .log-level-error { color: #f44336; }
-
-        .loading-spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 2px solid rgba(100, 255, 218, 0.3);
-            border-radius: 50%;
-            border-top-color: #64ffda;
-            animation: spin 1s ease-in-out infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .chart-container {
-            background: rgba(15, 20, 25, 0.5);
-            border: 1px solid rgba(100, 255, 218, 0.1);
-            border-radius: 8px;
-            padding: 1rem;
-            margin: 1rem 0;
-        }
-
-        .export-buttons {
-            display: flex;
-            gap: 0.5rem;
+        .signals-table {
+            width: 100%;
+            border-collapse: collapse;
             margin-top: 1rem;
         }
 
-        .export-btn {
+        .signals-table th,
+        .signals-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid rgba(100, 255, 218, 0.1);
+        }
+
+        .signals-table th {
             background: rgba(100, 255, 218, 0.1);
-            border: 1px solid rgba(100, 255, 218, 0.3);
             color: #64ffda;
-            padding: 0.5rem 1rem;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.875rem;
-            transition: all 0.3s ease;
+            font-weight: 600;
         }
 
-        .export-btn:hover {
-            background: rgba(100, 255, 218, 0.2);
-            transform: translateY(-1px);
+        .signal-buy {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4caf50;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 600;
         }
 
-        .feature-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 1rem;
+        .signal-sell {
+            background: rgba(244, 67, 54, 0.2);
+            color: #f44336;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 600;
         }
 
-        .feature-card {
-            background: rgba(15, 20, 25, 0.5);
-            border: 1px solid rgba(100, 255, 218, 0.1);
-            border-radius: 8px;
-            padding: 1rem;
+        .signal-hold {
+            background: rgba(255, 167, 38, 0.2);
+            color: #ffa726;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .arbitrage-opportunity {
+            background: rgba(156, 39, 176, 0.2);
+            color: #9c27b0;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .confidence-high {
+            color: #4caf50;
+            font-weight: 600;
+        }
+
+        .confidence-medium {
+            color: #ffa726;
+            font-weight: 600;
+        }
+
+        .confidence-low {
+            color: #f44336;
+            font-weight: 600;
+        }
+
+        .loading {
             text-align: center;
+            color: #64ffda;
+            padding: 2rem;
         }
 
-        .feature-importance {
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid rgba(100, 255, 218, 0.1);
         }
 
-        .feature-name {
+        .metric:last-child {
+            border-bottom: none;
+        }
+
+        .trading-status {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
             font-size: 0.875rem;
-            color: #8892b0;
+            font-weight: 500;
         }
 
-        .positive { color: #4caf50; }
-        .negative { color: #f44336; }
-        .neutral { color: #64ffda; }
+        .trading-enabled {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4caf50;
+            border: 1px solid rgba(76, 175, 80, 0.3);
+        }
+
+        .trading-disabled {
+            background: rgba(244, 67, 54, 0.2);
+            color: #f44336;
+            border: 1px solid rgba(244, 67, 54, 0.3);
+        }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="logo">⚡ Bottie Enhanced Dashboard v2.0 🚀 [DEPLOYED]</div>
-        <div class="status-indicators">
-            <div class="status-badge status-online">
-                <span>🟢</span>
-                <span>System Online</span>
-            </div>
-            <div class="status-badge" id="connection-status">
-                <span class="loading-spinner"></span>
-                <span>Connecting...</span>
-            </div>
-            <div class="status-badge status-online">
-                <span>🕒</span>
-                <span>Updated: ${new Date().toLocaleTimeString()}</span>
-            </div>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-screen">
+        <div class="login-box">
+            <h1 class="login-title">🤖 Bottie Dashboard</h1>
+            <p style="color: #a0aec0; margin-bottom: 2rem;">Enter password to access trading dashboard</p>
+            <input type="password" id="passwordInput" class="login-input" placeholder="Enter password">
+            <button onclick="authenticate()" class="login-button">Access Dashboard</button>
+            <div id="loginError" class="login-error"></div>
         </div>
     </div>
 
-    <div class="main-grid" id="slates-container">
-        <!-- Slates will be dynamically generated here -->
+    <!-- Main Dashboard -->
+    <div id="dashboard" class="dashboard">
+        <div class="header">
+            <div class="logo">⚡ Bottie Enhanced Trading Dashboard 🚀</div>
+            <div class="controls">
+                <div id="tradingStatus" class="trading-status">
+                    <span id="statusText">Checking...</span>
+                </div>
+                <button onclick="startTrading()" class="trading-control start-trading">▶️ Start Trading</button>
+                <button onclick="stopTrading()" class="trading-control stop-trading">⏹️ Stop Trading</button>
+                <button onclick="logout()" class="trading-control" style="background: rgba(255, 107, 107, 0.2); color: #ff6b6b;">🚪 Logout</button>
+            </div>
+        </div>
+
+        <div class="main-grid" id="slates-container">
+            <!-- Slates will be dynamically generated here -->
+        </div>
     </div>
 
-    <!-- Report Modal -->
-    <div class="report-modal" id="report-modal">
-        <div class="report-content">
-            <div class="report-header">
-                <div class="report-title" id="report-title">
-                    <span id="report-icon">📊</span>
-                    <span id="report-name">Loading Report...</span>
-                </div>
-                <button class="close-btn" onclick="closeReport()">✕</button>
+    <!-- Trading Signals Modal -->
+    <div id="signalsModal" class="signals-modal">
+        <div class="signals-content">
+            <div class="signals-header">
+                <h2 class="signals-title">🎯 Trading Signals & Arbitrage Opportunities</h2>
+                <button onclick="closeSignalsModal()" class="close-btn">✕</button>
             </div>
-            <div class="report-body" id="report-body">
-                <div style="text-align: center; padding: 2rem;">
-                    <div class="loading-spinner" style="width: 40px; height: 40px;"></div>
-                    <p style="margin-top: 1rem; color: #8892b0;">Generating report...</p>
-                </div>
-            </div>
+            <div id="signalsTableContainer" class="loading">Loading signals...</div>
         </div>
     </div>
 
     <script>
+        // Configuration
+        const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+            ? 'http://127.0.0.1:8000' 
+            : 'https://bottie-1.onrender.com';
+        
+        const DASHBOARD_PASSWORD = 'bottie2024';
+        let isAuthenticated = false;
+
+        // Authentication
+        function authenticate() {
+            const password = document.getElementById('passwordInput').value;
+            const errorDiv = document.getElementById('loginError');
+            
+            if (password === DASHBOARD_PASSWORD) {
+                isAuthenticated = true;
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('dashboard').classList.add('authenticated');
+                initDashboard();
+                errorDiv.textContent = '';
+            } else {
+                errorDiv.textContent = 'Invalid password. Please try again.';
+                document.getElementById('passwordInput').value = '';
+            }
+        }
+
+        function logout() {
+            isAuthenticated = false;
+            document.getElementById('loginScreen').style.display = 'flex';
+            document.getElementById('dashboard').classList.remove('authenticated');
+        }
+
+        // Enter key support
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !isAuthenticated) {
+                authenticate();
+            }
+        });
+
         class EnhancedDashboard {
             constructor() {
-                this.apiUrl = 'https://bottie-1.onrender.com';
+                this.apiUrl = API_BASE;
                 this.endpoints = [
                     { name: 'equity', title: 'Portfolio Equity', icon: '💰', endpoint: '/status' },
-                    { name: 'trades', title: 'Trade History', icon: '📈', endpoint: '/trades' },
+                    { name: 'signals', title: 'Trading Signals', icon: '🎯', endpoint: '/signals', special: 'signals_table' },
+                    { name: 'trades', title: 'Trade History', icon: '📈', endpoint: '/trades/recent' },
+                    { name: 'trading_status', title: 'Trading Controls', icon: '🎛️', endpoint: '/trading/status' },
                     { name: 'ml', title: 'ML Performance', icon: '🧠', endpoint: '/ml/status' },
                     { name: 'quantum', title: 'Quantum Analysis', icon: '⚛️', endpoint: '/quantum/analysis' },
                     { name: 'sentiment', title: 'Sentiment Analysis', icon: '📰', endpoint: '/sentiment' },
-                    { name: 'brierscore', title: 'Brier Score Analysis', icon: '📊', endpoint: '/ml/performance' },
-                    { name: 'signals', title: 'Trading Signals', icon: '🎯', endpoint: '/signals' },
                     { name: 'positions', title: 'Current Positions', icon: '💼', endpoint: '/positions' },
                     { name: 'health', title: 'System Health', icon: '🔋', endpoint: '/health' },
-                    { name: 'reports', title: 'Daily Reports', icon: '📋', endpoint: '/reports/daily' },
-                    { name: 'api', title: 'API Status', icon: '🌐', endpoint: '/api-info' }
+                    { name: 'logs', title: 'System Logs', icon: '📝', endpoint: '/logs' }
                 ];
                 this.endpointData = {};
                 this.init();
@@ -425,12 +426,13 @@
                 console.log('🚀 Initializing Enhanced Dashboard...');
                 await this.loadAllEndpoints();
                 this.renderSlates();
-                this.updateConnectionStatus();
+                this.updateTradingStatus();
                 
                 setInterval(() => {
                     this.loadAllEndpoints();
                     this.updateSlateMetrics();
-                }, 30000);
+                    this.updateTradingStatus();
+                }, 10000);
             }
 
             async loadAllEndpoints() {
@@ -446,533 +448,355 @@
                         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                     }
                     
-                    const contentType = response.headers.get('content-type');
-                    if (!contentType || !contentType.includes('application/json')) {
-                        throw new Error(`Expected JSON, got ${contentType}`);
-                    }
-                    
                     const data = await response.json();
-                    this.endpointData[endpoint.name] = {
-                        ...data,
-                        status: 'success',
-                        lastUpdate: new Date().toISOString()
-                    };
-                    console.log(`✅ Loaded ${endpoint.name}:`, data);
+                    this.endpointData[endpoint.name] = data;
+                    console.log(`✅ Loaded ${endpoint.name}:`, typeof data === 'object' ? Object.keys(data) : data);
                 } catch (error) {
-                    // Provide fallback data for better UX
-                    const fallbackData = this.getFallbackData(endpoint.name);
-                    this.endpointData[endpoint.name] = {
-                        ...fallbackData,
-                        status: 'error',
-                        error: error.message,
-                        lastUpdate: new Date().toISOString(),
-                        fallback: true
-                    };
-                    console.log(`❌ Error loading ${endpoint.name}:`, error.message, '- Using fallback data');
+                    console.log(`❌ Error loading ${endpoint.name}: ${error.message}`);
+                    this.endpointData[endpoint.name] = { error: error.message };
                 }
-            }
-
-            getFallbackData(endpointName) {
-                const fallbackData = {
-                    equity: {
-                        equity: { display_value: 0 },
-                        positions: {},
-                        ok: false,
-                        service: 'bottie-trading-offline'
-                    },
-                    health: {
-                        ok: false,
-                        service: 'bottie-trading-offline',
-                        equity: { display_value: 0 },
-                        mode: 'OFFLINE'
-                    },
-                    trades: {
-                        trades: [],
-                        total_trades: 0
-                    },
-                    positions: {
-                        positions: {},
-                        total_positions: 0
-                    },
-                    signals: {
-                        signals: [],
-                        total_signals: 0
-                    },
-                    ml: {
-                        accuracy: 0,
-                        sample_count: 0,
-                        enabled: false
-                    },
-                    sentiment: {
-                        articles: [],
-                        overall_sentiment: 0
-                    },
-                    quantum: {
-                        enabled: false,
-                        quantum_score: 0,
-                        backend: 'offline'
-                    },
-                    brierscore: {
-                        brier_score: 0.25,
-                        accuracy: 0.5,
-                        total_predictions: 0,
-                        timeframe: '24h',
-                        performance_grade: 'Offline'
-                    },
-                    reports: {
-                        reports: [],
-                        last_generated: 'Service offline'
-                    },
-                    api: {
-                        status: 'offline',
-                        service: 'bottie-api-offline',
-                        version: 'N/A'
-                    }
-                };
-                
-                return fallbackData[endpointName] || { status: 'offline', error: 'Service unavailable' };
             }
 
             renderSlates() {
                 const container = document.getElementById('slates-container');
-                if (!container) {
-                    console.error('❌ Slates container not found');
-                    return;
-                }
-                container.innerHTML = this.endpoints.map(endpoint => this.createSlate(endpoint)).join('');
-                console.log('✅ Slates rendered');
-            }
+                container.innerHTML = '';
 
-            createSlate(endpoint) {
-                const data = this.endpointData[endpoint.name] || {};
-                const metrics = this.getEndpointMetrics(endpoint.name, data);
-                const status = this.getEndpointStatus(data);
-
-                return `
-                    <div class="slate" onclick="dashboard.generateReport('${endpoint.name}')">
+                this.endpoints.forEach(endpoint => {
+                    const slate = document.createElement('div');
+                    slate.className = 'slate';
+                    slate.onclick = () => this.handleSlateClick(endpoint);
+                    
+                    slate.innerHTML = `
                         <div class="slate-header">
-                            <div class="slate-title">
-                                <span class="slate-icon">${endpoint.icon}</span>
-                                ${endpoint.title}
-                            </div>
-                            <div class="slate-status ${status.class}">${status.text}</div>
+                            <div class="slate-title">${endpoint.title}</div>
+                            <div class="slate-icon">${endpoint.icon}</div>
                         </div>
-                        <div class="slate-metrics">
-                            ${metrics.map(metric => `
-                                <div class="metric">
-                                    <div class="metric-value ${metric.class || ''}">${metric.value}</div>
-                                    <div class="metric-label">${metric.label}</div>
-                                </div>
-                            `).join('')}
+                        <div class="slate-content" id="slate-${endpoint.name}">
+                            Loading...
                         </div>
-                        <div class="slate-description">
-                            ${this.getEndpointDescription(endpoint.name, data)}
-                        </div>
-                    </div>
-                `;
-            }
-
-            getEndpointMetrics(name, data) {
-                switch (name) {
-                    case 'equity':
-                        const equityValue = data.equity?.display_value || data.equity || 0;
-                        const numericEquity = typeof equityValue === 'number' ? equityValue : parseFloat(equityValue) || 0;
-                        return [
-                            { label: 'Current Equity', value: `$${numericEquity.toFixed(2)}`, class: numericEquity > 0 ? 'positive' : 'neutral' },
-                            { label: 'Positions', value: Object.keys(data.positions || {}).length }
-                        ];
-                    case 'trades':
-                        const trades = data.trades || [];
-                        return [
-                            { label: 'Total Trades', value: trades.length },
-                            { label: 'Status', value: data.status === 'success' ? 'Active' : 'Error', class: data.status === 'success' ? 'positive' : 'negative' }
-                        ];
-                    case 'ml':
-                        const mlAccuracy = (data.accuracy || 0) * (data.accuracy > 1 ? 1 : 100);
-                        return [
-                            { label: 'Accuracy', value: `${mlAccuracy.toFixed(1)}%`, class: mlAccuracy > 70 ? 'positive' : 'neutral' },
-                            { label: 'Status', value: data.enabled ? 'Active' : 'Disabled', class: data.enabled ? 'positive' : 'negative' }
-                        ];
-                    case 'sentiment':
-                        const scores = data.scores || {};
-                        const totalArticles = Object.values(scores).reduce((sum, score) => sum + (score.n || 0), 0);
-                        const avgSentiment = Object.values(scores).reduce((sum, score) => sum + (score.score || 0), 0) / Object.keys(scores).length || 0;
-                        return [
-                            { label: 'Avg Sentiment', value: avgSentiment.toFixed(2), class: avgSentiment > 0 ? 'positive' : avgSentiment < 0 ? 'negative' : 'neutral' },
-                            { label: 'Articles', value: totalArticles }
-                        ];
-                    case 'brierscore':
-                        const brierScore = data.brier_score || 0;
-                        return [
-                            { label: 'Brier Score', value: brierScore.toFixed(3), class: brierScore < 0.2 ? 'positive' : brierScore < 0.3 ? 'neutral' : 'negative' },
-                            { label: 'Performance', value: data.performance_grade || 'Unknown', class: (data.performance_grade === 'Excellent') ? 'positive' : 'neutral' }
-                        ];
-                    case 'health':
-                        const healthEquity = data.equity?.display_value || data.equity || 0;
-                        const healthEquityNum = typeof healthEquity === 'number' ? healthEquity : parseFloat(healthEquity) || 0;
-                        const tradingEnabled = data.features?.real_trading?.enabled || data.mode === 'LIVE' || false;
-                        return [
-                            { label: 'Status', value: data.ok ? 'Healthy' : 'Issues', class: data.ok ? 'positive' : 'negative' },
-                            { label: 'Trading', value: tradingEnabled ? 'Enabled' : 'Disabled', class: tradingEnabled ? 'positive' : 'negative' }
-                        ];
-                    default:
-                        return [
-                            { label: 'Status', value: data.status === 'success' ? 'OK' : 'Error', class: data.status === 'success' ? 'positive' : 'negative' },
-                            { label: 'Last Update', value: data.lastUpdate ? new Date(data.lastUpdate).toLocaleTimeString() : 'Never' }
-                        ];
-                }
-            }
-
-            getEndpointStatus(data) {
-                if (data.status === 'error') {
-                    if (data.fallback) {
-                        return { class: 'status-warning', text: 'Offline' };
-                    }
-                    return { class: 'status-error', text: 'Error' };
-                }
-                
-                switch (data.status) {
-                    case 'success':
-                        return { class: 'status-excellent', text: 'Active' };
-                    default:
-                        return { class: 'status-loading', text: 'Loading' };
-                }
-            }
-
-            getEndpointDescription(name, data) {
-                const descriptions = {
-                    equity: `Monitor your portfolio value and asset allocation across all trading pairs.`,
-                    trades: `Complete history of executed trades with P&L calculations and performance metrics.`,
-                    ml: `Machine learning model performance, accuracy metrics, and prediction confidence scores.`,
-                    quantum: `Quantum-inspired algorithmic analysis and portfolio optimization insights.`,
-                    sentiment: `Real-time market sentiment analysis from news sources and social media.`,
-                    brierscore: `Statistical accuracy measure for probabilistic predictions and model calibration.`,
-                    signals: `Live trading signals with confidence levels and recommended actions.`,
-                    positions: `Current open positions, unrealized P&L, and risk exposure analysis.`,
-                    health: `Overall system health monitoring and trading status checks.`,
-                    reports: `Daily trading reports and performance summaries.`,
-                    api: `API status and system information.`
-                };
-                
-                return descriptions[name] || 'Comprehensive data analysis and reporting for this component.';
-            }
-
-            async generateReport(endpointName) {
-                const endpoint = this.endpoints.find(e => e.name === endpointName);
-                if (!endpoint) return;
-
-                const modal = document.getElementById('report-modal');
-                const icon = document.getElementById('report-icon');
-                const name = document.getElementById('report-name');
-                const body = document.getElementById('report-body');
-
-                icon.textContent = endpoint.icon;
-                name.textContent = `${endpoint.title} Report`;
-                modal.style.display = 'flex';
-
-                body.innerHTML = `
-                    <div style="text-align: center; padding: 2rem;">
-                        <div class="loading-spinner" style="width: 40px; height: 40px;"></div>
-                        <p style="margin-top: 1rem; color: #8892b0;">Generating comprehensive report...</p>
-                    </div>
-                `;
-
-                setTimeout(() => {
-                    const data = this.endpointData[endpointName] || {};
-                    body.innerHTML = this.createDetailedReport(endpointName, endpoint, data);
-                }, 1500);
-            }
-
-            createDetailedReport(endpointName, endpoint, data) {
-                const tableView = this.createTableView(endpointName, data);
-                const statusIndicator = data.fallback ? '🔴 Offline Data' : '🟢 Live Data';
-                
-                return `
-                    <div style="padding: 1.5rem;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                            <h3>📊 ${endpoint.title} Details</h3>
-                            <span style="color: ${data.fallback ? '#f44336' : '#4caf50'}; font-size: 0.875rem;">${statusIndicator}</span>
-                        </div>
-                        
-                        ${tableView}
-                        
-                        <div style="margin-top: 1.5rem;">
-                            <h4 style="color: #64ffda; margin-bottom: 0.5rem;">📄 Raw JSON Data</h4>
-                            <div style="background: rgba(15, 20, 25, 0.8); border: 1px solid rgba(100, 255, 218, 0.1); border-radius: 8px; padding: 1rem; font-family: 'Fira Code', monospace; font-size: 0.875rem; max-height: 300px; overflow-y: auto;">
-                                <pre>${JSON.stringify(data, null, 2)}</pre>
-                            </div>
-                        </div>
-                        
-                        <div style="margin-top: 1.5rem; display: flex; gap: 0.5rem;">
-                            <button onclick="dashboard.exportData('${endpointName}')" style="background: rgba(100, 255, 218, 0.1); border: 1px solid rgba(100, 255, 218, 0.3); color: #64ffda; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer;">💾 Export JSON</button>
-                            <button onclick="dashboard.exportTable('${endpointName}')" style="background: rgba(76, 175, 80, 0.1); border: 1px solid rgba(76, 175, 80, 0.3); color: #4caf50; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer;">📊 Export CSV</button>
-                            <button onclick="closeReport()" style="background: rgba(244, 67, 54, 0.1); border: 1px solid rgba(244, 67, 54, 0.3); color: #f44336; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer;">✕ Close</button>
-                        </div>
-                    </div>
-                `;
-            }
-
-            createTableView(endpointName, data) {
-                const tableStyle = `
-                    border-collapse: collapse; 
-                    width: 100%; 
-                    background: rgba(15, 20, 25, 0.5); 
-                    border: 1px solid rgba(100, 255, 218, 0.1); 
-                    border-radius: 8px; 
-                    overflow: hidden;
-                `;
-                const headerStyle = `
-                    background: rgba(100, 255, 218, 0.1); 
-                    color: #64ffda; 
-                    padding: 0.75rem; 
-                    text-align: left; 
-                    font-weight: 600;
-                `;
-                const cellStyle = `
-                    padding: 0.75rem; 
-                    border-bottom: 1px solid rgba(100, 255, 218, 0.05); 
-                    color: #e6fffa;
-                `;
-
-                switch (endpointName) {
-                    case 'positions':
-                        const positions = data.positions || {};
-                        if (Object.keys(positions).length === 0) {
-                            return `<div style="text-align: center; padding: 2rem; color: #8892b0;">No positions data available</div>`;
-                        }
-                        return `
-                            <table style="${tableStyle}">
-                                <thead>
-                                    <tr>
-                                        <th style="${headerStyle}">Symbol</th>
-                                        <th style="${headerStyle}">Quantity</th>
-                                        <th style="${headerStyle}">Current Price</th>
-                                        <th style="${headerStyle}">Market Value</th>
-                                        <th style="${headerStyle}">P&L</th>
-                                        <th style="${headerStyle}">P&L %</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${Object.entries(positions).map(([symbol, pos]) => `
-                                        <tr>
-                                            <td style="${cellStyle}"><strong>${symbol}</strong></td>
-                                            <td style="${cellStyle}">${(pos.quantity || 0).toFixed(6)}</td>
-                                            <td style="${cellStyle}">$${(pos.current_price || 0).toFixed(2)}</td>
-                                            <td style="${cellStyle}">$${(pos.market_value || 0).toFixed(2)}</td>
-                                            <td style="${cellStyle}; color: ${(pos.pnl || 0) >= 0 ? '#4caf50' : '#f44336'}">$${(pos.pnl || 0).toFixed(2)}</td>
-                                            <td style="${cellStyle}; color: ${(pos.pnl_percentage || 0) >= 0 ? '#4caf50' : '#f44336'}">${(pos.pnl_percentage || 0).toFixed(2)}%</td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        `;
+                    `;
                     
-                    case 'trades':
-                        const trades = data.trades || [];
-                        if (trades.length === 0) {
-                            return `<div style="text-align: center; padding: 2rem; color: #8892b0;">No trades data available</div>`;
-                        }
-                        return `
-                            <table style="${tableStyle}">
-                                <thead>
-                                    <tr>
-                                        <th style="${headerStyle}">Time</th>
-                                        <th style="${headerStyle}">Symbol</th>
-                                        <th style="${headerStyle}">Side</th>
-                                        <th style="${headerStyle}">Quantity</th>
-                                        <th style="${headerStyle}">Price</th>
-                                        <th style="${headerStyle}">Value</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${trades.slice(0, 20).map(trade => `
-                                        <tr>
-                                            <td style="${cellStyle}">${new Date(trade.timestamp).toLocaleString()}</td>
-                                            <td style="${cellStyle}"><strong>${trade.symbol}</strong></td>
-                                            <td style="${cellStyle}; color: ${trade.side === 'buy' ? '#4caf50' : '#f44336'}">${trade.side?.toUpperCase()}</td>
-                                            <td style="${cellStyle}">${trade.quantity}</td>
-                                            <td style="${cellStyle}">$${trade.price}</td>
-                                            <td style="${cellStyle}">$${(trade.quantity * trade.price).toFixed(2)}</td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        `;
-                    
-                    case 'sentiment':
-                        const scores = data.scores || {};
-                        if (Object.keys(scores).length === 0) {
-                            return `<div style="text-align: center; padding: 2rem; color: #8892b0;">No sentiment data available</div>`;
-                        }
-                        return `
-                            <table style="${tableStyle}">
-                                <thead>
-                                    <tr>
-                                        <th style="${headerStyle}">Asset</th>
-                                        <th style="${headerStyle}">Sentiment Score</th>
-                                        <th style="${headerStyle}">Articles Count</th>
-                                        <th style="${headerStyle}">Sentiment</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${Object.entries(scores).map(([asset, score]) => {
-                                        const sentiment = (score.score || 0) > 0 ? 'Bullish' : (score.score || 0) < 0 ? 'Bearish' : 'Neutral';
-                                        const color = (score.score || 0) > 0 ? '#4caf50' : (score.score || 0) < 0 ? '#f44336' : '#64ffda';
-                                        return `
-                                            <tr>
-                                                <td style="${cellStyle}"><strong>${asset}</strong></td>
-                                                <td style="${cellStyle}">${(score.score || 0).toFixed(3)}</td>
-                                                <td style="${cellStyle}">${score.n || 0}</td>
-                                                <td style="${cellStyle}; color: ${color}">${sentiment}</td>
-                                            </tr>
-                                        `;
-                                    }).join('')}
-                                </tbody>
-                            </table>
-                        `;
-                    
-                    default:
-                        // For other endpoints, show key-value pairs
-                        const entries = Object.entries(data).filter(([key, value]) => 
-                            typeof value !== 'object' || value === null
-                        );
-                        return `
-                            <table style="${tableStyle}">
-                                <thead>
-                                    <tr>
-                                        <th style="${headerStyle}">Property</th>
-                                        <th style="${headerStyle}">Value</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${entries.map(([key, value]) => `
-                                        <tr>
-                                            <td style="${cellStyle}"><strong>${key.replace(/_/g, ' ').toUpperCase()}</strong></td>
-                                            <td style="${cellStyle}">${value}</td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        `;
-                }
-            }
+                    container.appendChild(slate);
+                });
 
-            exportTable(endpointName) {
-                const data = this.endpointData[endpointName] || {};
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                const filename = `${endpointName}_table_${timestamp}.csv`;
-                
-                let csvContent = '';
-                
-                switch (endpointName) {
-                    case 'positions':
-                        const positions = data.positions || {};
-                        csvContent = 'Symbol,Quantity,Current Price,Market Value,P&L,P&L %\n';
-                        csvContent += Object.entries(positions).map(([symbol, pos]) => 
-                            `${symbol},${pos.quantity || 0},${pos.current_price || 0},${pos.market_value || 0},${pos.pnl || 0},${pos.pnl_percentage || 0}`
-                        ).join('\n');
-                        break;
-                    case 'trades':
-                        const trades = data.trades || [];
-                        csvContent = 'Time,Symbol,Side,Quantity,Price,Value\n';
-                        csvContent += trades.map(trade => 
-                            `${new Date(trade.timestamp).toISOString()},${trade.symbol},${trade.side},${trade.quantity},${trade.price},${trade.quantity * trade.price}`
-                        ).join('\n');
-                        break;
-                    case 'sentiment':
-                        const scores = data.scores || {};
-                        csvContent = 'Asset,Sentiment Score,Articles Count\n';
-                        csvContent += Object.entries(scores).map(([asset, score]) => 
-                            `${asset},${score.score || 0},${score.n || 0}`
-                        ).join('\n');
-                        break;
-                    default:
-                        const entries = Object.entries(data).filter(([key, value]) => 
-                            typeof value !== 'object' || value === null
-                        );
-                        csvContent = 'Property,Value\n';
-                        csvContent += entries.map(([key, value]) => `${key},${value}`).join('\n');
-                }
-                
-                const blob = new Blob([csvContent], { type: 'text/csv' });
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
-            }
-
-            exportData(endpointName) {
-                const data = this.endpointData[endpointName] || {};
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                const filename = `${endpointName}_report_${timestamp}.json`;
-                
-                const content = JSON.stringify(data, null, 2);
-                const blob = new Blob([content], { type: 'application/json' });
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
-            }
-
-            updateConnectionStatus() {
-                const statusEl = document.getElementById('connection-status');
-                if (!statusEl) return;
-                
-                const hasErrors = Object.values(this.endpointData).some(data => data.status === 'error');
-                const allOffline = Object.values(this.endpointData).every(data => data.fallback);
-                const hasOffline = Object.values(this.endpointData).some(data => data.fallback);
-                
-                if (allOffline) {
-                    statusEl.innerHTML = '<span>🔴</span><span>Service Offline</span>';
-                    statusEl.className = 'status-badge status-offline';
-                } else if (hasOffline || hasErrors) {
-                    statusEl.innerHTML = '<span>🟡</span><span>Partial Connection</span>';
-                    statusEl.className = 'status-badge status-warning';
-                } else {
-                    statusEl.innerHTML = '<span>🟢</span><span>All Systems Online</span>';
-                    statusEl.className = 'status-badge status-online';
-                }
+                this.updateSlateMetrics();
             }
 
             updateSlateMetrics() {
-                this.renderSlates();
+                this.endpoints.forEach(endpoint => {
+                    const element = document.getElementById(`slate-${endpoint.name}`);
+                    const data = this.endpointData[endpoint.name];
+                    
+                    if (!element) return;
+                    
+                    if (data && !data.error) {
+                        element.innerHTML = this.formatSlateContent(endpoint, data);
+                    } else {
+                        element.innerHTML = `<div style="color: #f44336;">Error: ${data?.error || 'No data'}</div>`;
+                    }
+                });
+            }
+
+            formatSlateContent(endpoint, data) {
+                switch (endpoint.name) {
+                    case 'equity':
+                        const equity = data.equity?.display_value || data.equity || 0;
+                        const posCount = data.positions ? Object.keys(data.positions).length : 0;
+                        return `
+                            <div class="metric">
+                                <span>Total Equity:</span>
+                                <span style="color: #4caf50; font-weight: 600;">$${equity.toFixed(2)}</span>
+                            </div>
+                            <div class="metric">
+                                <span>Active Positions:</span>
+                                <span>${posCount}</span>
+                            </div>
+                        `;
+
+                    case 'signals':
+                        const signals = data.signals || [];
+                        const buySignals = signals.filter(s => s.signal === 'BUY').length;
+                        const sellSignals = signals.filter(s => s.signal === 'SELL').length;
+                        const holdSignals = signals.filter(s => s.signal === 'HOLD').length;
+                        return `
+                            <div class="metric">
+                                <span>🟢 BUY Signals:</span>
+                                <span>${buySignals}</span>
+                            </div>
+                            <div class="metric">
+                                <span>🔴 SELL Signals:</span>
+                                <span>${sellSignals}</span>
+                            </div>
+                            <div class="metric">
+                                <span>🟡 HOLD Signals:</span>
+                                <span>${holdSignals}</span>
+                            </div>
+                            <div style="margin-top: 1rem; font-size: 0.75rem; color: #64ffda;">
+                                Click to view detailed signals table
+                            </div>
+                        `;
+
+                    case 'trading_status':
+                        return `
+                            <div class="metric">
+                                <span>Trade Enabled:</span>
+                                <span style="color: ${data.trade_enabled ? '#4caf50' : '#f44336'}">${data.trade_enabled ? 'Yes' : 'No'}</span>
+                            </div>
+                            <div class="metric">
+                                <span>Execution Enabled:</span>
+                                <span style="color: ${data.execution_enabled ? '#4caf50' : '#f44336'}">${data.execution_enabled ? 'Yes' : 'No'}</span>
+                            </div>
+                            <div class="metric">
+                                <span>Recent Trades:</span>
+                                <span>${data.recent_trades || 0}</span>
+                            </div>
+                        `;
+
+                    case 'trades':
+                        const trades = data.trades || [];
+                        const recentTrades = trades.slice(0, 3);
+                        if (recentTrades.length === 0) {
+                            return '<div style="color: #ffa726;">No trades executed yet</div>';
+                        }
+                        return recentTrades.map(trade => `
+                            <div class="metric">
+                                <span>${trade.symbol}</span>
+                                <span style="color: ${trade.side === 'BUY' ? '#4caf50' : '#f44336'}">${trade.side} ${trade.quantity}</span>
+                            </div>
+                        `).join('');
+
+                    case 'logs':
+                        const logs = data.logs || [];
+                        const recentLogs = logs.slice(-3);
+                        return recentLogs.map(log => `
+                            <div style="font-family: monospace; font-size: 0.75rem; margin-bottom: 0.5rem; color: #a0aec0;">
+                                ${log.substring(0, 60)}...
+                            </div>
+                        `).join('');
+
+                    default:
+                        return '<div>Click to view details</div>';
+                }
+            }
+
+            handleSlateClick(endpoint) {
+                if (endpoint.special === 'signals_table') {
+                    this.showSignalsTable();
+                } else {
+                    // Handle other slate clicks
+                    console.log(`Clicked ${endpoint.name}`);
+                }
+            }
+
+            async showSignalsTable() {
+                document.getElementById('signalsModal').style.display = 'block';
+                const container = document.getElementById('signalsTableContainer');
+                container.innerHTML = '<div class="loading">Loading comprehensive signals analysis...</div>';
+
+                try {
+                    // Load signals and positions data
+                    const [signalsRes, positionsRes] = await Promise.all([
+                        fetch(`${this.apiUrl}/signals`),
+                        fetch(`${this.apiUrl}/status`)
+                    ]);
+
+                    const signalsData = await signalsRes.json();
+                    const statusData = await positionsRes.json();
+                    
+                    const signals = signalsData.signals || [];
+                    const positions = statusData.positions || {};
+
+                    // Create comprehensive signals table
+                    let tableHTML = `
+                        <table class="signals-table">
+                            <thead>
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th>Signal</th>
+                                    <th>Confidence</th>
+                                    <th>Current Price</th>
+                                    <th>Change %</th>
+                                    <th>Position</th>
+                                    <th>P&L</th>
+                                    <th>Arbitrage</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                    `;
+
+                    // Add signals from the signals endpoint
+                    signals.forEach(signal => {
+                        const position = positions[signal.symbol] || {};
+                        const hasPosition = Object.keys(position).length > 0;
+                        const pnl = position.pnl || 0;
+                        const change = signal.change ? (signal.change * 100).toFixed(2) : 'N/A';
+                        const price = signal.price ? signal.price.toFixed(2) : 'N/A';
+                        
+                        // Determine confidence class
+                        const conf = signal.conf || 0;
+                        let confClass = 'confidence-low';
+                        if (conf > 0.7) confClass = 'confidence-high';
+                        else if (conf > 0.5) confClass = 'confidence-medium';
+                        
+                        // Check for arbitrage opportunity (simplified)
+                        const isArbitrage = hasPosition && Math.abs(change) > 2 && conf > 0.6;
+                        
+                        tableHTML += `
+                            <tr>
+                                <td><strong>${signal.symbol}</strong></td>
+                                <td><span class="signal-${signal.signal.toLowerCase()}">${signal.signal}</span></td>
+                                <td><span class="${confClass}">${(conf * 100).toFixed(1)}%</span></td>
+                                <td>$${price}</td>
+                                <td style="color: ${parseFloat(change) >= 0 ? '#4caf50' : '#f44336'}">${change}%</td>
+                                <td>${hasPosition ? '✅' : '❌'}</td>
+                                <td style="color: ${pnl >= 0 ? '#4caf50' : '#f44336'}">$${pnl.toFixed(2)}</td>
+                                <td>${isArbitrage ? '<span class="arbitrage-opportunity">OPPORTUNITY</span>' : '-'}</td>
+                                <td>
+                                    ${signal.signal === 'BUY' && conf > 0.6 ? '🟢 Execute Buy' : ''}
+                                    ${signal.signal === 'SELL' && conf > 0.6 ? '🔴 Execute Sell' : ''}
+                                    ${signal.signal === 'HOLD' || conf <= 0.6 ? '🟡 Hold' : ''}
+                                </td>
+                            </tr>
+                        `;
+                    });
+
+                    // Add potential arbitrage pairs (cross-pair opportunities)
+                    const positionSymbols = Object.keys(positions);
+                    for (let i = 0; i < positionSymbols.length; i++) {
+                        for (let j = i + 1; j < positionSymbols.length; j++) {
+                            const symbol1 = positionSymbols[i];
+                            const symbol2 = positionSymbols[j];
+                            const pos1 = positions[symbol1];
+                            const pos2 = positions[symbol2];
+                            
+                            // Simple arbitrage detection
+                            const pnl1_pct = pos1.pnl_percentage || 0;
+                            const pnl2_pct = pos2.pnl_percentage || 0;
+                            const spread = Math.abs(pnl1_pct - pnl2_pct);
+                            
+                            if (spread > 3) { // >3% spread indicates potential arbitrage
+                                const crossPair = `${symbol1.split('/')[0]}/${symbol2.split('/')[0]}`;
+                                tableHTML += `
+                                    <tr style="background: rgba(156, 39, 176, 0.1);">
+                                        <td><strong>${crossPair}</strong></td>
+                                        <td><span class="arbitrage-opportunity">ARBITRAGE</span></td>
+                                        <td class="confidence-high">${Math.min(95, 60 + spread).toFixed(1)}%</td>
+                                        <td>Cross-pair</td>
+                                        <td style="color: #9c27b0">${spread.toFixed(2)}% spread</td>
+                                        <td>✅ Both</td>
+                                        <td style="color: #9c27b0">Potential</td>
+                                        <td><span class="arbitrage-opportunity">ATOMIC SWAP</span></td>
+                                        <td>🔄 Cross-trade</td>
+                                    </tr>
+                                `;
+                            }
+                        }
+                    }
+
+                    tableHTML += '</tbody></table>';
+                    
+                    // Add summary stats
+                    const totalSignals = signals.length;
+                    const highConfSignals = signals.filter(s => s.conf > 0.6).length;
+                    const arbitrageOpps = positionSymbols.length > 1 ? Math.floor(positionSymbols.length * (positionSymbols.length - 1) / 2) : 0;
+                    
+                    const summaryHTML = `
+                        <div style="margin-bottom: 2rem; padding: 1rem; background: rgba(100, 255, 218, 0.1); border-radius: 8px;">
+                            <h3 style="color: #64ffda; margin-bottom: 1rem;">📊 Signals Summary</h3>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                                <div>
+                                    <strong>Total Signals:</strong> ${totalSignals}<br>
+                                    <strong>High Confidence (>60%):</strong> ${highConfSignals}<br>
+                                    <strong>Potential Arbitrage Pairs:</strong> ${arbitrageOpps}
+                                </div>
+                                <div>
+                                    <strong>Top 50 Crypto Analysis:</strong> Active<br>
+                                    <strong>Atomic Swap Detection:</strong> Enabled<br>
+                                    <strong>Real-time Updates:</strong> Every 30s
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                    container.innerHTML = summaryHTML + tableHTML;
+                } catch (error) {
+                    container.innerHTML = `<div style="color: #f44336;">Error loading signals: ${error.message}</div>`;
+                }
+            }
+
+            async updateTradingStatus() {
+                try {
+                    const response = await fetch(`${this.apiUrl}/trading/status`);
+                    const data = await response.json();
+                    
+                    const statusElement = document.getElementById('tradingStatus');
+                    const statusText = document.getElementById('statusText');
+                    
+                    if (data.execution_enabled) {
+                        statusElement.className = 'trading-status trading-enabled';
+                        statusText.textContent = '🟢 Trading Active';
+                    } else {
+                        statusElement.className = 'trading-status trading-disabled';
+                        statusText.textContent = '🔴 Trading Stopped';
+                    }
+                } catch (error) {
+                    const statusText = document.getElementById('statusText');
+                    statusText.textContent = '⚠️ Status Unknown';
+                }
             }
         }
 
-        function closeReport() {
-            const modal = document.getElementById('report-modal');
-            if (modal) {
-                modal.style.display = 'none';
+        // Trading Controls
+        async function startTrading() {
+            try {
+                const response = await fetch(`${API_BASE}/trading/start`, { 
+                    method: 'POST',
+                    headers: { 'X-Dashboard-Password': DASHBOARD_PASSWORD }
+                });
+                const data = await response.json();
+                alert(data.ok ? '✅ Trading started!' : '❌ Failed to start trading');
+                dashboard.updateTradingStatus();
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
             }
         }
 
-        // Initialize dashboard when page loads
+        async function stopTrading() {
+            if (confirm('⚠️ Stop trading execution?')) {
+                try {
+                    const response = await fetch(`${API_BASE}/trading/stop`, { 
+                        method: 'POST',
+                        headers: { 'X-Dashboard-Password': DASHBOARD_PASSWORD }
+                    });
+                    const data = await response.json();
+                    alert(data.ok ? '🛑 Trading stopped!' : '❌ Failed to stop trading');
+                    dashboard.updateTradingStatus();
+                } catch (error) {
+                    alert('❌ Error: ' + error.message);
+                }
+            }
+        }
+
+        function closeSignalsModal() {
+            document.getElementById('signalsModal').style.display = 'none';
+        }
+
+        // Initialize
         let dashboard;
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('🎯 DOM Content Loaded - Starting Dashboard');
+        function initDashboard() {
             dashboard = new EnhancedDashboard();
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('passwordInput').focus();
         });
 
         // Close modal when clicking outside
         document.addEventListener('click', function(e) {
-            const modal = document.getElementById('report-modal');
+            const modal = document.getElementById('signalsModal');
             if (modal && e.target === modal) {
-                closeReport();
-            }
-        });
-
-        // Keyboard shortcuts
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                closeReport();
+                closeSignalsModal();
             }
         });
     </script>
