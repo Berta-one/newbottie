@@ -8,14 +8,10 @@ services:
     buildCommand: |
       python -m pip install --upgrade pip
       pip install --no-cache-dir -r requirements.txt
-      echo "Installing Node.js dependencies for frontend..."
-      npm install
-      echo "Building enhanced dashboard..."
-      npm run build
-      echo "Copying enhanced dashboard to root for serving..."
-      cp index.html ./
+      echo "Copying enhanced dashboard for deployment..."
+      cp web/index_enhanced.html index.html
       cp style.css ./
-      echo "Build completed for render_api deployment with enhanced dashboard"
+      echo "Enhanced dashboard with password protection deployed"
     startCommand: uvicorn render_api:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PORT
@@ -36,3 +32,5 @@ services:
         value: "bottie-render-secret-key-2024"
       - key: NETLIFY_URL
         value: "*"
+      - key: DASHBOARD_PASSWORD
+        value: "bottie2024"
