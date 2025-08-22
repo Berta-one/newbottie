@@ -59,9 +59,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files
-if os.path.exists('web'):
-    app.mount("/", StaticFiles(directory="web", html=True), name="static")
+# Mount static files (after all API routes are defined)
+# This will be done at the end to avoid conflicts
 
 # Global variables for real trading
 exchange_client = None
@@ -1415,6 +1414,22 @@ async def startup_event():
     else:
         startup_logs.append(f"{time.strftime('%Y-%m-%d %H:%M:%S')} - ⚠️ Exchange libraries not available - simulation mode")
         print("⚠️ Exchange libraries not available - simulation mode")
+
+# Serve specific dashboard files without mounting root
+@app.get("/index_enhanced.html")
+def enhanced_dashboard():
+    """Serve the enhanced dashboard"""
+    return FileResponse("web/index_enhanced.html")
+
+@app.get("/test_connection.html") 
+def test_connection():
+    """Serve the test connection page"""
+    return FileResponse("web/test_connection.html")
+
+@app.get("/dashboard")
+def dashboard_redirect():
+    """Redirect to enhanced dashboard"""
+    return FileResponse("web/index_enhanced.html")
 
 if __name__ == "__main__":
     import uvicorn
