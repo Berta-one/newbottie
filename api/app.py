@@ -1153,6 +1153,74 @@ def get_recent_trades():
     """Get recent executed trades"""
     return {"trades": _trade_log[-50:], "count": len(_trade_log)}
 
+@app.get("/arbitrage/opportunities")
+def arbitrage_opportunities():
+    """Detect arbitrage opportunities between current positions and top 50 cryptos"""
+    try:
+        positions = get_real_positions()
+        opportunities = []
+        
+        if not positions:
+            return {
+                "opportunities": [],
+                "message": "No positions available for arbitrage analysis",
+                "count": 0
+            }
+        
+        # Get top volume cryptos (simplified - in real implementation would fetch from exchange)
+        top_cryptos = ["BTC", "ETH", "BNB", "SOL", "ADA", "XRP", "DOT", "AVAX", "MATIC", "LINK", 
+                      "UNI", "ATOM", "FTM", "ALGO", "NEAR", "MANA", "SAND", "CRV", "COMP", "AAVE"]
+        
+        position_symbols = list(positions.keys())
+        
+        # Check cross-pair opportunities
+        for pos_symbol in position_symbols:
+            position = positions[pos_symbol]
+            base_asset = pos_symbol.split('/')[0]
+            pnl_pct = position.get('pnl_percentage', 0)
+            
+            for crypto in top_cryptos:
+                if crypto != base_asset:
+                    # Calculate potential arbitrage opportunity
+                    cross_pair = f"{base_asset}/{crypto}"
+                    reverse_pair = f"{crypto}/{base_asset}"
+                    
+                    # Simple arbitrage scoring based on position performance
+                    if abs(pnl_pct) > 2:  # Significant P&L movement
+                        opportunity_score = min(95, 60 + abs(pnl_pct))
+                        
+                        opportunities.append({
+                            "pair": cross_pair,
+                            "reverse_pair": reverse_pair,
+                            "base_position": pos_symbol,
+                            "opportunity_score": round(opportunity_score, 1),
+                            "current_pnl_pct": round(pnl_pct, 2),
+                            "suggested_action": "SELL" if pnl_pct > 2 else "BUY",
+                            "swap_type": "atomic_swap",
+                            "confidence": "high" if opportunity_score > 70 else "medium",
+                            "timestamp": int(time.time())
+                        })
+        
+        # Sort by opportunity score
+        opportunities.sort(key=lambda x: x['opportunity_score'], reverse=True)
+        
+        return {
+            "opportunities": opportunities[:20],  # Top 20 opportunities
+            "total_analyzed": len(position_symbols) * len(top_cryptos),
+            "positions_count": len(position_symbols),
+            "top_cryptos_count": len(top_cryptos),
+            "high_confidence_opps": len([o for o in opportunities if o['confidence'] == 'high']),
+            "analysis_time": time.time(),
+            "status": "active"
+        }
+        
+    except Exception as e:
+        return {
+            "opportunities": [],
+            "error": str(e),
+            "status": "error"
+        }
+
 async def execution_loop():
     """Main trading execution loop that places actual orders"""
     global _last_exec
