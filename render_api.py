@@ -8,8 +8,10 @@ import time
 import json
 import random
 import logging
+import math
+import asyncio
 from typing import Dict, Any, List, Optional
-from fastapi import FastAPI, HTTPException, Depends, Query, APIRouter
+from fastapi import FastAPI, HTTPException, Depends, Query, APIRouter, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
@@ -77,6 +79,75 @@ real_time_data = {
     'prices': {},
     'last_update': 0
 }
+
+# Trading execution variables
+_signals = []
+_logs = []
+_trade_log = []
+_open_spend = {}
+_last_exec = 0.0
+EXECUTION_RUNTIME_ENABLED = True  # Default enabled for trading
+
+# Trading configuration
+TRADE_ENABLED = os.getenv('TRADE_ENABLED', '1') == '1'  # Default enabled on Render
+EXECUTION_INTERVAL_S = float(os.getenv("EXECUTION_INTERVAL_S", "20"))
+TRADE_QUOTE_PER_ORDER = float(os.getenv("TRADE_QUOTE_PER_ORDER", "100"))
+MAX_SPEND_PER_SYMBOL = float(os.getenv("MAX_SPEND_PER_SYMBOL", "1000"))
+SELL_FRACTION = float(os.getenv("SELL_FRACTION", "0.5"))
+MAX_OPEN_POSITIONS = int(os.getenv("MAX_OPEN_POSITIONS", "10"))
+
+# Dashboard password protection
+DASHBOARD_PASSWORD = os.getenv("DASHBOARD_PASSWORD", "bottie2024")
+security = HTTPBearer(auto_error=False)
+
+def add_log(msg: str):
+    """Add log message to the logs list"""
+    _logs.append(f"{time.strftime('%Y-%m-%d %H:%M:%S')} - {msg}")
+    if len(_logs) > 1500:
+        del _logs[:-1000]
+    print(msg)
+
+def verify_password(password: str = Header(None, alias="X-Dashboard-Password")):
+    """Verify dashboard password for protected endpoints"""
+    if password != DASHBOARD_PASSWORD:
+        raise HTTPException(status_code=401, detail="Invalid password")
+    return True
+
+def _position_qty(symbol: str) -> float:
+    """Get current position quantity for a symbol"""
+    try:
+        positions = real_time_data.get('positions', {})
+        return positions.get(symbol, {}).get('quantity', 0.0)
+    except:
+        return 0.0
+
+def _last_px(symbol: str) -> Optional[float]:
+    """Get last price for a symbol"""
+    try:
+        if exchange_client:
+            ticker = exchange_client.fetch_ticker(symbol)
+            return ticker.get('last')
+    except:
+        pass
+    return None
+
+def _min_notional_and_step(symbol: str) -> tuple:
+    """Get minimum notional and quantity step for a symbol"""
+    try:
+        if exchange_client and hasattr(exchange_client, 'markets'):
+            market = exchange_client.markets.get(symbol, {})
+            min_notional = market.get('limits', {}).get('cost', {}).get('min', 10.0)
+            qty_step = market.get('precision', {}).get('amount', 0.001)
+            return min_notional, qty_step
+    except:
+        pass
+    return 10.0, 0.001
+
+def _round_step(qty: float, step: float) -> float:
+    """Round quantity to the exchange's step size"""
+    if step <= 0:
+        return qty
+    return math.floor(qty / step) * step
 
 # Initialize exchange if possible
 def initialize_exchange():
@@ -285,58 +356,68 @@ def status():
 # Signals endpoint
 @app.get("/signals")
 def signals():
-    """Generate trading signals with real data"""
+    """Get current trading signals from the live trading system"""
     try:
-        positions = get_real_positions()
-        balance = get_real_balance()
+        # Return recent signals from the signals loop
+        recent_signals = []
+        symbols_seen = set()
         
-        signals = []
-        
-        # Define symbols to analyze
-        symbols_to_analyze = list(positions.keys()) if positions else []
-        major_pairs = ["BTC/USDT", "ETH/USDT", "BNB/USDT", "SOL/USDT", "ADA/USDT"]
-        
-        for pair in major_pairs:
-            if pair not in symbols_to_analyze:
-                symbols_to_analyze.append(pair)
-        
-        for symbol in symbols_to_analyze[:10]:
-            try:
-                # Get position data if exists
-                position = positions.get(symbol, {})
-                has_position = bool(position)
-                
-                # Simple signal generation based on position P&L
-                if has_position:
-                    pnl_pct = position.get('pnl_percentage', 0)
-                    if pnl_pct > 5:
-                        signal_type = "SELL"
-                        confidence = 0.8
-                    elif pnl_pct < -5:
-                        signal_type = "BUY"
-                        confidence = 0.7
-                    else:
-                        signal_type = "HOLD"
-                        confidence = 0.5
-                else:
-                    # No position - neutral signal
-                    signal_type = "HOLD"
-                    confidence = 0.5
-                
-                signals.append({
+        # Get latest signal per symbol (newest first)
+        for signal in reversed(_signals[-50:]):
+            symbol = signal.get("symbol")
+            if symbol not in symbols_seen:
+                symbols_seen.add(symbol)
+                recent_signals.append({
                     "symbol": symbol,
-                    "signal": signal_type,
-                    "conf": round(confidence, 3),
-                    "has_position": has_position,
-                    "t": int(time.time())
+                    "signal": signal.get("signal", "HOLD"),
+                    "conf": signal.get("conf", 0.5),
+                    "final_prob": signal.get("conf", 0.5),
+                    "ema": signal.get("conf", 0.5),
+                    "ml": signal.get("conf", 0.5),
+                    "q": 0.5,
+                    "sent": 0.5,
+                    "weights": {
+                        "ema": 0.4,
+                        "ml": 0.3,
+                        "quantum": 0.2,
+                        "sentiment": 0.1
+                    },
+                    "thr_buy": 0.6,
+                    "thr_sell": 0.4,
+                    "has_position": symbol in get_real_positions(),
+                    "t": signal.get("t", int(time.time())),
+                    "price": signal.get("price"),
+                    "change": signal.get("change")
                 })
-                
-            except Exception as e:
-                print(f"⚠️ Error generating signal for {symbol}: {e}")
-                continue
+        
+        # If no signals yet, return default holds for current positions
+        if not recent_signals:
+            positions = get_real_positions()
+            current_time = int(time.time())
+            for symbol in positions.keys():
+                recent_signals.append({
+                    "symbol": symbol,
+                    "signal": "HOLD",
+                    "conf": 0.5,
+                    "final_prob": 0.5,
+                    "ema": 0.5,
+                    "ml": 0.5,
+                    "q": 0.5,
+                    "sent": 0.5,
+                    "weights": {
+                        "ema": 0.4,
+                        "ml": 0.3,
+                        "quantum": 0.2,
+                        "sentiment": 0.1
+                    },
+                    "thr_buy": 0.6,
+                    "thr_sell": 0.4,
+                    "has_position": True,
+                    "t": current_time
+                })
         
         return {
-            "signals": signals,
+            "signals": recent_signals,
             "status": "active",
             "timestamp": time.time()
         }
@@ -575,12 +656,235 @@ def daily_reports():
         }
 
 # Startup event
+async def execution_loop():
+    """Main trading execution loop that places actual orders"""
+    global _last_exec
+    
+    if not TRADE_ENABLED:
+        add_log("Execution loop disabled (TRADE_ENABLED=0).")
+        return
+        
+    add_log("🚀 Execution loop started (LIVE orders).")
+    
+    while True:
+        try:
+            now = time.time()
+            if now - _last_exec < EXECUTION_INTERVAL_S:
+                await asyncio.sleep(1.0)
+                continue
+            _last_exec = now
+
+            # Check runtime kill switch
+            if not EXECUTION_RUNTIME_ENABLED:
+                await asyncio.sleep(1.0)
+                continue
+
+            # Get latest signals
+            if not _signals:
+                await asyncio.sleep(1.0)
+                continue
+                
+            # Pick latest signal per symbol
+            latest = {}
+            for s in _signals[-100:]:
+                latest[s["symbol"]] = s
+
+            for sym, s in latest.items():
+                signal = s.get("signal")
+                conf = float(s.get("conf", 0.0))
+                px = _last_px(sym)
+                
+                if px is None or px <= 0:
+                    continue
+
+                # Only trade on strong signals
+                if conf < 0.6:  # Require 60% confidence
+                    continue
+
+                # Calculate position size
+                quote_budget = TRADE_QUOTE_PER_ORDER * conf
+                if quote_budget < 10.0:  # Minimum order size
+                    continue
+
+                min_notional, qty_step = _min_notional_and_step(sym)
+                qty = quote_budget / px
+                qty = _round_step(qty, qty_step)
+
+                if qty * px < min_notional:
+                    qty = _round_step(min_notional / px, qty_step)
+
+                if qty <= 0:
+                    continue
+
+                # Check spending limits
+                spent = _open_spend.get(sym, 0.0)
+                if spent + qty * px > MAX_SPEND_PER_SYMBOL and signal == "BUY":
+                    continue
+
+                # Execute trade
+                side = None
+                if signal == "BUY":
+                    side = "buy"
+                elif signal == "SELL":
+                    # Sell fraction of current holdings
+                    have = _position_qty(sym)
+                    sell_qty = _round_step(have * SELL_FRACTION * conf, qty_step)
+                    if sell_qty <= 0:
+                        continue
+                    qty = sell_qty
+                    side = "sell"
+                else:
+                    continue
+
+                try:
+                    if exchange_client:
+                        order = exchange_client.create_order(sym, type="market", side=side, amount=qty)
+                        _trade_log.append({
+                            "t": int(time.time()),
+                            "symbol": sym,
+                            "side": side,
+                            "qty": qty,
+                            "px": px,
+                            "conf": conf,
+                            "order_id": order.get('id', 'unknown')
+                        })
+                        if side == "buy":
+                            _open_spend[sym] = _open_spend.get(sym, 0.0) + qty * px
+                        else:
+                            _open_spend[sym] = max(0.0, _open_spend.get(sym, 0.0) - qty * px)
+                        add_log(f"🔥 ORDER {side.upper()} {sym} qty={qty:.6f} px={px:.6f} conf={conf:.3f}")
+                except Exception as e:
+                    add_log(f"❌ ORDER error {sym} {side} {qty}: {e}")
+
+        except Exception as e:
+            add_log(f"❌ ERROR execution_loop: {e}")
+        
+        await asyncio.sleep(1.0)
+
+async def signals_loop():
+    """Generate trading signals continuously"""
+    add_log("🧠 Signals loop started")
+    
+    while True:
+        try:
+            # Get current positions to include in analysis
+            positions = real_time_data.get('positions', {})
+            symbols = list(positions.keys())
+            
+            # Add some major trading pairs if no positions
+            if not symbols:
+                symbols = ["BTC/USDT", "ETH/USDT", "BNB/USDT"]
+            
+            for symbol in symbols:
+                try:
+                    # Simple signal generation based on current price vs average
+                    current_price = _last_px(symbol)
+                    if current_price:
+                        # Generate signal based on position and price movement
+                        position_data = positions.get(symbol, {})
+                        avg_price = position_data.get('avg_buy_price', current_price)
+                        
+                        # Simple momentum-based signal
+                        price_change = (current_price - avg_price) / avg_price if avg_price > 0 else 0
+                        
+                        if price_change > 0.02:  # 2% gain
+                            signal = "SELL"
+                            conf = min(0.8, abs(price_change) * 10)
+                        elif price_change < -0.02:  # 2% loss
+                            signal = "BUY"
+                            conf = min(0.8, abs(price_change) * 10)
+                        else:
+                            signal = "HOLD"
+                            conf = 0.5
+                        
+                        signal_data = {
+                            "symbol": symbol,
+                            "signal": signal,
+                            "conf": conf,
+                            "t": int(time.time()),
+                            "price": current_price,
+                            "change": price_change
+                        }
+                        
+                        _signals.append(signal_data)
+                        
+                        # Keep only recent signals
+                        if len(_signals) > 1000:
+                            _signals[:] = _signals[-500:]
+                            
+                except Exception as e:
+                    add_log(f"Signal error for {symbol}: {e}")
+                    
+        except Exception as e:
+            add_log(f"❌ ERROR signals_loop: {e}")
+        
+        await asyncio.sleep(30)  # Generate signals every 30 seconds
+
+# Trading control endpoints
+@app.get("/trading/status")
+def trading_status():
+    """Get current trading status and controls"""
+    return {
+        "trade_enabled": TRADE_ENABLED,
+        "execution_enabled": EXECUTION_RUNTIME_ENABLED,
+        "execution_interval": EXECUTION_INTERVAL_S,
+        "quote_per_order": TRADE_QUOTE_PER_ORDER,
+        "max_spend_per_symbol": MAX_SPEND_PER_SYMBOL,
+        "recent_signals": len(_signals),
+        "recent_trades": len(_trade_log),
+        "last_execution": _last_exec
+    }
+
+@app.post("/trading/start")
+def start_trading(auth: bool = Depends(verify_password)):
+    """Start trading execution (password protected)"""
+    global EXECUTION_RUNTIME_ENABLED
+    EXECUTION_RUNTIME_ENABLED = True
+    add_log("🟢 Trading execution ENABLED by authenticated user")
+    return {"ok": True, "enabled": EXECUTION_RUNTIME_ENABLED, "message": "Trading started"}
+
+@app.post("/trading/stop")
+def stop_trading(auth: bool = Depends(verify_password)):
+    """Stop trading execution (password protected)"""
+    global EXECUTION_RUNTIME_ENABLED
+    EXECUTION_RUNTIME_ENABLED = False
+    add_log("🔴 Trading execution DISABLED by authenticated user")
+    return {"ok": True, "enabled": EXECUTION_RUNTIME_ENABLED, "message": "Trading stopped"}
+
+@app.post("/trading/toggle")
+def toggle_trading(auth: bool = Depends(verify_password)):
+    """Toggle trading execution on/off (password protected)"""
+    global EXECUTION_RUNTIME_ENABLED
+    EXECUTION_RUNTIME_ENABLED = not EXECUTION_RUNTIME_ENABLED
+    status = "ENABLED" if EXECUTION_RUNTIME_ENABLED else "DISABLED"
+    add_log(f"🔄 Trading execution {status} by authenticated user")
+    return {"ok": True, "enabled": EXECUTION_RUNTIME_ENABLED, "message": f"Trading {status.lower()}"}
+
+@app.get("/logs")
+def get_logs():
+    """Get recent system logs"""
+    return {"logs": _logs[-100:], "count": len(_logs)}
+
+@app.get("/trades/recent")
+def get_recent_trades():
+    """Get recent executed trades"""
+    return {"trades": _trade_log[-50:], "count": len(_trade_log)}
+
 @app.on_event("startup")
 async def startup_event():
     print("🚀 Bottie Render API starting...")
     
     if initialize_exchange():
         print("✅ Exchange client initialized")
+        
+        # Start trading loops
+        if TRADE_ENABLED:
+            add_log("🚀 Starting trading background tasks...")
+            asyncio.create_task(signals_loop())
+            asyncio.create_task(execution_loop())
+            add_log(f"🔥 Trading loops started - Execution: {'ENABLED' if EXECUTION_RUNTIME_ENABLED else 'DISABLED'}")
+        else:
+            add_log("⚠️ Trading disabled (TRADE_ENABLED=0)")
     else:
         print("❌ Exchange client initialization failed")
     
