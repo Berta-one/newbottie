@@ -320,6 +320,141 @@
             color: #f44336;
             border: 1px solid rgba(244, 67, 54, 0.3);
         }
+
+        /* Report Modal */
+        .report-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(4px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .report-content {
+            background: linear-gradient(135deg, #1a2332 0%, #2d3748 100%);
+            border-radius: 16px;
+            border: 1px solid rgba(100, 255, 218, 0.2);
+            max-width: 90vw;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .report-header {
+            padding: 2rem;
+            border-bottom: 1px solid rgba(100, 255, 218, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .report-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .report-body {
+            padding: 2rem;
+        }
+
+        .report-section {
+            margin-bottom: 2rem;
+        }
+
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #64ffda;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .data-card {
+            background: rgba(15, 20, 25, 0.5);
+            border: 1px solid rgba(100, 255, 218, 0.1);
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .data-label {
+            font-size: 0.875rem;
+            color: #8892b0;
+            margin-bottom: 0.5rem;
+        }
+
+        .data-value {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .logs-container {
+            background: rgba(15, 20, 25, 0.8);
+            border: 1px solid rgba(100, 255, 218, 0.1);
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.875rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(100, 255, 218, 0.3);
+            border-radius: 50%;
+            border-top-color: #64ffda;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .export-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .export-btn {
+            background: rgba(100, 255, 218, 0.1);
+            border: 1px solid rgba(100, 255, 218, 0.3);
+            color: #64ffda;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all 0.3s ease;
+        }
+
+        .export-btn:hover {
+            background: rgba(100, 255, 218, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .positive { color: #4caf50; }
+        .negative { color: #f44336; }
+        .neutral { color: #64ffda; }
     </style>
 </head>
 <body>
@@ -361,6 +496,25 @@
                 <button onclick="closeSignalsModal()" class="close-btn">✕</button>
             </div>
             <div id="signalsTableContainer" class="loading">Loading signals...</div>
+        </div>
+    </div>
+
+    <!-- Report Modal -->
+    <div class="report-modal" id="report-modal">
+        <div class="report-content">
+            <div class="report-header">
+                <div class="report-title" id="report-title">
+                    <span id="report-icon">📊</span>
+                    <span id="report-name">Loading Report...</span>
+                </div>
+                <button class="close-btn" onclick="closeReport()">✕</button>
+            </div>
+            <div class="report-body" id="report-body">
+                <div style="text-align: center; padding: 2rem;">
+                    <div class="loading-spinner" style="width: 40px; height: 40px;"></div>
+                    <p style="margin-top: 1rem; color: #8892b0;">Generating report...</p>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -579,12 +733,115 @@
                 }
             }
 
+            generateReport(endpointName) {
+                const endpoint = this.endpoints.find(e => e.name === endpointName);
+                if (!endpoint) return;
+
+                const modal = document.getElementById('report-modal');
+                const title = document.getElementById('report-title');
+                const icon = document.getElementById('report-icon');
+                const name = document.getElementById('report-name');
+                const body = document.getElementById('report-body');
+
+                icon.textContent = endpoint.icon;
+                name.textContent = `${endpoint.title} Report`;
+                modal.style.display = 'flex';
+
+                body.innerHTML = `
+                    <div style="text-align: center; padding: 2rem;">
+                        <div class="loading-spinner" style="width: 40px; height: 40px;"></div>
+                        <p style="margin-top: 1rem; color: #8892b0;">Generating comprehensive report...</p>
+                    </div>
+                `;
+
+                setTimeout(() => {
+                    body.innerHTML = this.createReportContent(endpointName, this.endpointData[endpointName] || {});
+                }, 1500);
+            }
+
+            createReportContent(endpointName, data) {
+                const timestamp = new Date().toLocaleString();
+                return `
+                    <div class="report-section">
+                        <div class="section-title">📋 Report Summary</div>
+                        <div class="data-grid">
+                            <div class="data-card">
+                                <div class="data-label">Generated</div>
+                                <div class="data-value">${timestamp}</div>
+                            </div>
+                            <div class="data-card">
+                                <div class="data-label">Status</div>
+                                <div class="data-value ${data.status === 'success' ? 'positive' : 'negative'}">${data.status === 'success' ? 'Online' : 'Error'}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="report-section">
+                        <div class="section-title">📊 Key Metrics & Analysis</div>
+                        ${this.createDetailedAnalysis(endpointName, data)}
+                    </div>
+                    <div class="report-section">
+                        <div class="section-title">📄 Raw Data & Logs</div>
+                        <div class="logs-container"><pre>${JSON.stringify(data, null, 2)}</pre></div>
+                    </div>
+                    <div class="export-buttons">
+                        <button class="export-btn" onclick="dashboard.exportReport('${endpointName}','json')">💾 Export JSON</button>
+                        <button class="export-btn" onclick="dashboard.exportReport('${endpointName}','csv')">📊 Export CSV</button>
+                        <button class="export-btn" onclick="dashboard.printReport()">🖨️ Print Report</button>
+                    </div>
+                `;
+            }
+
+            createDetailedAnalysis(endpointName, data) {
+                switch (endpointName) {
+                    case 'equity':
+                        return `<div class="data-card"><div class="data-label">Total Equity</div><div class="data-value">$${(data.equity || 0).toFixed(2)}</div></div>`;
+                    case 'trades':
+                        const trades = data.trades || [];
+                        return `<div class="data-card"><div class="data-label">Recent Trades</div><div class="data-value">${trades.length}</div></div>`;
+                    case 'ml':
+                        return `<div class="data-card"><div class="data-label">Accuracy</div><div class="data-value">${((data.accuracy || 0) * 100).toFixed(1)}%</div></div>`;
+                    case 'quantum':
+                        return `<div class="data-card"><div class="data-label">Q-Score</div><div class="data-value">${(data.quantum_score || 0).toFixed(3)}</div></div>`;
+                    case 'sentiment':
+                        const articles = data.articles || [];
+                        return `<div class="data-card"><div class="data-label">Articles</div><div class="data-value">${articles.length}</div></div>`;
+                    case 'brierscore':
+                        return `<div class="data-card"><div class="data-label">Brier Score</div><div class="data-value">${(data.brier_score || 0).toFixed(3)}</div></div>`;
+                    default:
+                        return `<div class="data-card"><div class="data-label">Analysis</div><div class="data-value">No specific analysis available for this endpoint.</div></div>`;
+                }
+            }
+
+            exportReport(endpointName, format) {
+                const data = this.endpointData[endpointName] || {};
+                let content = '';
+                let mime = '';
+                if (format === 'csv') {
+                    const rows = Object.entries(data).map(([key, value]) => `${key},${JSON.stringify(value)}`);
+                    content = rows.join('\n');
+                    mime = 'text/csv';
+                } else {
+                    content = JSON.stringify(data, null, 2);
+                    mime = 'application/json';
+                }
+                const blob = new Blob([content], { type: mime });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${endpointName}.${format}`;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+
+            printReport() {
+                window.print();
+            }
+
             handleSlateClick(endpoint) {
                 if (endpoint.special === 'signals_table') {
                     this.showSignalsTable();
                 } else {
-                    // Handle other slate clicks
-                    console.log(`Clicked ${endpoint.name}`);
+                    this.generateReport(endpoint.name);
                 }
             }
 
@@ -782,6 +1039,10 @@
             document.getElementById('signalsModal').style.display = 'none';
         }
 
+        function closeReport() {
+            document.getElementById('report-modal').style.display = 'none';
+        }
+
         // Initialize
         let dashboard;
         function initDashboard() {
@@ -792,10 +1053,21 @@
             document.getElementById('passwordInput').focus();
         });
 
-        // Close modal when clicking outside
+        // Close modals when clicking outside
         document.addEventListener('click', function(e) {
-            const modal = document.getElementById('signalsModal');
-            if (modal && e.target === modal) {
+            const signalsModal = document.getElementById('signalsModal');
+            if (signalsModal && e.target === signalsModal) {
+                closeSignalsModal();
+            }
+            const reportModal = document.getElementById('report-modal');
+            if (reportModal && e.target === reportModal) {
+                closeReport();
+            }
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeReport();
                 closeSignalsModal();
             }
         });
