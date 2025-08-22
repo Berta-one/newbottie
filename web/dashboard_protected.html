@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bottie Trading Dashboard - Protected</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0f1419 0%, #1a2332 100%);
+            color: #e6fffa;
+            min-height: 100vh;
+        }
+
+        /* Login Screen Styles */
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .login-box {
+            background: rgba(26, 35, 50, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(100, 255, 218, 0.2);
+            border-radius: 12px;
+            padding: 3rem;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .login-title {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(45deg, #64ffda, #4caf50);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 2rem;
+        }
+
+        .login-input {
+            width: 100%;
+            padding: 1rem;
+            background: rgba(15, 20, 25, 0.8);
+            border: 1px solid rgba(100, 255, 218, 0.3);
+            border-radius: 8px;
+            color: #e6fffa;
+            font-size: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .login-input:focus {
+            outline: none;
+            border-color: #64ffda;
+            box-shadow: 0 0 0 2px rgba(100, 255, 218, 0.2);
+        }
+
+        .login-button {
+            width: 100%;
+            padding: 1rem;
+            background: linear-gradient(45deg, #64ffda, #4caf50);
+            border: none;
+            border-radius: 8px;
+            color: #0f1419;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .login-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(100, 255, 218, 0.3);
+        }
+
+        .login-error {
+            color: #ff6b6b;
+            margin-top: 1rem;
+            font-size: 0.875rem;
+        }
+
+        /* Dashboard Styles */
+        .dashboard {
+            display: none;
+        }
+
+        .dashboard.authenticated {
+            display: block;
+        }
+
+        .header {
+            background: rgba(26, 35, 50, 0.9);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(100, 255, 218, 0.2);
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(45deg, #64ffda, #4caf50);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .trading-control {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.875rem;
+        }
+
+        .start-trading {
+            background: linear-gradient(45deg, #4caf50, #45a049);
+            color: white;
+        }
+
+        .stop-trading {
+            background: linear-gradient(45deg, #f44336, #d32f2f);
+            color: white;
+        }
+
+        .logout-button {
+            background: rgba(255, 107, 107, 0.2);
+            color: #ff6b6b;
+            border: 1px solid rgba(255, 107, 107, 0.3);
+        }
+
+        .trading-control:hover, .logout-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .trading-status {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .trading-enabled {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4caf50;
+            border: 1px solid rgba(76, 175, 80, 0.3);
+        }
+
+        .trading-disabled {
+            background: rgba(244, 67, 54, 0.2);
+            color: #f44336;
+            border: 1px solid rgba(244, 67, 54, 0.3);
+        }
+
+        .main-content {
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .card {
+            background: rgba(26, 35, 50, 0.8);
+            border: 1px solid rgba(100, 255, 218, 0.2);
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #64ffda;
+        }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid rgba(100, 255, 218, 0.1);
+        }
+
+        .metric:last-child {
+            border-bottom: none;
+        }
+
+        .metric-label {
+            color: #a0aec0;
+            font-size: 0.875rem;
+        }
+
+        .metric-value {
+            font-weight: 600;
+            color: #e6fffa;
+        }
+
+        .positive {
+            color: #4caf50;
+        }
+
+        .negative {
+            color: #f44336;
+        }
+
+        .loading {
+            text-align: center;
+            color: #64ffda;
+            font-style: italic;
+        }
+
+        .signal-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            background: rgba(15, 20, 25, 0.5);
+            border-radius: 8px;
+            border-left: 3px solid #64ffda;
+        }
+
+        .signal-buy {
+            border-left-color: #4caf50;
+        }
+
+        .signal-sell {
+            border-left-color: #f44336;
+        }
+
+        .signal-hold {
+            border-left-color: #ffa726;
+        }
+
+        .signal-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge-buy {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4caf50;
+        }
+
+        .badge-sell {
+            background: rgba(244, 67, 54, 0.2);
+            color: #f44336;
+        }
+
+        .badge-hold {
+            background: rgba(255, 167, 38, 0.2);
+            color: #ffa726;
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-container">
+        <div class="login-box">
+            <h1 class="login-title">🤖 Bottie Dashboard</h1>
+            <p style="color: #a0aec0; margin-bottom: 2rem;">Enter password to access trading dashboard</p>
+            <input type="password" id="passwordInput" class="login-input" placeholder="Enter password" autocomplete="current-password">
+            <button onclick="authenticate()" class="login-button">Access Dashboard</button>
+            <div id="loginError" class="login-error"></div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div id="dashboard" class="dashboard">
+        <header class="header">
+            <div class="logo">🤖 Bottie Trading Dashboard</div>
+            <div class="controls">
+                <div id="tradingStatus" class="trading-status">
+                    <span id="statusText">Checking...</span>
+                </div>
+                <button id="startTradingBtn" onclick="startTrading()" class="trading-control start-trading">▶️ Start Trading</button>
+                <button id="stopTradingBtn" onclick="stopTrading()" class="trading-control stop-trading">⏹️ Stop Trading</button>
+                <button onclick="logout()" class="trading-control logout-button">🚪 Logout</button>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <!-- Portfolio Overview -->
+            <div class="card">
+                <h2 class="card-title">💰 Portfolio Overview</h2>
+                <div id="portfolioData" class="loading">Loading portfolio data...</div>
+            </div>
+
+            <!-- Trading Status -->
+            <div class="card">
+                <h2 class="card-title">🔄 Trading Status</h2>
+                <div id="tradingData" class="loading">Loading trading status...</div>
+            </div>
+
+            <!-- Recent Signals -->
+            <div class="card">
+                <h2 class="card-title">📊 Recent Signals</h2>
+                <div id="signalsData" class="loading">Loading signals...</div>
+            </div>
+
+            <!-- Recent Trades -->
+            <div class="card">
+                <h2 class="card-title">💹 Recent Trades</h2>
+                <div id="tradesData" class="loading">Loading trades...</div>
+            </div>
+
+            <!-- System Logs -->
+            <div class="card">
+                <h2 class="card-title">📝 System Logs</h2>
+                <div id="logsData" class="loading">Loading logs...</div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+            ? 'http://127.0.0.1:8000' 
+            : 'https://bottie-1.onrender.com';
+        
+        const DASHBOARD_PASSWORD = 'bottie2024'; // Change this password as needed
+        let isAuthenticated = false;
+        let refreshInterval;
+
+        // Authentication
+        function authenticate() {
+            const password = document.getElementById('passwordInput').value;
+            const errorDiv = document.getElementById('loginError');
+            
+            if (password === DASHBOARD_PASSWORD) {
+                isAuthenticated = true;
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('dashboard').classList.add('authenticated');
+                startDashboard();
+                errorDiv.textContent = '';
+            } else {
+                errorDiv.textContent = 'Invalid password. Please try again.';
+                document.getElementById('passwordInput').value = '';
+            }
+        }
+
+        function logout() {
+            isAuthenticated = false;
+            document.getElementById('loginScreen').style.display = 'flex';
+            document.getElementById('dashboard').classList.remove('authenticated');
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+        }
+
+        // Enter key support for login
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !isAuthenticated) {
+                authenticate();
+            }
+        });
+
+        // Dashboard Functions
+        function startDashboard() {
+            loadAllData();
+            refreshInterval = setInterval(loadAllData, 10000); // Refresh every 10 seconds
+        }
+
+        async function loadAllData() {
+            if (!isAuthenticated) return;
+            
+            await Promise.all([
+                loadPortfolioData(),
+                loadTradingStatus(),
+                loadSignals(),
+                loadRecentTrades(),
+                loadLogs()
+            ]);
+        }
+
+        async function loadPortfolioData() {
+            try {
+                const response = await fetch(`${API_BASE}/status`);
+                const data = await response.json();
+                
+                let html = '';
+                if (data.equity && data.equity.display_value) {
+                    html += `<div class="metric">
+                        <span class="metric-label">Total Equity</span>
+                        <span class="metric-value">$${data.equity.display_value.toFixed(2)}</span>
+                    </div>`;
+                }
+                
+                if (data.positions) {
+                    const positionCount = Object.keys(data.positions).length;
+                    html += `<div class="metric">
+                        <span class="metric-label">Active Positions</span>
+                        <span class="metric-value">${positionCount}</span>
+                    </div>`;
+                    
+                    // Show top positions
+                    const positions = Object.entries(data.positions).slice(0, 5);
+                    for (const [symbol, pos] of positions) {
+                        const pnlClass = pos.pnl >= 0 ? 'positive' : 'negative';
+                        html += `<div class="metric">
+                            <span class="metric-label">${symbol}</span>
+                            <span class="metric-value ${pnlClass}">$${pos.pnl.toFixed(2)}</span>
+                        </div>`;
+                    }
+                }
+                
+                document.getElementById('portfolioData').innerHTML = html || '<div class="loading">No portfolio data available</div>';
+            } catch (error) {
+                document.getElementById('portfolioData').innerHTML = '<div class="loading">Error loading portfolio data</div>';
+            }
+        }
+
+        async function loadTradingStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/trading/status`);
+                const data = await response.json();
+                
+                let html = `
+                    <div class="metric">
+                        <span class="metric-label">Trade Enabled</span>
+                        <span class="metric-value">${data.trade_enabled ? '✅ Yes' : '❌ No'}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Execution Enabled</span>
+                        <span class="metric-value">${data.execution_enabled ? '✅ Yes' : '❌ No'}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Recent Signals</span>
+                        <span class="metric-value">${data.recent_signals}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Recent Trades</span>
+                        <span class="metric-value">${data.recent_trades}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Quote per Order</span>
+                        <span class="metric-value">$${data.quote_per_order}</span>
+                    </div>
+                `;
+                
+                document.getElementById('tradingData').innerHTML = html;
+                
+                // Update header status
+                const statusElement = document.getElementById('tradingStatus');
+                const statusText = document.getElementById('statusText');
+                
+                if (data.execution_enabled) {
+                    statusElement.className = 'trading-status trading-enabled';
+                    statusText.textContent = '🟢 Trading Active';
+                } else {
+                    statusElement.className = 'trading-status trading-disabled';
+                    statusText.textContent = '🔴 Trading Stopped';
+                }
+                
+            } catch (error) {
+                document.getElementById('tradingData').innerHTML = '<div class="loading">Error loading trading status</div>';
+            }
+        }
+
+        async function loadSignals() {
+            try {
+                const response = await fetch(`${API_BASE}/signals`);
+                const data = await response.json();
+                
+                let html = '';
+                if (data.signals && data.signals.length > 0) {
+                    for (const signal of data.signals.slice(0, 10)) {
+                        const signalClass = `signal-${signal.signal.toLowerCase()}`;
+                        const badgeClass = `badge-${signal.signal.toLowerCase()}`;
+                        
+                        html += `
+                            <div class="signal-item ${signalClass}">
+                                <div>
+                                    <strong>${signal.symbol}</strong>
+                                    <div style="font-size: 0.75rem; color: #a0aec0;">
+                                        Conf: ${(signal.conf * 100).toFixed(1)}%
+                                        ${signal.change ? ` | Change: ${(signal.change * 100).toFixed(2)}%` : ''}
+                                    </div>
+                                </div>
+                                <span class="signal-badge ${badgeClass}">${signal.signal}</span>
+                            </div>
+                        `;
+                    }
+                } else {
+                    html = '<div class="loading">No signals available</div>';
+                }
+                
+                document.getElementById('signalsData').innerHTML = html;
+            } catch (error) {
+                document.getElementById('signalsData').innerHTML = '<div class="loading">Error loading signals</div>';
+            }
+        }
+
+        async function loadRecentTrades() {
+            try {
+                const response = await fetch(`${API_BASE}/trades/recent`);
+                const data = await response.json();
+                
+                let html = '';
+                if (data.trades && data.trades.length > 0) {
+                    for (const trade of data.trades.slice(0, 10)) {
+                        const sideClass = trade.side === 'buy' ? 'positive' : 'negative';
+                        const date = new Date(trade.t * 1000).toLocaleString();
+                        
+                        html += `
+                            <div class="metric">
+                                <div>
+                                    <div style="font-weight: 600;">${trade.symbol}</div>
+                                    <div style="font-size: 0.75rem; color: #a0aec0;">${date}</div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div class="metric-value ${sideClass}">${trade.side.toUpperCase()}</div>
+                                    <div style="font-size: 0.75rem; color: #a0aec0;">
+                                        ${trade.qty.toFixed(6)} @ $${trade.px.toFixed(2)}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                } else {
+                    html = '<div class="loading">No recent trades</div>';
+                }
+                
+                document.getElementById('tradesData').innerHTML = html;
+            } catch (error) {
+                document.getElementById('tradesData').innerHTML = '<div class="loading">Error loading trades</div>';
+            }
+        }
+
+        async function loadLogs() {
+            try {
+                const response = await fetch(`${API_BASE}/logs`);
+                const data = await response.json();
+                
+                let html = '';
+                if (data.logs && data.logs.length > 0) {
+                    for (const log of data.logs.slice(-10).reverse()) {
+                        html += `<div style="padding: 0.5rem 0; border-bottom: 1px solid rgba(100, 255, 218, 0.1); font-size: 0.875rem; font-family: monospace;">${log}</div>`;
+                    }
+                } else {
+                    html = '<div class="loading">No logs available</div>';
+                }
+                
+                document.getElementById('logsData').innerHTML = html;
+            } catch (error) {
+                document.getElementById('logsData').innerHTML = '<div class="loading">Error loading logs</div>';
+            }
+        }
+
+        // Trading Controls
+        async function startTrading() {
+            try {
+                const response = await fetch(`${API_BASE}/trading/start`, { 
+                    method: 'POST',
+                    headers: {
+                        'X-Dashboard-Password': DASHBOARD_PASSWORD
+                    }
+                });
+                const data = await response.json();
+                
+                if (data.ok) {
+                    alert('✅ Trading started successfully!');
+                    loadTradingStatus();
+                } else {
+                    alert('❌ Failed to start trading');
+                }
+            } catch (error) {
+                alert('❌ Error starting trading: ' + error.message);
+            }
+        }
+
+        async function stopTrading() {
+            if (confirm('⚠️ Are you sure you want to stop trading? This will prevent new trades from being executed.')) {
+                try {
+                    const response = await fetch(`${API_BASE}/trading/stop`, { 
+                        method: 'POST',
+                        headers: {
+                            'X-Dashboard-Password': DASHBOARD_PASSWORD
+                        }
+                    });
+                    const data = await response.json();
+                    
+                    if (data.ok) {
+                        alert('🛑 Trading stopped successfully!');
+                        loadTradingStatus();
+                    } else {
+                        alert('❌ Failed to stop trading');
+                    }
+                } catch (error) {
+                    alert('❌ Error stopping trading: ' + error.message);
+                }
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            // Focus password input
+            document.getElementById('passwordInput').focus();
+        });
+    </script>
+</body>
+</html>
