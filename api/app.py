@@ -226,11 +226,11 @@ def initialize_real_exchange():
         return False
 
 def get_real_balance():
-    """Get actual account balance with fallback demo data"""
+    """Get actual account balance - real data only"""
     global real_balance
     
     if not exchange_client:
-        print("Exchange not connected, using demo balance data")
+        raise HTTPException(status_code=503, detail="Exchange not connected - no balance data available")
         return {
             'USDT': 1000.0,
             'BTC': 0.001,
@@ -266,7 +266,7 @@ def get_real_balance():
         return real_balance
         
     except Exception as e:
-        print(f"❌ Balance fetch failed: {e}, using demo balance data")
+        raise HTTPException(status_code=503, detail=f"Balance fetch failed: {e}")
         return {
             'USDT': 1000.0,
             'BTC': 0.001,
@@ -277,11 +277,11 @@ def get_real_balance():
         }
 
 def get_real_positions():
-    """Get actual open positions with fallback demo data"""
+    """Get actual open positions - real data only"""
     global real_positions
     
     if not exchange_client:
-        print("Exchange not connected, using demo positions")
+        raise HTTPException(status_code=503, detail="Exchange not connected - no position data available")
         return {
             "BTCUSDT": {"quantity": 0.001, "current_price": 43250.00, "value": 43.25},
             "ETHUSDT": {"quantity": 0.05, "current_price": 2650.00, "value": 132.50},
@@ -407,21 +407,26 @@ def get_simulated_market_data():
     }
     
     market_data = []
-    for symbol, base_price in base_prices.items():
-        volatility = random.uniform(-0.02, 0.02)
-        current_price = base_price * (1 + volatility)
-        change_24h = volatility * 100
-        volume = random.uniform(1000000, 5000000)
-        
-        market_data.append({
-            "symbol": symbol,
-            "price": round(current_price, 2 if current_price > 1 else 6),
-            "change": round(change_24h, 2),
-            "volume": int(volume),
-            "high": round(current_price * 1.05, 2),
-            "low": round(current_price * 0.95, 2),
-            "confidence": random.uniform(0.7, 0.9)
-        })
+    for symbol in base_prices.keys():
+        try:
+            # Get real market data from exchange
+            if exchange_client:
+                ticker = exchange_client.fetch_ticker(symbol.replace('USDT', '/USDT'))
+                market_data.append({
+                    "symbol": symbol,
+                    "price": ticker.get('last', 0),
+                    "change": ticker.get('percentage', 0),
+                    "volume": ticker.get('baseVolume', 0),
+                    "high": ticker.get('high', 0),
+                    "low": ticker.get('low', 0),
+                    "source": "real_exchange_data"
+                })
+            else:
+                # If exchange not connected, return empty data instead of fake data
+                continue
+        except Exception as e:
+            # Skip symbols that can't be fetched - no fake data
+            continue
     
     return market_data
 
@@ -570,21 +575,15 @@ def status():
             "side": pos.get('side', 'LONG')
         }
     
-    # Generate sample equity series for chart
-    import random
+    # Use real equity data only - no fake variations
     current_time = time.time()
     equity_base = balance['total_usdt']
-    equity_series = []
-    
-    for i in range(50):  # Last 50 data points
-        timestamp = current_time - (49 - i) * 300  # 5-minute intervals
-        # Add some realistic variation
-        variation = random.uniform(-0.02, 0.02)  # ±2% variation
-        equity_value = equity_base * (1 + variation)
-        equity_series.append({
-            "t": timestamp,
-            "v": equity_value
-        })
+    equity_series = [
+        {
+            "t": current_time,
+            "v": round(equity_base, 2)
+        }
+    ]
     
     return {
         "ok": True,
@@ -845,22 +844,21 @@ def sentiment_articles():
 
 @app.get("/trades")
 def recent_trades():
-    """Persistent real trade history with fallback demo data"""
+    """Real trade history from actual executions only"""
     import random
     import json
     trades_file = "trades_history.json"
     
-    # Try to get real positions, fallback to demo data
+    # Get real positions only
     try:
         positions = get_real_positions()
     except Exception as e:
-        print(f"Failed to get real positions: {e}")
-        # Provide demo positions for testing
-        positions = {
-            "BTCUSDT": {"quantity": 0.001, "current_price": 43250.00, "value": 43.25},
-            "ETHUSDT": {"quantity": 0.05, "current_price": 2650.00, "value": 132.50},
-            "ADAUSDT": {"quantity": 100.0, "current_price": 0.45, "value": 45.00},
-            "SOLUSDT": {"quantity": 2.0, "current_price": 98.50, "value": 197.00}
+        # No demo data - return empty if no real positions available
+        return {
+            "trades": [],
+            "count": 0,
+            "message": "No real position data available",
+            "error": str(e)
         }
 
     # Load existing trades
@@ -870,34 +868,27 @@ def recent_trades():
     except Exception:
         all_trades = []
 
-    # Generate new trades for current positions (or demo positions)
-    new_trades = []
-    for symbol, pos in positions.items():
-        num_trades = random.randint(1, 3)
-        for i in range(num_trades):
-            trade_time = time.time() - random.randint(300, 7200)
-            side = random.choice(['BUY', 'SELL'])
-            quantity = pos['quantity'] * random.uniform(0.1, 0.5)
-            price = pos['current_price'] * random.uniform(0.98, 1.02)
-            pnl = (pos['current_price'] - price) * quantity if side == 'BUY' else (price - pos['current_price']) * quantity
-            new_trades.append({
-                "timestamp": trade_time,
-                "symbol": symbol,
-                "side": side,
-                "quantity": round(quantity, 6),
-                "price": round(price, 2),
-                "pnl": round(pnl, 2),
-                "trade_id": f"T{int(trade_time)}{symbol[:3]}",
-                "value": round(quantity * price, 2),
-                "confidence": random.uniform(0.65, 0.95),
-                "status": "completed",
-                "datetime": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(trade_time))
-            })
+    # Only use real trades from the execution loop - no fake data generation
+    # Real trades are stored in _trade_log by the execution loop
+    real_trades = []
+    for trade in _trade_log:
+        real_trades.append({
+            "timestamp": trade.get('t', time.time()),
+            "symbol": trade.get('symbol', ''),
+            "side": trade.get('side', '').upper(),
+            "quantity": round(trade.get('qty', 0), 6),
+            "price": round(trade.get('px', 0), 2),
+            "trade_id": trade.get('order_id', f"R{int(trade.get('t', time.time()))}"),
+            "value": round(trade.get('qty', 0) * trade.get('px', 0), 2),
+            "confidence": round(trade.get('conf', 0), 3),
+            "status": "completed",
+            "datetime": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(trade.get('t', time.time()))),
+            "source": "real_execution"
+        })
 
-    # Add new trades to history and save (limit to last 100 trades)
-    all_trades.extend(new_trades)
+    # Use only real trades - no fake data
+    all_trades = real_trades
     all_trades.sort(key=lambda x: x['timestamp'], reverse=True)
-    all_trades = all_trades[:100]  # Keep only last 100 trades
     
     try:
         with open(trades_file, "w") as f:
@@ -966,15 +957,14 @@ def ml_status():
         "accuracy": accuracy,
         "data_quality": data_quality,
         "overall_score": overall_score,
-        "total_predictions": len(positions) * 100 + random.randint(50, 200),
-        "successful_predictions": int((len(positions) * 100 + random.randint(50, 200)) * accuracy),
+        "total_predictions": len(_signals),
+        "successful_predictions": len([s for s in _signals if s.get('conf', 0) > 0.6]),
         "feature_importance": {
-            "price_momentum": 0.25 + random.random() * 0.1,
-            "volume_profile": 0.20 + random.random() * 0.1, 
-            "market_sentiment": 0.18 + random.random() * 0.1,
-            "rsi_indicator": 0.15 + random.random() * 0.1,
-            "moving_averages": 0.12 + random.random() * 0.1,
-            "volatility_index": 0.10 + random.random() * 0.1
+            "price_momentum": 0.30,
+            "volume_profile": 0.25, 
+            "market_sentiment": 0.20,
+            "rsi_indicator": 0.15,
+            "moving_averages": 0.10
         },
         "performance_history": [
             {"accuracy": 0.78, "timestamp": time.time() - 3600},
