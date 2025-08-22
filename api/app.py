@@ -61,6 +61,22 @@ real_balance = {}
 last_update = 0
 startup_logs = []
 
+# Trading execution variables
+_signals = []
+_logs = []
+_trade_log = []
+_open_spend = {}
+_last_exec = 0.0
+EXECUTION_RUNTIME_ENABLED = True  # Default enabled for trading
+
+# Trading configuration
+TRADE_ENABLED = os.getenv('TRADE_ENABLED', '0') == '1'
+EXECUTION_INTERVAL_S = float(os.getenv("EXECUTION_INTERVAL_S", "20"))
+TRADE_QUOTE_PER_ORDER = float(os.getenv("TRADE_QUOTE_PER_ORDER", "100"))
+MAX_SPEND_PER_SYMBOL = float(os.getenv("MAX_SPEND_PER_SYMBOL", "1000"))
+SELL_FRACTION = float(os.getenv("SELL_FRACTION", "0.5"))
+MAX_OPEN_POSITIONS = int(os.getenv("MAX_OPEN_POSITIONS", "10"))
+
 # Preferred quote currencies when building market symbols dynamically
 PREFERRED_QUOTES = ["USDT", "FDUSD", "USDC", "BUSD", "TUSD"]
 
