@@ -14,6 +14,8 @@ from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from . import diagnostics
 
 # Load environment variables from .env file
@@ -56,6 +58,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount static files
+if os.path.exists('web'):
+    app.mount("/", StaticFiles(directory="web", html=True), name="static")
 
 # Global variables for real trading
 exchange_client = None
