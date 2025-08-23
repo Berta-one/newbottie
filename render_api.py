@@ -743,6 +743,17 @@ async def execution_loop():
                     sell_qty = _round_step(have * SELL_FRACTION * conf, qty_step)
                     if sell_qty <= 0:
                         continue
+                    
+                    # Check minimum notional requirement (Binance requires ~$5-10 minimum)
+                    sell_value = sell_qty * px
+                    if sell_value < min_notional:
+                        # If partial sell is too small, sell minimum notional amount
+                        min_sell_qty = _round_step(min_notional / px, qty_step)
+                        if min_sell_qty <= have:  # Only if we have enough to sell
+                            sell_qty = min_sell_qty
+                        else:
+                            continue  # Skip if we don't have enough for minimum order
+                    
                     qty = sell_qty
                     side = "sell"
                 else:
