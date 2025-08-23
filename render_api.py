@@ -116,7 +116,7 @@ def verify_password(password: str = Header(None, alias="X-Dashboard-Password")):
 def _position_qty(symbol: str) -> float:
     """Get current position quantity for a symbol"""
     try:
-        positions = real_time_data.get('positions', {})
+        positions = get_real_positions()
         return positions.get(symbol, {}).get('quantity', 0.0)
     except:
         return 0.0
