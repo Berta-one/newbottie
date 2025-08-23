@@ -136,12 +136,12 @@ def _min_notional_and_step(symbol: str) -> tuple:
     try:
         if exchange_client and hasattr(exchange_client, 'markets'):
             market = exchange_client.markets.get(symbol, {})
-            min_notional = market.get('limits', {}).get('cost', {}).get('min', 10.0)
+            min_notional = market.get('limits', {}).get('cost', {}).get('min', 15.0)
             qty_step = market.get('precision', {}).get('amount', 0.001)
-            return min_notional, qty_step
+            return max(min_notional, 15.0), qty_step  # Ensure at least $15 minimum
     except:
         pass
-    return 10.0, 0.001
+    return 15.0, 0.001  # Increased from $10 to $15
 
 def _round_step(qty: float, step: float) -> float:
     """Round quantity to the exchange's step size"""
