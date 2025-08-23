@@ -780,7 +780,7 @@ async def signals_loop():
     while True:
         try:
             # Get current positions to include in analysis
-            positions = real_time_data.get('positions', {})
+            positions = get_real_positions()
             symbols = list(positions.keys())
             
             # Add some major trading pairs if no positions
