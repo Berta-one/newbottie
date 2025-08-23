@@ -804,10 +804,10 @@ async def signals_loop():
                         conf = 0.5
                         
                         # Profit-taking logic (for existing positions)
-                        if pnl_percentage > 5.0:  # 5% profit
+                        if pnl_percentage > 3.0:  # 3% profit
                             signal = "SELL"
                             conf = min(0.9, 0.6 + (pnl_percentage / 100))
-                        elif pnl_percentage > 2.5:  # 2.5% profit
+                        elif pnl_percentage > 1.5:  # 1.5% profit - more aggressive
                             signal = "SELL" 
                             conf = 0.7
                         
