@@ -176,12 +176,12 @@ class SmartClaudeSelector {
             return 'claude-3-haiku-20240307'; // Most cost-effective for simple tasks
         }
         
-        if (analysis.estimatedTokens < 1000 && !analysis.requiresAdvancedReasoning) {
-            return 'claude-3-5-haiku-20241022'; // Good balance for short tasks
-        }
-        
         if (analysis.taskType === 'coding' || analysis.requiresAdvancedReasoning) {
             return 'claude-3-5-sonnet-20241022'; // Best balance for complex tasks
+        }
+        
+        if (analysis.estimatedTokens < 1000 && !analysis.requiresAdvancedReasoning) {
+            return 'claude-3-5-haiku-20241022'; // Good balance for short tasks
         }
         
         if (analysis.complexity === 'high' && analysis.requiresAdvancedReasoning) {
@@ -397,13 +397,14 @@ class SmartClaudeSelector {
         }
         
         const endTime = Date.now();
-        const selectionsPerSecond = Math.round(iterations / ((endTime - startTime) / 1000));
+        const totalTimeMs = endTime - startTime;
+        const selectionsPerSecond = totalTimeMs > 0 ? Math.round(iterations / (totalTimeMs / 1000)) : iterations * 1000;
         
         return {
             iterations,
-            totalTime: endTime - startTime,
+            totalTime: totalTimeMs,
             selectionsPerSecond,
-            averageTimePerSelection: (endTime - startTime) / iterations
+            averageTimePerSelection: totalTimeMs > 0 ? totalTimeMs / iterations : 0
         };
     }
 }
