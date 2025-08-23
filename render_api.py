@@ -508,7 +508,7 @@ def ml_status():
         "message": "ML system operational",
         "equity": balance.get('total_usdt', 0),
         "positions": len(positions),
-        "accuracy": 75.0,
+        "accuracy": 0.75,
         "confidence": 0.8,
         "mode": "LIVE",
         "data_source": "real"
