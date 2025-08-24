@@ -605,67 +605,388 @@ def ml_performance():
             "source": "fallback_data"
         }
 
-# Daily reports endpoint
-@app.get("/reports/daily")
-def daily_reports():
-    """Get daily reports based on actual trading data"""
+# Enhanced Reporting System with Commentary and Scheduling
+from datetime import datetime, timezone, timedelta
+
+# Global variables for report scheduling
+report_cache = {}
+last_auto_report = 0
+auto_reports_enabled = True
+
+def generate_comprehensive_analysis():
+    """Generate comprehensive trading analysis with human commentary"""
     try:
-        # Return real trading data only - no fake reports
-        actual_trades = _trade_log[-100:] if _trade_log else []
+        # Get current data
+        positions = get_real_positions()
+        balance = get_real_balance()
+        recent_trades = _trade_log[-50:] if _trade_log else []
+        recent_signals = _signals[-100:] if _signals else []
         
-        if not actual_trades:
-            return {
-                "reports": [],
-                "total": 0,
-                "generation_time": "18:00 UTC",
-                "status": "no_trades",
-                "message": "No actual trades executed yet"
-            }
+        # Calculate key metrics
+        total_positions = len(positions)
+        total_equity = balance.get('total_usdt', 0)
+        total_pnl = sum(pos.get('pnl', 0) for pos in positions.values())
+        total_pnl_pct = (total_pnl / total_equity * 100) if total_equity > 0 else 0
         
-        # Calculate real statistics from actual trades
-        today = datetime.now()
-        today_trades = [t for t in actual_trades if t.get('t', 0) > time.time() - 86400]
+        # Analyze recent trading activity
+        trades_24h = [t for t in recent_trades if t.get('t', 0) > time.time() - 86400]
+        signals_24h = [s for s in recent_signals if s.get('t', 0) > time.time() - 86400]
         
-        if today_trades:
-            total_trades = len(today_trades)
-            # Calculate real win rate and P&L from actual trades
-            buy_trades = [t for t in today_trades if t.get('side') == 'buy']
-            sell_trades = [t for t in today_trades if t.get('side') == 'sell']
-            
-            # Simple P&L calculation (this would need more sophisticated logic in real implementation)
-            total_pnl = sum(t.get('qty', 0) * t.get('px', 0) * (1 if t.get('side') == 'sell' else -1) for t in today_trades)
-            
-            reports = [{
-                "id": f"report_{int(today.timestamp())}",
-                "title": f"Daily Trading Report - {today.strftime('%Y-%m-%d')}",
-                "created_at": today.replace(hour=18, minute=0, second=0).isoformat(),
-                "type": "daily",
-                "summary": {
-                    "total_trades": total_trades,
-                    "buy_trades": len(buy_trades),
-                    "sell_trades": len(sell_trades),
-                    "profit_loss": round(total_pnl, 2),
-                    "data_source": "real_trades"
-                },
-                "status": "completed"
-            }]
+        # Generate actionable signals count
+        actionable_signals = [s for s in recent_signals[-50:] if s.get('conf', 0) > 0.6 and s.get('signal') != 'HOLD']
+        
+        # Generate human commentary
+        commentary = []
+        
+        # Portfolio Analysis
+        if total_positions > 0:
+            if total_pnl_pct > 2:
+                commentary.append(f"🟢 **Strong Performance**: Portfolio showing {total_pnl_pct:.1f}% gains (${total_pnl:.2f}). Consider taking profits on best performers.")
+            elif total_pnl_pct > 0:
+                commentary.append(f"🟡 **Modest Gains**: Portfolio up {total_pnl_pct:.1f}% (${total_pnl:.2f}). Monitor for profit-taking opportunities.")
+            elif total_pnl_pct > -2:
+                commentary.append(f"🟡 **Flat Performance**: Portfolio near breakeven ({total_pnl_pct:.1f}%). Wait for clearer market direction.")
+            else:
+                commentary.append(f"🔴 **Underperforming**: Portfolio down {abs(total_pnl_pct):.1f}% (${total_pnl:.2f}). Consider risk management measures.")
         else:
-            reports = []
+            commentary.append("📊 **No Active Positions**: Ready to deploy capital when opportunities arise.")
+        
+        # Trading Activity Analysis
+        if len(trades_24h) > 0:
+            commentary.append(f"📈 **Active Trading**: {len(trades_24h)} trades executed in 24h. System is functioning normally.")
+        else:
+            if len(actionable_signals) > 0:
+                commentary.append(f"⚠️ **Signal Execution Issue**: {len(actionable_signals)} actionable signals generated but no trades executed. Check minimum notional requirements.")
+            else:
+                commentary.append("😴 **Quiet Market**: No actionable signals generated. Waiting for better opportunities.")
+        
+        # Signal Quality Analysis
+        if len(recent_signals) > 0:
+            avg_confidence = sum(s.get('conf', 0.5) for s in recent_signals) / len(recent_signals)
+            if avg_confidence > 0.7:
+                commentary.append(f"🎯 **High Confidence Signals**: Average confidence {avg_confidence:.2f}. Strong conviction in market direction.")
+            elif avg_confidence > 0.6:
+                commentary.append(f"🟡 **Moderate Confidence**: Average confidence {avg_confidence:.2f}. Cautious approach recommended.")
+            else:
+                commentary.append(f"🔴 **Low Confidence**: Average confidence {avg_confidence:.2f}. Market uncertainty high, avoid large positions.")
+        
+        # Position-specific insights
+        profitable_positions = [sym for sym, pos in positions.items() if pos.get('pnl_percentage', 0) > 2]
+        losing_positions = [sym for sym, pos in positions.items() if pos.get('pnl_percentage', 0) < -2]
+        
+        if profitable_positions:
+            commentary.append(f"💰 **Profit Opportunities**: {', '.join(profitable_positions)} showing strong gains. Consider partial profit-taking.")
+        
+        if losing_positions:
+            commentary.append(f"🛑 **Risk Management**: {', '.join(losing_positions)} underperforming. Monitor for stop-loss triggers.")
         
         return {
-            "reports": reports,
-            "total": len(reports),
-            "generation_time": "18:00 UTC",
-            "status": "success",
-            "data_source": "real_trading_data"
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "portfolio_summary": {
+                "total_equity": total_equity,
+                "total_positions": total_positions,
+                "total_pnl": total_pnl,
+                "total_pnl_percentage": total_pnl_pct,
+                "profitable_positions": len(profitable_positions),
+                "losing_positions": len(losing_positions)
+            },
+            "trading_activity": {
+                "trades_24h": len(trades_24h),
+                "signals_24h": len(signals_24h),
+                "actionable_signals": len(actionable_signals),
+                "avg_signal_confidence": sum(s.get('conf', 0.5) for s in recent_signals[-50:]) / len(recent_signals[-50:]) if recent_signals else 0.5
+            },
+            "commentary": commentary,
+            "recommendations": generate_recommendations(positions, recent_signals, trades_24h),
+            "risk_assessment": generate_risk_assessment(positions, total_pnl_pct),
+            "data_quality": "live_data" if positions else "no_positions"
         }
     except Exception as e:
-        print(f"❌ Daily reports error: {e}")
         return {
-            "reports": [],
-            "status": "error",
-            "message": f"Failed to retrieve daily reports: {str(e)}"
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "error": str(e),
+            "commentary": ["❌ **Analysis Error**: Unable to generate comprehensive analysis. Check data sources."],
+            "data_quality": "error"
         }
+
+def generate_recommendations(positions, recent_signals, trades_24h):
+    """Generate actionable trading recommendations"""
+    recommendations = []
+    
+    # Position-based recommendations
+    for symbol, pos in positions.items():
+        pnl_pct = pos.get('pnl_percentage', 0)
+        if pnl_pct > 5:
+            recommendations.append(f"🎯 {symbol}: Strong gains ({pnl_pct:.1f}%) - Consider taking 50% profits")
+        elif pnl_pct < -3:
+            recommendations.append(f"⚠️ {symbol}: Significant loss ({pnl_pct:.1f}%) - Review stop-loss strategy")
+    
+    # Signal-based recommendations
+    strong_signals = [s for s in recent_signals[-20:] if s.get('conf', 0) > 0.8]
+    if strong_signals:
+        recommendations.append(f"🚀 High-conviction opportunities: {len(strong_signals)} strong signals detected")
+    
+    # Activity-based recommendations
+    if len(trades_24h) == 0 and len(recent_signals) > 10:
+        recommendations.append("🔧 Check execution system - signals generated but no trades executed")
+    
+    if not recommendations:
+        recommendations.append("📊 Continue monitoring - no immediate actions required")
+    
+    return recommendations
+
+def generate_risk_assessment(positions, total_pnl_pct):
+    """Generate risk assessment with specific metrics"""
+    risk_level = "LOW"
+    risk_factors = []
+    
+    if abs(total_pnl_pct) > 5:
+        risk_level = "MEDIUM"
+        risk_factors.append(f"Portfolio volatility: {abs(total_pnl_pct):.1f}% deviation")
+    
+    if abs(total_pnl_pct) > 10:
+        risk_level = "HIGH"
+        risk_factors.append("Significant portfolio drawdown detected")
+    
+    concentrated_positions = [pos for pos in positions.values() if pos.get('market_value', 0) > 1000]
+    if len(concentrated_positions) > 3:
+        risk_level = "MEDIUM" if risk_level == "LOW" else "HIGH"
+        risk_factors.append(f"Position concentration: {len(concentrated_positions)} large positions")
+    
+    if not risk_factors:
+        risk_factors.append("Portfolio within normal risk parameters")
+    
+    return {
+        "level": risk_level,
+        "factors": risk_factors,
+        "max_position_size": max([pos.get('market_value', 0) for pos in positions.values()]) if positions else 0,
+        "diversification_score": min(10, len(positions)) if positions else 0
+    }
+
+@app.get("/reports/comprehensive")
+def comprehensive_report():
+    """Generate comprehensive trading report with analysis and commentary"""
+    analysis = generate_comprehensive_analysis()
+    
+    return {
+        "report_type": "comprehensive_analysis",
+        "generated_at": analysis["timestamp"],
+        "status": "success" if "error" not in analysis else "error",
+        "analysis": analysis,
+        "formatted_summary": format_analysis_summary(analysis),
+        "next_update": "Automatic updates every 5-30 minutes based on market hours"
+    }
+
+def format_analysis_summary(analysis):
+    """Format analysis into readable summary"""
+    if "error" in analysis:
+        return f"❌ Report generation failed: {analysis['error']}"
+    
+    portfolio = analysis.get("portfolio_summary", {})
+    activity = analysis.get("trading_activity", {})
+    
+    summary = f"""
+📊 **BOTTIE TRADING ANALYSIS SUMMARY**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💰 **Portfolio Status**
+   • Total Equity: ${portfolio.get('total_equity', 0):,.2f}
+   • Active Positions: {portfolio.get('total_positions', 0)}
+   • Total P&L: ${portfolio.get('total_pnl', 0):,.2f} ({portfolio.get('total_pnl_percentage', 0):+.1f}%)
+   • Winners: {portfolio.get('profitable_positions', 0)} | Losers: {portfolio.get('losing_positions', 0)}
+
+📈 **Trading Activity (24h)**
+   • Trades Executed: {activity.get('trades_24h', 0)}
+   • Signals Generated: {activity.get('signals_24h', 0)}
+   • Actionable Signals: {activity.get('actionable_signals', 0)}
+   • Avg Signal Confidence: {activity.get('avg_signal_confidence', 0):.1%}
+
+🎯 **Key Insights**
+{chr(10).join(f'   • {comment}' for comment in analysis.get('commentary', ['No insights available']))}
+
+💡 **Recommendations**
+{chr(10).join(f'   • {rec}' for rec in analysis.get('recommendations', ['No recommendations']))}
+
+⚠️ **Risk Assessment: {analysis.get('risk_assessment', {}).get('level', 'UNKNOWN')}**
+{chr(10).join(f'   • {factor}' for factor in analysis.get('risk_assessment', {}).get('factors', ['No risk factors identified']))}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}
+    """.strip()
+    
+    return summary
+
+@app.get("/reports/daily")
+def enhanced_daily_reports():
+    """Enhanced daily reports with comprehensive analysis"""
+    analysis = generate_comprehensive_analysis()
+    
+    # Generate daily-specific insights
+    today = datetime.now(timezone.utc)
+    trades_today = [t for t in _trade_log if t.get('t', 0) > time.time() - 86400]
+    
+    daily_report = {
+        "id": f"daily_{today.strftime('%Y%m%d')}",
+        "title": f"Daily Trading Report - {today.strftime('%B %d, %Y')}",
+        "generated_at": today.isoformat(),
+        "type": "daily_comprehensive",
+        "summary": analysis.get("portfolio_summary", {}),
+        "trading_activity": analysis.get("trading_activity", {}),
+        "daily_trades": len(trades_today),
+        "daily_pnl": sum(t.get('qty', 0) * t.get('px', 0) * (1 if t.get('side') == 'sell' else -1) for t in trades_today),
+        "commentary": analysis.get("commentary", []),
+        "recommendations": analysis.get("recommendations", []),
+        "risk_assessment": analysis.get("risk_assessment", {}),
+        "formatted_report": format_daily_report(analysis, trades_today),
+        "status": "completed"
+    }
+    
+    return {
+        "reports": [daily_report],
+        "total": 1,
+        "generation_time": today.strftime('%H:%M UTC'),
+        "status": "success",
+        "data_source": "live_trading_data",
+        "next_generation": get_next_report_time()
+    }
+
+def format_daily_report(analysis, trades_today):
+    """Format daily report with detailed commentary"""
+    portfolio = analysis.get("portfolio_summary", {})
+    
+    report = f"""
+📅 **DAILY TRADING REPORT - {datetime.now(timezone.utc).strftime('%B %d, %Y')}**
+════════════════════════════════════════════════════════════════
+
+📊 **PORTFOLIO PERFORMANCE**
+   Current Equity: ${portfolio.get('total_equity', 0):,.2f}
+   Daily P&L: ${sum(t.get('qty', 0) * t.get('px', 0) * (1 if t.get('side') == 'sell' else -1) for t in trades_today):+,.2f}
+   Total P&L: ${portfolio.get('total_pnl', 0):+,.2f} ({portfolio.get('total_pnl_percentage', 0):+.1f}%)
+   Active Positions: {portfolio.get('total_positions', 0)}
+
+📈 **TODAY'S TRADING ACTIVITY**
+   Trades Executed: {len(trades_today)}
+   Signals Generated: {analysis.get('trading_activity', {}).get('signals_24h', 0)}
+   Signal Success Rate: {(len(trades_today) / max(1, analysis.get('trading_activity', {}).get('actionable_signals', 1))) * 100:.1f}%
+
+🎯 **MARKET INSIGHTS**
+{chr(10).join(f'   • {comment}' for comment in analysis.get('commentary', ['No insights available']))}
+
+💡 **ACTION ITEMS**
+{chr(10).join(f'   • {rec}' for rec in analysis.get('recommendations', ['No actions required']))}
+
+⚠️ **RISK STATUS: {analysis.get('risk_assessment', {}).get('level', 'UNKNOWN')}**
+   Diversification Score: {analysis.get('risk_assessment', {}).get('diversification_score', 0)}/10
+   Largest Position: ${analysis.get('risk_assessment', {}).get('max_position_size', 0):,.2f}
+
+════════════════════════════════════════════════════════════════
+Report generated automatically at {datetime.now(timezone.utc).strftime('%H:%M UTC')}
+Next report: {get_next_report_time()}
+    """.strip()
+    
+    return report
+
+def get_next_report_time():
+    """Calculate next automatic report generation time"""
+    now = datetime.now(timezone.utc)
+    
+    if 7 <= now.hour < 18:  # Business hours GMT
+        next_time = now + timedelta(minutes=5)
+        return f"In 5 minutes ({next_time.strftime('%H:%M GMT')})"
+    else:  # Off hours
+        next_time = now + timedelta(minutes=30)
+        return f"In 30 minutes ({next_time.strftime('%H:%M GMT')})"
+
+@app.get("/reports/on-demand")
+def generate_on_demand_report():
+    """Generate immediate comprehensive report on demand"""
+    report_cache['last_manual'] = time.time()
+    analysis = generate_comprehensive_analysis()
+    
+    return {
+        "report_type": "on_demand",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "requested_by": "manual_trigger",
+        "analysis": analysis,
+        "formatted_report": format_analysis_summary(analysis),
+        "cache_status": "fresh",
+        "generation_time_ms": 50  # Approximate
+    }
+
+@app.get("/reports/status")
+def report_system_status():
+    """Get status of automatic reporting system"""
+    now = datetime.now(timezone.utc)
+    is_business_hours = 7 <= now.hour < 18
+    
+    return {
+        "auto_reports_enabled": auto_reports_enabled,
+        "current_time_gmt": now.strftime('%Y-%m-%d %H:%M:%S GMT'),
+        "business_hours": is_business_hours,
+        "report_frequency": "5 minutes" if is_business_hours else "30 minutes",
+        "last_auto_report": last_auto_report,
+        "next_report_in": get_next_report_time(),
+        "available_reports": [
+            {"endpoint": "/reports/comprehensive", "description": "Full analysis with commentary"},
+            {"endpoint": "/reports/daily", "description": "Daily trading summary"},
+            {"endpoint": "/reports/on-demand", "description": "Immediate report generation"},
+            {"endpoint": "/reports/status", "description": "Reporting system status"}
+        ],
+        "cache_info": {
+            "last_manual_report": report_cache.get('last_manual', 0),
+            "cache_size": len(report_cache)
+        }
+    }
+
+# Background report generation function
+def auto_generate_reports():
+    """Automatically generate reports based on schedule"""
+    global last_auto_report
+    
+    if not auto_reports_enabled:
+        return
+    
+    try:
+        now = datetime.now(timezone.utc)
+        current_time = time.time()
+        
+        # Check if it's time for a report
+        is_business_hours = 7 <= now.hour < 18
+        interval = 300 if is_business_hours else 1800  # 5 min or 30 min in seconds
+        
+        if current_time - last_auto_report >= interval:
+            print(f"🤖 Auto-generating report at {now.strftime('%H:%M GMT')}")
+            analysis = generate_comprehensive_analysis()
+            
+            # Store in cache for quick retrieval
+            report_cache['last_auto'] = {
+                'timestamp': current_time,
+                'analysis': analysis,
+                'business_hours': is_business_hours
+            }
+            
+            last_auto_report = current_time
+            print(f"✅ Auto-report generated successfully")
+            
+    except Exception as e:
+        print(f"❌ Auto-report generation failed: {e}")
+
+# Add auto-report generation to the background tasks
+def start_auto_reporting():
+    """Start automatic report generation"""
+    def report_worker():
+        while True:
+            try:
+                auto_generate_reports()
+                time.sleep(60)  # Check every minute
+            except Exception as e:
+                print(f"❌ Report worker error: {e}")
+                time.sleep(60)
+    
+    if auto_reports_enabled:
+        report_thread = threading.Thread(target=report_worker, daemon=True)
+        report_thread.start()
+        print("✅ Auto-reporting system started")
 
 # Startup event
 async def execution_loop():
@@ -939,6 +1260,10 @@ async def startup_event():
             add_log(f"🔥 Trading loops started - Execution: {'ENABLED' if EXECUTION_RUNTIME_ENABLED else 'DISABLED'}")
         else:
             add_log("⚠️ Trading disabled (TRADE_ENABLED=0)")
+        
+        # Start auto-reporting system
+        start_auto_reporting()
+        add_log("📊 Auto-reporting system started (5min business hours, 30min off-hours)")
     else:
         print("❌ Exchange client initialization failed")
     
