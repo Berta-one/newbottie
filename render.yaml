@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: bottie-api
+    name: sntax-api
     runtime: python
     buildCommand: |
       python -m pip install --upgrade pip

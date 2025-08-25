@@ -50,7 +50,7 @@ except Exception as e:
     print(f"⚠️ Data processing not available: {e}")
 
 # FastAPI app
-app = FastAPI(title="Bottie Render API", version="1.0.1")
+app = FastAPI(title="Sntax Trading API", version="1.0.1")
 
 # CORS setup - Allow all origins for Netlify
 app.add_middleware(
@@ -390,7 +390,7 @@ def root():
         return FileResponse('reports-dashboard.html')
     else:
         # Fallback to API info
-        return {"status": "ok", "service": "bottie-render-api", "version": "1.0.1"}
+        return {"status": "ok", "service": "sntax-trading-api", "version": "1.0.1"}
 
 # Main dashboard data endpoint with P&L slate
 @app.get("/dashboard/main")
@@ -1587,7 +1587,7 @@ def get_recent_trades():
 
 @app.on_event("startup")
 async def startup_event():
-    print("🚀 Bottie Render API starting...")
+    print("🚀 Sntax Trading API starting...")
     
     # Initialize exchange but don't start trading loops (prevents startup crashes)
     if initialize_exchange():
@@ -1597,7 +1597,7 @@ async def startup_event():
         print("⚠️ Exchange client initialization skipped (no credentials)")
         add_log("⚠️ Exchange client not available - API will serve cached/demo data")
     
-    print("✅ Render API ready")
+    print("✅ Sntax API ready")
 
 if __name__ == "__main__":
     import uvicorn

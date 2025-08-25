@@ -53,7 +53,7 @@ except Exception as e:
     print(f"⚠️ HTTP requests not available: {e}")
 
 # FastAPI app for real trading
-app = FastAPI(title="Bottie API (Real Trading)", version="4.0.0")
+app = FastAPI(title="Sntax Trading API", version="4.0.0")
 
 # include version diagnostics
 app.include_router(diagnostics.router)
@@ -498,7 +498,7 @@ def get_simulated_market_data():
 def root():
     return {
         "status": "ok",
-        "service": "bottie-real-trading",
+        "service": "sntax-trading",
         "time": time.time(),
         "mode": "LIVE" if (exchange_client and not exchange_client.sandbox) else "TESTNET",
         "features": {
@@ -537,7 +537,7 @@ def health():
     return {
         "status": "UP",
         "ok": True,
-        "service": "bottie-real-trading",
+        "service": "sntax-trading",
         "time": int(time.time()),
         "exchange": "binance",
         "exchange_status": exchange_status,
