@@ -475,6 +475,13 @@
                         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                     }
                     
+                    // Check if response is actually JSON
+                    const contentType = response.headers.get('content-type');
+                    if (!contentType || !contentType.includes('application/json')) {
+                        const text = await response.text();
+                        throw new Error(`Expected JSON but got ${contentType}. Response: ${text.substring(0, 100)}`);
+                    }
+                    
                     const data = await response.json();
                     console.log(`✅ Loaded ${endpoint.name}:`, Object.keys(data));
                     this.endpointData[endpoint.name] = data;
@@ -645,8 +652,25 @@
                         fetch(`${this.apiUrl}/status`)
                     ]);
 
-                    const signalsData = await signalsRes.json();
-                    const statusData = await positionsRes.json();
+                    // Safely parse JSON responses
+                    let signalsData = {};
+                    let statusData = {};
+                    
+                    try {
+                        if (signalsRes.ok && signalsRes.headers.get('content-type')?.includes('application/json')) {
+                            signalsData = await signalsRes.json();
+                        }
+                    } catch (e) {
+                        console.error('Error parsing signals response:', e);
+                    }
+                    
+                    try {
+                        if (positionsRes.ok && positionsRes.headers.get('content-type')?.includes('application/json')) {
+                            statusData = await positionsRes.json();
+                        }
+                    } catch (e) {
+                        console.error('Error parsing status response:', e);
+                    }
                     
                     const signals = signalsData.signals || [];
                     const positions = statusData.positions || {};
@@ -720,10 +744,23 @@
                     method: 'POST',
                     headers: { 'X-Dashboard-Password': DASHBOARD_PASSWORD }
                 });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                // Check if response is JSON
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const text = await response.text();
+                    throw new Error(`Expected JSON response but got ${contentType}`);
+                }
+                
                 const data = await response.json();
                 alert(data.ok ? '✅ Trading started!' : '❌ Failed to start trading');
-                dashboard.updateTradingStatus();
+                if (dashboard) dashboard.updateTradingStatus();
             } catch (error) {
+                console.error('Trading start error:', error);
                 alert('❌ Error: ' + error.message);
             }
         }
@@ -735,10 +772,23 @@
                         method: 'POST',
                         headers: { 'X-Dashboard-Password': DASHBOARD_PASSWORD }
                     });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    // Check if response is JSON
+                    const contentType = response.headers.get('content-type');
+                    if (!contentType || !contentType.includes('application/json')) {
+                        const text = await response.text();
+                        throw new Error(`Expected JSON response but got ${contentType}`);
+                    }
+                    
                     const data = await response.json();
                     alert(data.ok ? '🛑 Trading stopped!' : '❌ Failed to stop trading');
-                    dashboard.updateTradingStatus();
+                    if (dashboard) dashboard.updateTradingStatus();
                 } catch (error) {
+                    console.error('Trading stop error:', error);
                     alert('❌ Error: ' + error.message);
                 }
             }
@@ -1004,9 +1054,22 @@
             
             try {
                 const response = await fetch(`${API_BASE}${endpoint}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                // Check if response is JSON
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const text = await response.text();
+                    throw new Error(`Expected JSON but got ${contentType}. Response: ${text.substring(0, 100)}`);
+                }
+                
                 const data = await response.json();
                 document.getElementById('modalContent').innerHTML = formatter(data);
             } catch (error) {
+                console.error('Modal data fetch error:', error);
                 document.getElementById('modalContent').innerHTML = `
                     <div style="text-align: center; color: #f44336; padding: 2rem;">
                         <div>❌ Error loading data</div>
