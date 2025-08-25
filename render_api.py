@@ -345,47 +345,9 @@ def get_real_positions():
             print(f"⚠️ Exchange positions failed (likely geographic restriction): {e}")
             # Fall through to demo data
     
-    # Fallback to demo positions when exchange is unavailable
-    print("📊 Using demo positions data due to exchange restrictions")
-    demo_positions = {
-        "BTCUSDT": {
-            'quantity': 0.001,
-            'current_price': 95000.00,
-            'avg_buy_price': 92000.00,
-            'pnl': 3.00,
-            'pnl_percentage': 3.26,
-            'market_value': 95.00,
-            'source': 'demo_data'
-        },
-        "ETHUSDT": {
-            'quantity': 0.05,
-            'current_price': 3500.00,
-            'avg_buy_price': 3300.00,
-            'pnl': 10.00,
-            'pnl_percentage': 6.06,
-            'market_value': 175.00,
-            'source': 'demo_data'
-        },
-        "ADAUSDT": {
-            'quantity': 100.0,
-            'current_price': 0.85,
-            'avg_buy_price': 0.80,
-            'pnl': 5.00,
-            'pnl_percentage': 6.25,
-            'market_value': 85.00,
-            'source': 'demo_data'
-        },
-        "SOLUSDT": {
-            'quantity': 2.0,
-            'current_price': 185.00,
-            'avg_buy_price': 170.00,
-            'pnl': 30.00,
-            'pnl_percentage': 8.82,
-            'market_value': 370.00,
-            'source': 'demo_data'
-        }
-    }
-    return demo_positions
+    # No fallback data - return empty if exchange unavailable
+    print("❌ Exchange connection failed - cannot provide real position data")
+    return {}
 
 def get_real_balance():
     """Get real balance from exchange - with fallback for geographic restrictions"""
@@ -409,9 +371,8 @@ def get_real_balance():
             print(f"⚠️ Exchange connection failed (likely geographic restriction): {e}")
             # Fall through to demo data
     
-    # Fallback to demo data when exchange is unavailable
-    print("📊 Using demo balance data due to exchange restrictions")
-    return {'total_usdt': 7650.0, 'source': 'demo_data'}
+    # No fallback data - return error if exchange unavailable
+    return {'total_usdt': 0, 'source': 'exchange_unavailable', 'error': 'Exchange connection failed'}
 
 # Root endpoint
 @app.get("/")

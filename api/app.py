@@ -44,6 +44,14 @@ except Exception as e:
     DATA_AVAILABLE = False
     print(f"⚠️ Data processing not available: {e}")
 
+try:
+    import requests
+    REQUESTS_AVAILABLE = True
+    print("✅ HTTP requests available for alternative data sources")
+except Exception as e:
+    REQUESTS_AVAILABLE = False
+    print(f"⚠️ HTTP requests not available: {e}")
+
 # FastAPI app for real trading
 app = FastAPI(title="Bottie API (Real Trading)", version="4.0.0")
 
@@ -230,6 +238,68 @@ def initialize_real_exchange():
         log_startup(f"❌ Traceback: {traceback.format_exc()}")
         return False
 
+def get_real_crypto_prices(symbols=None):
+    """Get real crypto prices from alternative APIs when Binance is blocked"""
+    if not REQUESTS_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Cannot fetch real crypto prices - requests library unavailable")
+    
+    if symbols is None:
+        symbols = ['BTC', 'ETH', 'ADA', 'SOL', 'BNB', 'MATIC', 'DOT', 'LINK']
+    
+    prices = {}
+    
+    try:
+        # Try Coinbase API first
+        print("📊 Fetching real crypto prices from Coinbase...")
+        for symbol in symbols:
+            try:
+                response = requests.get(f"https://api.coinbase.com/v2/exchange-rates?currency={symbol}", timeout=10)
+                if response.status_code == 200:
+                    data = response.json()
+                    usd_rate = float(data['data']['rates']['USD'])
+                    prices[f"{symbol}USDT"] = usd_rate
+                    print(f"✅ {symbol}: ${usd_rate:.2f}")
+            except Exception as e:
+                print(f"⚠️ Failed to get {symbol} price from Coinbase: {e}")
+                continue
+        
+        if len(prices) > 0:
+            print(f"✅ Got {len(prices)} real crypto prices from Coinbase")
+            return prices
+            
+    except Exception as e:
+        print(f"❌ Coinbase API failed: {e}")
+    
+    # Fallback to CoinGecko if Coinbase fails
+    try:
+        print("📊 Trying CoinGecko as backup...")
+        coin_ids = {
+            'BTC': 'bitcoin', 'ETH': 'ethereum', 'ADA': 'cardano', 
+            'SOL': 'solana', 'BNB': 'binancecoin', 'MATIC': 'matic-network',
+            'DOT': 'polkadot', 'LINK': 'chainlink'
+        }
+        
+        ids_str = ','.join(coin_ids.values())
+        response = requests.get(f"https://api.coingecko.com/api/v3/simple/price?ids={ids_str}&vs_currencies=usd", timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            for symbol, coin_id in coin_ids.items():
+                if coin_id in data and 'usd' in data[coin_id]:
+                    prices[f"{symbol}USDT"] = data[coin_id]['usd']
+            
+            print(f"✅ Got {len(prices)} real crypto prices from CoinGecko")
+            return prices
+            
+    except Exception as e:
+        print(f"❌ CoinGecko API failed: {e}")
+    
+    # If all APIs fail, raise error (no fallback data)
+    raise HTTPException(
+        status_code=503,
+        detail="Cannot fetch real crypto prices - all data sources unavailable"
+    )
+
 def get_real_balance():
     """Get actual account balance - with fallback for geographic restrictions"""
     global real_balance
@@ -265,21 +335,11 @@ def get_real_balance():
             print(f"⚠️ Exchange connection failed (likely geographic restriction): {e}")
             # Fall through to demo data
     
-    # Fallback to demo data when exchange is unavailable
-    print("📊 Using demo balance data due to exchange restrictions")
-    demo_balance = {
-        'USDT': 1000.0,
-        'BTC': 0.001,
-        'ETH': 0.05,
-        'ADA': 100.0,
-        'SOL': 2.0,
-        'BNB': 1.5,
-        'MATIC': 50.0,
-        'DOT': 5.0,
-        'LINK': 3.0,
-        'total_usdt': 7650.0  # Realistic portfolio value
-    }
-    return demo_balance
+    # No fallback data - return error if exchange unavailable
+    raise HTTPException(
+        status_code=503, 
+        detail="Exchange connection failed - cannot provide real balance data. Please check API credentials and network connectivity."
+    )
 
 def get_real_positions():
     """Get actual open positions - with fallback for geographic restrictions"""
@@ -363,43 +423,11 @@ def get_real_positions():
             print(f"⚠️ Exchange positions failed (likely geographic restriction): {e}")
             # Fall through to demo data
     
-    # Fallback to demo positions when exchange is unavailable
-    print("📊 Using demo positions data due to exchange restrictions")
-    demo_positions = {
-        "BTCUSDT": {
-            "symbol": "BTCUSDT",
-            "quantity": 0.001,
-            "current_price": 95000.00,
-            "market_value": 95.00,
-            "side": "LONG",
-            "type": "SPOT_HOLDING"
-        },
-        "ETHUSDT": {
-            "symbol": "ETHUSDT", 
-            "quantity": 0.05,
-            "current_price": 3500.00,
-            "market_value": 175.00,
-            "side": "LONG",
-            "type": "SPOT_HOLDING"
-        },
-        "ADAUSDT": {
-            "symbol": "ADAUSDT",
-            "quantity": 100.0,
-            "current_price": 0.85,
-            "market_value": 85.00,
-            "side": "LONG",
-            "type": "SPOT_HOLDING"
-        },
-        "SOLUSDT": {
-            "symbol": "SOLUSDT",
-            "quantity": 2.0,
-            "current_price": 185.00,
-            "market_value": 370.00,
-            "side": "LONG", 
-            "type": "SPOT_HOLDING"
-        }
-    }
-    return demo_positions
+    # No fallback data - return error if exchange unavailable
+    raise HTTPException(
+        status_code=503,
+        detail="Exchange connection failed - cannot provide real position data. Please check API credentials and network connectivity."
+    )
 
 def get_real_market_data():
     """Get real market data from exchange"""
@@ -479,6 +507,20 @@ def root():
             "live_mode": exchange_client and not exchange_client.sandbox if exchange_client else False
         }
     }
+
+@app.get("/crypto/prices")
+def crypto_prices():
+    """Get real crypto prices from alternative data sources"""
+    try:
+        prices = get_real_crypto_prices()
+        return {
+            "success": True,
+            "prices": prices,
+            "source": "real_market_data",
+            "timestamp": time.time()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
 @app.get("/health")
 def health():
