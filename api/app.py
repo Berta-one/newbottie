@@ -451,15 +451,25 @@ def root():
 
 @app.get("/health")
 def health():
-    balance = get_real_balance()
+    # Simple health check without requiring Binance connection
+    try:
+        balance = get_real_balance()
+        equity = balance['total_usdt']
+        exchange_status = "connected"
+    except Exception as e:
+        # If Binance fails, return basic health info
+        equity = 0.0
+        exchange_status = f"error: {str(e)[:50]}..."
+    
     return {
         "status": "UP",
         "ok": True,
         "service": "bottie-real-trading",
         "time": int(time.time()),
         "exchange": "binance",
+        "exchange_status": exchange_status,
         "mode": "LIVE" if (exchange_client and not exchange_client.sandbox) else "TESTNET",
-        "equity": balance['total_usdt'],
+        "equity": equity,
         "quantum": {
             "enabled": True,
             "backend": "binance_live_data",
