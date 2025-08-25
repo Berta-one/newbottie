@@ -392,18 +392,26 @@
         const DASHBOARD_PASSWORD = 'bottie2024';
         let isAuthenticated = false;
 
-        // Authentication
+        // Authentication with debugging
         function authenticate() {
+            console.log('🔧 Authenticate function called');
+            
             const password = document.getElementById('passwordInput').value;
             const errorDiv = document.getElementById('loginError');
             
+            console.log('Password entered:', password);
+            console.log('Expected password:', DASHBOARD_PASSWORD);
+            console.log('Match:', password === DASHBOARD_PASSWORD);
+            
             if (password === DASHBOARD_PASSWORD) {
+                console.log('✅ Login successful');
                 isAuthenticated = true;
                 document.getElementById('loginScreen').style.display = 'none';
                 document.getElementById('dashboard').classList.add('authenticated');
                 initDashboard();
                 errorDiv.textContent = '';
             } else {
+                console.log('❌ Login failed');
                 errorDiv.textContent = 'Invalid password. Please try again.';
                 document.getElementById('passwordInput').value = '';
             }
@@ -1025,6 +1033,15 @@
 
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🌟 Sntax Trading Dashboard loaded');
+            console.log('🔧 Testing authenticate function:', typeof authenticate);
+            console.log('🔧 DASHBOARD_PASSWORD:', DASHBOARD_PASSWORD);
+            
+            // Focus on password input
+            const passwordInput = document.getElementById('passwordInput');
+            if (passwordInput) {
+                passwordInput.focus();
+                console.log('✅ Password input focused');
+            }
         });
 
         // Close modal when clicking outside
