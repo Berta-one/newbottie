@@ -320,6 +320,127 @@
             color: #f44336;
             border: 1px solid rgba(244, 67, 54, 0.3);
         }
+
+        /* Data Table Styles */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+            background: rgba(26, 35, 50, 0.5);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid rgba(100, 255, 218, 0.1);
+        }
+
+        .data-table th {
+            background: rgba(100, 255, 218, 0.1);
+            color: #64ffda;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .data-table tbody tr:hover {
+            background: rgba(100, 255, 218, 0.05);
+        }
+
+        /* Status Styles */
+        .status-pending { color: #ffa726; }
+        .status-filled { color: #4caf50; }
+        .status-cancelled { color: #f44336; }
+        .status-rejected { color: #f44336; }
+
+        /* Confidence Styles */
+        .confidence-high { color: #4caf50; font-weight: bold; }
+        .confidence-medium { color: #ffa726; font-weight: bold; }
+        .confidence-low { color: #f44336; font-weight: bold; }
+
+        /* Signal Styles */
+        .signal-buy { 
+            color: #4caf50; 
+            background: rgba(76, 175, 80, 0.2);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .signal-sell { 
+            color: #f44336; 
+            background: rgba(244, 67, 54, 0.2);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .signal-hold { 
+            color: #ffa726; 
+            background: rgba(255, 167, 38, 0.2);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+
+        /* Metric Styles */
+        .sentiment-overview, .ml-overview, .health-overview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .sentiment-metric, .ml-metric, .health-metric {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.75rem;
+            background: rgba(26, 35, 50, 0.5);
+            border-radius: 8px;
+            border: 1px solid rgba(100, 255, 218, 0.1);
+        }
+
+        /* Logs Styles */
+        .logs-container {
+            max-height: 400px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .log-entry {
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+            padding: 0.5rem;
+            border-radius: 4px;
+            border-left: 3px solid;
+        }
+
+        .log-error {
+            background: rgba(244, 67, 54, 0.1);
+            border-left-color: #f44336;
+            color: #ffcdd2;
+        }
+
+        .log-warning {
+            background: rgba(255, 167, 38, 0.1);
+            border-left-color: #ffa726;
+            color: #ffe0b2;
+        }
+
+        .log-success {
+            background: rgba(76, 175, 80, 0.1);
+            border-left-color: #4caf50;
+            color: #c8e6c9;
+        }
+
+        .log-info {
+            background: rgba(100, 255, 218, 0.1);
+            border-left-color: #64ffda;
+            color: #e0f2f1;
+        }
     </style>
 </head>
 <body>
@@ -580,11 +701,31 @@
             }
 
             handleSlateClick(endpoint) {
-                if (endpoint.special === 'signals_table') {
-                    this.showSignalsTable();
-                } else {
-                    // Handle other slate clicks
-                    console.log(`Clicked ${endpoint.name}`);
+                switch(endpoint.name) {
+                    case 'signals':
+                        this.showSignalsTable();
+                        break;
+                    case 'trades':
+                        this.showTradesModal();
+                        break;
+                    case 'positions':
+                        this.showPositionsModal();
+                        break;
+                    case 'sentiment':
+                        this.showSentimentModal();
+                        break;
+                    case 'ml':
+                        this.showMLModal();
+                        break;
+                    case 'logs':
+                        this.showLogsModal();
+                        break;
+                    case 'health':
+                        this.showHealthModal();
+                        break;
+                    default:
+                        this.showGenericModal(endpoint);
+                        break;
                 }
             }
 
@@ -776,10 +917,328 @@
                     alert('❌ Error: ' + error.message);
                 }
             }
+
+            // Additional Modal Functions
+            async showTradesModal() {
+                this.showDataModal('Trades History', '/trades/recent', (data) => {
+                    const trades = data.trades || [];
+                    if (trades.length === 0) {
+                        return '<div style="text-align: center; color: #ffa726; padding: 2rem;">No trades executed yet</div>';
+                    }
+                    
+                    let tableHTML = `
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Symbol</th>
+                                    <th>Side</th>
+                                    <th>Quantity</th>
+                                    <th>Price</th>
+                                    <th>P&L</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                    `;
+                    
+                    trades.forEach(trade => {
+                        const pnlColor = trade.pnl > 0 ? '#4caf50' : (trade.pnl < 0 ? '#f44336' : '#ffa726');
+                        const sideColor = trade.side === 'BUY' ? '#4caf50' : '#f44336';
+                        
+                        tableHTML += `
+                            <tr>
+                                <td>${new Date(trade.timestamp).toLocaleString()}</td>
+                                <td><strong>${trade.symbol}</strong></td>
+                                <td><span style="color: ${sideColor}; font-weight: bold;">${trade.side}</span></td>
+                                <td>${trade.quantity}</td>
+                                <td>$${trade.price ? trade.price.toFixed(4) : 'N/A'}</td>
+                                <td style="color: ${pnlColor}; font-weight: bold;">${trade.pnl ? '$' + trade.pnl.toFixed(2) : 'N/A'}</td>
+                                <td><span class="status-${trade.status?.toLowerCase() || 'pending'}">${trade.status || 'Pending'}</span></td>
+                            </tr>
+                        `;
+                    });
+                    
+                    tableHTML += '</tbody></table>';
+                    return tableHTML;
+                });
+            }
+
+            async showPositionsModal() {
+                this.showDataModal('Current Positions', '/positions', (data) => {
+                    const positions = data.positions || {};
+                    const positionList = Object.entries(positions);
+                    
+                    if (positionList.length === 0) {
+                        return '<div style="text-align: center; color: #ffa726; padding: 2rem;">No open positions</div>';
+                    }
+                    
+                    let tableHTML = `
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th>Quantity</th>
+                                    <th>Entry Price</th>
+                                    <th>Current Price</th>
+                                    <th>Unrealized P&L</th>
+                                    <th>% Change</th>
+                                    <th>Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                    `;
+                    
+                    positionList.forEach(([symbol, position]) => {
+                        const pnl = position.unrealized_pnl || 0;
+                        const pnlColor = pnl > 0 ? '#4caf50' : (pnl < 0 ? '#f44336' : '#ffa726');
+                        const changePercent = position.change_percent || 0;
+                        const changeColor = changePercent > 0 ? '#4caf50' : (changePercent < 0 ? '#f44336' : '#ffa726');
+                        
+                        tableHTML += `
+                            <tr>
+                                <td><strong>${symbol}</strong></td>
+                                <td>${position.quantity || 0}</td>
+                                <td>$${position.entry_price ? position.entry_price.toFixed(4) : 'N/A'}</td>
+                                <td>$${position.current_price ? position.current_price.toFixed(4) : 'N/A'}</td>
+                                <td style="color: ${pnlColor}; font-weight: bold;">$${pnl.toFixed(2)}</td>
+                                <td style="color: ${changeColor}; font-weight: bold;">${changePercent.toFixed(2)}%</td>
+                                <td>$${position.market_value ? position.market_value.toFixed(2) : 'N/A'}</td>
+                            </tr>
+                        `;
+                    });
+                    
+                    tableHTML += '</tbody></table>';
+                    return tableHTML;
+                });
+            }
+
+            async showSentimentModal() {
+                this.showDataModal('Sentiment Analysis', '/sentiment', (data) => {
+                    const sentiment = data.sentiment || {};
+                    
+                    let contentHTML = `
+                        <div class="sentiment-overview">
+                            <div class="sentiment-metric">
+                                <span>Overall Sentiment:</span>
+                                <span style="color: ${sentiment.overall === 'positive' ? '#4caf50' : sentiment.overall === 'negative' ? '#f44336' : '#ffa726'}">
+                                    ${sentiment.overall ? sentiment.overall.toUpperCase() : 'NEUTRAL'}
+                                </span>
+                            </div>
+                            <div class="sentiment-metric">
+                                <span>Confidence Score:</span>
+                                <span>${sentiment.confidence ? (sentiment.confidence * 100).toFixed(1) + '%' : 'N/A'}</span>
+                            </div>
+                        </div>
+                    `;
+                    
+                    if (sentiment.symbols) {
+                        contentHTML += `
+                            <table class="data-table" style="margin-top: 1rem;">
+                                <thead>
+                                    <tr>
+                                        <th>Symbol</th>
+                                        <th>Sentiment</th>
+                                        <th>Score</th>
+                                        <th>News Count</th>
+                                        <th>Social Mentions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                        `;
+                        
+                        Object.entries(sentiment.symbols).forEach(([symbol, data]) => {
+                            const sentimentColor = data.sentiment === 'positive' ? '#4caf50' : 
+                                                 data.sentiment === 'negative' ? '#f44336' : '#ffa726';
+                            
+                            contentHTML += `
+                                <tr>
+                                    <td><strong>${symbol}</strong></td>
+                                    <td style="color: ${sentimentColor}; font-weight: bold;">${data.sentiment?.toUpperCase() || 'NEUTRAL'}</td>
+                                    <td>${data.score ? data.score.toFixed(2) : 'N/A'}</td>
+                                    <td>${data.news_count || 0}</td>
+                                    <td>${data.social_mentions || 0}</td>
+                                </tr>
+                            `;
+                        });
+                        
+                        contentHTML += '</tbody></table>';
+                    }
+                    
+                    return contentHTML;
+                });
+            }
+
+            async showMLModal() {
+                this.showDataModal('ML Performance', '/ml/status', (data) => {
+                    const ml = data.ml || {};
+                    
+                    let contentHTML = `
+                        <div class="ml-overview">
+                            <div class="ml-metric">
+                                <span>Model Accuracy:</span>
+                                <span style="color: #4caf50; font-weight: bold;">${ml.accuracy ? (ml.accuracy * 100).toFixed(1) + '%' : 'N/A'}</span>
+                            </div>
+                            <div class="ml-metric">
+                                <span>Predictions Made:</span>
+                                <span>${ml.predictions_count || 0}</span>
+                            </div>
+                            <div class="ml-metric">
+                                <span>Training Status:</span>
+                                <span style="color: ${ml.training_status === 'active' ? '#4caf50' : '#ffa726'}">${ml.training_status || 'Unknown'}</span>
+                            </div>
+                        </div>
+                    `;
+                    
+                    if (ml.recent_predictions) {
+                        contentHTML += `
+                            <table class="data-table" style="margin-top: 1rem;">
+                                <thead>
+                                    <tr>
+                                        <th>Symbol</th>
+                                        <th>Prediction</th>
+                                        <th>Confidence</th>
+                                        <th>Target Price</th>
+                                        <th>Time Horizon</th>
+                                        <th>Actual Result</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                        `;
+                        
+                        ml.recent_predictions.forEach(pred => {
+                            const confColor = pred.confidence > 0.8 ? '#4caf50' : pred.confidence > 0.6 ? '#ffa726' : '#f44336';
+                            const predColor = pred.prediction === 'UP' ? '#4caf50' : '#f44336';
+                            
+                            contentHTML += `
+                                <tr>
+                                    <td><strong>${pred.symbol}</strong></td>
+                                    <td style="color: ${predColor}; font-weight: bold;">${pred.prediction}</td>
+                                    <td style="color: ${confColor}">${(pred.confidence * 100).toFixed(1)}%</td>
+                                    <td>$${pred.target_price ? pred.target_price.toFixed(4) : 'N/A'}</td>
+                                    <td>${pred.time_horizon || 'N/A'}</td>
+                                    <td style="color: ${pred.actual_result === 'correct' ? '#4caf50' : pred.actual_result === 'incorrect' ? '#f44336' : '#ffa726'}">
+                                        ${pred.actual_result || 'Pending'}
+                                    </td>
+                                </tr>
+                            `;
+                        });
+                        
+                        contentHTML += '</tbody></table>';
+                    }
+                    
+                    return contentHTML;
+                });
+            }
+
+            async showLogsModal() {
+                this.showDataModal('System Logs', '/logs', (data) => {
+                    const logs = data.logs || [];
+                    
+                    if (logs.length === 0) {
+                        return '<div style="text-align: center; color: #ffa726; padding: 2rem;">No logs available</div>';
+                    }
+                    
+                    let contentHTML = '<div class="logs-container">';
+                    logs.slice(-20).forEach(log => {
+                        const logClass = log.includes('ERROR') ? 'log-error' : 
+                                       log.includes('WARNING') ? 'log-warning' : 
+                                       log.includes('SUCCESS') ? 'log-success' : 'log-info';
+                        
+                        contentHTML += `<div class="log-entry ${logClass}">${log}</div>`;
+                    });
+                    contentHTML += '</div>';
+                    
+                    return contentHTML;
+                });
+            }
+
+            async showHealthModal() {
+                this.showDataModal('System Health', '/health', (data) => {
+                    let contentHTML = `
+                        <div class="health-overview">
+                            <div class="health-metric">
+                                <span>API Status:</span>
+                                <span style="color: ${data.status === 'healthy' ? '#4caf50' : '#f44336'}">
+                                    ${data.status ? data.status.toUpperCase() : 'UNKNOWN'}
+                                </span>
+                            </div>
+                            <div class="health-metric">
+                                <span>Exchange Connection:</span>
+                                <span style="color: ${data.exchange_status === 'connected' ? '#4caf50' : '#f44336'}">
+                                    ${data.exchange_status ? data.exchange_status.toUpperCase() : 'UNKNOWN'}
+                                </span>
+                            </div>
+                            <div class="health-metric">
+                                <span>Current Equity:</span>
+                                <span style="color: #4caf50; font-weight: bold;">$${data.equity ? data.equity.toFixed(2) : '0.00'}</span>
+                            </div>
+                            <div class="health-metric">
+                                <span>Uptime:</span>
+                                <span>${data.uptime || 'N/A'}</span>
+                            </div>
+                            <div class="health-metric">
+                                <span>Last Updated:</span>
+                                <span>${new Date().toLocaleString()}</span>
+                            </div>
+                        </div>
+                    `;
+                    
+                    return contentHTML;
+                });
+            }
+
+            async showGenericModal(endpoint) {
+                this.showDataModal(endpoint.title, endpoint.endpoint, (data) => {
+                    return `<pre style="background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 8px; overflow: auto; max-height: 400px;">${JSON.stringify(data, null, 2)}</pre>`;
+                });
+            }
+
+            async showDataModal(title, endpoint, formatter) {
+                // Create or update modal
+                let modal = document.getElementById('dataModal');
+                if (!modal) {
+                    modal = document.createElement('div');
+                    modal.id = 'dataModal';
+                    modal.className = 'signals-modal';
+                    modal.innerHTML = `
+                        <div class="signals-content">
+                            <div class="signals-header">
+                                <h2 class="signals-title" id="modalTitle">${title}</h2>
+                                <button onclick="closeDataModal()" class="close-btn">✕</button>
+                            </div>
+                            <div id="modalContent" class="loading">Loading...</div>
+                        </div>
+                    `;
+                    document.body.appendChild(modal);
+                }
+                
+                document.getElementById('modalTitle').textContent = title;
+                document.getElementById('modalContent').innerHTML = '<div class="loading">Loading...</div>';
+                modal.style.display = 'block';
+                
+                try {
+                    const response = await fetch(`${this.apiUrl}${endpoint}`);
+                    const data = await response.json();
+                    document.getElementById('modalContent').innerHTML = formatter(data);
+                } catch (error) {
+                    document.getElementById('modalContent').innerHTML = `
+                        <div style="text-align: center; color: #f44336; padding: 2rem;">
+                            <div>❌ Error loading data</div>
+                            <div style="font-size: 0.875rem; margin-top: 0.5rem;">${error.message}</div>
+                        </div>
+                    `;
+                }
+            }
         }
 
         function closeSignalsModal() {
             document.getElementById('signalsModal').style.display = 'none';
+        }
+
+        function closeDataModal() {
+            const modal = document.getElementById('dataModal');
+            if (modal) modal.style.display = 'none';
         }
 
         // Initialize
