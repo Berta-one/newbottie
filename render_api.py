@@ -1579,23 +1579,13 @@ def get_recent_trades():
 async def startup_event():
     print("🚀 Bottie Render API starting...")
     
+    # Initialize exchange but don't start trading loops (prevents startup crashes)
     if initialize_exchange():
         print("✅ Exchange client initialized")
-        
-        # Start trading loops
-        if TRADE_ENABLED:
-            add_log("🚀 Starting trading background tasks...")
-            asyncio.create_task(signals_loop())
-            asyncio.create_task(execution_loop())
-            add_log(f"🔥 Trading loops started - Execution: {'ENABLED' if EXECUTION_RUNTIME_ENABLED else 'DISABLED'}")
-        else:
-            add_log("⚠️ Trading disabled (TRADE_ENABLED=0)")
-        
-        # Start auto-reporting system
-        start_auto_reporting()
-        add_log("📊 Auto-reporting system started (5min business hours, 30min off-hours)")
+        add_log("✅ Exchange client ready")
     else:
-        print("❌ Exchange client initialization failed")
+        print("⚠️ Exchange client initialization skipped (no credentials)")
+        add_log("⚠️ Exchange client not available - API will serve cached/demo data")
     
     print("✅ Render API ready")
 
