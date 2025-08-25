@@ -1309,6 +1309,16 @@ async def execution_loop():
 
                 try:
                     if exchange_client:
+                        # Final balance check before API call to prevent wasted bandwidth
+                        if side == "sell":
+                            current_balance = _position_qty(sym)
+                            if qty > current_balance:
+                                add_log(f"⚠️ Skipping {sym} SELL - insufficient balance: trying to sell {qty:.6f}, but only have {current_balance:.6f}")
+                                continue
+                            elif current_balance <= 0:
+                                add_log(f"⚠️ Skipping {sym} SELL - no position to sell")
+                                continue
+                        
                         order = exchange_client.create_order(sym, type="market", side=side, amount=qty)
                         
                         # Calculate trading fees and update P&L
