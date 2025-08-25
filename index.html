@@ -3,1073 +3,282 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bottie Enhanced Trading Dashboard</title>
+    <title>Trading Dashboard - CACHE BYPASS</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: linear-gradient(135deg, #0f1419 0%, #1a2332 100%);
-            color: #e6fffa;
-            min-height: 100vh;
-        }
-
-        /* Login Screen */
-        .login-screen {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            padding: 2rem;
-        }
-
-        .login-box {
-            background: rgba(26, 35, 50, 0.9);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(100, 255, 218, 0.2);
-            border-radius: 12px;
-            padding: 3rem;
-            max-width: 400px;
-            width: 100%;
-            text-align: center;
-        }
-
-        .login-title {
-            font-size: 2rem;
-            font-weight: 700;
-            background: linear-gradient(45deg, #64ffda, #4caf50);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 2rem;
-        }
-
-        .login-input {
-            width: 100%;
-            padding: 1rem;
-            background: rgba(15, 20, 25, 0.8);
-            border: 1px solid rgba(100, 255, 218, 0.3);
-            border-radius: 8px;
-            color: #e6fffa;
-            font-size: 1rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .login-button {
-            width: 100%;
-            padding: 1rem;
-            background: linear-gradient(45deg, #64ffda, #4caf50);
-            border: none;
-            border-radius: 8px;
-            color: #0f1419;
-            font-weight: 600;
-            cursor: pointer;
-        }
-
-        .login-error {
-            color: #ff6b6b;
-            margin-top: 1rem;
-            font-size: 0.875rem;
-        }
-
-        /* Main Dashboard */
-        .dashboard {
-            display: none;
-        }
-
-        .dashboard.authenticated {
-            display: block;
-        }
-
-        .header {
-            background: rgba(26, 35, 50, 0.9);
-            backdrop-filter: blur(10px);
-            padding: 1rem 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid rgba(100, 255, 218, 0.2);
-        }
-
-        .logo {
-            font-size: 1.5rem;
-            font-weight: 700;
-            background: linear-gradient(45deg, #64ffda, #4caf50);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .controls {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-        }
-
-        .trading-control {
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .start-trading {
-            background: linear-gradient(45deg, #4caf50, #45a049);
-            color: white;
-        }
-
-        .stop-trading {
-            background: linear-gradient(45deg, #f44336, #d32f2f);
-            color: white;
-        }
-
-        .main-grid {
-            padding: 2rem;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
-        }
-
-        .slate {
-            background: rgba(26, 35, 50, 0.8);
-            border: 1px solid rgba(100, 255, 218, 0.2);
-            border-radius: 12px;
-            padding: 1.5rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .slate:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
-            border-color: #64ffda;
-        }
-
-        .slate-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-        }
-
-        .slate-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: #64ffda;
-        }
-
-        .slate-icon {
-            font-size: 2rem;
-        }
-
-        .slate-content {
-            color: #a0aec0;
-            font-size: 0.875rem;
-        }
-
-        /* Signals Table Modal */
-        .signals-modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            z-index: 1000;
-        }
-
-        .signals-content {
-            background: rgba(15, 20, 25, 0.95);
-            margin: 2rem auto;
-            padding: 2rem;
-            border-radius: 12px;
-            max-width: 95%;
-            max-height: 90%;
-            overflow-y: auto;
-            border: 1px solid rgba(100, 255, 218, 0.3);
-        }
-
-        .signals-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-            border-bottom: 1px solid rgba(100, 255, 218, 0.2);
-            padding-bottom: 1rem;
-        }
-
-        .signals-title {
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: #64ffda;
-        }
-
-        .close-btn {
-            background: none;
-            border: none;
-            color: #ff6b6b;
-            font-size: 1.5rem;
-            cursor: pointer;
-            padding: 0.5rem;
-        }
-
-        .signals-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 1rem;
-        }
-
-        .signals-table th,
-        .signals-table td {
-            padding: 0.75rem;
-            text-align: left;
-            border-bottom: 1px solid rgba(100, 255, 218, 0.1);
-        }
-
-        .signals-table th {
-            background: rgba(100, 255, 218, 0.1);
-            color: #64ffda;
-            font-weight: 600;
-        }
-
-        .signal-buy {
-            background: rgba(76, 175, 80, 0.2);
-            color: #4caf50;
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
-            font-weight: 600;
-        }
-
-        .signal-sell {
-            background: rgba(244, 67, 54, 0.2);
-            color: #f44336;
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
-            font-weight: 600;
-        }
-
-        .signal-hold {
-            background: rgba(255, 167, 38, 0.2);
-            color: #ffa726;
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
-            font-weight: 600;
-        }
-
-        .arbitrage-opportunity {
-            background: rgba(156, 39, 176, 0.2);
-            color: #9c27b0;
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
-            font-weight: 600;
-        }
-
-        .confidence-high {
-            color: #4caf50;
-            font-weight: 600;
-        }
-
-        .confidence-medium {
-            color: #ffa726;
-            font-weight: 600;
-        }
-
-        .confidence-low {
-            color: #f44336;
-            font-weight: 600;
-        }
-
-        .loading {
-            text-align: center;
-            color: #64ffda;
-            padding: 2rem;
-        }
-
-        .metric {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.5rem 0;
-            border-bottom: 1px solid rgba(100, 255, 218, 0.1);
-        }
-
-        .metric:last-child {
-            border-bottom: none;
-        }
-
-        .trading-status {
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-size: 0.875rem;
-            font-weight: 500;
-        }
-
-        .trading-enabled {
-            background: rgba(76, 175, 80, 0.2);
-            color: #4caf50;
-            border: 1px solid rgba(76, 175, 80, 0.3);
-        }
-
-        .trading-disabled {
-            background: rgba(244, 67, 54, 0.2);
-            color: #f44336;
-            border: 1px solid rgba(244, 67, 54, 0.3);
-        }
-
-        /* Report Modal */
-        .report-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(4px);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-
-        .report-content {
-            background: linear-gradient(135deg, #1a2332 0%, #2d3748 100%);
-            border-radius: 16px;
-            border: 1px solid rgba(100, 255, 218, 0.2);
-            max-width: 90vw;
-            max-height: 90vh;
-            overflow-y: auto;
-            position: relative;
-        }
-
-        .report-header {
-            padding: 2rem;
-            border-bottom: 1px solid rgba(100, 255, 218, 0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .report-title {
-            font-size: 1.5rem;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .report-body {
-            padding: 2rem;
-        }
-
-        .report-section {
-            margin-bottom: 2rem;
-        }
-
-        .section-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-            color: #64ffda;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .data-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .data-card {
-            background: rgba(15, 20, 25, 0.5);
-            border: 1px solid rgba(100, 255, 218, 0.1);
-            border-radius: 8px;
-            padding: 1rem;
-        }
-
-        .data-label {
-            font-size: 0.875rem;
-            color: #8892b0;
-            margin-bottom: 0.5rem;
-        }
-
-        .data-value {
-            font-size: 1.25rem;
-            font-weight: 600;
-        }
-
-        .logs-container {
-            background: rgba(15, 20, 25, 0.8);
-            border: 1px solid rgba(100, 255, 218, 0.1);
-            border-radius: 8px;
-            padding: 1rem;
-            font-family: 'Fira Code', monospace;
-            font-size: 0.875rem;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-
-        .loading-spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 2px solid rgba(100, 255, 218, 0.3);
-            border-radius: 50%;
-            border-top-color: #64ffda;
-            animation: spin 1s ease-in-out infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .export-buttons {
-            display: flex;
-            gap: 0.5rem;
-            margin-top: 1rem;
-        }
-
-        .export-btn {
-            background: rgba(100, 255, 218, 0.1);
-            border: 1px solid rgba(100, 255, 218, 0.3);
-            color: #64ffda;
-            padding: 0.5rem 1rem;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.875rem;
-            transition: all 0.3s ease;
-        }
-
-        .export-btn:hover {
-            background: rgba(100, 255, 218, 0.2);
-            transform: translateY(-1px);
-        }
-
-        .positive { color: #4caf50; }
-        .negative { color: #f44336; }
-        .neutral { color: #64ffda; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card-hover { transition: all 0.3s ease; }
+        .card-hover:hover { transform: translateY(-5px); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); }
+        .report-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1.5rem; }
     </style>
 </head>
-<body>
-    <!-- Login Screen -->
-    <div id="loginScreen" class="login-screen">
-        <div class="login-box">
-            <h1 class="login-title">🤖 Bottie Dashboard</h1>
-            <p style="color: #a0aec0; margin-bottom: 2rem;">Enter password to access trading dashboard</p>
-            <input type="password" id="passwordInput" class="login-input" placeholder="Enter password">
-            <button onclick="authenticate()" class="login-button">Access Dashboard</button>
-            <div id="loginError" class="login-error"></div>
-        </div>
-    </div>
-
-    <!-- Main Dashboard -->
-    <div id="dashboard" class="dashboard">
-        <div class="header">
-            <div class="logo">⚡ Bottie Enhanced Trading Dashboard 🚀</div>
-            <div class="controls">
-                <div id="tradingStatus" class="trading-status">
-                    <span id="statusText">Checking...</span>
+<body class="bg-gray-50 min-h-screen">
+    <nav class="gradient-bg text-white shadow-lg">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-4">
+                    <i class="fas fa-chart-line text-2xl"></i>
+                    <h1 class="text-2xl font-bold">Trading Dashboard - CACHE BYPASS VERSION</h1>
                 </div>
-                <button onclick="startTrading()" class="trading-control start-trading">▶️ Start Trading</button>
-                <button onclick="stopTrading()" class="trading-control stop-trading">⏹️ Stop Trading</button>
-                <button onclick="logout()" class="trading-control" style="background: rgba(255, 107, 107, 0.2); color: #ff6b6b;">🚪 Logout</button>
+                <button onclick="loadReports()" class="bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg">
+                    <i class="fas fa-sync-alt mr-2"></i>Refresh
+                </button>
             </div>
         </div>
+    </nav>
 
-        <div class="main-grid" id="slates-container">
-            <!-- Slates will be dynamically generated here -->
+    <div class="container mx-auto px-4 py-8">
+        <!-- Status Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h3 class="text-lg font-semibold mb-4">API Status</h3>
+                <div id="apiStatus">Testing...</div>
+            </div>
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h3 class="text-lg font-semibold mb-4">Trading Data</h3>
+                <div id="tradingData">Loading...</div>
+            </div>
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h3 class="text-lg font-semibold mb-4">ML Data</h3>
+                <div id="mlData">Loading...</div>
+            </div>
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h3 class="text-lg font-semibold mb-4">Proxy Test</h3>
+                <div id="proxyTest">Testing...</div>
+            </div>
         </div>
-    </div>
-
-    <!-- Trading Signals Modal -->
-    <div id="signalsModal" class="signals-modal">
-        <div class="signals-content">
-            <div class="signals-header">
-                <h2 class="signals-title">🎯 Trading Signals & Arbitrage Opportunities</h2>
-                <button onclick="closeSignalsModal()" class="close-btn">✕</button>
-            </div>
-            <div id="signalsTableContainer" class="loading">Loading signals...</div>
+        
+        <!-- Reports Grid -->
+        <div id="reportsContainer" class="report-grid mb-8">
+            <!-- Reports will be loaded here -->
         </div>
-    </div>
-
-    <!-- Report Modal -->
-    <div class="report-modal" id="report-modal">
-        <div class="report-content">
-            <div class="report-header">
-                <div class="report-title" id="report-title">
-                    <span id="report-icon">📊</span>
-                    <span id="report-name">Loading Report...</span>
-                </div>
-                <button class="close-btn" onclick="closeReport()">✕</button>
-            </div>
-            <div class="report-body" id="report-body">
-                <div style="text-align: center; padding: 2rem;">
-                    <div class="loading-spinner" style="width: 40px; height: 40px;"></div>
-                    <p style="margin-top: 1rem; color: #8892b0;">Generating report...</p>
-                </div>
-            </div>
+        
+        <!-- Debug Console -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h3 class="text-lg font-semibold mb-4">Debug Console</h3>
+            <div id="debugOutput" class="bg-gray-100 p-4 rounded font-mono text-sm max-h-96 overflow-y-auto"></div>
         </div>
     </div>
 
     <script>
-        // Configuration
-        const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-            ? 'http://127.0.0.1:8000' 
-            : 'https://bottie-1.onrender.com';
+        // INLINE JAVASCRIPT - ABSOLUTELY NO CACHE POSSIBLE
+        console.log('🚀 CACHE BYPASS VERSION LOADED');
         
-        const DASHBOARD_PASSWORD = 'bottie2024';
-        let isAuthenticated = false;
-
-        // Authentication
-        function authenticate() {
-            const password = document.getElementById('passwordInput').value;
-            const errorDiv = document.getElementById('loginError');
+        const VERSION = 'v2024-01-17-CACHE-BYPASS-FINAL';
+        const API_URL = '';  // Use direct paths on Render (no proxy)
+        
+        let reports = [];
+        
+        function log(message) {
+            console.log(message);
+            const output = document.getElementById('debugOutput');
+            output.innerHTML += new Date().toLocaleTimeString() + ': ' + message + '<br>';
+            output.scrollTop = output.scrollHeight;
+        }
+        
+        async function testEndpoint(endpoint, description, useProxy = true) {
+            // Since we're on Render directly, both URLs are the same
+            const url = `${API_URL}${endpoint}`;
+            log(`🔍 Testing ${description}: ${url}`);
             
-            if (password === DASHBOARD_PASSWORD) {
-                isAuthenticated = true;
-                document.getElementById('loginScreen').style.display = 'none';
-                document.getElementById('dashboard').classList.add('authenticated');
-                initDashboard();
-                errorDiv.textContent = '';
-            } else {
-                errorDiv.textContent = 'Invalid password. Please try again.';
-                document.getElementById('passwordInput').value = '';
-            }
-        }
-
-        function logout() {
-            isAuthenticated = false;
-            document.getElementById('loginScreen').style.display = 'flex';
-            document.getElementById('dashboard').classList.remove('authenticated');
-        }
-
-        // Enter key support
-        document.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter' && !isAuthenticated) {
-                authenticate();
-            }
-        });
-
-        class EnhancedDashboard {
-            constructor() {
-                this.apiUrl = API_BASE;
-                this.endpoints = [
-                    { name: 'equity', title: 'Portfolio Equity', icon: '💰', endpoint: '/status' },
-                    { name: 'signals', title: 'Trading Signals', icon: '🎯', endpoint: '/signals', special: 'signals_table' },
-                    { name: 'trades', title: 'Trade History', icon: '📈', endpoint: '/trades/recent' },
-                    { name: 'trading_status', title: 'Trading Controls', icon: '🎛️', endpoint: '/trading/status' },
-                    { name: 'ml', title: 'ML Performance', icon: '🧠', endpoint: '/ml/status' },
-                    { name: 'quantum', title: 'Quantum Analysis', icon: '⚛️', endpoint: '/quantum/analysis' },
-                    { name: 'sentiment', title: 'Sentiment Analysis', icon: '📰', endpoint: '/sentiment' },
-                    { name: 'positions', title: 'Current Positions', icon: '💼', endpoint: '/positions' },
-                    { name: 'health', title: 'System Health', icon: '🔋', endpoint: '/health' },
-                    { name: 'logs', title: 'System Logs', icon: '📝', endpoint: '/logs' }
-                ];
-                this.endpointData = {};
-                this.init();
-            }
-
-            async init() {
-                console.log('🚀 Initializing Enhanced Dashboard...');
-                await this.loadAllEndpoints();
-                this.renderSlates();
-                this.updateTradingStatus();
-                
-                setInterval(() => {
-                    this.loadAllEndpoints();
-                    this.updateSlateMetrics();
-                    this.updateTradingStatus();
-                }, 10000);
-            }
-
-            async loadAllEndpoints() {
-                const promises = this.endpoints.map(endpoint => this.loadEndpoint(endpoint));
-                await Promise.allSettled(promises);
-            }
-
-            async loadEndpoint(endpoint) {
-                try {
-                    const response = await fetch(`${this.apiUrl}${endpoint.endpoint}`);
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                    }
-                    
-                    const data = await response.json();
-                    this.endpointData[endpoint.name] = data;
-                    console.log(`✅ Loaded ${endpoint.name}:`, typeof data === 'object' ? Object.keys(data) : data);
-                } catch (error) {
-                    console.log(`❌ Error loading ${endpoint.name}: ${error.message}`);
-                    this.endpointData[endpoint.name] = { error: error.message };
-                }
-            }
-
-            renderSlates() {
-                const container = document.getElementById('slates-container');
-                container.innerHTML = '';
-
-                this.endpoints.forEach(endpoint => {
-                    const slate = document.createElement('div');
-                    slate.className = 'slate';
-                    slate.onclick = () => this.handleSlateClick(endpoint);
-                    
-                    slate.innerHTML = `
-                        <div class="slate-header">
-                            <div class="slate-title">${endpoint.title}</div>
-                            <div class="slate-icon">${endpoint.icon}</div>
-                        </div>
-                        <div class="slate-content" id="slate-${endpoint.name}">
-                            Loading...
-                        </div>
-                    `;
-                    
-                    container.appendChild(slate);
-                });
-
-                this.updateSlateMetrics();
-            }
-
-            updateSlateMetrics() {
-                this.endpoints.forEach(endpoint => {
-                    const element = document.getElementById(`slate-${endpoint.name}`);
-                    const data = this.endpointData[endpoint.name];
-                    
-                    if (!element) return;
-                    
-                    if (data && !data.error) {
-                        element.innerHTML = this.formatSlateContent(endpoint, data);
-                    } else {
-                        element.innerHTML = `<div style="color: #f44336;">Error: ${data?.error || 'No data'}</div>`;
-                    }
-                });
-            }
-
-            formatSlateContent(endpoint, data) {
-                switch (endpoint.name) {
-                    case 'equity':
-                        const equity = data.equity?.display_value || data.equity || 0;
-                        const posCount = data.positions ? Object.keys(data.positions).length : 0;
-                        return `
-                            <div class="metric">
-                                <span>Total Equity:</span>
-                                <span style="color: #4caf50; font-weight: 600;">$${equity.toFixed(2)}</span>
-                            </div>
-                            <div class="metric">
-                                <span>Active Positions:</span>
-                                <span>${posCount}</span>
-                            </div>
-                        `;
-
-                    case 'signals':
-                        const signals = data.signals || [];
-                        const buySignals = signals.filter(s => s.signal === 'BUY').length;
-                        const sellSignals = signals.filter(s => s.signal === 'SELL').length;
-                        const holdSignals = signals.filter(s => s.signal === 'HOLD').length;
-                        return `
-                            <div class="metric">
-                                <span>🟢 BUY Signals:</span>
-                                <span>${buySignals}</span>
-                            </div>
-                            <div class="metric">
-                                <span>🔴 SELL Signals:</span>
-                                <span>${sellSignals}</span>
-                            </div>
-                            <div class="metric">
-                                <span>🟡 HOLD Signals:</span>
-                                <span>${holdSignals}</span>
-                            </div>
-                            <div style="margin-top: 1rem; font-size: 0.75rem; color: #64ffda;">
-                                Click to view detailed signals table
-                            </div>
-                        `;
-
-                    case 'trading_status':
-                        return `
-                            <div class="metric">
-                                <span>Trade Enabled:</span>
-                                <span style="color: ${data.trade_enabled ? '#4caf50' : '#f44336'}">${data.trade_enabled ? 'Yes' : 'No'}</span>
-                            </div>
-                            <div class="metric">
-                                <span>Execution Enabled:</span>
-                                <span style="color: ${data.execution_enabled ? '#4caf50' : '#f44336'}">${data.execution_enabled ? 'Yes' : 'No'}</span>
-                            </div>
-                            <div class="metric">
-                                <span>Recent Trades:</span>
-                                <span>${data.recent_trades || 0}</span>
-                            </div>
-                        `;
-
-                    case 'trades':
-                        const trades = data.trades || [];
-                        const recentTrades = trades.slice(0, 3);
-                        if (recentTrades.length === 0) {
-                            return '<div style="color: #ffa726;">No trades executed yet</div>';
-                        }
-                        return recentTrades.map(trade => `
-                            <div class="metric">
-                                <span>${trade.symbol}</span>
-                                <span style="color: ${trade.side === 'BUY' ? '#4caf50' : '#f44336'}">${trade.side} ${trade.quantity}</span>
-                            </div>
-                        `).join('');
-
-                    case 'logs':
-                        const logs = data.logs || [];
-                        const recentLogs = logs.slice(-3);
-                        return recentLogs.map(log => `
-                            <div style="font-family: monospace; font-size: 0.75rem; margin-bottom: 0.5rem; color: #a0aec0;">
-                                ${log.substring(0, 60)}...
-                            </div>
-                        `).join('');
-
-                    default:
-                        return '<div>Click to view details</div>';
-                }
-            }
-
-            generateReport(endpointName) {
-                const endpoint = this.endpoints.find(e => e.name === endpointName);
-                if (!endpoint) return;
-
-                const modal = document.getElementById('report-modal');
-                const title = document.getElementById('report-title');
-                const icon = document.getElementById('report-icon');
-                const name = document.getElementById('report-name');
-                const body = document.getElementById('report-body');
-
-                icon.textContent = endpoint.icon;
-                name.textContent = `${endpoint.title} Report`;
-                modal.style.display = 'flex';
-
-                body.innerHTML = `
-                    <div style="text-align: center; padding: 2rem;">
-                        <div class="loading-spinner" style="width: 40px; height: 40px;"></div>
-                        <p style="margin-top: 1rem; color: #8892b0;">Generating comprehensive report...</p>
-                    </div>
-                `;
-
-                setTimeout(() => {
-                    body.innerHTML = this.createReportContent(endpointName, this.endpointData[endpointName] || {});
-                }, 1500);
-            }
-
-            createReportContent(endpointName, data) {
-                const timestamp = new Date().toLocaleString();
-                return `
-                    <div class="report-section">
-                        <div class="section-title">📋 Report Summary</div>
-                        <div class="data-grid">
-                            <div class="data-card">
-                                <div class="data-label">Generated</div>
-                                <div class="data-value">${timestamp}</div>
-                            </div>
-                            <div class="data-card">
-                                <div class="data-label">Status</div>
-                                <div class="data-value ${data.status === 'success' ? 'positive' : 'negative'}">${data.status === 'success' ? 'Online' : 'Error'}</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="report-section">
-                        <div class="section-title">📊 Key Metrics & Analysis</div>
-                        ${this.createDetailedAnalysis(endpointName, data)}
-                    </div>
-                    <div class="report-section">
-                        <div class="section-title">📄 Raw Data & Logs</div>
-                        <div class="logs-container"><pre>${JSON.stringify(data, null, 2)}</pre></div>
-                    </div>
-                    <div class="export-buttons">
-                        <button class="export-btn" onclick="dashboard.exportReport('${endpointName}','json')">💾 Export JSON</button>
-                        <button class="export-btn" onclick="dashboard.exportReport('${endpointName}','csv')">📊 Export CSV</button>
-                        <button class="export-btn" onclick="dashboard.printReport()">🖨️ Print Report</button>
-                    </div>
-                `;
-            }
-
-            createDetailedAnalysis(endpointName, data) {
-                switch (endpointName) {
-                    case 'equity':
-                        return `<div class="data-card"><div class="data-label">Total Equity</div><div class="data-value">$${(data.equity || 0).toFixed(2)}</div></div>`;
-                    case 'trades':
-                        const trades = data.trades || [];
-                        return `<div class="data-card"><div class="data-label">Recent Trades</div><div class="data-value">${trades.length}</div></div>`;
-                    case 'ml':
-                        return `<div class="data-card"><div class="data-label">Accuracy</div><div class="data-value">${((data.accuracy || 0) * 100).toFixed(1)}%</div></div>`;
-                    case 'quantum':
-                        return `<div class="data-card"><div class="data-label">Q-Score</div><div class="data-value">${(data.quantum_score || 0).toFixed(3)}</div></div>`;
-                    case 'sentiment':
-                        const articles = data.articles || [];
-                        return `<div class="data-card"><div class="data-label">Articles</div><div class="data-value">${articles.length}</div></div>`;
-                    case 'brierscore':
-                        return `<div class="data-card"><div class="data-label">Brier Score</div><div class="data-value">${(data.brier_score || 0).toFixed(3)}</div></div>`;
-                    default:
-                        return `<div class="data-card"><div class="data-label">Analysis</div><div class="data-value">No specific analysis available for this endpoint.</div></div>`;
-                }
-            }
-
-            exportReport(endpointName, format) {
-                const data = this.endpointData[endpointName] || {};
-                let content = '';
-                let mime = '';
-                if (format === 'csv') {
-                    const rows = Object.entries(data).map(([key, value]) => `${key},${JSON.stringify(value)}`);
-                    content = rows.join('\n');
-                    mime = 'text/csv';
-                } else {
-                    content = JSON.stringify(data, null, 2);
-                    mime = 'application/json';
-                }
-                const blob = new Blob([content], { type: mime });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `${endpointName}.${format}`;
-                a.click();
-                URL.revokeObjectURL(url);
-            }
-
-            printReport() {
-                window.print();
-            }
-
-            handleSlateClick(endpoint) {
-                if (endpoint.special === 'signals_table') {
-                    this.showSignalsTable();
-                } else {
-                    this.generateReport(endpoint.name);
-                }
-            }
-
-            async showSignalsTable() {
-                document.getElementById('signalsModal').style.display = 'block';
-                const container = document.getElementById('signalsTableContainer');
-                container.innerHTML = '<div class="loading">Loading comprehensive signals analysis...</div>';
-
-                try {
-                    // Load signals and positions data
-                    const [signalsRes, positionsRes] = await Promise.all([
-                        fetch(`${this.apiUrl}/signals`),
-                        fetch(`${this.apiUrl}/status`)
-                    ]);
-
-                    const signalsData = await signalsRes.json();
-                    const statusData = await positionsRes.json();
-                    
-                    const signals = signalsData.signals || [];
-                    const positions = statusData.positions || {};
-
-                    // Create comprehensive signals table
-                    let tableHTML = `
-                        <table class="signals-table">
-                            <thead>
-                                <tr>
-                                    <th>Symbol</th>
-                                    <th>Signal</th>
-                                    <th>Confidence</th>
-                                    <th>Current Price</th>
-                                    <th>Change %</th>
-                                    <th>Position</th>
-                                    <th>P&L</th>
-                                    <th>Arbitrage</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                    `;
-
-                    // Add signals from the signals endpoint
-                    signals.forEach(signal => {
-                        const position = positions[signal.symbol] || {};
-                        const hasPosition = Object.keys(position).length > 0;
-                        const pnl = position.pnl || 0;
-                        const change = signal.change ? (signal.change * 100).toFixed(2) : 'N/A';
-                        const price = signal.price ? signal.price.toFixed(2) : 'N/A';
-                        
-                        // Determine confidence class
-                        const conf = signal.conf || 0;
-                        let confClass = 'confidence-low';
-                        if (conf > 0.7) confClass = 'confidence-high';
-                        else if (conf > 0.5) confClass = 'confidence-medium';
-                        
-                        // Check for arbitrage opportunity (simplified)
-                        const isArbitrage = hasPosition && Math.abs(change) > 2 && conf > 0.6;
-                        
-                        tableHTML += `
-                            <tr>
-                                <td><strong>${signal.symbol}</strong></td>
-                                <td><span class="signal-${signal.signal.toLowerCase()}">${signal.signal}</span></td>
-                                <td><span class="${confClass}">${(conf * 100).toFixed(1)}%</span></td>
-                                <td>$${price}</td>
-                                <td style="color: ${parseFloat(change) >= 0 ? '#4caf50' : '#f44336'}">${change}%</td>
-                                <td>${hasPosition ? '✅' : '❌'}</td>
-                                <td style="color: ${pnl >= 0 ? '#4caf50' : '#f44336'}">$${pnl.toFixed(2)}</td>
-                                <td>${isArbitrage ? '<span class="arbitrage-opportunity">OPPORTUNITY</span>' : '-'}</td>
-                                <td>
-                                    ${signal.signal === 'BUY' && conf > 0.6 ? '🟢 Execute Buy' : ''}
-                                    ${signal.signal === 'SELL' && conf > 0.6 ? '🔴 Execute Sell' : ''}
-                                    ${signal.signal === 'HOLD' || conf <= 0.6 ? '🟡 Hold' : ''}
-                                </td>
-                            </tr>
-                        `;
-                    });
-
-                    // Add potential arbitrage pairs (cross-pair opportunities)
-                    const positionSymbols = Object.keys(positions);
-                    for (let i = 0; i < positionSymbols.length; i++) {
-                        for (let j = i + 1; j < positionSymbols.length; j++) {
-                            const symbol1 = positionSymbols[i];
-                            const symbol2 = positionSymbols[j];
-                            const pos1 = positions[symbol1];
-                            const pos2 = positions[symbol2];
-                            
-                            // Simple arbitrage detection
-                            const pnl1_pct = pos1.pnl_percentage || 0;
-                            const pnl2_pct = pos2.pnl_percentage || 0;
-                            const spread = Math.abs(pnl1_pct - pnl2_pct);
-                            
-                            if (spread > 3) { // >3% spread indicates potential arbitrage
-                                const crossPair = `${symbol1.split('/')[0]}/${symbol2.split('/')[0]}`;
-                                tableHTML += `
-                                    <tr style="background: rgba(156, 39, 176, 0.1);">
-                                        <td><strong>${crossPair}</strong></td>
-                                        <td><span class="arbitrage-opportunity">ARBITRAGE</span></td>
-                                        <td class="confidence-high">${Math.min(95, 60 + spread).toFixed(1)}%</td>
-                                        <td>Cross-pair</td>
-                                        <td style="color: #9c27b0">${spread.toFixed(2)}% spread</td>
-                                        <td>✅ Both</td>
-                                        <td style="color: #9c27b0">Potential</td>
-                                        <td><span class="arbitrage-opportunity">ATOMIC SWAP</span></td>
-                                        <td>🔄 Cross-trade</td>
-                                    </tr>
-                                `;
-                            }
-                        }
-                    }
-
-                    tableHTML += '</tbody></table>';
-                    
-                    // Add summary stats
-                    const totalSignals = signals.length;
-                    const highConfSignals = signals.filter(s => s.conf > 0.6).length;
-                    const arbitrageOpps = positionSymbols.length > 1 ? Math.floor(positionSymbols.length * (positionSymbols.length - 1) / 2) : 0;
-                    
-                    const summaryHTML = `
-                        <div style="margin-bottom: 2rem; padding: 1rem; background: rgba(100, 255, 218, 0.1); border-radius: 8px;">
-                            <h3 style="color: #64ffda; margin-bottom: 1rem;">📊 Signals Summary</h3>
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-                                <div>
-                                    <strong>Total Signals:</strong> ${totalSignals}<br>
-                                    <strong>High Confidence (>60%):</strong> ${highConfSignals}<br>
-                                    <strong>Potential Arbitrage Pairs:</strong> ${arbitrageOpps}
-                                </div>
-                                <div>
-                                    <strong>Top 50 Crypto Analysis:</strong> Active<br>
-                                    <strong>Atomic Swap Detection:</strong> Enabled<br>
-                                    <strong>Real-time Updates:</strong> Every 30s
-                                </div>
-                            </div>
-                        </div>
-                    `;
-
-                    container.innerHTML = summaryHTML + tableHTML;
-                } catch (error) {
-                    container.innerHTML = `<div style="color: #f44336;">Error loading signals: ${error.message}</div>`;
-                }
-            }
-
-            async updateTradingStatus() {
-                try {
-                    const response = await fetch(`${this.apiUrl}/trading/status`);
-                    const data = await response.json();
-                    
-                    const statusElement = document.getElementById('tradingStatus');
-                    const statusText = document.getElementById('statusText');
-                    
-                    if (data.execution_enabled) {
-                        statusElement.className = 'trading-status trading-enabled';
-                        statusText.textContent = '🟢 Trading Active';
-                    } else {
-                        statusElement.className = 'trading-status trading-disabled';
-                        statusText.textContent = '🔴 Trading Stopped';
-                    }
-                } catch (error) {
-                    const statusText = document.getElementById('statusText');
-                    statusText.textContent = '⚠️ Status Unknown';
-                }
-            }
-        }
-
-        // Trading Controls
-        async function startTrading() {
             try {
-                const response = await fetch(`${API_BASE}/trading/start`, { 
-                    method: 'POST',
-                    headers: { 'X-Dashboard-Password': DASHBOARD_PASSWORD }
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
                 });
-                const data = await response.json();
-                alert(data.ok ? '✅ Trading started!' : '❌ Failed to start trading');
-                dashboard.updateTradingStatus();
-            } catch (error) {
-                alert('❌ Error: ' + error.message);
-            }
-        }
-
-        async function stopTrading() {
-            if (confirm('⚠️ Stop trading execution?')) {
-                try {
-                    const response = await fetch(`${API_BASE}/trading/stop`, { 
-                        method: 'POST',
-                        headers: { 'X-Dashboard-Password': DASHBOARD_PASSWORD }
-                    });
+                
+                log(`📊 ${description} Response: ${response.status} ${response.statusText}`);
+                
+                if (response.ok) {
                     const data = await response.json();
-                    alert(data.ok ? '🛑 Trading stopped!' : '❌ Failed to stop trading');
-                    dashboard.updateTradingStatus();
-                } catch (error) {
-                    alert('❌ Error: ' + error.message);
+                    log(`✅ ${description} SUCCESS - Data received`);
+                    return { success: true, data: data };
+                } else {
+                    log(`❌ ${description} FAILED: ${response.status}`);
+                    return { success: false, error: `HTTP ${response.status}` };
                 }
+            } catch (error) {
+                log(`💥 ${description} ERROR: ${error.message}`);
+                return { success: false, error: error.message };
             }
         }
-
-        function closeSignalsModal() {
-            document.getElementById('signalsModal').style.display = 'none';
-        }
-
-        function closeReport() {
-            document.getElementById('report-modal').style.display = 'none';
-        }
-
-        // Initialize
-        let dashboard;
-        function initDashboard() {
-            dashboard = new EnhancedDashboard();
-        }
-
-        document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('passwordInput').focus();
-        });
-
-        // Close modals when clicking outside
-        document.addEventListener('click', function(e) {
-            const signalsModal = document.getElementById('signalsModal');
-            if (signalsModal && e.target === signalsModal) {
-                closeSignalsModal();
+        
+        async function loadReports() {
+            log(`🌟 Starting Dashboard ${VERSION}`);
+            log(`📡 API URL: ${API_URL}`);
+            log(`🌐 Hostname: ${window.location.hostname}`);
+            
+            // Test API status
+            const health = await testEndpoint('/health', 'Health Check (via proxy)', true);
+            document.getElementById('apiStatus').innerHTML = health.success 
+                ? '<span class="text-green-600">✅ API Online</span>'
+                : '<span class="text-red-600">❌ API Offline</span>';
+            
+            // Test trading data via proxy
+            const trades = await testEndpoint('/trades', 'Trading Data (via proxy)', true);
+            if (trades.success && trades.data.trades) {
+                const tradesCount = trades.data.trades.length;
+                const totalPnL = trades.data.summary?.net_pnl || 0;
+                document.getElementById('tradingData').innerHTML = `
+                    <div class="space-y-2">
+                        <div>Trades: <span class="font-bold">${tradesCount}</span></div>
+                        <div>P&L: <span class="font-bold ${totalPnL >= 0 ? 'text-green-600' : 'text-red-600'}">$${totalPnL.toFixed(2)}</span></div>
+                    </div>
+                `;
+                log(`📈 Trading via proxy: ${tradesCount} trades, P&L: $${totalPnL.toFixed(2)}`);
+                
+                // Create trading report
+                reports.push({
+                    id: 'trading_' + Date.now(),
+                    type: 'trading',
+                    title: 'Trading Performance Report',
+                    summary: {
+                        totalTrades: tradesCount,
+                        totalProfit: totalPnL,
+                        winRate: calculateWinRate(trades.data.trades)
+                    },
+                    data: trades.data.trades
+                });
+            } else {
+                document.getElementById('tradingData').innerHTML = '<span class="text-red-600">❌ No Data</span>';
             }
-            const reportModal = document.getElementById('report-modal');
-            if (reportModal && e.target === reportModal) {
-                closeReport();
+            
+            // Test ML data via proxy
+            const ml = await testEndpoint('/ml/status', 'ML Status (via proxy)', true);
+            if (ml.success && ml.data) {
+                // Check if accuracy is already a percentage or decimal
+                const accuracyValue = ml.data.accuracy > 1 ? ml.data.accuracy : ml.data.accuracy * 100;
+                const accuracy = accuracyValue.toFixed(1);
+                const predictions = ml.data.total_predictions || 0;
+                document.getElementById('mlData').innerHTML = `
+                    <div class="space-y-2">
+                        <div>Accuracy: <span class="font-bold text-green-600">${accuracy}%</span></div>
+                        <div>Predictions: <span class="font-bold">${predictions}</span></div>
+                    </div>
+                `;
+                log(`🧠 ML via proxy: ${accuracy}% accuracy, ${predictions} predictions`);
+                
+                // Create ML report
+                reports.push({
+                    id: 'ml_' + Date.now(),
+                    type: 'ml',
+                    title: 'ML Performance Analysis',
+                    summary: {
+                        accuracy: ml.data.accuracy,
+                        confidence: ml.data.confidence || 0,
+                        totalPredictions: predictions
+                    },
+                    data: ml.data
+                });
+            } else {
+                document.getElementById('mlData').innerHTML = '<span class="text-red-600">❌ No Data</span>';
             }
-        });
-
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                closeReport();
-                closeSignalsModal();
+            
+            // Test proxy vs direct
+            const directTest = await testEndpoint('/trades', 'Direct Call (bypass proxy)', false);
+            const proxyTest = await testEndpoint('/trades', 'Proxy Call', true);
+            
+            document.getElementById('proxyTest').innerHTML = `
+                <div class="space-y-1 text-sm">
+                    <div>Direct: <span class="${directTest.success ? 'text-green-600' : 'text-red-600'}">${directTest.success ? '✅' : '❌'}</span></div>
+                    <div>Proxy: <span class="${proxyTest.success ? 'text-green-600' : 'text-red-600'}">${proxyTest.success ? '✅' : '❌'}</span></div>
+                </div>
+            `;
+            
+            // Render reports
+            renderReports();
+            log('✅ All tests completed!');
+        }
+        
+        function calculateWinRate(trades) {
+            if (!trades || trades.length === 0) return 0;
+            const wins = trades.filter(t => (t.profit || t.pnl || 0) > 0).length;
+            return (wins / trades.length) * 100;
+        }
+        
+        function renderReports() {
+            const container = document.getElementById('reportsContainer');
+            if (reports.length === 0) {
+                container.innerHTML = '<div class="col-span-full text-center text-gray-500">No reports available</div>';
+                return;
             }
+            
+            container.innerHTML = reports.map(report => createReportCard(report)).join('');
+        }
+        
+        function createReportCard(report) {
+            const typeIcon = report.type === 'trading' ? 'fa-chart-line' : 'fa-brain';
+            const createdAt = new Date().toLocaleDateString();
+            
+            return `
+                <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-2">
+                            <i class="fas ${typeIcon} text-blue-600"></i>
+                            <span class="text-sm font-medium text-gray-600 uppercase">${report.type}</span>
+                        </div>
+                        <span class="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            completed
+                        </span>
+                    </div>
+                    
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">${report.title}</h3>
+                    <p class="text-gray-600 text-sm mb-4">Created: ${createdAt}</p>
+                    
+                    <div class="space-y-2">
+                        ${createSummaryItems(report)}
+                    </div>
+                </div>
+            `;
+        }
+        
+        function createSummaryItems(report) {
+            if (report.type === 'trading') {
+                const s = report.summary;
+                return `
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Total Trades:</span>
+                        <span class="font-medium">${s.totalTrades || 0}</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Win Rate:</span>
+                        <span class="font-medium">${(s.winRate || 0).toFixed(1)}%</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Total P&L:</span>
+                        <span class="font-medium ${(s.totalProfit || 0) >= 0 ? 'text-green-600' : 'text-red-600'}">
+                            $${(s.totalProfit || 0).toFixed(2)}
+                        </span>
+                    </div>
+                `;
+            } else if (report.type === 'ml') {
+                const s = report.summary;
+                return `
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Accuracy:</span>
+                        <span class="font-medium">${(s.accuracy > 1 ? s.accuracy : s.accuracy * 100).toFixed(1)}%</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Confidence:</span>
+                        <span class="font-medium">${((s.confidence || 0) * 100).toFixed(1)}%</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Predictions:</span>
+                        <span class="font-medium">${s.totalPredictions || 0}</span>
+                    </div>
+                `;
+            }
+            return '';
+        }
+        
+        // Load data when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            log('🌟 Cache Bypass Dashboard loaded');
+            loadReports();
         });
     </script>
 </body>
