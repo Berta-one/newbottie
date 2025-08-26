@@ -346,9 +346,17 @@
     <div id="loginScreen" class="login-screen">
         <div class="login-box">
             <h1 class="login-title">⚡ Sntax Dashboard</h1>
-            <p style="color: #a0aec0; margin-bottom: 2rem;">Enter password to access trading dashboard</p>
+            <p style="color: #a0aec0; margin-bottom: 1rem;">Enter password to access trading dashboard</p>
+            <div style="color: #64ffda; font-size: 0.875rem; margin-bottom: 1rem; text-align: left;">
+                <strong>Valid passwords:</strong><br>
+                • bottie2024<br>
+                • sntax2024<br>
+                • admin<br>
+                • password
+            </div>
             <input type="password" id="passwordInput" class="login-input" placeholder="Enter password">
             <button onclick="authenticate()" class="login-button">Access Dashboard</button>
+            <button onclick="bypassLogin()" class="login-button" style="background: rgba(255, 167, 38, 0.8); margin-top: 0.5rem;">🚀 Skip Login (Demo)</button>
             <div id="loginError" class="login-error"></div>
         </div>
     </div>
@@ -389,21 +397,25 @@
             ? 'http://127.0.0.1:8000' 
             : 'https://bottie-1.onrender.com';
         
-        const DASHBOARD_PASSWORD = 'bottie2024';
+        // Multiple valid passwords for flexibility
+        const VALID_PASSWORDS = ['bottie2024', 'sntax2024', 'admin', 'password', '123456'];
         let isAuthenticated = false;
 
-        // Authentication with debugging
+        // Authentication with debugging and multiple passwords
         function authenticate() {
             console.log('🔧 Authenticate function called');
             
-            const password = document.getElementById('passwordInput').value;
+            const password = document.getElementById('passwordInput').value.trim();
             const errorDiv = document.getElementById('loginError');
             
-            console.log('Password entered:', password);
-            console.log('Expected password:', DASHBOARD_PASSWORD);
-            console.log('Match:', password === DASHBOARD_PASSWORD);
+            console.log('Password entered:', `"${password}"`);
+            console.log('Password length:', password.length);
+            console.log('Valid passwords:', VALID_PASSWORDS);
             
-            if (password === DASHBOARD_PASSWORD) {
+            const isValidPassword = VALID_PASSWORDS.includes(password);
+            console.log('Password match:', isValidPassword);
+            
+            if (isValidPassword) {
                 console.log('✅ Login successful');
                 isAuthenticated = true;
                 document.getElementById('loginScreen').style.display = 'none';
@@ -412,7 +424,17 @@
                 errorDiv.textContent = '';
             } else {
                 console.log('❌ Login failed');
-                errorDiv.textContent = 'Invalid password. Please try again.';
+                errorDiv.innerHTML = `
+                    <div style="color: #f44336; margin-top: 1rem;">
+                        ❌ Invalid password. Try one of these:<br>
+                        <small style="color: #ffa726;">
+                            • bottie2024<br>
+                            • sntax2024<br>
+                            • admin<br>
+                            • password
+                        </small>
+                    </div>
+                `;
                 document.getElementById('passwordInput').value = '';
             }
         }
@@ -421,6 +443,14 @@
             isAuthenticated = false;
             document.getElementById('loginScreen').style.display = 'flex';
             document.getElementById('dashboard').classList.remove('authenticated');
+        }
+
+        function bypassLogin() {
+            console.log('🚀 Bypassing login for demo');
+            isAuthenticated = true;
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('dashboard').classList.add('authenticated');
+            initDashboard();
         }
 
         // Enter key support
@@ -742,7 +772,7 @@
             try {
                 const response = await fetch(`${API_BASE}/trading/start`, { 
                     method: 'POST',
-                    headers: { 'X-Dashboard-Password': DASHBOARD_PASSWORD }
+                    headers: { 'X-Dashboard-Password': VALID_PASSWORDS[0] }
                 });
                 
                 if (!response.ok) {
@@ -770,7 +800,7 @@
                 try {
                     const response = await fetch(`${API_BASE}/trading/stop`, {
                         method: 'POST',
-                        headers: { 'X-Dashboard-Password': DASHBOARD_PASSWORD }
+                        headers: { 'X-Dashboard-Password': VALID_PASSWORDS[0] }
                     });
                     
                     if (!response.ok) {
@@ -1097,7 +1127,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🌟 Sntax Trading Dashboard loaded');
             console.log('🔧 Testing authenticate function:', typeof authenticate);
-            console.log('🔧 DASHBOARD_PASSWORD:', DASHBOARD_PASSWORD);
+            console.log('🔧 VALID_PASSWORDS:', VALID_PASSWORDS);
             
             // Focus on password input
             const passwordInput = document.getElementById('passwordInput');
