@@ -1309,6 +1309,7 @@ def get_recent_trades():
 def trades_history(since_date: str = "2024-08-01"):
     """Get comprehensive trades history since specified date with detailed P&L"""
     try:
+        from datetime import datetime
         # Convert date to timestamp
         since_timestamp = int(datetime.strptime(since_date, "%Y-%m-%d").timestamp() * 1000)
         
