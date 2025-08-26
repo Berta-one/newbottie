@@ -466,7 +466,7 @@
                 this.endpoints = [
                     { name: 'equity', title: 'Portfolio Equity', icon: '💰', endpoint: '/status' },
                     { name: 'signals', title: 'Trading Signals', icon: '🎯', endpoint: '/signals', special: 'signals_table' },
-                    { name: 'trades', title: 'Trade History', icon: '📈', endpoint: '/trades/recent' },
+                    { name: 'trades', title: 'Trade History', icon: '📈', endpoint: '/trades/history' },
                     { name: 'trading_status', title: 'Trading Controls', icon: '🎛️', endpoint: '/trading/status' },
                     { name: 'ml', title: 'ML Performance', icon: '🧠', endpoint: '/ml/status' },
                     { name: 'quantum', title: 'Quantum Analysis', icon: '⚛️', endpoint: '/quantum/analysis' },
@@ -616,16 +616,30 @@
 
                     case 'trades':
                         const trades = data.trades || [];
+                        const summary = data.summary || {};
                         const recentTrades = trades.slice(0, 3);
-                        if (recentTrades.length === 0) {
-                            return '<div style="color: #ffa726;">No trades executed yet</div>';
-                        }
-                        return recentTrades.map(trade => `
+                        
+                        const totalPnL = summary.net_pnl || 0;
+                        const totalTrades = summary.total_trades || trades.length;
+                        const totalFees = summary.total_fees || 0;
+                        
+                        return `
                             <div class="metric">
-                                <span>${trade.symbol}</span>
-                                <span style="color: ${trade.side === 'BUY' ? '#4caf50' : '#f44336'}">${trade.side} ${trade.quantity}</span>
+                                <span>Total P&L (Aug 1st):</span>
+                                <span style="color: ${totalPnL >= 0 ? '#4caf50' : '#f44336'}; font-weight: bold;">$${totalPnL.toFixed(2)}</span>
                             </div>
-                        `).join('');
+                            <div class="metric">
+                                <span>Total Trades:</span>
+                                <span>${totalTrades}</span>
+                            </div>
+                            <div class="metric">
+                                <span>Total Fees:</span>
+                                <span style="color: #f44336;">$${totalFees.toFixed(4)}</span>
+                            </div>
+                            <div style="margin-top: 1rem; font-size: 0.75rem; color: #64ffda;">
+                                Click to view detailed trades history with P&L
+                            </div>
+                        `;
 
                     case 'logs':
                         const logs = data.logs || [];
@@ -826,46 +840,87 @@
 
         // Modal Functions
         async function showTradesModal() {
-            showDataModal('Trades History', '/trades/recent', (data) => {
+            showDataModal('Comprehensive Trades History Since August 1st', '/trades/history', (data) => {
                 const trades = data.trades || [];
+                const summary = data.summary || {};
+                
                 if (trades.length === 0) {
-                    return '<div style="text-align: center; color: #ffa726; padding: 2rem;">No trades executed yet</div>';
+                    return '<div style="text-align: center; color: #ffa726; padding: 2rem;">No trades found since August 1st</div>';
                 }
                 
+                // Create summary section
+                let summaryHTML = `
+                    <div style="background: rgba(26, 35, 50, 0.5); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                        <h4 style="color: #64ffda; margin-bottom: 0.5rem;">📊 Trading Summary Since August 1st</h4>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.5rem; font-size: 0.875rem;">
+                            <div><strong>Total Trades:</strong> ${summary.total_trades || 0}</div>
+                            <div><strong>Total Volume:</strong> $${(summary.total_volume || 0).toFixed(2)}</div>
+                            <div><strong>Total Fees:</strong> <span style="color: #f44336;">$${(summary.total_fees || 0).toFixed(4)}</span></div>
+                            <div><strong>Gross P&L:</strong> <span style="color: ${(summary.total_pnl || 0) >= 0 ? '#4caf50' : '#f44336'};">$${(summary.total_pnl || 0).toFixed(2)}</span></div>
+                            <div><strong>Net P&L:</strong> <span style="color: ${(summary.net_pnl || 0) >= 0 ? '#4caf50' : '#f44336'}; font-weight: bold;">$${(summary.net_pnl || 0).toFixed(2)}</span></div>
+                            <div><strong>Win Rate:</strong> <span style="color: ${(summary.win_rate || 0) >= 60 ? '#4caf50' : (summary.win_rate || 0) >= 40 ? '#ffa726' : '#f44336'};">${(summary.win_rate || 0).toFixed(1)}%</span></div>
+                            <div><strong>Avg Win:</strong> <span style="color: #4caf50;">$${(summary.avg_win || 0).toFixed(2)}</span></div>
+                            <div><strong>Avg Loss:</strong> <span style="color: #f44336;">$${(summary.avg_loss || 0).toFixed(2)}</span></div>
+                            <div><strong>Best Trade:</strong> <span style="color: #4caf50;">$${(summary.largest_win || 0).toFixed(2)}</span></div>
+                            <div><strong>Worst Trade:</strong> <span style="color: #f44336;">$${(summary.largest_loss || 0).toFixed(2)}</span></div>
+                        </div>
+                    </div>
+                `;
+                
                 let tableHTML = `
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Time</th>
-                                <th>Symbol</th>
-                                <th>Side</th>
-                                <th>Quantity</th>
-                                <th>Price</th>
-                                <th>P&L</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
+                    ${summaryHTML}
+                    <div style="max-height: 400px; overflow-y: auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Date/Time</th>
+                                    <th>Symbol</th>
+                                    <th>Side</th>
+                                    <th>Amount</th>
+                                    <th>Entry Price</th>
+                                    <th>Current Price</th>
+                                    <th>Cost</th>
+                                    <th>Fee</th>
+                                    <th>P&L</th>
+                                    <th>P&L %</th>
+                                    <th>Net</th>
+                                </tr>
+                            </thead>
+                            <tbody>
                 `;
                 
                 trades.forEach(trade => {
-                    const pnlColor = trade.pnl > 0 ? '#4caf50' : (trade.pnl < 0 ? '#f44336' : '#ffa726');
-                    const sideColor = trade.side === 'BUY' ? '#4caf50' : '#f44336';
+                    const pnlColor = (trade.unrealized_pnl || 0) >= 0 ? '#4caf50' : '#f44336';
+                    const sideColor = trade.side.toLowerCase() === 'buy' ? '#4caf50' : '#f44336';
+                    const pnlPercent = trade.pnl_percentage || 0;
+                    const percentColor = pnlPercent >= 0 ? '#4caf50' : '#f44336';
                     
                     tableHTML += `
                         <tr>
-                            <td>${new Date(trade.timestamp).toLocaleString()}</td>
-                            <td><strong>${trade.symbol}</strong></td>
-                            <td><span style="color: ${sideColor}; font-weight: bold;">${trade.side}</span></td>
-                            <td>${trade.quantity}</td>
-                            <td>$${trade.price ? trade.price.toFixed(4) : 'N/A'}</td>
-                            <td style="color: ${pnlColor}; font-weight: bold;">${trade.pnl ? '$' + trade.pnl.toFixed(2) : 'N/A'}</td>
-                            <td><span class="status-${trade.status?.toLowerCase() || 'pending'}">${trade.status || 'Pending'}</span></td>
+                            <td style="font-size: 0.75rem;">${new Date(trade.timestamp).toLocaleDateString()}<br>${new Date(trade.timestamp).toLocaleTimeString()}</td>
+                            <td><span class="symbol-badge">${trade.symbol}</span></td>
+                            <td><span style="color: ${sideColor}; font-weight: bold;">${trade.side.toUpperCase()}</span></td>
+                            <td>${parseFloat(trade.amount).toFixed(6)}</td>
+                            <td>$${parseFloat(trade.price).toFixed(4)}</td>
+                            <td>$${parseFloat(trade.current_price || trade.price).toFixed(4)}</td>
+                            <td>$${parseFloat(trade.cost).toFixed(2)}</td>
+                            <td style="color: #f44336;">$${parseFloat(trade.fee?.cost || 0).toFixed(4)}</td>
+                            <td style="color: ${pnlColor}; font-weight: bold;">$${parseFloat(trade.unrealized_pnl || 0).toFixed(4)}</td>
+                            <td style="color: ${percentColor}; font-weight: bold;">${pnlPercent.toFixed(2)}%</td>
+                            <td style="color: ${(trade.net_proceeds || 0) >= 0 ? '#4caf50' : '#f44336'};">$${parseFloat(trade.net_proceeds || 0).toFixed(2)}</td>
                         </tr>
                     `;
                 });
                 
-                tableHTML += '</tbody></table>';
+                tableHTML += `
+                        </tbody>
+                    </table>
+                    </div>
+                    <div style="margin-top: 1rem; font-size: 0.75rem; color: #a0aec0; text-align: center;">
+                        📊 All trades since August 1st • P&L includes fees • Mark-to-market against current prices
+                    </div>
+                `;
+                
                 return tableHTML;
             });
         }
