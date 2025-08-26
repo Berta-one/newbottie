@@ -349,7 +349,6 @@
             <p style="color: #a0aec0; margin-bottom: 2rem;">Enter password to access trading dashboard</p>
             <input type="password" id="passwordInput" class="login-input" placeholder="Enter password">
             <button onclick="authenticate()" class="login-button">Access Dashboard</button>
-            <button onclick="bypassLogin()" class="login-button" style="background: rgba(255, 167, 38, 0.8); margin-top: 0.5rem;">🚀 Skip Login (Demo)</button>
             <div id="loginError" class="login-error"></div>
         </div>
     </div>
@@ -390,11 +389,11 @@
             ? 'http://127.0.0.1:8000' 
             : 'https://bottie-1.onrender.com';
         
-        // Multiple valid passwords for flexibility
-        const VALID_PASSWORDS = ['bottie2024', 'sntax2024', 'admin', 'password', '123456'];
+        // Single valid password
+        const DASHBOARD_PASSWORD = 'bottie2024';
         let isAuthenticated = false;
 
-        // Authentication with debugging and multiple passwords
+        // Authentication with single password
         function authenticate() {
             console.log('🔧 Authenticate function called');
             
@@ -402,13 +401,10 @@
             const errorDiv = document.getElementById('loginError');
             
             console.log('Password entered:', `"${password}"`);
-            console.log('Password length:', password.length);
-            console.log('Valid passwords:', VALID_PASSWORDS);
+            console.log('Expected password:', DASHBOARD_PASSWORD);
+            console.log('Password match:', password === DASHBOARD_PASSWORD);
             
-            const isValidPassword = VALID_PASSWORDS.includes(password);
-            console.log('Password match:', isValidPassword);
-            
-            if (isValidPassword) {
+            if (password === DASHBOARD_PASSWORD) {
                 console.log('✅ Login successful');
                 isAuthenticated = true;
                 document.getElementById('loginScreen').style.display = 'none';
@@ -432,13 +428,7 @@
             document.getElementById('dashboard').classList.remove('authenticated');
         }
 
-        function bypassLogin() {
-            console.log('🚀 Bypassing login for demo');
-            isAuthenticated = true;
-            document.getElementById('loginScreen').style.display = 'none';
-            document.getElementById('dashboard').classList.add('authenticated');
-            initDashboard();
-        }
+
 
         // Enter key support
         document.addEventListener('keypress', function(e) {
@@ -773,7 +763,7 @@
             try {
                 const response = await fetch(`${API_BASE}/trading/start`, { 
                     method: 'POST',
-                    headers: { 'X-Dashboard-Password': VALID_PASSWORDS[0] }
+                    headers: { 'X-Dashboard-Password': DASHBOARD_PASSWORD }
                 });
                 
                 if (!response.ok) {
@@ -801,7 +791,7 @@
                 try {
                     const response = await fetch(`${API_BASE}/trading/stop`, {
                         method: 'POST',
-                        headers: { 'X-Dashboard-Password': VALID_PASSWORDS[0] }
+                        headers: { 'X-Dashboard-Password': DASHBOARD_PASSWORD }
                     });
                     
                     if (!response.ok) {
@@ -1169,7 +1159,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🌟 Sntax Trading Dashboard loaded');
             console.log('🔧 Testing authenticate function:', typeof authenticate);
-            console.log('🔧 VALID_PASSWORDS:', VALID_PASSWORDS);
+            console.log('🔧 DASHBOARD_PASSWORD:', DASHBOARD_PASSWORD);
             
             // Focus on password input
             const passwordInput = document.getElementById('passwordInput');
