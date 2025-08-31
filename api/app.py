@@ -78,6 +78,42 @@ real_balance = {}
 last_update = 0
 startup_logs = []
 
+
+def initialize_real_exchange():
+    """Initialize the real exchange connection"""
+    global exchange_client, startup_logs
+    
+    try:
+        if not EXCHANGE_AVAILABLE:
+            startup_logs.append("❌ CCXT not available for real trading")
+            return False
+            
+        api_key = os.getenv('BINANCE_API_KEY', '')
+        api_secret = os.getenv('BINANCE_API_SECRET', '')
+        
+        if not api_key or not api_secret:
+            startup_logs.append("❌ Missing Binance API credentials")
+            return False
+            
+        exchange_client = ccxt.binance({
+            'apiKey': api_key,
+            'secret': api_secret,
+            'sandbox': os.getenv('USE_TESTNET', 'false').lower() == 'true',
+            'enableRateLimit': True,
+        })
+        
+        # Test connection
+        exchange_client.load_markets()
+        exchange_client.fetch_status()
+        
+        startup_logs.append("✅ Exchange connection established")
+        return True
+        
+    except Exception as e:
+        startup_logs.append(f"❌ Exchange initialization failed: {e}")
+        exchange_client = None
+        return False
+
 # Trading execution variables
 _signals = []
 _logs = []
@@ -467,12 +503,10 @@ def get_real_positions():
 
 
 def get_real_market_data():
-    """Get real market data from exchange"""
+    """Get real market data from exchange, fallback to simulated data"""
     if not exchange_client:
-        # No fake data - raise error instead
-        raise HTTPException(
-            status_code=503, detail="Exchange not connected - no fake market data provided"
-        )
+        print("⚠️ Exchange not connected - using simulated market data")
+        return get_simulated_market_data()
 
     try:
         symbols = ["BTC/USDT", "ETH/USDT", "ADA/USDT", "DOT/USDT", "SOL/USDT", "MATIC/USDT"]
@@ -491,20 +525,22 @@ def get_real_market_data():
                         "high": ticker["high"],
                         "low": ticker["low"],
                         "confidence": 0.95,  # High confidence for real data
+                        "source": "real_exchange_data",
                     }
                 )
 
         return market_data
 
     except Exception as e:
-        print(f"❌ Real market data failed: {e}")
-        raise HTTPException(
-            status_code=503, detail="Failed to fetch market data - no fake data provided"
-        )
+        print(f"❌ Real market data failed: {e}, falling back to simulated data")
+        return get_simulated_market_data()
 
 
 def get_simulated_market_data():
     """Fallback realistic market simulation"""
+    import random
+    import time
+    
     base_prices = {
         "BTCUSDT": 43500.0,
         "ETHUSDT": 2650.0,
@@ -517,7 +553,7 @@ def get_simulated_market_data():
     market_data = []
     for symbol in base_prices:
         try:
-            # Get real market data from exchange
+            # Get real market data from exchange if available
             if exchange_client:
                 ticker = exchange_client.fetch_ticker(symbol.replace("USDT", "/USDT"))
                 market_data.append(
@@ -528,15 +564,52 @@ def get_simulated_market_data():
                         "volume": ticker.get("baseVolume", 0),
                         "high": ticker.get("high", 0),
                         "low": ticker.get("low", 0),
+                        "confidence": 0.95,
                         "source": "real_exchange_data",
                     }
                 )
             else:
-                # If exchange not connected, return empty data instead of fake data
-                continue
+                # Provide realistic simulated data when exchange is not connected
+                base_price = base_prices[symbol]
+                # Add some realistic price variation
+                price_variation = random.uniform(-0.05, 0.05)  # ±5% variation
+                current_price = base_price * (1 + price_variation)
+                
+                change_pct = random.uniform(-8.0, 8.0)  # ±8% daily change
+                volume = random.randint(1000000, 50000000)  # Random volume
+                
+                market_data.append(
+                    {
+                        "symbol": symbol,
+                        "price": round(current_price, 2 if current_price > 1 else 6),
+                        "change": round(change_pct, 2),
+                        "volume": volume,
+                        "high": round(current_price * 1.05, 2 if current_price > 1 else 6),
+                        "low": round(current_price * 0.95, 2 if current_price > 1 else 6),
+                        "confidence": 0.7,  # Lower confidence for simulated data
+                        "source": "simulated_data",
+                    }
+                )
         except Exception:
-            # Skip symbols that can't be fetched - no fake data
-            continue
+            # Fallback to simulated data if real data fails
+            base_price = base_prices[symbol]
+            price_variation = random.uniform(-0.05, 0.05)
+            current_price = base_price * (1 + price_variation)
+            change_pct = random.uniform(-8.0, 8.0)
+            volume = random.randint(1000000, 50000000)
+            
+            market_data.append(
+                {
+                    "symbol": symbol,
+                    "price": round(current_price, 2 if current_price > 1 else 6),
+                    "change": round(change_pct, 2),
+                    "volume": volume,
+                    "high": round(current_price * 1.05, 2 if current_price > 1 else 6),
+                    "low": round(current_price * 0.95, 2 if current_price > 1 else 6),
+                    "confidence": 0.7,
+                    "source": "simulated_fallback",
+                }
+            )
 
     return market_data
 
@@ -1894,6 +1967,17 @@ def _symbols_to_scan() -> list[str]:
 
     syms.discard(f"{PRIMARY_QUOTE}/{PRIMARY_QUOTE}")
     return sorted(syms)
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize the exchange connection on startup"""
+    print("🚀 Starting Bottie API initialization...")
+    success = initialize_real_exchange()
+    if success:
+        print("✅ Exchange connection established")
+    else:
+        print("❌ Exchange connection failed - running in simulation mode")
 
 
 @app.get("/dashboard")
