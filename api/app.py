@@ -772,7 +772,6 @@ def grid_matrix():
         }
 
 
-
 # Real trading endpoints
 @app.get("/account/balance")
 def account_balance():
@@ -1256,9 +1255,9 @@ def performance_analysis():
             outcomes.append(actual_outcome)
 
         if predictions:
-            brier_score = sum((p - o) ** 2 for p, o in zip(predictions, outcomes, strict=False)) / len(
-                predictions
-            )
+            brier_score = sum(
+                (p - o) ** 2 for p, o in zip(predictions, outcomes, strict=False)
+            ) / len(predictions)
             accuracy = 1 - brier_score  # Convert to accuracy percentage
         else:
             brier_score = 0.5  # Neutral score
