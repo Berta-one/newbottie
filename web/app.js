@@ -4,6 +4,7 @@
 class BottieApp {
   constructor() {
     this.API = 'http://localhost:8000';
+    this.WS_API = 'ws://localhost:8000';
     this.authToken = localStorage.getItem('auth_token');
     this.refreshIntervals = {
       health: 5000,
@@ -15,6 +16,13 @@ class BottieApp {
     this.mlData = {};
     this.isAuthenticated = !!this.authToken;
     
+    // WebSocket properties
+    this.websocket = null;
+    this.wsConnected = false;
+    this.reconnectAttempts = 0;
+    this.maxReconnectAttempts = 5;
+    this.useWebSocket = true; // Enable WebSocket by default
+    
     this.init();
   }
 
@@ -23,8 +31,374 @@ class BottieApp {
     this.updateUI();
     
     if (this.isAuthenticated) {
-      await this.startDataRefresh();
+      if (this.useWebSocket) {
+        await this.initWebSocket();
+      } else {
+        await this.startDataRefresh();
+      }
     }
+  }
+
+  async initWebSocket() {
+    try {
+      console.log('🔌 Initializing WebSocket connection...');
+      this.websocket = new WebSocket(`${this.WS_API}/ws`);
+      
+      this.websocket.onopen = () => {
+        console.log('✅ WebSocket connected');
+        this.wsConnected = true;
+        this.reconnectAttempts = 0;
+        this.updateConnectionStatus('Connected via WebSocket', 'success');
+      };
+      
+      this.websocket.onmessage = (event) => {
+        this.handleWebSocketMessage(JSON.parse(event.data));
+      };
+      
+      this.websocket.onclose = () => {
+        console.log('❌ WebSocket disconnected');
+        this.wsConnected = false;
+        this.updateConnectionStatus('WebSocket disconnected', 'error');
+        this.attemptReconnect();
+      };
+      
+      this.websocket.onerror = (error) => {
+        console.error('❌ WebSocket error:', error);
+        this.updateConnectionStatus('WebSocket error', 'error');
+      };
+      
+    } catch (error) {
+      console.error('❌ Failed to initialize WebSocket:', error);
+      this.fallbackToPolling();
+    }
+  }
+
+  handleWebSocketMessage(message) {
+    const { type, data, timestamp } = message;
+    
+    switch (type) {
+      case 'initial_data':
+        console.log('📊 Received initial data');
+        if (data.market_data) this.updateMarketData(data.market_data);
+        if (data.signals) this.updateSignalsTable(data.signals);
+        if (data.status) this.updateStatus(data.status);
+        break;
+        
+      case 'market_update':
+        console.log('📈 Market data update');
+        this.updateMarketData(data);
+        break;
+        
+      case 'signals_update':
+        console.log('🎯 Signals update');
+        this.updateSignalsTable(data);
+        break;
+        
+      case 'trades_update':
+        console.log('💰 Trades update');
+        this.updateTradesTable(data);
+        break;
+        
+      case 'sentiment_update':
+        console.log('😊 Sentiment update');
+        this.updateSentimentTable(data);
+        break;
+        
+      case 'ml_update':
+        console.log('🤖 ML predictions update');
+        this.updateMLTable(data);
+        break;
+        
+      case 'quantum_update':
+        console.log('⚛️ Quantum analysis update');
+        this.updateQuantumTable(data);
+        break;
+        
+      case 'live_feed':
+        console.log('🔴 Live feed update');
+        if (data.market_data) this.updateMarketData(data.market_data);
+        if (data.signals) this.updateSignalsTable(data.signals);
+        if (data.status) this.updateStatus(data.status);
+        break;
+        
+      default:
+        console.log('📨 Unknown message type:', type);
+    }
+  }
+
+  async attemptReconnect() {
+    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+      this.reconnectAttempts++;
+      console.log(`🔄 Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+      setTimeout(() => this.initWebSocket(), 2000 * this.reconnectAttempts);
+    } else {
+      console.log('❌ Max reconnection attempts reached, falling back to polling');
+      this.fallbackToPolling();
+    }
+  }
+
+  fallbackToPolling() {
+    console.log('🔄 Falling back to HTTP polling');
+    this.useWebSocket = false;
+    this.startDataRefresh();
+  }
+
+  updateConnectionStatus(message, type) {
+    const statusElement = document.getElementById('connection-status');
+    if (statusElement) {
+      statusElement.textContent = message;
+      statusElement.className = `status-${type}`;
+    }
+  }
+
+  // WebSocket request methods
+  async requestMarketData() {
+    if (this.wsConnected && this.websocket) {
+      this.websocket.send(JSON.stringify({ type: 'get_market_data' }));
+    }
+  }
+
+  async requestSignals() {
+    if (this.wsConnected && this.websocket) {
+      this.websocket.send(JSON.stringify({ type: 'get_signals' }));
+    }
+  }
+
+  async requestTrades() {
+    if (this.wsConnected && this.websocket) {
+      this.websocket.send(JSON.stringify({ type: 'get_trades' }));
+    }
+  }
+
+  async requestSentiment() {
+    if (this.wsConnected && this.websocket) {
+      this.websocket.send(JSON.stringify({ type: 'get_sentiment' }));
+    }
+  }
+
+  async requestML() {
+    if (this.wsConnected && this.websocket) {
+      this.websocket.send(JSON.stringify({ type: 'get_ml' }));
+    }
+  }
+
+  async requestQuantum() {
+    if (this.wsConnected && this.websocket) {
+      this.websocket.send(JSON.stringify({ type: 'get_quantum' }));
+    }
+  }
+
+  // Data update methods for WebSocket
+  updateMarketData(data) {
+    console.log('📈 Updating market data via WebSocket');
+    // Update market data display
+    this.displayGridMatrix({ grid: data, symbols: data.map(d => d.symbol) });
+  }
+
+  updateSignalsTable(data) {
+    console.log('🎯 Updating signals table via WebSocket');
+    this.displaySignals({ signals: data });
+  }
+
+  updateTradesTable(data) {
+    console.log('💰 Updating trades table via WebSocket');
+    // Display trades in a table format
+    const container = document.getElementById('trades-container');
+    if (container && data.length > 0) {
+      container.innerHTML = this.createTradesTable(data);
+    }
+  }
+
+  updateSentimentTable(data) {
+    console.log('😊 Updating sentiment table via WebSocket');
+    const container = document.getElementById('sentiment-container');
+    if (container && data.length > 0) {
+      container.innerHTML = this.createSentimentTable(data);
+    }
+  }
+
+  updateMLTable(data) {
+    console.log('🤖 Updating ML table via WebSocket');
+    const container = document.getElementById('ml-container');
+    if (container && data.length > 0) {
+      container.innerHTML = this.createMLTable(data);
+    }
+  }
+
+  updateQuantumTable(data) {
+    console.log('⚛️ Updating quantum table via WebSocket');
+    const container = document.getElementById('quantum-container');
+    if (container && data.length > 0) {
+      container.innerHTML = this.createQuantumTable(data);
+    }
+  }
+
+  updateStatus(data) {
+    console.log('📊 Updating status via WebSocket');
+    // Update status indicators
+    const statusElements = document.querySelectorAll('.status-indicator');
+    statusElements.forEach(el => {
+      if (data.ok) {
+        el.className = 'status-indicator status-success';
+        el.textContent = `${data.mode} - Connected`;
+      }
+    });
+  }
+
+  createTradesTable(trades) {
+    if (!trades || trades.length === 0) return '<p>No trades available</p>';
+    
+    let html = `
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th>Side</th>
+              <th>Amount</th>
+              <th>Price</th>
+              <th>P&L</th>
+              <th>Performance</th>
+              <th>Days Ago</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+    
+    trades.slice(0, 20).forEach(trade => {
+      const performanceClass = trade.performance === 'profit' ? 'profit' : trade.performance === 'loss' ? 'loss' : 'neutral';
+      html += `
+        <tr class="trade-row ${performanceClass}">
+          <td>${trade.symbol}</td>
+          <td class="side-${trade.side.toLowerCase()}">${trade.side}</td>
+          <td>${trade.amount}</td>
+          <td>$${trade.price}</td>
+          <td class="${performanceClass}">$${trade.pnl_amount} (${trade.pnl_percentage}%)</td>
+          <td class="${performanceClass}">${trade.performance}</td>
+          <td>${trade.days_ago}d</td>
+        </tr>
+      `;
+    });
+    
+    html += '</tbody></table></div>';
+    return html;
+  }
+
+  createSentimentTable(sentiments) {
+    if (!sentiments || sentiments.length === 0) return '<p>No sentiment data available</p>';
+    
+    let html = `
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th>Sentiment</th>
+              <th>Score</th>
+              <th>Confidence</th>
+              <th>News</th>
+              <th>Social</th>
+              <th>Trend</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+    
+    sentiments.forEach(item => {
+      const sentimentClass = item.sentiment === 'positive' ? 'positive' : item.sentiment === 'negative' ? 'negative' : 'neutral';
+      html += `
+        <tr class="sentiment-row">
+          <td>${item.symbol}</td>
+          <td class="sentiment-${sentimentClass}">${item.sentiment}</td>
+          <td>${item.score}</td>
+          <td>${(item.confidence * 100).toFixed(1)}%</td>
+          <td>${item.news_count}</td>
+          <td>${item.social_mentions}</td>
+          <td class="trend-${item.trend}">${item.trend}</td>
+        </tr>
+      `;
+    });
+    
+    html += '</tbody></table></div>';
+    return html;
+  }
+
+  createMLTable(predictions) {
+    if (!predictions || predictions.length === 0) return '<p>No ML predictions available</p>';
+    
+    let html = `
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th>Current</th>
+              <th>1h Pred</th>
+              <th>4h Pred</th>
+              <th>24h Pred</th>
+              <th>Confidence</th>
+              <th>Trend</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+    
+    predictions.forEach(item => {
+      const trendClass = item.trend_direction === 'up' ? 'positive' : 'negative';
+      html += `
+        <tr class="ml-row">
+          <td>${item.symbol}</td>
+          <td>$${item.current_price}</td>
+          <td>$${item.prediction_1h}</td>
+          <td>$${item.prediction_4h}</td>
+          <td>$${item.prediction_24h}</td>
+          <td>${(item.confidence_24h * 100).toFixed(1)}%</td>
+          <td class="trend-${trendClass}">${item.trend_direction}</td>
+        </tr>
+      `;
+    });
+    
+    html += '</tbody></table></div>';
+    return html;
+  }
+
+  createQuantumTable(analysis) {
+    if (!analysis || analysis.length === 0) return '<p>No quantum analysis available</p>';
+    
+    let html = `
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th>State</th>
+              <th>Prob Up</th>
+              <th>Entanglement</th>
+              <th>Coherence</th>
+              <th>Quantum Advantage</th>
+              <th>Optimization</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+    
+    analysis.forEach(item => {
+      const stateClass = item.quantum_state.toLowerCase();
+      html += `
+        <tr class="quantum-row">
+          <td>${item.symbol}</td>
+          <td class="state-${stateClass}">${item.quantum_state}</td>
+          <td>${(item.probability_up * 100).toFixed(1)}%</td>
+          <td>${(item.entanglement_score * 100).toFixed(1)}%</td>
+          <td>${item.coherence_time}min</td>
+          <td>${(item.quantum_advantage * 100).toFixed(1)}%</td>
+          <td>${(item.optimization_score * 100).toFixed(1)}%</td>
+        </tr>
+      `;
+    });
+    
+    html += '</tbody></table></div>';
+    return html;
   }
 
   setupEventListeners() {

@@ -10,7 +10,7 @@ import os
 import random
 import time
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.security import HTTPBearer
@@ -119,6 +119,32 @@ _signals = []
 _logs = []
 _trade_log = []
 _open_spend = {}
+
+# WebSocket connection management
+connected_websockets = set()
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: set[WebSocket] = set()
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.add(websocket)
+        print(f"✅ WebSocket client connected. Total: {len(self.active_connections)}")
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.discard(websocket)
+        print(f"❌ WebSocket client disconnected. Total: {len(self.active_connections)}")
+
+    async def broadcast(self, message: dict):
+        if self.active_connections:
+            message_str = json.dumps(message)
+            await asyncio.gather(
+                *[connection.send_text(message_str) for connection in self.active_connections],
+                return_exceptions=True
+            )
+
+manager = ConnectionManager()
 _last_exec = 0.0
 EXECUTION_RUNTIME_ENABLED = True  # Default enabled for trading
 
@@ -627,8 +653,125 @@ def root():
             "live_mode": (
                 exchange_client and not exchange_client.sandbox if exchange_client else False
             ),
+            "websockets": {"enabled": True, "endpoints": ["/ws", "/ws/live"]},
         },
+        "endpoints": {
+            "websocket": "/ws - Interactive WebSocket for data requests",
+            "websocket_live": "/ws/live - Continuous live data feed (5s intervals)"
+        }
     }
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """WebSocket endpoint for real-time trading data"""
+    await manager.connect(websocket)
+    try:
+        # Send initial data
+        initial_data = {
+            "type": "initial_data",
+            "timestamp": int(time.time() * 1000),
+            "data": {
+                "status": {
+                    "ok": True,
+                    "mode": "LIVE" if (exchange_client and not exchange_client.sandbox) else "TESTNET",
+                    "time": int(time.time())
+                },
+                "market_data": get_real_market_data(),
+                "signals": signals().get("signals", [])
+            }
+        }
+        await websocket.send_text(json.dumps(initial_data))
+        
+        while True:
+            # Listen for client messages
+            message = await websocket.receive_text()
+            data = json.loads(message)
+            
+            if data.get("type") == "get_market_data":
+                market_update = {
+                    "type": "market_update",
+                    "timestamp": int(time.time() * 1000),
+                    "data": get_real_market_data()
+                }
+                await websocket.send_text(json.dumps(market_update))
+                
+            elif data.get("type") == "get_signals":
+                signals_update = {
+                    "type": "signals_update", 
+                    "timestamp": int(time.time() * 1000),
+                    "data": signals().get("signals", [])
+                }
+                await websocket.send_text(json.dumps(signals_update))
+                
+            elif data.get("type") == "get_trades":
+                trades_update = {
+                    "type": "trades_update",
+                    "timestamp": int(time.time() * 1000), 
+                    "data": trades_table().get("trades", [])
+                }
+                await websocket.send_text(json.dumps(trades_update))
+                
+            elif data.get("type") == "get_sentiment":
+                sentiment_update = {
+                    "type": "sentiment_update",
+                    "timestamp": int(time.time() * 1000),
+                    "data": sentiment_table().get("sentiment_analysis", [])
+                }
+                await websocket.send_text(json.dumps(sentiment_update))
+                
+            elif data.get("type") == "get_ml":
+                ml_update = {
+                    "type": "ml_update",
+                    "timestamp": int(time.time() * 1000),
+                    "data": ml_table().get("ml_predictions", [])
+                }
+                await websocket.send_text(json.dumps(ml_update))
+                
+            elif data.get("type") == "get_quantum":
+                quantum_update = {
+                    "type": "quantum_update",
+                    "timestamp": int(time.time() * 1000),
+                    "data": quantum_table().get("quantum_analysis", [])
+                }
+                await websocket.send_text(json.dumps(quantum_update))
+                
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+    except Exception as e:
+        print(f"❌ WebSocket error: {e}")
+        manager.disconnect(websocket)
+
+
+@app.websocket("/ws/live")
+async def websocket_live_feed(websocket: WebSocket):
+    """WebSocket endpoint for continuous live data feed"""
+    await manager.connect(websocket)
+    try:
+        while True:
+            # Send live updates every 5 seconds
+            live_data = {
+                "type": "live_feed",
+                "timestamp": int(time.time() * 1000),
+                "data": {
+                    "market_data": get_real_market_data(),
+                    "signals": signals().get("signals", []),
+                    "status": {
+                        "ok": True,
+                        "equity": 0.0,
+                        "mode": "LIVE" if (exchange_client and not exchange_client.sandbox) else "TESTNET",
+                        "time": int(time.time())
+                    }
+                }
+            }
+            await websocket.send_text(json.dumps(live_data))
+            await asyncio.sleep(5)  # Update every 5 seconds
+            
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+    except Exception as e:
+        print(f"❌ Live WebSocket error: {e}")
+        manager.disconnect(websocket)
 
 
 @app.get("/crypto/prices")
