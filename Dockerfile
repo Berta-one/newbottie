@@ -19,9 +19,9 @@ RUN python -m pip install --upgrade pip && \
 # App code
 COPY . .
 
-# Render provides $PORT; default to 10000
-ENV PORT=10000
-EXPOSE 10000
+# Use dynamic PORT from environment, default to 8000 for consistency
+ENV PORT=8000
+EXPOSE 8000
 
 # Stamp the image with Render commit SHA and start API
-CMD ["sh", "-c", "v=${RENDER_GIT_COMMIT:-unknown}; echo $v > /app/VERSION; echo \"Running commit: $v\"; uvicorn api.app:app --host 0.0.0.0 --port ${PORT}"] 
+CMD ["sh", "-c", "v=${RENDER_GIT_COMMIT:-unknown}; echo $v > /app/VERSION; echo \"Running commit: $v\"; echo \"Starting on port ${PORT}\"; uvicorn api.app:app --host 0.0.0.0 --port ${PORT}"] 
