@@ -10,7 +10,7 @@ import random
 import logging
 import math
 import asyncio
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Set
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -99,6 +99,8 @@ security = HTTPBearer(auto_error=False)
 
 # Preferred quote currencies when building market symbols dynamically
 PREFERRED_QUOTES = ["USDT", "FDUSD", "USDC", "BUSD", "TUSD"]
+PRIMARY_QUOTE = os.getenv("PRIMARY_QUOTE", "USDT").upper()
+TRADE_SYMBOLS_ENV = os.getenv("TRADE_SYMBOLS", "")
 
 def add_log(msg: str):
     """Add log message to the logs list"""
@@ -1763,6 +1765,27 @@ def enhanced_dashboard():
 def test_connection():
     """Serve the test connection page"""
     return FileResponse("web/test_connection.html")
+
+def _symbols_to_scan() -> List[str]:
+    """Get list of symbols to scan for trading opportunities"""
+    syms: Set[str] = set()
+    
+    # from positions
+    positions = get_real_positions()
+    for sym in positions.keys():
+        if sym.endswith(f"/{PRIMARY_QUOTE}") and not sym.startswith(f"{PRIMARY_QUOTE}/"):
+            if exchange_client and hasattr(exchange_client, 'markets') and sym in exchange_client.markets:
+                syms.add(sym)
+    
+    # forced via env
+    if TRADE_SYMBOLS_ENV.strip():
+        for s in TRADE_SYMBOLS_ENV.split(","):
+            s = s.strip().upper()
+            if s and exchange_client and hasattr(exchange_client, 'markets') and s in exchange_client.markets:
+                syms.add(s)
+    
+    syms.discard(f"{PRIMARY_QUOTE}/{PRIMARY_QUOTE}")
+    return sorted(syms)
 
 @app.get("/dashboard")
 def dashboard_redirect():
