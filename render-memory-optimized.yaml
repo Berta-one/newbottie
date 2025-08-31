@@ -10,7 +10,7 @@ services:
       pip install --no-cache-dir -r requirements-lightweight.txt
       python -c "import gc; gc.collect()"
     
-    startCommand: python integrated_startup_script.py
+    startCommand: python working_dashboard.py
     
     # Memory optimization environment variables
     envVars:
@@ -91,8 +91,7 @@ services:
     # Build settings for memory optimization
     buildFilter:
       paths:
-        - lightweight_dashboard_api.py
-        - integrated_startup_script.py
+        - working_dashboard.py
         - requirements-lightweight.txt
         - render-memory-optimized.yaml
       ignoredPaths:
@@ -102,3 +101,6 @@ services:
         - "*.log"
         - __pycache__/
         - "*.pyc"
+        - api/
+        - web/
+        - venv/
