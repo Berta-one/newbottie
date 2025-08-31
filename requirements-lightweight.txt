@@ -1,22 +1,8 @@
-# Minimal requirements for memory-optimized Bottie dashboard
-# Total memory footprint: ~150-200MB for all packages
-
-# Core FastAPI and WebSocket support
+# Minimal requirements for memory efficiency
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 websockets==12.0
-
-# System monitoring
 psutil==5.9.6
 
-# Optional: Exchange integration (can be removed for demo mode)
+# Optional: Only if using real exchange (can be removed for demo)
 ccxt==4.1.30
-
-# Built-in Python modules (no additional memory):
-# - sqlite3 (database)
-# - asyncio (async operations)
-# - json (data serialization)
-# - logging (system logs)
-# - threading (background tasks)
-# - gc (garbage collection)
-# - dataclasses (efficient data structures)

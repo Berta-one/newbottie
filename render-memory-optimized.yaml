@@ -1,0 +1,104 @@
+services:
+  - type: web
+    name: bottie-lightweight
+    env: python
+    region: oregon
+    plan: free  # 512MB memory limit
+    
+    # Minimal build process to save memory
+    buildCommand: |
+      pip install --no-cache-dir -r requirements-lightweight.txt
+      python -c "import gc; gc.collect()"
+    
+    startCommand: python integrated_startup_script.py
+    
+    # Memory optimization environment variables
+    envVars:
+      # Core settings
+      - key: PORT
+        value: "8000"
+      - key: DEMO_MODE
+        value: "0"  # Disable demo mode for production
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      
+      # Memory management
+      - key: MAX_MEMORY_MB
+        value: "400"  # Stay well under 512MB limit
+      - key: MEMORY_CHECK_INTERVAL
+        value: "30"
+      - key: CLEANUP_INTERVAL
+        value: "300"
+      - key: GC_INTERVAL
+        value: "60"
+      
+      # Data limits (optimized for memory efficiency)
+      - key: MAX_STORED_RECORDS
+        value: "10000"  # Sufficient for ML analysis
+      - key: MAX_LOG_ENTRIES
+        value: "1000"   # More logs for detailed tracking
+      - key: MAX_CANDLE_CACHE
+        value: "50"     # Reduced cache
+      - key: MAX_POSITION_CACHE
+        value: "25"     # Reduced cache
+      
+      # Trading settings (optimized for low API usage)
+      - key: UPDATE_INTERVAL
+        value: "60"     # Update every 60 seconds (reduced frequency)
+      - key: BALANCE_UPDATE_INTERVAL
+        value: "600"    # Balance update every 10 minutes
+      - key: WEBSOCKET_BROADCAST_INTERVAL
+        value: "15"     # Broadcast every 15 seconds
+      
+      # Exchange settings (if using real exchange)
+      - key: BINANCE_API_KEY
+        sync: false
+      - key: BINANCE_SECRET
+        sync: false
+      - key: BINANCE_TESTNET
+        value: "true"   # Use testnet to avoid real trading costs
+      
+      # Database settings
+      - key: USE_MEMORY_DB
+        value: "0"      # Use disk-based SQLite to save RAM
+      - key: DB_PATH
+        value: "/tmp/bottie_lite.db"
+      
+      # WebSocket settings
+      - key: MAX_WEBSOCKET_CONNECTIONS
+        value: "10"     # Limit concurrent connections
+      - key: WEBSOCKET_TIMEOUT
+        value: "30"
+      
+      # Logging settings (reduced to save memory)
+      - key: LOG_LEVEL
+        value: "INFO"   # Changed to INFO for detailed logging as requested
+      - key: DISABLE_ACCESS_LOG
+        value: "1"
+      
+      # Python optimization
+      - key: PYTHONOPTIMIZE
+        value: "2"      # Enable optimizations
+      - key: PYTHONDONTWRITEBYTECODE
+        value: "1"      # Don't create .pyc files
+
+    # Health check configuration
+    healthCheckPath: /health
+    
+    # Auto-deploy settings
+    autoDeploy: true
+    
+    # Build settings for memory optimization
+    buildFilter:
+      paths:
+        - lightweight_dashboard_api.py
+        - integrated_startup_script.py
+        - requirements-lightweight.txt
+        - render-memory-optimized.yaml
+      ignoredPaths:
+        - tests/
+        - docs/
+        - "*.md"
+        - "*.log"
+        - __pycache__/
+        - "*.pyc"
