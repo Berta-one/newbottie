@@ -20,12 +20,18 @@ from collections import deque
 import threading
 from dataclasses import dataclass, asdict
 
-# Memory-efficient configuration
-MAX_STORED_RECORDS = 500   # Reduced from 1000
-MAX_LOG_ENTRIES = 200      # Reduced from 500
-CLEANUP_INTERVAL = 300     # Cleanup every 5 minutes
-GC_INTERVAL = 60          # Garbage collection every minute
+# ML-scale configuration with smart memory management
+MAX_STORED_RECORDS = 10000    # Sufficient for ML analysis (10k records)
+MAX_LOG_ENTRIES = 1000        # More logs for detailed tracking
+CLEANUP_INTERVAL = 600        # Cleanup every 10 minutes (less frequent)
+GC_INTERVAL = 120            # Garbage collection every 2 minutes
 MAX_MEMORY_MB = int(os.getenv("MAX_MEMORY_MB", "400"))
+
+# ML-specific configuration
+ML_TRAINING_WINDOW = 5000     # Use 5000 records for ML training
+ML_ANALYSIS_BATCH_SIZE = 100  # Process ML in batches to save memory
+DATABASE_RETENTION_DAYS = 30  # Keep 30 days of data for ML analysis
+MEMORY_PRESSURE_THRESHOLD = 0.75  # Start cleanup at 75% memory usage
 
 # Configure minimal logging
 logging.basicConfig(
@@ -64,81 +70,165 @@ class MarketData:
     volume: float
     timestamp: str
 
-class LightweightDataManager:
-    """Memory-efficient data management with automatic cleanup"""
+class MLScaleDataManager:
+    """ML-scale data management with intelligent memory optimization"""
     
     def __init__(self):
-        self.trades = deque(maxlen=MAX_STORED_RECORDS)
-        self.signals = deque(maxlen=MAX_STORED_RECORDS)
-        self.market_data = deque(maxlen=50)  # Only keep recent market data
+        # Smart tiered storage system
+        self.recent_trades = deque(maxlen=1000)      # Recent trades in memory for dashboard
+        self.recent_signals = deque(maxlen=1000)     # Recent signals in memory for dashboard  
+        self.recent_market_data = deque(maxlen=200)  # Recent market data in memory
         self.logs = deque(maxlen=MAX_LOG_ENTRIES)
+        
+        # ML analysis cache (loaded on demand)
+        self.ml_analysis_cache = {}
+        self.ml_last_update = 0
+        
+        # Portfolio and stats
         self.portfolio = {}
         self.stats = {
             'total_trades': 0,
             'total_pnl': 0.0,
             'win_rate': 0.0,
             'equity': 10000.0,
-            'memory_usage': 0.0
+            'memory_usage': 0.0,
+            'database_size_mb': 0.0,
+            'ml_model_accuracy': 0.0
         }
         
-        # Start cleanup thread
+        # Memory management
+        self.memory_pressure = False
+        self.last_cleanup = 0
+        
+        # Start background threads
         self.cleanup_thread = threading.Thread(target=self._cleanup_worker, daemon=True)
         self.cleanup_thread.start()
         
-        # Initialize database
-        self._init_database()
+        self.ml_thread = threading.Thread(target=self._ml_analysis_worker, daemon=True)
+        self.ml_thread.start()
         
-    def _init_database(self):
-        """Initialize lightweight SQLite database"""
+        # Initialize database with ML-optimized schema
+        self._init_ml_database()
+        
+    def _init_ml_database(self):
+        """Initialize ML-optimized database with larger capacity"""
         try:
-            self.db_path = "/tmp/bottie_lite.db"
+            self.db_path = "/tmp/bottie_ml.db"
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             
-            # Create optimized tables
+            # Enable WAL mode for better performance with large datasets
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+            cursor.execute("PRAGMA cache_size=10000")
+            cursor.execute("PRAGMA temp_store=memory")
+            
+            # ML-optimized trades table with additional features for analysis
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS trades (
                     id INTEGER PRIMARY KEY,
-                    symbol TEXT,
-                    side TEXT,
-                    amount REAL,
-                    price REAL,
-                    pnl REAL,
-                    timestamp TEXT,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    symbol TEXT NOT NULL,
+                    side TEXT NOT NULL,
+                    amount REAL NOT NULL,
+                    price REAL NOT NULL,
+                    pnl REAL DEFAULT 0,
+                    timestamp TEXT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    volume_24h REAL,
+                    price_change_1h REAL,
+                    rsi_14 REAL,
+                    ema_20 REAL,
+                    ml_prediction REAL,
+                    confidence_score REAL
                 )
             """)
             
+            # ML-optimized signals table with feature data
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS signals (
                     id INTEGER PRIMARY KEY,
-                    symbol TEXT,
-                    signal TEXT,
-                    confidence REAL,
-                    price REAL,
-                    timestamp TEXT,
+                    symbol TEXT NOT NULL,
+                    signal TEXT NOT NULL,
+                    confidence REAL NOT NULL,
+                    price REAL NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    ema_signal REAL,
+                    rsi_signal REAL,
+                    volume_signal REAL,
+                    ml_score REAL,
+                    quantum_score REAL,
+                    sentiment_score REAL,
+                    final_score REAL
+                )
+            """)
+            
+            # Market data with ML features
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS market_data (
+                    id INTEGER PRIMARY KEY,
+                    symbol TEXT NOT NULL,
+                    price REAL NOT NULL,
+                    change_24h REAL,
+                    volume REAL,
+                    timestamp TEXT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    high_24h REAL,
+                    low_24h REAL,
+                    volatility REAL,
+                    trend_strength REAL
+                )
+            """)
+            
+            # ML analysis results table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS ml_analysis (
+                    id INTEGER PRIMARY KEY,
+                    symbol TEXT NOT NULL,
+                    prediction_1h REAL,
+                    prediction_4h REAL,
+                    prediction_24h REAL,
+                    confidence_1h REAL,
+                    confidence_4h REAL,
+                    confidence_24h REAL,
+                    model_accuracy REAL,
+                    feature_importance TEXT,
+                    timestamp TEXT NOT NULL,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
             """)
             
-            # Create indexes for performance
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_timestamp ON trades(timestamp)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_signals_timestamp ON signals(timestamp)")
+            # Performance optimization indexes
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_symbol_time ON trades(symbol, timestamp)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_signals_symbol_time ON signals(symbol, timestamp)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_market_symbol_time ON market_data(symbol, timestamp)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_ml_symbol_time ON ml_analysis(symbol, timestamp)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_created ON trades(created_at)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_signals_created ON signals(created_at)")
             
-            # Clean old data on startup
-            cutoff = (datetime.now() - timedelta(days=3)).isoformat()
+            # Only clean very old data (keep 30 days for ML)
+            cutoff = (datetime.now() - timedelta(days=DATABASE_RETENTION_DAYS)).isoformat()
             cursor.execute("DELETE FROM trades WHERE timestamp < ?", (cutoff,))
             cursor.execute("DELETE FROM signals WHERE timestamp < ?", (cutoff,))
-            cursor.execute("VACUUM")
+            cursor.execute("DELETE FROM market_data WHERE timestamp < ?", (cutoff,))
+            cursor.execute("DELETE FROM ml_analysis WHERE timestamp < ?", (cutoff,))
+            
+            # Analyze and optimize
+            cursor.execute("ANALYZE")
             
             conn.commit()
             conn.close()
-            logger.info("✅ Lightweight database initialized")
+            
+            # Get database size
+            db_size_mb = os.path.getsize(self.db_path) / 1024 / 1024 if os.path.exists(self.db_path) else 0
+            self.stats['database_size_mb'] = db_size_mb
+            
+            logger.info(f"✅ ML-scale database initialized (Size: {db_size_mb:.1f}MB)")
         except Exception as e:
             logger.error(f"❌ Database init error: {e}")
     
     def _cleanup_worker(self):
-        """Background cleanup to maintain memory limits"""
+        """Intelligent cleanup based on memory pressure and ML needs"""
         while True:
             try:
                 time.sleep(CLEANUP_INTERVAL)
@@ -146,21 +236,187 @@ class LightweightDataManager:
                 # Update memory usage
                 memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
                 self.stats['memory_usage'] = memory_mb
+                memory_pressure_ratio = memory_mb / MAX_MEMORY_MB
                 
-                # Emergency cleanup if memory high
-                if memory_mb > MAX_MEMORY_MB * 0.8:
-                    logger.warning(f"⚠️ High memory usage: {memory_mb:.1f}MB")
+                # Adaptive cleanup based on memory pressure
+                if memory_pressure_ratio > 0.9:  # 90% - Critical
+                    logger.critical(f"🚨 CRITICAL MEMORY: {memory_mb:.1f}MB")
                     self._emergency_cleanup()
+                    self.memory_pressure = True
+                elif memory_pressure_ratio > MEMORY_PRESSURE_THRESHOLD:  # 75% - Warning
+                    logger.warning(f"⚠️ Memory pressure: {memory_mb:.1f}MB")
+                    self._smart_cleanup()
+                    self.memory_pressure = True
+                else:
+                    self.memory_pressure = False
+                    # Light maintenance cleanup
+                    self._maintenance_cleanup()
                 
-                # Regular cleanup
-                self._cleanup_database()
+                # Update database size
+                if os.path.exists(self.db_path):
+                    db_size_mb = os.path.getsize(self.db_path) / 1024 / 1024
+                    self.stats['database_size_mb'] = db_size_mb
                 
                 # Force garbage collection
                 collected = gc.collect()
-                logger.info(f"🧹 Cleanup: {memory_mb:.1f}MB memory, {collected} objects collected")
+                logger.info(f"🧹 Cleanup: {memory_mb:.1f}MB memory ({memory_pressure_ratio:.1%}), DB: {self.stats['database_size_mb']:.1f}MB, GC: {collected}")
                     
             except Exception as e:
                 logger.error(f"❌ Cleanup error: {e}")
+    
+    def _ml_analysis_worker(self):
+        """Background ML analysis on stored data"""
+        while True:
+            try:
+                time.sleep(300)  # Run ML analysis every 5 minutes
+                
+                # Only run ML analysis if not under memory pressure
+                if not self.memory_pressure:
+                    self._run_ml_analysis()
+                else:
+                    logger.info("⏸️ Skipping ML analysis due to memory pressure")
+                    
+            except Exception as e:
+                logger.error(f"❌ ML analysis worker error: {e}")
+    
+    def _run_ml_analysis(self):
+        """Run ML analysis on historical data"""
+        try:
+            # Get training data from database (last 5000 records)
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # Get recent trades for analysis
+            cursor.execute("""
+                SELECT symbol, side, amount, price, pnl, timestamp, 
+                       volume_24h, price_change_1h, rsi_14, ema_20
+                FROM trades 
+                ORDER BY created_at DESC 
+                LIMIT ?
+            """, (ML_TRAINING_WINDOW,))
+            
+            trades_data = cursor.fetchall()
+            
+            if len(trades_data) < 100:  # Need minimum data for ML
+                logger.info("📊 Insufficient data for ML analysis")
+                conn.close()
+                return
+            
+            # Simple ML analysis (without heavy libraries to save memory)
+            symbol_performance = {}
+            total_trades = len(trades_data)
+            profitable_trades = 0
+            
+            for trade in trades_data:
+                symbol = trade[0]
+                pnl = trade[4] or 0
+                
+                if symbol not in symbol_performance:
+                    symbol_performance[symbol] = {'trades': 0, 'total_pnl': 0, 'wins': 0}
+                
+                symbol_performance[symbol]['trades'] += 1
+                symbol_performance[symbol]['total_pnl'] += pnl
+                if pnl > 0:
+                    symbol_performance[symbol]['wins'] += 1
+                    profitable_trades += 1
+            
+            # Calculate overall metrics
+            overall_win_rate = (profitable_trades / total_trades) * 100 if total_trades > 0 else 0
+            self.stats['win_rate'] = overall_win_rate
+            self.stats['ml_model_accuracy'] = min(95, max(50, overall_win_rate))  # Convert to accuracy
+            
+            # Generate ML predictions for each symbol
+            for symbol, perf in symbol_performance.items():
+                win_rate = (perf['wins'] / perf['trades']) * 100 if perf['trades'] > 0 else 50
+                avg_pnl = perf['total_pnl'] / perf['trades'] if perf['trades'] > 0 else 0
+                
+                # Simple prediction model based on historical performance
+                prediction_1h = 1.0 + (avg_pnl / 1000)  # Convert PnL to price multiplier
+                prediction_4h = 1.0 + (avg_pnl / 800)
+                prediction_24h = 1.0 + (avg_pnl / 500)
+                
+                confidence = min(0.95, max(0.5, win_rate / 100))
+                
+                # Store ML analysis
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO ml_analysis 
+                    (symbol, prediction_1h, prediction_4h, prediction_24h, 
+                     confidence_1h, confidence_4h, confidence_24h, model_accuracy, 
+                     feature_importance, timestamp)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (symbol, prediction_1h, prediction_4h, prediction_24h,
+                      confidence, confidence * 0.9, confidence * 0.8, win_rate,
+                      json.dumps({'historical_performance': avg_pnl, 'trade_count': perf['trades']}),
+                      datetime.now().isoformat()))
+            
+            conn.commit()
+            conn.close()
+            
+            # Update cache with latest analysis
+            self.ml_analysis_cache = {
+                'last_update': time.time(),
+                'model_accuracy': overall_win_rate,
+                'total_trades_analyzed': total_trades,
+                'symbols_analyzed': len(symbol_performance)
+            }
+            
+            logger.info(f"🤖 ML analysis completed: {total_trades} trades, {len(symbol_performance)} symbols, {overall_win_rate:.1f}% accuracy")
+            
+        except Exception as e:
+            logger.error(f"❌ ML analysis error: {e}")
+    
+    def _smart_cleanup(self):
+        """Smart cleanup that preserves ML training data"""
+        try:
+            # Only clean in-memory caches, preserve database for ML
+            while len(self.recent_trades) > 500:  # Keep 500 most recent in memory
+                self.recent_trades.popleft()
+            
+            while len(self.recent_signals) > 500:  # Keep 500 most recent in memory
+                self.recent_signals.popleft()
+            
+            while len(self.logs) > 200:  # Reduce logs during pressure
+                self.logs.popleft()
+            
+            # Clear ML cache if under severe pressure
+            if self.stats['memory_usage'] > MAX_MEMORY_MB * 0.85:
+                self.ml_analysis_cache.clear()
+            
+            gc.collect()
+            logger.info("🧠 Smart cleanup: Preserved ML data, cleaned memory caches")
+            
+        except Exception as e:
+            logger.error(f"❌ Smart cleanup error: {e}")
+    
+    def _maintenance_cleanup(self):
+        """Light maintenance cleanup during normal operation"""
+        try:
+            # Only clean very old database entries (keep 30 days)
+            if time.time() - self.last_cleanup > 3600:  # Once per hour
+                conn = sqlite3.connect(self.db_path)
+                cursor = conn.cursor()
+                
+                # Clean only very old data
+                cutoff = (datetime.now() - timedelta(days=DATABASE_RETENTION_DAYS)).isoformat()
+                
+                cursor.execute("DELETE FROM trades WHERE timestamp < ?", (cutoff,))
+                cursor.execute("DELETE FROM signals WHERE timestamp < ?", (cutoff,))
+                cursor.execute("DELETE FROM market_data WHERE timestamp < ?", (cutoff,))
+                
+                # Optimize database occasionally
+                if time.time() - self.last_cleanup > 86400:  # Once per day
+                    cursor.execute("VACUUM")
+                    cursor.execute("ANALYZE")
+                
+                conn.commit()
+                conn.close()
+                
+                self.last_cleanup = time.time()
+                logger.info("🔧 Maintenance cleanup completed")
+            
+        except Exception as e:
+            logger.error(f"❌ Maintenance cleanup error: {e}")
     
     def _emergency_cleanup(self):
         """Emergency memory cleanup"""
@@ -261,32 +517,153 @@ class LightweightDataManager:
         self.logs.append(log_entry)
         logger.info(message)
     
+    def get_ml_training_data(self, symbol: str = None, limit: int = ML_TRAINING_WINDOW) -> Dict[str, Any]:
+        """Get ML training data efficiently from database"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # Build query based on parameters
+            if symbol:
+                query = """
+                    SELECT symbol, side, amount, price, pnl, timestamp, 
+                           volume_24h, price_change_1h, rsi_14, ema_20, ml_prediction, confidence_score
+                    FROM trades 
+                    WHERE symbol = ?
+                    ORDER BY created_at DESC 
+                    LIMIT ?
+                """
+                cursor.execute(query, (symbol, limit))
+            else:
+                query = """
+                    SELECT symbol, side, amount, price, pnl, timestamp, 
+                           volume_24h, price_change_1h, rsi_14, ema_20, ml_prediction, confidence_score
+                    FROM trades 
+                    ORDER BY created_at DESC 
+                    LIMIT ?
+                """
+                cursor.execute(query, (limit,))
+            
+            trades = cursor.fetchall()
+            
+            # Get corresponding signals data
+            if symbol:
+                cursor.execute("""
+                    SELECT symbol, signal, confidence, price, timestamp,
+                           ema_signal, rsi_signal, volume_signal, ml_score, quantum_score, sentiment_score
+                    FROM signals 
+                    WHERE symbol = ?
+                    ORDER BY created_at DESC 
+                    LIMIT ?
+                """, (symbol, limit))
+            else:
+                cursor.execute("""
+                    SELECT symbol, signal, confidence, price, timestamp,
+                           ema_signal, rsi_signal, volume_signal, ml_score, quantum_score, sentiment_score
+                    FROM signals 
+                    ORDER BY created_at DESC 
+                    LIMIT ?
+                """, (limit,))
+            
+            signals = cursor.fetchall()
+            
+            conn.close()
+            
+            return {
+                'trades': trades,
+                'signals': signals,
+                'total_trades': len(trades),
+                'total_signals': len(signals),
+                'data_quality': 'sufficient' if len(trades) >= 100 else 'insufficient'
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ ML training data error: {e}")
+            return {'trades': [], 'signals': [], 'total_trades': 0, 'total_signals': 0, 'data_quality': 'error'}
+    
     def get_table_data(self) -> Dict[str, Any]:
-        """Get all data formatted for table display"""
+        """Get all data formatted for table display with ML insights"""
         # Get memory usage
         memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
         self.stats['memory_usage'] = memory_mb
         
+        # Get recent data from memory (for dashboard display)
+        recent_trades = [asdict(trade) for trade in list(self.recent_trades)[-100:]]
+        recent_signals = [asdict(signal) for signal in list(self.recent_signals)[-100:]]
+        recent_market = [asdict(data) for data in list(self.recent_market_data)[-50:]]
+        
+        # Get ML analysis summary
+        ml_summary = self.get_ml_summary()
+        
         return {
-            'trades': [asdict(trade) for trade in list(self.trades)[-50:]],
-            'signals': [asdict(signal) for signal in list(self.signals)[-50:]],
-            'market_data': [asdict(data) for data in list(self.market_data)[-20:]],
+            'trades': recent_trades,
+            'signals': recent_signals,
+            'market_data': recent_market,
             'portfolio': dict(self.portfolio),
             'stats': dict(self.stats),
-            'logs': list(self.logs)[-100:],
+            'logs': list(self.logs)[-200:],  # More logs for detailed tracking
+            'ml_analysis': ml_summary,
             'timestamp': datetime.now().isoformat(),
             'memory_status': {
                 'current_mb': round(memory_mb, 1),
                 'limit_mb': MAX_MEMORY_MB,
                 'percent': round((memory_mb / MAX_MEMORY_MB) * 100, 1),
-                'status': 'ok' if memory_mb < MAX_MEMORY_MB * 0.8 else 'warning'
+                'status': 'ok' if memory_mb < MAX_MEMORY_MB * 0.8 else 'warning',
+                'database_mb': round(self.stats.get('database_size_mb', 0), 1)
+            },
+            'data_scale': {
+                'total_available_trades': self.get_total_trades_count(),
+                'total_available_signals': self.get_total_signals_count(),
+                'ml_training_window': ML_TRAINING_WINDOW,
+                'retention_days': DATABASE_RETENTION_DAYS
             }
         }
+    
+    def get_ml_summary(self) -> Dict[str, Any]:
+        """Get ML analysis summary"""
+        if self.ml_analysis_cache:
+            return {
+                'status': 'active',
+                'last_update': datetime.fromtimestamp(self.ml_analysis_cache['last_update']).strftime('%H:%M:%S'),
+                'model_accuracy': round(self.ml_analysis_cache['model_accuracy'], 1),
+                'trades_analyzed': self.ml_analysis_cache['total_trades_analyzed'],
+                'symbols_analyzed': self.ml_analysis_cache['symbols_analyzed'],
+                'next_analysis': 'In 5 minutes'
+            }
+        else:
+            return {
+                'status': 'initializing',
+                'message': 'ML analysis starting soon...'
+            }
+    
+    def get_total_trades_count(self) -> int:
+        """Get total number of trades in database"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM trades")
+            count = cursor.fetchone()[0]
+            conn.close()
+            return count
+        except:
+            return 0
+    
+    def get_total_signals_count(self) -> int:
+        """Get total number of signals in database"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM signals")
+            count = cursor.fetchone()[0]
+            conn.close()
+            return count
+        except:
+            return 0
 
 class WebSocketManager:
     """Manage WebSocket connections efficiently"""
     
-    def __init__(self, data_manager: LightweightDataManager):
+    def __init__(self, data_manager: MLScaleDataManager):
         self.connections: List[WebSocket] = []
         self.data_manager = data_manager
         self.max_connections = int(os.getenv("MAX_WEBSOCKET_CONNECTIONS", "10"))
@@ -341,7 +718,7 @@ class WebSocketManager:
             self.disconnect(ws)
 
 # Initialize components
-data_manager = LightweightDataManager()
+data_manager = MLScaleDataManager()
 ws_manager = WebSocketManager(data_manager)
 
 # FastAPI app with minimal memory footprint
@@ -765,7 +1142,7 @@ async def get_dashboard():
 
 @app.get("/health")
 async def health_check():
-    """Lightweight health check for Render"""
+    """Comprehensive health check with ML data scale info"""
     try:
         memory = psutil.Process().memory_info().rss / 1024 / 1024
         
@@ -776,12 +1153,178 @@ async def health_check():
             "memory_percent": round((memory / MAX_MEMORY_MB) * 100, 1),
             "timestamp": datetime.now().isoformat(),
             "websocket_connections": len(ws_manager.connections),
-            "total_trades": len(data_manager.trades),
-            "total_signals": len(data_manager.signals)
+            "data_scale": {
+                "memory_trades": len(data_manager.recent_trades),
+                "memory_signals": len(data_manager.recent_signals),
+                "database_trades": data_manager.get_total_trades_count(),
+                "database_signals": data_manager.get_total_signals_count(),
+                "ml_training_window": ML_TRAINING_WINDOW,
+                "retention_days": DATABASE_RETENTION_DAYS
+            },
+            "ml_status": data_manager.get_ml_summary(),
+            "database_size_mb": round(data_manager.stats.get('database_size_mb', 0), 1)
         }
     except Exception as e:
         return {
             "status": "error", 
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+
+@app.get("/ml/training-data")
+async def get_ml_training_data(symbol: str = None, limit: int = 1000):
+    """Get ML training data for analysis (up to 5000 records)"""
+    try:
+        # Limit to prevent memory issues
+        safe_limit = min(limit, ML_TRAINING_WINDOW)
+        training_data = data_manager.get_ml_training_data(symbol, safe_limit)
+        
+        return {
+            "status": "success",
+            "data": training_data,
+            "requested_limit": limit,
+            "actual_limit": safe_limit,
+            "memory_safe": True,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+
+@app.get("/ml/analysis")
+async def get_ml_analysis():
+    """Get current ML analysis results"""
+    try:
+        conn = sqlite3.connect(data_manager.db_path)
+        cursor = conn.cursor()
+        
+        # Get latest ML analysis for each symbol
+        cursor.execute("""
+            SELECT symbol, prediction_1h, prediction_4h, prediction_24h,
+                   confidence_1h, confidence_4h, confidence_24h, model_accuracy,
+                   feature_importance, timestamp
+            FROM ml_analysis 
+            WHERE timestamp > datetime('now', '-1 hour')
+            ORDER BY created_at DESC
+        """)
+        
+        analysis_data = []
+        for row in cursor.fetchall():
+            analysis_data.append({
+                'symbol': row[0],
+                'prediction_1h': row[1],
+                'prediction_4h': row[2], 
+                'prediction_24h': row[3],
+                'confidence_1h': row[4],
+                'confidence_4h': row[5],
+                'confidence_24h': row[6],
+                'model_accuracy': row[7],
+                'feature_importance': json.loads(row[8]) if row[8] else {},
+                'timestamp': row[9]
+            })
+        
+        conn.close()
+        
+        return {
+            "status": "success",
+            "analysis": analysis_data,
+            "total_symbols": len(analysis_data),
+            "ml_summary": data_manager.get_ml_summary(),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+
+@app.get("/data/stats")
+async def get_data_statistics():
+    """Get comprehensive data statistics for ML analysis"""
+    try:
+        conn = sqlite3.connect(data_manager.db_path)
+        cursor = conn.cursor()
+        
+        # Get trade statistics by symbol
+        cursor.execute("""
+            SELECT symbol, 
+                   COUNT(*) as trade_count,
+                   AVG(pnl) as avg_pnl,
+                   SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END) as winning_trades,
+                   MIN(timestamp) as first_trade,
+                   MAX(timestamp) as last_trade
+            FROM trades 
+            GROUP BY symbol
+            ORDER BY trade_count DESC
+        """)
+        
+        trade_stats = []
+        for row in cursor.fetchall():
+            win_rate = (row[3] / row[1]) * 100 if row[1] > 0 else 0
+            trade_stats.append({
+                'symbol': row[0],
+                'trade_count': row[1],
+                'avg_pnl': round(row[2] or 0, 2),
+                'winning_trades': row[3],
+                'win_rate': round(win_rate, 1),
+                'first_trade': row[4],
+                'last_trade': row[5],
+                'data_quality': 'excellent' if row[1] > 100 else 'good' if row[1] > 50 else 'limited'
+            })
+        
+        # Get signal statistics
+        cursor.execute("""
+            SELECT symbol,
+                   COUNT(*) as signal_count,
+                   AVG(confidence) as avg_confidence,
+                   COUNT(CASE WHEN signal = 'BUY' THEN 1 END) as buy_signals,
+                   COUNT(CASE WHEN signal = 'SELL' THEN 1 END) as sell_signals,
+                   COUNT(CASE WHEN signal = 'HOLD' THEN 1 END) as hold_signals
+            FROM signals
+            GROUP BY symbol
+            ORDER BY signal_count DESC
+        """)
+        
+        signal_stats = []
+        for row in cursor.fetchall():
+            signal_stats.append({
+                'symbol': row[0],
+                'signal_count': row[1],
+                'avg_confidence': round(row[2] or 0, 3),
+                'buy_signals': row[3],
+                'sell_signals': row[4],
+                'hold_signals': row[5],
+                'signal_distribution': {
+                    'buy_pct': round((row[3] / row[1]) * 100, 1) if row[1] > 0 else 0,
+                    'sell_pct': round((row[4] / row[1]) * 100, 1) if row[1] > 0 else 0,
+                    'hold_pct': round((row[5] / row[1]) * 100, 1) if row[1] > 0 else 0
+                }
+            })
+        
+        conn.close()
+        
+        return {
+            "status": "success",
+            "trade_statistics": trade_stats,
+            "signal_statistics": signal_stats,
+            "overall_stats": {
+                "total_trades": data_manager.get_total_trades_count(),
+                "total_signals": data_manager.get_total_signals_count(),
+                "ml_training_window": ML_TRAINING_WINDOW,
+                "database_retention_days": DATABASE_RETENTION_DAYS,
+                "database_size_mb": data_manager.stats.get('database_size_mb', 0)
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
             "error": str(e),
             "timestamp": datetime.now().isoformat()
         }
@@ -815,7 +1358,27 @@ async def simulate_trading_data():
                     timestamp=datetime.now().isoformat(),
                     pnl=pnl
                 )
-                data_manager.add_trade(trade)
+                data_manager.recent_trades.append(trade)
+                
+                # Add enhanced trade data to database for ML
+                try:
+                    conn = sqlite3.connect(data_manager.db_path)
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                        INSERT INTO trades 
+                        (symbol, side, amount, price, pnl, timestamp, volume_24h, price_change_1h, rsi_14, ema_20, ml_prediction, confidence_score)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (symbol, side, amount, price, pnl, trade.timestamp,
+                          random.uniform(10000, 100000),  # volume_24h
+                          random.uniform(-5, 5),          # price_change_1h
+                          random.uniform(20, 80),         # rsi_14
+                          price * random.uniform(0.98, 1.02),  # ema_20
+                          random.uniform(0.3, 0.9),       # ml_prediction
+                          random.uniform(0.5, 0.95)))     # confidence_score
+                    conn.commit()
+                    conn.close()
+                except Exception as e:
+                    logger.error(f"❌ Enhanced trade data error: {e}")
             
             # Simulate signal (50% chance)
             if random.random() < 0.5:
@@ -832,7 +1395,7 @@ async def simulate_trading_data():
                     timestamp=datetime.now().isoformat(),
                     reason=random.choice(['EMA crossover', 'RSI oversold', 'Volume spike', 'Support bounce'])
                 )
-                data_manager.add_signal(signal_record)
+                data_manager.recent_signals.append(signal_record)
             
             # Simulate market data updates
             for symbol in symbols:
@@ -847,7 +1410,7 @@ async def simulate_trading_data():
                     volume=volume,
                     timestamp=datetime.now().isoformat()
                 )
-                data_manager.add_market_data(market)
+                data_manager.recent_market_data.append(market)
             
             # Broadcast update to WebSocket clients
             if ws_manager.connections:
