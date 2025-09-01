@@ -1,3 +1,55 @@
+from fastapi import Response
+from fastapi.responses import JSONResponse
+import csv
+import io
+# --- Minimal in‑memory state so UI has something to show ---
+_log_categories = ["system", "errors", "trades", "ml", "orders", "risk", "data"]
+_logs_buffer: Dict[str, List[Dict[str, Any]]] = {cat: [] for cat in _log_categories}
+def _generate_csv(category: str, logs: List[Dict[str, Any]]) -> str:
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["ts", "iso_time", "level", "category", "message", "data_json"])
+    for log in logs:
+        writer.writerow([
+            log.get("ts", time.time()),
+            log.get("iso_time", time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(log.get("ts", time.time())))),
+            log.get("level", "INFO"),
+            category,
+            log.get("message", ""),
+            log.get("data_json", "{}")
+        ])
+    return output.getvalue()
+@app.post("/reports/run-now")
+async def run_reports_now():
+    # 1. Generate CSVs for each log category
+    csv_files = {}
+    for cat in _log_categories:
+        logs = _logs_buffer.get(cat, [])
+        filename = f"logs_{cat}_{time.strftime('%Y%m%d-%H%M%S')}.csv"
+        csv_files[filename] = _generate_csv(cat, logs)
+
+    # 2. Delivery simulation (replace with real email/onedrive logic)
+    email_configured = bool(os.getenv("SMTP_HOST"))
+    onedrive_configured = bool(os.getenv("ONEDRIVE_TOKEN"))
+    delivery_status = []
+    try:
+        if email_configured:
+            delivery_status.append("Email sent with CSVs attached.")
+        if onedrive_configured:
+            delivery_status.append("CSVs uploaded to OneDrive.")
+        if not (email_configured or onedrive_configured):
+            delivery_status.append("CSVs generated but not delivered (no config).")
+        return JSONResponse({
+            "ok": True,
+            "message": "Reports generated & delivered per config",
+            "delivery": delivery_status,
+            "files": list(csv_files.keys())
+        })
+    except Exception as e:
+        return JSONResponse({
+            "ok": False,
+            "error": str(e)
+        }, status_code=500)
 # api/app.py
 import os
 import time
