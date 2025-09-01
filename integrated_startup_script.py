@@ -19,6 +19,7 @@ from typing import Dict, Any
 
 # Import our optimized components
 from lightweight_dashboard_api import app, data_manager, ws_manager
+from memory_optimized_trader import OptimizedDataCollector, MemoryMonitor
 
 # Configuration
 PORT = int(os.getenv("PORT", "8000"))
@@ -42,6 +43,8 @@ class IntegratedBottieSystem:
     """Integrated system combining dashboard and data collection"""
     
     def __init__(self):
+        self.memory_monitor = MemoryMonitor()
+        self.data_collector = OptimizedDataCollector() if not DEMO_MODE else None
         self.running = False
         self.tasks = []
         
