@@ -42,6 +42,8 @@ Thumbs.db
 trades_*.json
 trades_*.backup*
 *.backup.*
+*backup*
+exec_state.json
 
 # Model files (can be large)
 models/*.h5
