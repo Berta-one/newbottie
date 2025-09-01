@@ -1,10 +1,38 @@
-from fastapi import Response
-from fastapi.responses import JSONResponse
+import os
+import time
+import asyncio
+import random
 import csv
 import io
+from typing import Any, Dict, List
+
+from fastapi import FastAPI, Response
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+
+# Environment variables
+BINANCE_API_KEY = os.getenv("BINANCE_API_KEY")
+BINANCE_API_SECRET = os.getenv("BINANCE_API_SECRET")
+DEMO_MODE = os.getenv("DEMO_MODE", "0") == "1"
+
+app = FastAPI(title="Bottie API", version="1.0.0")
+
+# Allow your Netlify site (or "*" while testing)
+NETLIFY_URL = os.getenv("NETLIFY_URL", "https://dancing-figolla-978034.netlify.app")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # --- Minimal in‑memory state so UI has something to show ---
 _log_categories = ["system", "errors", "trades", "ml", "orders", "risk", "data"]
 _logs_buffer: Dict[str, List[Dict[str, Any]]] = {cat: [] for cat in _log_categories}
+
+
 def _generate_csv(category: str, logs: List[Dict[str, Any]]) -> str:
     output = io.StringIO()
     writer = csv.writer(output)
@@ -12,13 +40,18 @@ def _generate_csv(category: str, logs: List[Dict[str, Any]]) -> str:
     for log in logs:
         writer.writerow([
             log.get("ts", time.time()),
-            log.get("iso_time", time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(log.get("ts", time.time())))),
+            log.get(
+                "iso_time",
+                time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(log.get("ts", time.time())))
+            ),
             log.get("level", "INFO"),
             category,
             log.get("message", ""),
             log.get("data_json", "{}")
         ])
     return output.getvalue()
+
+
 @app.post("/reports/run-now")
 async def run_reports_now():
     # 1. Generate CSVs for each log category
@@ -50,33 +83,6 @@ async def run_reports_now():
             "ok": False,
             "error": str(e)
         }, status_code=500)
-# api/app.py
-import os
-import time
-import asyncio
-import random
-from typing import Any, Dict, List
-
-# Environment variables
-BINANCE_API_KEY = os.getenv("BINANCE_API_KEY")
-BINANCE_API_SECRET = os.getenv("BINANCE_API_SECRET")
-DEMO_MODE = os.getenv("DEMO_MODE", "0") == "1"
-
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
-app = FastAPI(title="Bottie API", version="1.0.0")
-
-# Allow your Netlify site (or "*" while testing)
-NETLIFY_URL = os.getenv("NETLIFY_URL", "https://dancing-figolla-978034.netlify.app")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # --- Minimal in‑memory state so UI has something to show ---
 _started = time.time()
@@ -138,7 +144,6 @@ def status():
     }
 
 
-
 @app.get("/reports")
 def serve_reports():
     from fastapi.responses import HTMLResponse
@@ -159,9 +164,11 @@ document.getElementById('data').innerHTML = '<pre>' + JSON.stringify(data, null,
 }
 </script></body></html>""")
 
+
 @app.get("/logs/last")
 def logs_last():
     return {"logs": _logs[-300:]}
+
 
 # Simple portfolio update loop for demo purposes
 async def portfolio_loop():
@@ -179,17 +186,18 @@ async def portfolio_loop():
                 # Keep the list from growing too large
                 if len(_equity_series) > 1000:
                     _equity_series = _equity_series[-1000:]
-            
+
             # Sleep for a while before the next update
             await asyncio.sleep(60)
         except Exception as e:
             print(f"Portfolio loop error: {e}")
             await asyncio.sleep(60)
 
+
 @app.on_event("startup")
 async def _on_startup():
     # Import here to avoid circular imports
-    
+
     # Check if we're in demo mode
     if DEMO_MODE:
         print("Starting in DEMO MODE - Binance API keys not required")
