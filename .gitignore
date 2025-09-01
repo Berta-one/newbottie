@@ -3,10 +3,9 @@
 netlify-deploy/
 
 # Environment variables with secrets
-.env
-.env.local
-.env.production
-.env.real_trading
+.env*
+*.env
+!.env.example
 
 # Python cache and virtual environments
 __pycache__/
