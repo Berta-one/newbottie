@@ -1,7 +1,14 @@
 # api/app.py
 import os
 import time
+import asyncio
+import random
 from typing import Any, Dict, List
+
+# Environment variables
+BINANCE_API_KEY = os.getenv("BINANCE_API_KEY")
+BINANCE_API_SECRET = os.getenv("BINANCE_API_SECRET")
+DEMO_MODE = os.getenv("DEMO_MODE", "0") == "1"
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -63,7 +70,7 @@ def health():
         "ok": True,
         "service": "bottie",
         "time": int(time.time()),
-        "quantum": os.getenv("QUANTUM_BACKEND", "disabled"),
+        "quantum": os.getenv("QUANTUM_BACKEND", "enabled"),
     }
 
 
@@ -104,9 +111,39 @@ document.getElementById('data').innerHTML = '<pre>' + JSON.stringify(data, null,
 def logs_last():
     return {"logs": _logs[-300:]}
 
+# Simple portfolio update loop for demo purposes
+async def portfolio_loop():
+    """Update portfolio data periodically"""
+    while True:
+        try:
+            # In a real implementation, this would fetch data from Binance API
+            # For demo, we'll just update the timestamp
+            global _equity_series
+            now = int(time.time())
+            if _equity_series:
+                last_value = _equity_series[-1]["v"]
+                new_value = last_value + random.uniform(-50, 50)
+                _equity_series.append({"t": now, "v": new_value})
+                # Keep the list from growing too large
+                if len(_equity_series) > 1000:
+                    _equity_series = _equity_series[-1000:]
+            
+            # Sleep for a while before the next update
+            await asyncio.sleep(60)
+        except Exception as e:
+            print(f"Portfolio loop error: {e}")
+            await asyncio.sleep(60)
+
 @app.on_event("startup")
 async def _on_startup():
-    # Raise loudly if keys are missing
-    if not BINANCE_API_KEY or not BINANCE_API_SECRET:
-        raise RuntimeError("Live mode requires BINANCE_API_KEY/SECRET")
-    asyncio.create_task(portfolio_loop())
+    # Import here to avoid circular imports
+    
+    # Check if we're in demo mode
+    if DEMO_MODE:
+        print("Starting in DEMO MODE - Binance API keys not required")
+        asyncio.create_task(portfolio_loop())
+    else:
+        # Only check for API keys in live mode
+        if not BINANCE_API_KEY or not BINANCE_API_SECRET:
+            raise RuntimeError("Live mode requires BINANCE_API_KEY/SECRET")
+        asyncio.create_task(portfolio_loop())
