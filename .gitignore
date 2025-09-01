@@ -47,3 +47,8 @@ trades_*.backup*
 models/*.h5
 models/*.pkl
 models/*.joblib
+
+# Archive and backup artifacts
+*.zip
+*.tar.gz
+*backup*
