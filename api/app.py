@@ -2287,11 +2287,11 @@ async def startup_event():
         print("⚠️ Exchange libraries not available - simulation mode")
 
 
-# Serve specific dashboard files without mounting root
-@app.get("/index_enhanced.html")
-def enhanced_dashboard():
-    """Serve the enhanced dashboard"""
-    return FileResponse("web/index_enhanced.html")
+# Serve main dashboard file
+@app.get("/index.html")
+def serve_dashboard():
+    """Serve the main dashboard"""
+    return FileResponse("index.html")
 
 
 @app.get("/test_connection.html")
@@ -2344,8 +2344,8 @@ async def startup_event():
 
 @app.get("/dashboard")
 def dashboard_redirect():
-    """Redirect to enhanced dashboard"""
-    return FileResponse("web/index_enhanced.html")
+    """Redirect to main dashboard"""
+    return FileResponse("index.html")
 
 
 if __name__ == "__main__":

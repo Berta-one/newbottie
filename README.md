@@ -78,6 +78,8 @@ export FINNHUB_API_KEY="your_finnhub_key"
 python render_api.py
 ```
 
+Then open `index.html` in your browser to view the dashboard.
+
 ### **Render Deployment**
 1. Connect GitHub repository to Render
 2. Set environment variables in Render dashboard:
