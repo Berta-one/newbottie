@@ -6,7 +6,7 @@ import csv
 import io
 from typing import Any, Dict, List
 
-from fastapi import FastAPI, Response
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
