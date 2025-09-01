@@ -8,8 +8,6 @@ scikit-learn>=1.5.0
 xgboost>=2.0.0
 qiskit
 qiskit-aer
-ccxt
-fastapi
 uvicorn[standard]
 python-dotenv
 PyJWT==2.8.0
@@ -19,3 +17,10 @@ bcrypt
 python-multipart>=0.0.6
 websockets>=11.0.3
 python-binance>=1.0.19
+fastapi==0.116.1
+uvicorn[standard]==0.35.0
+apscheduler==3.11.0
+requests==2.32.5
+psutil==5.9.8
+ccxt==4.3.74
+python-dotenv==1.0.1
