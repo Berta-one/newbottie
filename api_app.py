@@ -111,8 +111,8 @@ def _seed_demo():
         "ws: (demo) synthetic feed",
     ])
 
-
-_seed_demo()
+if DEMO_MODE:
+    _seed_demo()
 
 
 @app.get("/")
