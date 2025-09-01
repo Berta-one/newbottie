@@ -56,7 +56,7 @@ services:
       - key: BINANCE_SECRET
         sync: false
       - key: BINANCE_TESTNET
-        value: "true"   # Use testnet to avoid real trading costs
+        value: "false"  # Connect to Binance live environment
       
       # Database settings
       - key: USE_MEMORY_DB
