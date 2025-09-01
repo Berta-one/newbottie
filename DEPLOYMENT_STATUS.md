@@ -26,7 +26,7 @@
 - **Backend**: https://bottie-1.onrender.com
 
 ### Local (Currently Working)
-- **Frontend**: http://127.0.0.1:3000/working-dashboard.html
+- **Frontend**: http://127.0.0.1:3000/index.html
 - **Backend**: http://127.0.0.1:8000
 - **Simple Deploy**: http://127.0.0.1:8080
 

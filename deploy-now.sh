@@ -25,8 +25,7 @@ print_status "Creating deployment packages..."
 # Create Netlify deployment package
 print_status "📦 Creating Netlify deployment package..."
 mkdir -p netlify-ready
-cp working-dashboard.html netlify-ready/index.html
-cp style.css netlify-ready/
+cp index.html netlify-ready/index.html
 cat > netlify-ready/_redirects << 'EOF'
 /api/* https://bottie-1.onrender.com/:splat 200
 /* /index.html 200
@@ -87,7 +86,7 @@ cat > DEPLOYMENT_STATUS.md << EOF
 - **Backend**: https://bottie-1.onrender.com
 
 ### Local (Currently Working)
-- **Frontend**: http://127.0.0.1:3000/working-dashboard.html
+- **Frontend**: http://127.0.0.1:3000/index.html
 - **Backend**: $LOCAL_API
 - **Simple Deploy**: http://127.0.0.1:8080
 
