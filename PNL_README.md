@@ -10,10 +10,10 @@ cd /workspace
 python3 start_pnl_server.py
 ```
 
-### 2. Access the P&L Dashboard
+### 2. Access the Dashboard
 Open your browser and go to:
 ```
-http://localhost:9000/pnl_dashboard.html
+http://localhost:9000/index.html
 ```
 
 ### 3. (Optional) Start API Integration
@@ -79,7 +79,7 @@ python3 pnl_integration.py
 - **Real-time updates** every 10 seconds
 - **Trade simulation** for testing
 
-### Dashboard (`pnl_dashboard.html`)
+### Dashboard (`index.html`)
 - **WebSocket client** with auto-reconnection
 - **Real-time data visualization**
 - **Export functionality** (JSON format)
@@ -126,7 +126,7 @@ python3 pnl_integration.py
 ## 🎮 Usage Examples
 
 ### View P&L Report
-1. Open dashboard at `http://localhost:9000/pnl_dashboard.html`
+1. Open dashboard at `http://localhost:9000/index.html`
 2. Dashboard automatically loads with current data
 3. Real-time updates every 10 seconds
 
@@ -205,7 +205,7 @@ The `start_pnl_server.py` script automatically:
 ## 🎯 Next Steps
 
 1. **Start the server**: `python3 start_pnl_server.py`
-2. **Open dashboard**: `http://localhost:9000/pnl_dashboard.html`
+2. **Open dashboard**: `http://localhost:9000/index.html`
 3. **Test functionality**: Use simulate trade feature
 4. **Connect to API**: Run `pnl_integration.py` for live data
 5. **Export reports**: Use dashboard export feature

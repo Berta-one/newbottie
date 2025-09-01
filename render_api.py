@@ -384,8 +384,6 @@ def root():
     # Legacy fallbacks
     elif os.path.exists('dashboard.html'):
         return FileResponse('dashboard.html')
-    elif os.path.exists('working-dashboard.html'):
-        return FileResponse('working-dashboard.html')
     elif os.path.exists('reports-dashboard.html'):
         return FileResponse('reports-dashboard.html')
     else:

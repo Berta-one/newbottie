@@ -3,10 +3,9 @@
 netlify-deploy/
 
 # Environment variables with secrets
-.env
-.env.local
-.env.production
-.env.real_trading
+.env*
+*.env
+!.env.example
 
 # Python cache and virtual environments
 __pycache__/
@@ -42,8 +41,15 @@ Thumbs.db
 trades_*.json
 trades_*.backup*
 *.backup.*
+*backup*
+exec_state.json
 
 # Model files (can be large)
 models/*.h5
 models/*.pkl
 models/*.joblib
+
+# Archive and backup artifacts
+*.zip
+*.tar.gz
+*backup*
