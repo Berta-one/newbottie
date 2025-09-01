@@ -4,6 +4,16 @@
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
 
+## Quick Start
+
+Launch the application using the `render_api.py` script:
+
+```bash
+python render_api.py
+```
+
+`render_api.py` is the official entry point for the Bottie system.
+
 ## 🚀 **Key Features**
 
 ### 🧠 **Adaptive Machine Learning**
