@@ -51,6 +51,7 @@ class ReportsManager {
             }
         } catch (error) {
             console.log(`💥 ERROR from ${url}:`, error.message);
+            this.showError(`Unable to reach ${endpoint}`);
             throw error;
         }
     }
@@ -135,6 +136,7 @@ class ReportsManager {
             return this.processMLData(data);
         } catch (error) {
             console.info('⚠️ ML performance endpoint not available:', error.message);
+            this.showError('ML performance data unavailable. Using cached data.');
             return [];
         }
     }
