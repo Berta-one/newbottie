@@ -85,42 +85,8 @@ real_positions = {}
 real_balance = {}
 last_update = 0
 startup_logs = []
-
-
-def initialize_real_exchange():
-    """Initialize the real exchange connection"""
-    global exchange_client, startup_logs
-    
-    try:
-        if not EXCHANGE_AVAILABLE:
-            startup_logs.append("❌ CCXT not available for real trading")
-            return False
-            
-        api_key = os.getenv('BINANCE_API_KEY', '')
-        api_secret = os.getenv('BINANCE_API_SECRET', '')
-        
-        if not api_key or not api_secret:
-            startup_logs.append("❌ Missing Binance API credentials")
-            return False
-            
-        exchange_client = ccxt.binance({
-            'apiKey': api_key,
-            'secret': api_secret,
-            'sandbox': os.getenv('USE_TESTNET', 'false').lower() == 'true',
-            'enableRateLimit': True,
-        })
-        
-        # Test connection
-        exchange_client.load_markets()
-        exchange_client.fetch_status()
-        
-        startup_logs.append("✅ Exchange connection established")
-        return True
-        
-    except Exception as e:
-        startup_logs.append(f"❌ Exchange initialization failed: {e}")
-        exchange_client = None
-        return False
+# A more robust version of `initialize_real_exchange` is defined later in the
+# file with enhanced logging and production safeguards.
 
 # Trading execution variables
 _signals = []
@@ -2281,13 +2247,16 @@ async def signals_loop():
 # Startup
 @app.on_event("startup")
 async def startup_event():
+    """Initialize the exchange connection on startup"""
     global startup_logs
-    startup_logs.append(
-        f"{time.strftime('%Y-%m-%d %H:%M:%S')} - 🚀 Starting Bottie API initialization..."
-    )
+    msg = "🚀 Starting Bottie API initialization..."
+    startup_logs.append(f"{time.strftime('%Y-%m-%d %H:%M:%S')} - {msg}")
+    logging.info(msg)
 
     if EXCHANGE_AVAILABLE:
-        startup_logs.append(f"{time.strftime('%Y-%m-%d %H:%M:%S')} - ✅ CCXT libraries available")
+        startup_logs.append(
+            f"{time.strftime('%Y-%m-%d %H:%M:%S')} - ✅ CCXT libraries available"
+        )
         success = initialize_real_exchange()
         mode = (
             "LIVE TRADING"
@@ -2297,6 +2266,10 @@ async def startup_event():
         startup_logs.append(
             f"{time.strftime('%Y-%m-%d %H:%M:%S')} - 🚀 Real trading initialization: {mode}"
         )
+        if success:
+            logging.info("✅ Exchange connection established")
+        else:
+            logging.warning("❌ Exchange connection failed - running in simulation mode")
         logging.info(f"🚀 Real trading initialization: {mode}")
 
         # Start trading loops
@@ -2358,19 +2331,6 @@ def _symbols_to_scan() -> list[str]:
 
     syms.discard(f"{PRIMARY_QUOTE}/{PRIMARY_QUOTE}")
     return sorted(syms)
-
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize the exchange connection on startup"""
-    logging.info("🚀 Starting Bottie API initialization...")
-    success = initialize_real_exchange()
-    if success:
-        logging.info("✅ Exchange connection established")
-    else:
-        logging.warning("❌ Exchange connection failed - running in simulation mode")
-
-
 @app.get("/dashboard")
 def dashboard_redirect():
     """Redirect to main dashboard"""
