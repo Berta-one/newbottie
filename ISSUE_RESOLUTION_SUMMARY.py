@@ -114,52 +114,53 @@ NEXT STEPS (Optional):
 """
 
 import requests
-import json
+
 
 def test_key_endpoints():
     """Final verification of key endpoints"""
     base_url = "http://localhost:8000"
-    
+
     endpoints = [
         ("/health", "System Health"),
-        ("/ml/status", "ML Status"), 
+        ("/ml/status", "ML Status"),
         ("/ml/performance?timeframe=1h", "ML Performance"),
         ("/sentiment/articles", "Sentiment Articles"),
         ("/signals", "Trading Signals"),
-        ("/status", "Trading Status")
+        ("/status", "Trading Status"),
     ]
-    
+
     print("🔍 FINAL ENDPOINT VERIFICATION")
     print("=" * 50)
-    
+
     for endpoint, name in endpoints:
         try:
             response = requests.get(f"{base_url}{endpoint}", timeout=5)
             status = "✅ OK" if response.status_code == 200 else f"❌ {response.status_code}"
             print(f"{status} | {name:20} | {endpoint}")
-            
+
             if response.status_code == 200:
                 data = response.json()
-                
+
                 # Quick data quality checks
                 if endpoint == "/ml/status":
                     health = data.get("interpretation", {}).get("health", "unknown")
                     samples = data.get("sample_count", 0)
                     print(f"     └─ ML Health: {health}, Samples: {samples}")
-                    
+
                 elif endpoint == "/signals":
                     signals = len(data.get("signals", []))
                     print(f"     └─ Active Signals: {signals}")
-                    
+
                 elif endpoint == "/sentiment/articles":
                     enabled = data.get("enabled", False)
                     articles = len(data.get("articles", []))
                     print(f"     └─ Enabled: {enabled}, Articles: {articles}")
-                    
+
         except Exception as e:
             print(f"❌ ERR | {name:20} | {str(e)[:30]}...")
-    
+
     print("\n🎉 System verification complete!")
+
 
 if __name__ == "__main__":
     test_key_endpoints()
