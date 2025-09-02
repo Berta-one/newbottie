@@ -1,6 +1,13 @@
 # api/admin.py
-import os, asyncio, json, time, html
-from typing import Optional, Dict, Any, Set
+"""FastAPI admin router for model training and status monitoring."""
+
+import asyncio
+import html
+import json
+import os
+import time
+from typing import Any, Dict, Optional, Set
+
 from fastapi import APIRouter, HTTPException, Header, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 
@@ -48,7 +55,7 @@ _WS_CLIENTS: Set[WebSocket] = set()
 _TRAINING_LOCK = asyncio.Lock()
 _TRAINING_RUNNING = False
 
-async def _ws_broadcast(msg: Dict[str, Any]):
+async def _ws_broadcast(msg: Dict[str, Any]) -> None:
     dead = []
     data = json.dumps(msg, ensure_ascii=False)
     for ws in list(_WS_CLIENTS):
@@ -90,7 +97,7 @@ def _normalize_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
             out[key] = str(v)
     return out
 
-async def _run_trainer(cfg: Dict[str, Any]):
+async def _run_trainer(cfg: Dict[str, Any]) -> None:
     """
     Launch scripts/train_from_exchange.py with env overrides; stream stdout
     to WebSocket clients as JSON lines.
@@ -156,7 +163,7 @@ async def _run_trainer(cfg: Dict[str, Any]):
 
 # ── HTTP Admin UI (optional, still no-console) ────────────────────────────────
 @router.get("/admin/ui", response_class=HTMLResponse)
-def admin_ui():
+def admin_ui() -> HTMLResponse:
     d = DEFAULTS
     return HTMLResponse(f"""
 <!doctype html><meta charset="utf-8"/>
@@ -243,7 +250,7 @@ $("btnTrain").onclick = () => {{
 
 # ── Simple status for current model files ─────────────────────────────────────
 @router.get("/ml/status")
-def ml_status():
+def ml_status() -> Dict[str, Any]:
     model_path = DEFAULTS["model_out"]
     meta_path  = DEFAULTS["model_meta"]
     meta = {}
@@ -265,7 +272,9 @@ def ml_status():
 
 # ── POST fallback (non-WS) ───────────────────────────────────────────────────
 @router.post("/admin/train")
-async def trigger_train(request: Request, authorization: Optional[str] = Header(None)):
+async def trigger_train(
+    request: Request, authorization: Optional[str] = Header(None)
+) -> Dict[str, Any]:
     try:
         payload = await request.json()
     except Exception:
@@ -280,7 +289,7 @@ async def trigger_train(request: Request, authorization: Optional[str] = Header(
 
 # ── WebSocket admin channel ──────────────────────────────────────────────────
 @router.websocket("/ws/admin")
-async def ws_admin(ws: WebSocket):
+async def ws_admin(ws: WebSocket) -> None:
     await ws.accept()
     authed = False
     _WS_CLIENTS.add(ws)
@@ -324,7 +333,7 @@ async def ws_admin(ws: WebSocket):
         except: pass
 
 # ── Scheduler: first-boot & periodic auto-train ──────────────────────────────
-async def _auto_train_scheduler():
+async def _auto_train_scheduler() -> None:
     """
     If enabled:
       - run once at startup if model missing (or ML_TRAIN_AT_START=1)
@@ -347,7 +356,7 @@ async def _auto_train_scheduler():
             await _ws_broadcast({"type":"auto/train", "reason":"interval"})
             await _run_trainer(cfg)
 
-def wire_admin_startup(app):
+def wire_admin_startup(app: Any) -> None:
     """
     Call this from your app.py startup to activate auto-train scheduler.
     """
