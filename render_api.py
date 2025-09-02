@@ -23,31 +23,38 @@ import threading
 from collections import defaultdict
 from enum import Enum
 
+# Configure logging
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(
+    level=getattr(logging, LOG_LEVEL, logging.INFO),
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
 # Load environment variables
 try:
     from dotenv import load_dotenv
     load_dotenv()
-    print("✅ Environment variables loaded from .env")
+    logging.info("✅ Environment variables loaded from .env")
 except ImportError:
-    print("⚠️ python-dotenv not available, using system environment")
+    logging.warning("⚠️ python-dotenv not available, using system environment")
 
 # Try to import trading dependencies
 try:
     import ccxt
     EXCHANGE_AVAILABLE = True
-    print("✅ Exchange libraries available")
+    logging.info("✅ Exchange libraries available")
 except Exception as e:
     EXCHANGE_AVAILABLE = False
-    print(f"⚠️ Exchange libraries not available: {e}")
+    logging.warning(f"⚠️ Exchange libraries not available: {e}")
 
 try:
     import pandas as pd
     import numpy as np
     DATA_AVAILABLE = True
-    print("✅ Data processing available")
+    logging.info("✅ Data processing available")
 except Exception as e:
     DATA_AVAILABLE = False
-    print(f"⚠️ Data processing not available: {e}")
+    logging.warning(f"⚠️ Data processing not available: {e}")
 
 # FastAPI app
 app = FastAPI(title="Sntax Trading API", version="1.0.1")
@@ -65,9 +72,9 @@ app.add_middleware(
 try:
     if os.path.exists('static'):
         app.mount("/static", StaticFiles(directory="static"), name="static")
-        print("✅ Static files directory mounted")
+        logging.info("✅ Static files directory mounted")
 except Exception as e:
-    print(f"⚠️ Could not mount static files: {e}")
+    logging.warning(f"⚠️ Could not mount static files: {e}")
 
 # Global variables
 exchange_client = None
@@ -212,7 +219,7 @@ def calculate_brier_score():
         return round(min(1.0, max(0.0, brier_score)), 3)
         
     except Exception as e:
-        print(f"Error calculating Brier score: {e}")
+        logging.error(f"Error calculating Brier score: {e}")
         return 0.25
 
 # Dashboard password protection
@@ -224,7 +231,7 @@ def add_log(msg: str):
     _logs.append(f"{time.strftime('%Y-%m-%d %H:%M:%S')} - {msg}")
     if len(_logs) > 1500:
         del _logs[:-1000]
-    print(msg)
+    logging.info(msg)
 
 def verify_password(password: str = Header(None, alias="X-Dashboard-Password")):
     """Verify dashboard password for protected endpoints"""
@@ -279,7 +286,7 @@ def initialize_exchange():
         api_secret = os.getenv('BINANCE_API_SECRET', '')
         
         if not api_key or not api_secret:
-            print("⚠️ No exchange credentials provided")
+            logging.warning("⚠️ No exchange credentials provided")
             return False
             
         exchange_client = ccxt.binance({
@@ -289,11 +296,11 @@ def initialize_exchange():
             'enableRateLimit': True,
         })
         
-        print("✅ Exchange client created (no API calls to prevent bans)")
+        logging.info("✅ Exchange client created (no API calls to prevent bans)")
         return True
-        
+
     except Exception as e:
-        print(f"❌ Exchange initialization failed: {e}")
+        logging.error(f"❌ Exchange initialization failed: {e}")
         return False
 
 # Helper functions for real data
@@ -335,18 +342,18 @@ def get_real_positions():
                                 }
                                 
                         except Exception as e:
-                            print(f"⚠️ Could not get price for {asset}: {e}")
+                            logging.warning(f"⚠️ Could not get price for {asset}: {e}")
                             continue
-            
-            print(f"✅ Got {len(positions)} real positions from Binance")
+
+            logging.info(f"✅ Got {len(positions)} real positions from Binance")
             return positions
-            
+
         except Exception as e:
-            print(f"⚠️ Exchange positions failed (likely geographic restriction): {e}")
+            logging.warning(f"⚠️ Exchange positions failed (likely geographic restriction): {e}")
             # Fall through to demo data
-    
+
     # No fallback data - return empty if exchange unavailable
-    print("❌ Exchange connection failed - cannot provide real position data")
+    logging.error("❌ Exchange connection failed - cannot provide real position data")
     return {}
 
 def get_real_balance():
@@ -368,7 +375,7 @@ def get_real_balance():
             
             return {'total_usdt': total_usdt, 'source': 'binance_api'}
         except Exception as e:
-            print(f"⚠️ Exchange connection failed (likely geographic restriction): {e}")
+            logging.warning(f"⚠️ Exchange connection failed (likely geographic restriction): {e}")
             # Fall through to demo data
     
     # No fallback data - return error if exchange unavailable
@@ -629,7 +636,7 @@ def signals():
         }
         
     except Exception as e:
-        print(f"❌ Signals generation error: {e}")
+        logging.error(f"❌ Signals generation error: {e}")
         return {
             "signals": [],
             "message": f"Signal generation failed: {str(e)}",
@@ -692,7 +699,7 @@ def sentiment():
         }
             
     except Exception as e:
-        print(f"❌ Sentiment service error: {e}")
+        logging.error(f"❌ Sentiment service error: {e}")
         return {
             "source": "error", 
             "window_sec": 0,
@@ -768,7 +775,7 @@ def quantum_analysis():
             "message": "Quantum analysis based on real portfolio data"
         }
     except Exception as e:
-        print(f"❌ Quantum analysis error: {e}")
+        logging.error(f"❌ Quantum analysis error: {e}")
         return {
             "status": "error",
             "message": f"Quantum analysis failed: {str(e)}",
@@ -1163,7 +1170,7 @@ def auto_generate_reports():
         interval = 300 if is_business_hours else 1800  # 5 min or 30 min in seconds
         
         if current_time - last_auto_report >= interval:
-            print(f"🤖 Auto-generating report at {now.strftime('%H:%M GMT')}")
+            logging.info(f"🤖 Auto-generating report at {now.strftime('%H:%M GMT')}")
             analysis = generate_comprehensive_analysis()
             
             # Store in cache for quick retrieval
@@ -1174,10 +1181,10 @@ def auto_generate_reports():
             }
             
             last_auto_report = current_time
-            print(f"✅ Auto-report generated successfully")
+            logging.info(f"✅ Auto-report generated successfully")
             
     except Exception as e:
-        print(f"❌ Auto-report generation failed: {e}")
+        logging.error(f"❌ Auto-report generation failed: {e}")
 
 # Add auto-report generation to the background tasks
 def start_auto_reporting():
@@ -1188,13 +1195,13 @@ def start_auto_reporting():
                 auto_generate_reports()
                 time.sleep(60)  # Check every minute
             except Exception as e:
-                print(f"❌ Report worker error: {e}")
+                logging.error(f"❌ Report worker error: {e}")
                 time.sleep(60)
     
     if auto_reports_enabled:
         report_thread = threading.Thread(target=report_worker, daemon=True)
         report_thread.start()
-        print("✅ Auto-reporting system started")
+        logging.info("✅ Auto-reporting system started")
 
 # Startup event
 async def execution_loop():
@@ -1585,17 +1592,17 @@ def get_recent_trades():
 
 @app.on_event("startup")
 async def startup_event():
-    print("🚀 Sntax Trading API starting...")
+    logging.info("🚀 Sntax Trading API starting...")
     
     # Initialize exchange but don't start trading loops (prevents startup crashes)
     if initialize_exchange():
-        print("✅ Exchange client initialized")
+        logging.info("✅ Exchange client initialized")
         add_log("✅ Exchange client ready")
     else:
-        print("⚠️ Exchange client initialization skipped (no credentials)")
+        logging.warning("⚠️ Exchange client initialization skipped (no credentials)")
         add_log("⚠️ Exchange client not available - API will serve cached/demo data")
     
-    print("✅ Sntax API ready")
+    logging.info("✅ Sntax API ready")
 
 if __name__ == "__main__":
     import uvicorn

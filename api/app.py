@@ -9,6 +9,7 @@ import math
 import os
 import random
 import time
+import logging
 
 from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,41 +18,48 @@ from fastapi.security import HTTPBearer
 
 from . import diagnostics
 
+# Configure logging
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(
+    level=getattr(logging, LOG_LEVEL, logging.INFO),
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
 # Load environment variables from .env file
 try:
     from dotenv import load_dotenv
 
     load_dotenv()
-    print("✅ Environment variables loaded from .env")
+    logging.info("✅ Environment variables loaded from .env")
 except ImportError:
-    print("⚠️ python-dotenv not available, using system environment")
+    logging.warning("⚠️ python-dotenv not available, using system environment")
 
 # Try to import real trading dependencies
 try:
     import ccxt
 
     EXCHANGE_AVAILABLE = True
-    print("✅ Exchange libraries available")
+    logging.info("✅ Exchange libraries available")
 except Exception as e:
     EXCHANGE_AVAILABLE = False
-    print(f"⚠️ Exchange libraries not available: {e}")
+    logging.warning(f"⚠️ Exchange libraries not available: {e}")
 
 try:
 
     DATA_AVAILABLE = True
-    print("✅ Data processing available")
+    logging.info("✅ Data processing available")
 except Exception as e:
     DATA_AVAILABLE = False
-    print(f"⚠️ Data processing not available: {e}")
+    logging.warning(f"⚠️ Data processing not available: {e}")
 
 try:
     import requests
 
     REQUESTS_AVAILABLE = True
-    print("✅ HTTP requests available for alternative data sources")
+    logging.info("✅ HTTP requests available for alternative data sources")
 except Exception as e:
     REQUESTS_AVAILABLE = False
-    print(f"⚠️ HTTP requests not available: {e}")
+    logging.warning(f"⚠️ HTTP requests not available: {e}")
 
 # FastAPI app for real trading
 app = FastAPI(title="Sntax Trading API", version="4.0.0")
@@ -130,11 +138,11 @@ class ConnectionManager:
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.add(websocket)
-        print(f"✅ WebSocket client connected. Total: {len(self.active_connections)}")
+        logging.info(f"✅ WebSocket client connected. Total: {len(self.active_connections)}")
 
     def disconnect(self, websocket: WebSocket):
         self.active_connections.discard(websocket)
-        print(f"❌ WebSocket client disconnected. Total: {len(self.active_connections)}")
+        logging.info(f"❌ WebSocket client disconnected. Total: {len(self.active_connections)}")
 
     async def broadcast(self, message: dict):
         if self.active_connections:
@@ -171,7 +179,7 @@ def add_log(msg: str):
     _logs.append(f"{time.strftime('%Y-%m-%d %H:%M:%S')} - {msg}")
     if len(_logs) > 1500:
         del _logs[:-1000]
-    print(msg)
+    logging.info(msg)
 
 
 def verify_password(password: str = Header(None, alias="X-Dashboard-Password")):
@@ -250,7 +258,7 @@ def initialize_real_exchange():
 
     def log_startup(message):
         startup_logs.append(f"{time.strftime('%Y-%m-%d %H:%M:%S')} - {message}")
-        print(message)
+        logging.info(message)
 
     if not EXCHANGE_AVAILABLE:
         log_startup("❌ EXCHANGE_AVAILABLE is False - ccxt not available")
@@ -335,7 +343,7 @@ def get_real_crypto_prices(symbols=None):
 
     try:
         # Try Coinbase API first
-        print("📊 Fetching real crypto prices from Coinbase...")
+        logging.info("📊 Fetching real crypto prices from Coinbase...")
         for symbol in symbols:
             try:
                 response = requests.get(
@@ -345,21 +353,21 @@ def get_real_crypto_prices(symbols=None):
                     data = response.json()
                     usd_rate = float(data["data"]["rates"]["USD"])
                     prices[f"{symbol}USDT"] = usd_rate
-                    print(f"✅ {symbol}: ${usd_rate:.2f}")
+                    logging.info(f"✅ {symbol}: ${usd_rate:.2f}")
             except Exception as e:
-                print(f"⚠️ Failed to get {symbol} price from Coinbase: {e}")
+                logging.warning(f"⚠️ Failed to get {symbol} price from Coinbase: {e}")
                 continue
 
         if len(prices) > 0:
-            print(f"✅ Got {len(prices)} real crypto prices from Coinbase")
+            logging.info(f"✅ Got {len(prices)} real crypto prices from Coinbase")
             return prices
 
     except Exception as e:
-        print(f"❌ Coinbase API failed: {e}")
+        logging.error(f"❌ Coinbase API failed: {e}")
 
     # Fallback to CoinGecko if Coinbase fails
     try:
-        print("📊 Trying CoinGecko as backup...")
+        logging.info("📊 Trying CoinGecko as backup...")
         coin_ids = {
             "BTC": "bitcoin",
             "ETH": "ethereum",
@@ -383,11 +391,11 @@ def get_real_crypto_prices(symbols=None):
                 if coin_id in data and "usd" in data[coin_id]:
                     prices[f"{symbol}USDT"] = data[coin_id]["usd"]
 
-            print(f"✅ Got {len(prices)} real crypto prices from CoinGecko")
+            logging.info(f"✅ Got {len(prices)} real crypto prices from CoinGecko")
             return prices
 
     except Exception as e:
-        print(f"❌ CoinGecko API failed: {e}")
+        logging.error(f"❌ CoinGecko API failed: {e}")
 
     # If all APIs fail, raise error (no fallback data)
     raise HTTPException(
@@ -427,7 +435,7 @@ def get_real_balance():
             return real_balance
 
         except Exception as e:
-            print(f"⚠️ Exchange connection failed (likely geographic restriction): {e}")
+            logging.warning(f"⚠️ Exchange connection failed (likely geographic restriction): {e}")
             # Fall through to demo data
 
     # No fallback data - return error if exchange unavailable
@@ -461,7 +469,7 @@ def get_real_positions():
                         "order_id": order["id"],
                     }
             except Exception as e:
-                print(f"Could not fetch open orders: {e}")
+                logging.warning(f"Could not fetch open orders: {e}")
 
             # Method 2: Check futures positions (if you have futures trading)
             try:
@@ -482,7 +490,7 @@ def get_real_positions():
                             "entry_price": pos["entryPrice"],
                         }
             except Exception as e:
-                print(f"Could not fetch futures positions: {e}")
+                logging.warning(f"Could not fetch futures positions: {e}")
 
             # Method 3: Check balance holdings as positions (for spot holdings)
             try:
@@ -511,14 +519,14 @@ def get_real_positions():
                             # Silently skip assets without a tradable USD-quoted market
                             continue
             except Exception as e:
-                print(f"Could not fetch balance: {e}")
+                logging.warning(f"Could not fetch balance: {e}")
 
             real_positions = positions
-            print(f"✅ Found {len(positions)} positions")
+            logging.info(f"✅ Found {len(positions)} positions")
             return positions
 
         except Exception as e:
-            print(f"⚠️ Exchange positions failed (likely geographic restriction): {e}")
+            logging.warning(f"⚠️ Exchange positions failed (likely geographic restriction): {e}")
             # Fall through to demo data
 
     # No fallback data - return error if exchange unavailable
@@ -531,7 +539,7 @@ def get_real_positions():
 def get_real_market_data():
     """Get real market data from exchange, fallback to simulated data"""
     if not exchange_client:
-        print("⚠️ Exchange not connected - using simulated market data")
+        logging.warning("⚠️ Exchange not connected - using simulated market data")
         return get_simulated_market_data()
 
     try:
@@ -558,7 +566,7 @@ def get_real_market_data():
         return market_data
 
     except Exception as e:
-        print(f"❌ Real market data failed: {e}, falling back to simulated data")
+        logging.error(f"❌ Real market data failed: {e}, falling back to simulated data")
         return get_simulated_market_data()
 
 
@@ -739,7 +747,7 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         manager.disconnect(websocket)
     except Exception as e:
-        print(f"❌ WebSocket error: {e}")
+        logging.error(f"❌ WebSocket error: {e}")
         manager.disconnect(websocket)
 
 
@@ -770,7 +778,7 @@ async def websocket_live_feed(websocket: WebSocket):
     except WebSocketDisconnect:
         manager.disconnect(websocket)
     except Exception as e:
-        print(f"❌ Live WebSocket error: {e}")
+        logging.error(f"❌ Live WebSocket error: {e}")
         manager.disconnect(websocket)
 
 
@@ -1021,7 +1029,7 @@ def grid_matrix():
             "data_source": "binance_live" if exchange_client else "simulated",
         }
     except Exception as e:
-        print(f"Grid error: {e}")
+        logging.error(f"Grid error: {e}")
         return {
             "rows": ["BTC"],
             "cols": ["USDT"],
@@ -1433,7 +1441,7 @@ def recent_trades():
         with open(trades_file, "w") as f:
             json.dump(all_trades, f)
     except Exception as e:
-        print(f"Failed to save trades history: {e}")
+        logging.error(f"Failed to save trades history: {e}")
 
     # Calculate summary statistics
     if all_trades:
@@ -2268,7 +2276,7 @@ async def startup_event():
         startup_logs.append(
             f"{time.strftime('%Y-%m-%d %H:%M:%S')} - 🚀 Real trading initialization: {mode}"
         )
-        print(f"🚀 Real trading initialization: {mode}")
+        logging.info(f"🚀 Real trading initialization: {mode}")
 
         # Start trading loops
         if TRADE_ENABLED:
@@ -2284,7 +2292,7 @@ async def startup_event():
         startup_logs.append(
             f"{time.strftime('%Y-%m-%d %H:%M:%S')} - ⚠️ Exchange libraries not available - simulation mode"
         )
-        print("⚠️ Exchange libraries not available - simulation mode")
+        logging.warning("⚠️ Exchange libraries not available - simulation mode")
 
 
 # Serve main dashboard file
@@ -2334,12 +2342,12 @@ def _symbols_to_scan() -> list[str]:
 @app.on_event("startup")
 async def startup_event():
     """Initialize the exchange connection on startup"""
-    print("🚀 Starting Bottie API initialization...")
+    logging.info("🚀 Starting Bottie API initialization...")
     success = initialize_real_exchange()
     if success:
-        print("✅ Exchange connection established")
+        logging.info("✅ Exchange connection established")
     else:
-        print("❌ Exchange connection failed - running in simulation mode")
+        logging.warning("❌ Exchange connection failed - running in simulation mode")
 
 
 @app.get("/dashboard")
