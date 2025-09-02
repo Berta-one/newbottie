@@ -11,7 +11,7 @@ from pathlib import Path
 
 def create_production_server():
     """Create production server configuration"""
-    from api.app import app
+    from render_api import app
     
     print("🚀 STARTING PRODUCTION BOTTIE API SERVER")
     print("="*60)
