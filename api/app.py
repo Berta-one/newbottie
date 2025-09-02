@@ -1823,6 +1823,7 @@ def trades_history(since_date: str = "2024-08-01"):
             # Generate realistic price movement
             days_from_start = (trade_time - start_time) / (24 * 3600)
             trend = 1 + (days_from_start / 100) * random.uniform(-0.5, 1.2)  # Overall upward trend
+            trend = max(0.05, trend)
             price_variation = random.uniform(1 - template["volatility"], 1 + template["volatility"])
             trade_price = template["base_price"] * trend * price_variation
 
@@ -1839,9 +1840,9 @@ def trades_history(since_date: str = "2024-08-01"):
             else:
                 amount = random.uniform(0.01, 10)
 
-            cost = amount * trade_price
+            cost = abs(amount * trade_price)
             fee_rate = 0.001  # 0.1% fee
-            fee_cost = cost * fee_rate
+            fee_cost = abs(cost * fee_rate)
 
             # Calculate P&L
             current_price = current_prices.get(symbol, trade_price)
@@ -1861,13 +1862,13 @@ def trades_history(since_date: str = "2024-08-01"):
             # Calculate P&L for this trade
             if side == "buy":
                 # For buy trades, P&L is current value minus cost
-                unrealized_pnl = (current_price - trade_price) * amount - fee_cost
+                unrealized_pnl = (current_price - trade_price) * abs(amount) - fee_cost
             else:
                 # For sell trades, P&L is proceeds minus average cost
-                avg_cost = positions[symbol]["total_cost"] / max(
-                    positions[symbol]["quantity"], 0.0001
+                avg_cost = abs(positions[symbol]["total_cost"]) / max(
+                    abs(positions[symbol]["quantity"]), 0.0001
                 )
-                unrealized_pnl = (trade_price - avg_cost) * amount - fee_cost
+                unrealized_pnl = (trade_price - avg_cost) * abs(amount) - fee_cost
 
             trade = {
                 "id": f"trade_{trade_id}",
