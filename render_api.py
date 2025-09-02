@@ -11,12 +11,13 @@ import logging
 import math
 import asyncio
 from typing import Dict, Any, List, Optional
-from fastapi import FastAPI, HTTPException, Depends, Query, APIRouter, Header
+from fastapi import FastAPI, HTTPException, Depends, Query, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from passlib.context import CryptContext
+from pydantic import BaseModel
 import jwt
 from datetime import datetime, timedelta
 import threading
@@ -224,7 +225,30 @@ def calculate_brier_score():
 
 # Dashboard password protection
 DASHBOARD_PASSWORD = os.getenv("DASHBOARD_PASSWORD", "bottie2024")
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change_me")
+JWT_ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+
 security = HTTPBearer(auto_error=False)
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+HASHED_PASSWORD = pwd_context.hash(DASHBOARD_PASSWORD)
+
+class TokenRequest(BaseModel):
+    password: str
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    if credentials is None:
+        raise HTTPException(status_code=401, detail="Missing credentials")
+    try:
+        return jwt.decode(credentials.credentials, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 def add_log(msg: str):
     """Add log message to the logs list"""
@@ -233,11 +257,13 @@ def add_log(msg: str):
         del _logs[:-1000]
     logging.info(msg)
 
-def verify_password(password: str = Header(None, alias="X-Dashboard-Password")):
-    """Verify dashboard password for protected endpoints"""
-    if password != DASHBOARD_PASSWORD:
+@app.post("/auth/token")
+def login(request: TokenRequest):
+    """Authenticate user and return JWT token"""
+    if not pwd_context.verify(request.password, HASHED_PASSWORD):
         raise HTTPException(status_code=401, detail="Invalid password")
-    return True
+    token = create_access_token({"sub": "dashboard"})
+    return {"access_token": token, "token_type": "bearer"}
 
 def _position_qty(symbol: str) -> float:
     """Get current position quantity for a symbol"""
@@ -1556,24 +1582,24 @@ def trading_status():
     }
 
 @app.post("/trading/start")
-def start_trading(auth: bool = Depends(verify_password)):
-    """Start trading execution (password protected)"""
+def start_trading(token: dict = Depends(verify_token)):
+    """Start trading execution (JWT protected)"""
     global EXECUTION_RUNTIME_ENABLED
     EXECUTION_RUNTIME_ENABLED = True
     add_log("🟢 Trading execution ENABLED by authenticated user")
     return {"ok": True, "enabled": EXECUTION_RUNTIME_ENABLED, "message": "Trading started"}
 
 @app.post("/trading/stop")
-def stop_trading(auth: bool = Depends(verify_password)):
-    """Stop trading execution (password protected)"""
+def stop_trading(token: dict = Depends(verify_token)):
+    """Stop trading execution (JWT protected)"""
     global EXECUTION_RUNTIME_ENABLED
     EXECUTION_RUNTIME_ENABLED = False
     add_log("🔴 Trading execution DISABLED by authenticated user")
     return {"ok": True, "enabled": EXECUTION_RUNTIME_ENABLED, "message": "Trading stopped"}
 
 @app.post("/trading/toggle")
-def toggle_trading(auth: bool = Depends(verify_password)):
-    """Toggle trading execution on/off (password protected)"""
+def toggle_trading(token: dict = Depends(verify_token)):
+    """Toggle trading execution on/off (JWT protected)"""
     global EXECUTION_RUNTIME_ENABLED
     EXECUTION_RUNTIME_ENABLED = not EXECUTION_RUNTIME_ENABLED
     status = "ENABLED" if EXECUTION_RUNTIME_ENABLED else "DISABLED"
