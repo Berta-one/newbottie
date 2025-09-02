@@ -51,6 +51,12 @@ real_positions = {}
 real_balance = {}
 last_update = 0
 
+# Initialize exchange on startup
+@app.on_event("startup")
+async def startup_event():
+    if not initialize_real_exchange():
+        logging.error("Failed to initialize exchange client on startup")
+
 # Preferred USD-like quotes for dynamic market selection
 PREFERRED_QUOTES = ["USDT", "FDUSD", "USDC", "BUSD", "TUSD"]
 
@@ -83,7 +89,7 @@ def initialize_real_exchange():
         
         exchange_client = ccxt.binance({
             'apiKey': os.getenv('BINANCE_API_KEY', ''),
-            'secret': os.getenv('BINANCE_SECRET', ''),
+            'secret': os.getenv('BINANCE_API_SECRET', ''),
             'sandbox': not use_live_trading,  # False for live trading
             'enableRateLimit': True,
         })
@@ -101,13 +107,15 @@ def initialize_real_exchange():
         
     except Exception as e:
         print(f"❌ Exchange initialization failed: {e}")
+        exchange_client = None
         return False
 
 def get_real_balance():
     """Get actual account balance"""
     global real_balance
-    
+
     if not exchange_client:
+        logging.error("Exchange client not initialized in get_real_balance")
         return {"USDT": 10000.0, "BTC": 0.0, "ETH": 0.0}
     
     try:
@@ -139,8 +147,9 @@ def get_real_balance():
 def get_real_positions():
     """Get actual open positions"""
     global real_positions
-    
+
     if not exchange_client:
+        logging.error("Exchange client not initialized in get_real_positions")
         return {}
     
     try:
