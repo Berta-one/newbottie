@@ -311,7 +311,7 @@ curl https://your-render-app.onrender.com/analytics/advanced
 
 ## 📄 **License**
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the [MIT License](LICENSE).
 
 ## ⚠️ **Disclaimer**
 
