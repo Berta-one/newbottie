@@ -960,7 +960,7 @@ class BottieApp {
         <div class="sentiment-summary">
           <div class="sentiment-metric">
             <span class="metric-label">Overall Sentiment:</span>
-            <span class="metric-value sentiment-${data.overall_sentiment > 0.6 ? 'positive' : data.overall_sentiment > 0.4 ? 'neutral' : 'negative'}">
+              <span class="metric-value sentiment-${data.overall_sentiment > 0.5 ? 'positive' : data.overall_sentiment >= 0.3 ? 'neutral' : 'negative'}">
               ${(data.overall_sentiment * 100).toFixed(1)}%
             </span>
           </div>
@@ -981,7 +981,7 @@ class BottieApp {
       
       data.articles.forEach(article => {
         const articleElement = document.createElement('div');
-        articleElement.className = `article-item sentiment-${article.sentiment > 0.6 ? 'positive' : article.sentiment > 0.4 ? 'neutral' : 'negative'}`;
+        articleElement.className = `article-item sentiment-${article.sentiment > 0.5 ? 'positive' : article.sentiment >= 0.3 ? 'neutral' : 'negative'}`;
         
         const timeAgo = Math.floor((Date.now() / 1000 - article.timestamp) / 3600);
         
