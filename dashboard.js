@@ -695,8 +695,93 @@ class ReportsManager {
     showReportDetail(reportId) { console.log('Show report detail:', reportId); }
 }
 
+class QuantumTableManager {
+    constructor(apiUrl = 'https://bottie-1.onrender.com') {
+        this.apiUrl = apiUrl;
+        this.table = null;
+        this.refreshBtn = null;
+        this.initDOM();
+    }
+
+    initDOM() {
+        // Create container, refresh button, and table if they don't exist
+        if (document.getElementById('quantumTable')) return;
+
+        const container = document.createElement('section');
+        container.className = 'p-4';
+        container.innerHTML = `
+            <h2 class="text-2xl font-bold mb-2">Quantum Analysis</h2>
+            <button id="refreshQuantumTable" class="mb-4 px-4 py-2 bg-blue-500 text-white rounded">Refresh</button>
+            <table id="quantumTable" class="min-w-full bg-white text-gray-800 rounded"></table>
+        `;
+        document.body.insertBefore(container, document.body.firstChild);
+        this.table = container.querySelector('#quantumTable');
+        this.refreshBtn = container.querySelector('#refreshQuantumTable');
+    }
+
+    init() {
+        if (!this.table) return;
+        this.refreshBtn.addEventListener('click', () => this.loadTable());
+        this.loadTable();
+        // Refresh every minute
+        setInterval(() => this.loadTable(), 60 * 1000);
+    }
+
+    async loadTable() {
+        try {
+            const response = await fetch(`${this.apiUrl}/quantum/table`);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            this.renderTable(data.quantum_analysis || []);
+        } catch (error) {
+            console.error('❌ Error fetching quantum table:', error);
+        }
+    }
+
+    renderTable(rows) {
+        if (!this.table) return;
+
+        const headers = [
+            'symbol',
+            'quantum_state',
+            'probability_up',
+            'probability_down',
+            'entanglement_score',
+            'coherence_time'
+        ];
+
+        this.table.innerHTML = '';
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        headers.forEach(h => {
+            const th = document.createElement('th');
+            th.textContent = h.replace(/_/g, ' ');
+            th.className = 'px-2 py-1 border';
+            headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+
+        const tbody = document.createElement('tbody');
+        rows.forEach(item => {
+            const tr = document.createElement('tr');
+            headers.forEach(key => {
+                const td = document.createElement('td');
+                td.textContent = item[key];
+                td.className = 'px-2 py-1 border';
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
+
+        this.table.appendChild(thead);
+        this.table.appendChild(tbody);
+    }
+}
+
 // Initialize the reports manager when the page loads
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🌟 Starting NUCLEAR FIX Reports Dashboard...');
     new ReportsManager();
+    const quantumTable = new QuantumTableManager();
+    quantumTable.init();
 });
