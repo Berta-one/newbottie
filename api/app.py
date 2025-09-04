@@ -593,8 +593,13 @@ def get_real_positions():
                     from engine.free_websocket_manager import get_free_websocket_manager
                     ws_manager = get_free_websocket_manager()
                     
-                    if ws_manager.is_connected() and ws_manager.account_balance:
+                    if ws_manager.is_connected():  # Try WebSocket if connected, even without balance yet
                         balance_data = {"total": ws_manager.get_balance()}
+                        # If WebSocket balance is empty but connected, wait a moment and try again
+                        if not balance_data["total"] and ws_manager.is_connected():
+                            import asyncio, time
+                            time.sleep(1)  # Brief wait for balance data
+                            balance_data = {"total": ws_manager.get_balance()}
                         logging.debug("✅ Using WebSocket balance for positions (no API calls)")
                 except Exception:
                     pass
@@ -2174,6 +2179,34 @@ async def signals_loop():
 # Startup
 
 
+
+@app.get("/admin/websocket-status")
+def websocket_status():
+    """Check WebSocket connection status"""
+    try:
+        from engine.free_websocket_manager import get_free_websocket_manager
+        ws_manager = get_free_websocket_manager()
+        
+        status = ws_manager.get_status()
+        
+        return {
+            "websocket_status": status,
+            "connection_healthy": ws_manager.is_connected(),
+            "balance_available": bool(ws_manager.account_balance),
+            "ticker_count": len(ws_manager.tickers),
+            "recommendations": [
+                "Restart API if connection is False",
+                "Check BINANCE_API_KEY and BINANCE_API_SECRET if balance_available is False",
+                "WebSocket should prevent rate limit issues"
+            ]
+        }
+    except Exception as e:
+        return {
+            "error": str(e),
+            "websocket_status": "ERROR",
+            "recommendations": ["Check if python-binance is installed", "Restart API server"]
+        }
+
 @app.get("/admin/nuclear-reset")
 def nuclear_reset():
     """ADMIN: Nuclear reset - clear ALL trades completely"""
@@ -2239,7 +2272,60 @@ async def startup_event():
             logging.warning("❌ Exchange connection failed - running in simulation mode")
         logging.info(f"🚀 Real trading initialization: {mode}")
 
-        # Start trading loops
+        
+            # Initialize WebSocket BEFORE trading loops to prevent rate limits
+            try:
+                import os
+                from engine.free_websocket_manager import get_free_websocket_manager, initialize_free_websocket_data
+                
+                # Get API credentials
+                api_key = os.getenv('BINANCE_API_KEY')
+                api_secret = os.getenv('BINANCE_API_SECRET')
+                
+                if api_key and api_secret:
+                    # Initialize WebSocket with trading symbols
+                    trading_symbols = [
+                        'BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT', 
+                        'DOT/USDT', 'SOL/USDT', 'MATIC/USDT', 'LINK/USDT'
+                    ]
+                    
+                    ws_success = await initialize_free_websocket_data(
+                        symbols=trading_symbols,
+                        kline_symbols=trading_symbols[:4],  # Limit klines
+                        api_key=api_key,
+                        api_secret=api_secret
+                    )
+                    
+                    if ws_success:
+                        startup_logs.append(
+                            f"{time.strftime('%Y-%m-%d %H:%M:%S')} - 🚀 WebSocket initialized successfully - Rate limits prevented!"
+                        )
+                        logging.info("🚀 WebSocket initialized - Balance and price data will stream in real-time")
+                        
+                        # Give WebSocket time to connect and get initial data
+                        await asyncio.sleep(3)
+                        
+                        # Check connection status
+                        ws_manager = get_free_websocket_manager()
+                        if ws_manager.is_connected():
+                            logging.info(f"✅ WebSocket connected - {len(ws_manager.tickers)} tickers, balance: {bool(ws_manager.account_balance)}")
+                        else:
+                            logging.warning("⚠️ WebSocket connection issues detected")
+                    else:
+                        startup_logs.append(
+                            f"{time.strftime('%Y-%m-%d %H:%M:%S')} - ❌ WebSocket initialization failed - Will use REST API"
+                        )
+                        logging.error("❌ WebSocket initialization failed - Rate limits may occur")
+                else:
+                    logging.warning("⚠️ No API keys found - WebSocket will work for public data only")
+                    
+            except Exception as e:
+                startup_logs.append(
+                    f"{time.strftime('%Y-%m-%d %H:%M:%S')} - ❌ WebSocket setup error: {e}"
+                )
+                logging.error(f"❌ WebSocket setup error: {e}")
+            
+            # Start trading loops
         if TRADE_ENABLED:
             add_log("🚀 Starting trading background tasks...")
             asyncio.create_task(signals_loop())
