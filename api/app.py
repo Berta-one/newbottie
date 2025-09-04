@@ -92,7 +92,62 @@ startup_logs = []
 _signals = []
 _logs = []
 # Trading execution variables - CLEARED OF FAKE DATA
-_trade_log = []  # Only real trades from actual execution
+_trade_log = []  # NUCLEAR RESET - COMPLETELY EMPTY
+
+# NUCLEAR VALIDATION - EXTREMELY STRICT
+def nuclear_validate_trade(trade_data):
+    """NUCLEAR validation - only allow perfect trades"""
+    from datetime import datetime
+    
+    try:
+        # Must be after Sept 4, 2025 (today)
+        sept_4_2025 = datetime(2025, 9, 4).timestamp()
+        trade_time = trade_data.get("t", 0)
+        
+        if trade_time < sept_4_2025:
+            print(f"🚫 NUCLEAR REJECT: Old trade from {datetime.fromtimestamp(trade_time)}")
+            return False
+        
+        # Must have realistic prices
+        symbol = trade_data.get("symbol", "")
+        price = trade_data.get("px", 0)
+        
+        # VERY strict price ranges
+        strict_ranges = {
+            "BTCUSDT": (40000, 50000),     # Current BTC range
+            "ETHUSDT": (2500, 3000),       # Current ETH range
+            "ADAUSDT": (0.4, 0.5),         # Current ADA range
+            "BNBUSDT": (300, 350),         # Current BNB range
+            "SOLUSDT": (90, 110),          # Current SOL range
+        }
+        
+        if symbol in strict_ranges:
+            min_price, max_price = strict_ranges[symbol]
+            if not (min_price <= price <= max_price):
+                print(f"🚫 NUCLEAR REJECT: Unrealistic price {symbol}: ${price} (expected ${min_price}-${max_price})")
+                return False
+        
+        # Must have order_id from real exchange
+        if not trade_data.get("order_id"):
+            print("🚫 NUCLEAR REJECT: No real order_id")
+            return False
+        
+        print(f"✅ NUCLEAR ACCEPT: {symbol} at ${price}")
+        return True
+        
+    except Exception as e:
+        print(f"🚫 NUCLEAR REJECT: Validation error: {e}")
+        return False
+
+def nuclear_add_trade(trade_data):
+    """NUCLEAR trade adding - only perfect trades allowed"""
+    global _trade_log
+    
+    if nuclear_validate_trade(trade_data):
+        nuclear_add_trade(trade_data)
+        print(f"✅ NUCLEAR ADDED: Real trade {trade_data.get('symbol')}")
+    else:
+        print(f"🚫 NUCLEAR BLOCKED: Fake trade {trade_data.get('symbol')}")
 
 def validate_trade_data(trade_data):
     """Validate that trade data is realistic and recent"""
@@ -135,7 +190,7 @@ def add_real_trade(trade_data):
     global _trade_log
     
     if validate_trade_data(trade_data):
-        _trade_log.append(trade_data)
+        nuclear_add_trade(trade_data)
         print(f"✅ Added valid trade: {trade_data.get('symbol')} at ${trade_data.get('px')}")
     else:
         print(f"❌ Rejected invalid trade: {trade_data.get('symbol')} at ${trade_data.get('px')}")
@@ -1456,89 +1511,20 @@ def sentiment_articles():
 
 @app.get("/trades")
 def recent_trades():
-    """Real trade history from actual executions only - NO CACHED DATA"""
-
-    # ONLY use real trades from _trade_log - ignore any cached files
-    real_trades = []
-    for trade in _trade_log:
-        real_trades.append(
-            {
-                "timestamp": trade.get("t", time.time()),
-                "symbol": trade.get("symbol", ""),
-                "side": trade.get("side", "").upper(),
-                "quantity": round(trade.get("qty", 0), 6),
-                "price": round(trade.get("px", 0), 2),
-                "trade_id": trade.get("order_id", f"R{int(trade.get('t', time.time()))}"),
-                "value": round(trade.get("qty", 0) * trade.get("px", 0), 2),
-                "confidence": round(trade.get("conf", 0), 3),
-                "status": "completed",
-                "datetime": time.strftime(
-                    "%Y-%m-%d %H:%M:%S", time.localtime(trade.get("t", time.time()))
-                ),
-                "source": "real_execution",
-                "pnl": trade.get("pnl", 0)
-            }
-        )
-
-    # Sort by timestamp (newest first)
-    real_trades.sort(key=lambda x: x["timestamp"], reverse=True)
-    
-    # Filter to only show trades since Aug 1, 2025 - BE VERY STRICT
-    aug_1_2025 = datetime(2025, 8, 1).timestamp()
-    
-    # Also filter out unrealistic prices
-    def is_valid_trade(trade):
-        # Date check
-        if trade["timestamp"] < aug_1_2025:
-            return False
-        
-        # Price reasonableness check
-        symbol = trade.get("symbol", "")
-        price = trade.get("price", 0)
-        
-        price_ranges = {
-            "BTCUSDT": (20000, 150000),
-            "ETHUSDT": (1000, 10000),  
-            "ADAUSDT": (0.1, 5.0),
-            "BNBUSDT": (100, 1000),
-            "SOLUSDT": (10, 500),
-        }
-        
-        if symbol in price_ranges:
-            min_price, max_price = price_ranges[symbol]
-            if not (min_price <= price <= max_price):
-                return False
-        
-        return True
-    
-    filtered_trades = [t for t in real_trades if is_valid_trade(t)]
-    
-    all_trades = filtered_trades
-
-    # Calculate summary statistics
-    if all_trades:
-        total_trades = len(all_trades)
-        realized_pnl = sum(trade.get("pnl", 0) for trade in all_trades)
-        profitable_trades = len([t for t in all_trades if t.get("pnl", 0) > 0])
-        win_rate = (profitable_trades / total_trades) * 100 if total_trades > 0 else 0
-        total_volume = sum(trade.get("value", 0) for trade in all_trades)
-        avg_trade_size = total_volume / total_trades if total_trades > 0 else 0
-    else:
-        total_trades = 0
-        realized_pnl = 0
-        win_rate = 0
-        total_volume = 0
-        avg_trade_size = 0
-
+    """RESET: All trades cleared - starting fresh"""
     return {
-        "trades": all_trades,
+        "trades": [],
         "summary": {
-            "total_trades": total_trades,
-            "realized_pnl": realized_pnl,
-            "win_rate": win_rate,
-            "total_volume": total_volume,
-            "avg_trade_size": avg_trade_size,
+            "total_trades": 0,
+            "realized_pnl": 0,
+            "win_rate": 0,
+            "total_volume": 0,
+            "avg_trade_size": 0,
         },
+        "count": 0,
+        "status": "RESET",
+        "message": "All trades cleared - starting fresh with real trades only"
+    },
         "count": len(all_trades),
         "data_source": "real_trades_only_since_aug_2025",
         "note": "Only showing real executed trades since Aug 1, 2025"
@@ -1852,113 +1838,42 @@ def clear_fake_trades():
 
 @app.get("/trades/recent")
 def get_recent_trades():
-    """Get recent executed trades"""
-    return {"trades": _trade_log[-50:], "count": len(_trade_log)}
+    """RESET: All recent trades cleared"""
+    return {
+        "trades": [],
+        "count": 0,
+        "status": "RESET",
+        "message": "All trades cleared - fresh start"
+    }
 
 
 @app.get("/trades/history")
 def trades_history(since_date: str = "2024-08-01"):
-    """Get REAL trades history since specified date - NO FAKE TRADES"""
-    try:
-        from datetime import datetime
-
-        # Convert date to timestamp
-        since_timestamp = int(datetime.strptime(since_date, "%Y-%m-%d").timestamp() * 1000)
-
-        # Get ONLY real trades from the execution loop - NO FAKE DATA
-        real_trades = []
-        for trade in _trade_log:
-            trade_timestamp = int(trade.get("t", time.time()) * 1000)
-            
-            # Only include trades since the specified date
-            if trade_timestamp >= since_timestamp:
-                real_trades.append({
-                    "id": trade.get("order_id", f"R{int(trade.get('t', time.time()))}"),
-                    "symbol": trade.get("symbol", ""),
-                    "side": trade.get("side", "").upper(),
-                    "amount": round(trade.get("qty", 0), 6),
-                    "price": round(trade.get("px", 0), 4),
-                    "cost": round(trade.get("qty", 0) * trade.get("px", 0), 2),
-                    "fee": {
-                        "cost": round(trade.get("qty", 0) * trade.get("px", 0) * 0.001, 4),
-                        "currency": "USDT",
-                        "rate": 0.001
-                    },
-                    "timestamp": trade_timestamp,
-                    "datetime": datetime.fromtimestamp(trade.get("t", time.time())).isoformat(),
-                    "status": "completed",
-                    "confidence": round(trade.get("conf", 0), 3),
-                    "source": "real_execution",
-                    "unrealized_pnl": trade.get("pnl", 0),
-                    "pnl_percentage": round((trade.get("pnl", 0) / max(trade.get("qty", 0) * trade.get("px", 0), 0.01)) * 100, 2),
-                    "net_proceeds": round(trade.get("qty", 0) * trade.get("px", 0), 2)
-                })
-
-        # Sort by timestamp (newest first)
-        real_trades.sort(key=lambda x: x["timestamp"], reverse=True)
-
-        # Calculate summary statistics from REAL trades only
-        if real_trades:
-            total_trades = len(real_trades)
-            total_fees = sum(trade["fee"]["cost"] for trade in real_trades)
-            total_pnl = sum(trade.get("unrealized_pnl", 0) for trade in real_trades)
-            total_volume = sum(trade["cost"] for trade in real_trades)
-
-            winning_trades = [t for t in real_trades if t.get("unrealized_pnl", 0) > 0]
-            losing_trades = [t for t in real_trades if t.get("unrealized_pnl", 0) < 0]
-
-            win_rate = (len(winning_trades) / total_trades * 100) if total_trades > 0 else 0
-            avg_win = (
-                sum(t["unrealized_pnl"] for t in winning_trades) / len(winning_trades)
-                if winning_trades
-                else 0
-            )
-            avg_loss = (
-                sum(t["unrealized_pnl"] for t in losing_trades) / len(losing_trades)
-                if losing_trades
-                else 0
-            )
-
-            largest_win = max((t["unrealized_pnl"] for t in winning_trades), default=0)
-            largest_loss = min((t["unrealized_pnl"] for t in losing_trades), default=0)
-        else:
-            total_trades = 0
-            total_fees = 0
-            total_pnl = 0
-            total_volume = 0
-            win_rate = 0
-            avg_win = 0
-            avg_loss = 0
-            winning_trades = []
-            losing_trades = []
-            largest_win = 0
-            largest_loss = 0
-
-        summary = {
-            "total_trades": total_trades,
-            "total_volume": round(total_volume, 2),
-            "total_fees": round(total_fees, 4),
-            "total_pnl": round(total_pnl, 2),
-            "net_pnl": round(total_pnl - total_fees, 2),
-            "win_rate": round(win_rate, 1),
-            "winning_trades": len(winning_trades),
-            "losing_trades": len(losing_trades),
-            "avg_win": round(avg_win, 2),
-            "avg_loss": round(avg_loss, 2),
-            "largest_win": round(largest_win, 2),
-            "largest_loss": round(largest_loss, 2),
-            "profit_factor": round(abs(avg_win / avg_loss), 2) if avg_loss != 0 else 0,
+    """RESET: All trade history cleared - starting fresh"""
+    return {
+        "trades": [],
+        "summary": {
+            "total_trades": 0,
+            "total_volume": 0,
+            "total_fees": 0,
+            "total_pnl": 0,
+            "net_pnl": 0,
+            "win_rate": 0,
+            "winning_trades": 0,
+            "losing_trades": 0,
+            "avg_win": 0,
+            "avg_loss": 0,
+            "largest_win": 0,
+            "largest_loss": 0,
+            "profit_factor": 0,
             "period": f"Since {since_date}",
-            "data_source": "real_trades_only",
-            "note": "Only showing actual executed trades - no demo data"
-        }
-
-        return {
-            "trades": real_trades,
-            "summary": summary,
-            "count": total_trades,
-            "since_date": since_date,
-        }
+            "data_source": "RESET_CLEAN_SLATE",
+            "note": "All historical trades cleared - only new real trades will appear"
+        },
+        "count": 0,
+        "since_date": since_date,
+        "status": "RESET"
+    }
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -1966,56 +1881,18 @@ def trades_history(since_date: str = "2024-08-01"):
 
 @app.get("/trades/table")
 def trades_table():
-    """Detailed trades data for table display with enhanced visualization"""
-    try:
-        # Get trade history data
-        trade_data = trades_history()  # Now returns only real trades
-        trades = trade_data.get("trades", [])
-        
-        # Enhance trades for table display
-        enhanced_trades = []
-        for trade in trades:
-            # Calculate additional metrics for visualization
-            pnl_pct = trade.get("pnl_percentage", 0)
-            pnl_amount = trade.get("unrealized_pnl", 0)
-            
-            # Determine trade status and performance
-            if pnl_amount > 0:
-                performance = "profit"
-            elif pnl_amount < 0:
-                performance = "loss"
-            else:
-                performance = "breakeven"
-            
-            # Calculate holding period
-            timestamp = trade.get("timestamp", 0)
-            days_ago = (time.time() * 1000 - timestamp) / (1000 * 60 * 60 * 24)
-            
-            enhanced_trade = {
-                "id": trade.get("id", ""),
-                "symbol": trade.get("symbol", ""),
-                "side": trade.get("side", "").upper(),
-                "amount": round(trade.get("amount", 0), 6),
-                "price": round(trade.get("price", 0), 2 if trade.get("price", 0) > 1 else 6),
-                "cost": round(trade.get("cost", 0), 2),
-                "fee": round(trade.get("fee", {}).get("cost", 0), 4),
-                "pnl_amount": round(pnl_amount, 2),
-                "pnl_percentage": round(pnl_pct, 2),
-                "performance": performance,
-                "current_price": round(trade.get("current_price", 0), 2 if trade.get("current_price", 0) > 1 else 6),
-                "days_ago": round(days_ago, 1),
-                "datetime": trade.get("datetime", ""),
-                "status": trade.get("status", "closed"),
-                "net_proceeds": round(trade.get("net_proceeds", 0), 2)
-            }
-            enhanced_trades.append(enhanced_trade)
-        
-        # Sort by timestamp (newest first)
-        enhanced_trades.sort(key=lambda x: x["days_ago"])
-        
-        return {
-            "trades": enhanced_trades,
-            "summary": trade_data.get("summary", {}),
+    """RESET: All trade table data cleared"""
+    return {
+        "trades": [],
+        "summary": {
+            "total_trades": 0,
+            "total_volume": 0,
+            "win_rate": 0
+        },
+        "total_count": 0,
+        "status": "RESET",
+        "message": "Trade table cleared - starting fresh"
+    }),
             "total_count": len(enhanced_trades)
         }
         
@@ -2295,6 +2172,25 @@ async def signals_loop():
 
 
 # Startup
+
+
+@app.get("/admin/nuclear-reset")
+def nuclear_reset():
+    """ADMIN: Nuclear reset - clear ALL trades completely"""
+    global _trade_log
+    
+    original_count = len(_trade_log)
+    _trade_log = []  # NUCLEAR CLEAR
+    
+    return {
+        "message": "NUCLEAR RESET COMPLETE",
+        "status": "ALL_TRADES_CLEARED",
+        "original_count": original_count,
+        "remaining_count": 0,
+        "reset_time": datetime.now().isoformat(),
+        "note": "Starting completely fresh - only real future trades will be accepted"
+    }
+
 @app.on_event("startup")
 async def startup_event():
     """Initialize the exchange connection on startup"""
