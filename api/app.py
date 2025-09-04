@@ -1409,31 +1409,9 @@ def sentiment_articles():
 
 @app.get("/trades")
 def recent_trades():
-    """Real trade history from actual executions only"""
+    """Real trade history from actual executions only - NO CACHED DATA"""
 
-    trades_file = "trades_history.json"
-
-    # Get real positions only
-    try:
-        positions = get_real_positions()
-    except Exception as e:
-        # No demo data - return empty if no real positions available
-        return {
-            "trades": [],
-            "count": 0,
-            "message": "No real position data available",
-            "error": str(e),
-        }
-
-    # Load existing trades
-    try:
-        with open(trades_file) as f:
-            all_trades = json.load(f)
-    except Exception:
-        all_trades = []
-
-    # Only use real trades from the execution loop - no fake data generation
-    # Real trades are stored in _trade_log by the execution loop
+    # ONLY use real trades from _trade_log - ignore any cached files
     real_trades = []
     for trade in _trade_log:
         real_trades.append(
@@ -1451,18 +1429,18 @@ def recent_trades():
                     "%Y-%m-%d %H:%M:%S", time.localtime(trade.get("t", time.time()))
                 ),
                 "source": "real_execution",
+                "pnl": trade.get("pnl", 0)
             }
         )
 
-    # Use only real trades - no fake data
-    all_trades = real_trades
-    all_trades.sort(key=lambda x: x["timestamp"], reverse=True)
-
-    try:
-        with open(trades_file, "w") as f:
-            json.dump(all_trades, f)
-    except Exception as e:
-        logging.error(f"Failed to save trades history: {e}")
+    # Sort by timestamp (newest first)
+    real_trades.sort(key=lambda x: x["timestamp"], reverse=True)
+    
+    # Filter to only show trades since Aug 1, 2025
+    aug_1_2025 = datetime(2025, 8, 1).timestamp()
+    filtered_trades = [t for t in real_trades if t["timestamp"] >= aug_1_2025]
+    
+    all_trades = filtered_trades
 
     # Calculate summary statistics
     if all_trades:
@@ -1487,8 +1465,10 @@ def recent_trades():
             "win_rate": win_rate,
             "total_volume": total_volume,
             "avg_trade_size": avg_trade_size,
-            "net_pnl": realized_pnl,
         },
+        "count": len(all_trades),
+        "data_source": "real_trades_only_since_aug_2025",
+        "note": "Only showing real executed trades since Aug 1, 2025"
     }
 
 
