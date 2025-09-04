@@ -58,8 +58,14 @@ class FreeBinanceWebSocketManager:
         # Connection status
         self.last_ticker_update = 0
         self.last_kline_update = 0
+        self.last_balance_update = 0
         self.connection_errors = 0
         self.max_connection_errors = 5
+        
+        # Balance caching to reduce API calls
+        self.cached_balance = {}
+        self.balance_cache_ttl = 30  # Cache balance for 30 seconds
+        self.last_balance_fetch = 0
         
         log.info("FreeBinanceWebSocketManager initialized")
     
@@ -205,6 +211,8 @@ class FreeBinanceWebSocketManager:
                                 locked = float(balance['l'])
                                 self.account_balance[asset] = free + locked
                                 
+                            self.last_balance_update = time.time()
+                                
                 except Exception as e:
                     log.error(f"Error processing user message: {e}")
             
@@ -288,6 +296,55 @@ class FreeBinanceWebSocketManager:
         """Get real-time balance data (requires authentication)"""
         with self._lock:
             return self.account_balance.copy()
+    
+    def get_total_balance_usdt(self, exchange_client=None) -> float:
+        """Calculate total balance in USDT using real-time prices"""
+        with self._lock:
+            total_usdt = self.account_balance.get('USDT', 0.0)
+            
+            # Add crypto values converted to USDT using WebSocket prices
+            for asset, amount in self.account_balance.items():
+                if asset != 'USDT' and amount > 0:
+                    # Try to find price from WebSocket tickers
+                    symbol_key = f"{asset}/USDT"
+                    if symbol_key in self.tickers:
+                        price = self.tickers[symbol_key].get('last', 0)
+                        total_usdt += amount * price
+                    elif exchange_client:
+                        # Fallback to REST API only if WebSocket data not available
+                        try:
+                            ticker = exchange_client.fetch_ticker(symbol_key)
+                            price = ticker.get('last') or ticker.get('close') or 0
+                            total_usdt += amount * price
+                        except:
+                            pass
+            
+            return total_usdt
+    
+    def get_formatted_balance(self, exchange_client=None) -> Dict[str, Any]:
+        """Get balance in the format expected by the API with intelligent caching"""
+        now = time.time()
+        
+        with self._lock:
+            # If WebSocket balance is available and recent, use it
+            if self.account_balance and (now - self.last_balance_update) < 60:
+                balance_copy = self.account_balance.copy()
+                total_usdt = self.get_total_balance_usdt(exchange_client)
+                balance_copy['total_usdt'] = total_usdt
+                return balance_copy
+            
+            # If we have cached balance and it's still valid, use it
+            if self.cached_balance and (now - self.last_balance_fetch) < self.balance_cache_ttl:
+                return self.cached_balance.copy()
+            
+            # Otherwise, we need to fetch from API (this will be handled by calling code)
+            return None
+    
+    def cache_balance_data(self, balance_data: Dict[str, Any]) -> None:
+        """Cache balance data to reduce API calls"""
+        with self._lock:
+            self.cached_balance = balance_data.copy()
+            self.last_balance_fetch = time.time()
     
     def add_symbols(self, ticker_symbols: List[str] = None, kline_symbols: List[str] = None):
         """Add new symbols to existing streams (requires restart)"""

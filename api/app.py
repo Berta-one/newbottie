@@ -370,10 +370,25 @@ def get_real_crypto_prices(symbols=None):
 
 
 def get_real_balance():
-    """Get actual account balance - with fallback for geographic restrictions"""
+    """Get actual account balance - with WebSocket support to avoid rate limits"""
     global real_balance
+    
+    # Try WebSocket data first to avoid rate limits
+    try:
+        from engine.free_websocket_manager import get_free_websocket_manager
+        ws_manager = get_free_websocket_manager()
+        
+        balance_data = ws_manager.get_formatted_balance(exchange_client)
+        if balance_data is not None:
+            # Use WebSocket or cached balance data - no API calls needed!
+            real_balance = balance_data
+            logging.debug("✅ Using WebSocket/cached balance data (no API calls)")
+            return real_balance
+            
+    except Exception as e:
+        logging.debug(f"WebSocket balance not available: {e}")
 
-    # If exchange client is available, try to get real data
+    # If exchange client is available and WebSocket data not available, try REST API
     if exchange_client:
         try:
             balance = exchange_client.fetch_balance()
@@ -398,6 +413,16 @@ def get_real_balance():
                         continue
 
             real_balance["total_usdt"] = total_usdt
+            
+            # Cache the balance data to reduce future API calls
+            try:
+                from engine.free_websocket_manager import get_free_websocket_manager
+                ws_manager = get_free_websocket_manager()
+                ws_manager.cache_balance_data(real_balance)
+            except Exception:
+                pass
+            
+            logging.warning("⚠️ Using REST API balance data (may cause rate limits)")
             return real_balance
 
         except Exception as e:
@@ -458,17 +483,47 @@ def get_real_positions():
             except Exception as e:
                 logging.warning(f"Could not fetch futures positions: {e}")
 
-            # Method 3: Check balance holdings as positions (for spot holdings)
+            # Method 3: Check balance holdings as positions (for spot holdings) - Use WebSocket when possible
             try:
-                balance = exchange_client.fetch_balance()
-                for symbol, amount in balance["total"].items():
+                # Try to get balance from WebSocket first to avoid rate limits
+                balance_data = None
+                try:
+                    from engine.free_websocket_manager import get_free_websocket_manager
+                    ws_manager = get_free_websocket_manager()
+                    
+                    if ws_manager.is_connected() and ws_manager.account_balance:
+                        balance_data = {"total": ws_manager.get_balance()}
+                        logging.debug("✅ Using WebSocket balance for positions (no API calls)")
+                except Exception:
+                    pass
+                
+                # Fallback to REST API if WebSocket not available
+                if balance_data is None:
+                    balance_data = exchange_client.fetch_balance()
+                    logging.warning("⚠️ Using REST API for positions balance (may cause rate limits)")
+                
+                for symbol, amount in balance_data["total"].items():
                     if amount > 0.001 and symbol != "USDT":  # Exclude USDT
                         try:
                             tradable = _find_tradable_symbol_for_base(symbol)
                             if not tradable:
                                 continue
-                            ticker = exchange_client.fetch_ticker(tradable)
-                            current_price = ticker.get("last") or ticker.get("close") or 0
+                            
+                            # Try to get price from WebSocket tickers first
+                            current_price = 0
+                            try:
+                                from engine.free_websocket_manager import get_free_websocket_manager
+                                ws_manager = get_free_websocket_manager()
+                                ticker_key = f"{symbol}/USDT"
+                                if ticker_key in ws_manager.tickers:
+                                    current_price = ws_manager.tickers[ticker_key].get('last', 0)
+                            except Exception:
+                                pass
+                            
+                            # Fallback to REST API for price if WebSocket not available
+                            if current_price == 0:
+                                ticker = exchange_client.fetch_ticker(tradable)
+                                current_price = ticker.get("last") or ticker.get("close") or 0
 
                             # Only add if not already in positions from orders/futures
                             position_key = f"{symbol}USDT"
@@ -2268,6 +2323,27 @@ async def startup_event():
         )
         if success:
             logging.info("✅ Exchange connection established")
+            
+            # Initialize WebSocket to prevent rate limit issues
+            try:
+                from initialize_websocket_fix import initialize_websocket_for_trading
+                ws_success = await initialize_websocket_for_trading()
+                if ws_success:
+                    startup_logs.append(
+                        f"{time.strftime('%Y-%m-%d %H:%M:%S')} - 🚀 WebSocket initialized - Rate limits prevented!"
+                    )
+                    logging.info("🚀 WebSocket initialized - Rate limits prevented!")
+                else:
+                    startup_logs.append(
+                        f"{time.strftime('%Y-%m-%d %H:%M:%S')} - ⚠️ WebSocket initialization failed - May encounter rate limits"
+                    )
+                    logging.warning("⚠️ WebSocket initialization failed - May encounter rate limits")
+            except Exception as e:
+                startup_logs.append(
+                    f"{time.strftime('%Y-%m-%d %H:%M:%S')} - ⚠️ WebSocket setup error: {e}"
+                )
+                logging.warning(f"⚠️ WebSocket setup error: {e}")
+                
         else:
             logging.warning("❌ Exchange connection failed - running in simulation mode")
         logging.info(f"🚀 Real trading initialization: {mode}")

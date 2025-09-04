@@ -111,12 +111,27 @@ def initialize_real_exchange():
         return False
 
 def get_real_balance():
-    """Get actual account balance"""
+    """Get actual account balance - with WebSocket support to avoid rate limits"""
     global real_balance
 
     if not exchange_client:
         logging.error("Exchange client not initialized in get_real_balance")
         return {"USDT": 10000.0, "BTC": 0.0, "ETH": 0.0}
+    
+    # Try WebSocket data first to avoid rate limits
+    try:
+        from engine.free_websocket_manager import get_free_websocket_manager
+        ws_manager = get_free_websocket_manager()
+        
+        balance_data = ws_manager.get_formatted_balance(exchange_client)
+        if balance_data is not None:
+            # Use WebSocket or cached balance data - no API calls needed!
+            real_balance = balance_data
+            print("✅ Using WebSocket/cached balance data (no API calls)")
+            return real_balance
+            
+    except Exception as e:
+        print(f"WebSocket balance not available: {e}")
     
     try:
         balance = exchange_client.fetch_balance()
@@ -138,6 +153,16 @@ def get_real_balance():
                     pass  # Skip if price not available
         
         real_balance['total_usdt'] = total_usdt
+        
+        # Cache the balance data to reduce future API calls
+        try:
+            from engine.free_websocket_manager import get_free_websocket_manager
+            ws_manager = get_free_websocket_manager()
+            ws_manager.cache_balance_data(real_balance)
+        except Exception:
+            pass
+        
+        print("⚠️ Using REST API balance data (may cause rate limits)")
         return real_balance
         
     except Exception as e:
@@ -145,7 +170,7 @@ def get_real_balance():
         return {"USDT": 10000.0, "BTC": 0.0, "ETH": 0.0, "total_usdt": 10000.0}
 
 def get_real_positions():
-    """Get actual open positions"""
+    """Get actual open positions - with WebSocket support to avoid rate limits"""
     global real_positions
 
     if not exchange_client:
@@ -157,10 +182,24 @@ def get_real_positions():
         open_orders = exchange_client.fetch_open_orders()
         positions = {}
         
-        # Get balance for actual holdings
-        balance = exchange_client.fetch_balance()
+        # Get balance for actual holdings - try WebSocket first
+        balance_data = None
+        try:
+            from engine.free_websocket_manager import get_free_websocket_manager
+            ws_manager = get_free_websocket_manager()
+            
+            if ws_manager.is_connected() and ws_manager.account_balance:
+                balance_data = {"total": ws_manager.get_balance()}
+                print("✅ Using WebSocket balance for positions (no API calls)")
+        except Exception:
+            pass
         
-        for symbol, amount in balance['total'].items():
+        # Fallback to REST API if WebSocket not available
+        if balance_data is None:
+            balance_data = exchange_client.fetch_balance()
+            print("⚠️ Using REST API for positions balance (may cause rate limits)")
+        
+        for symbol, amount in balance_data['total'].items():
             if amount > 0.001:  # Minimum threshold
                 # Get current price
                 try:
@@ -168,8 +207,22 @@ def get_real_positions():
                         tradable = _find_tradable_symbol_for_base(symbol)
                         if not tradable:
                             continue
-                        ticker = exchange_client.fetch_ticker(tradable)
-                        current_price = ticker.get('last') or ticker.get('close') or 0
+                        
+                        # Try to get price from WebSocket tickers first
+                        current_price = 0
+                        try:
+                            from engine.free_websocket_manager import get_free_websocket_manager
+                            ws_manager = get_free_websocket_manager()
+                            ticker_key = f"{symbol}/USDT"
+                            if ticker_key in ws_manager.tickers:
+                                current_price = ws_manager.tickers[ticker_key].get('last', 0)
+                        except Exception:
+                            pass
+                        
+                        # Fallback to REST API for price if WebSocket not available
+                        if current_price == 0:
+                            ticker = exchange_client.fetch_ticker(tradable)
+                            current_price = ticker.get('last') or ticker.get('close') or 0
                         
                         # Calculate PnL (simplified - would need trade history for exact entry price)
                         positions[f"{symbol}USDT"] = {
