@@ -1778,166 +1778,81 @@ def get_recent_trades():
 
 @app.get("/trades/history")
 def trades_history(since_date: str = "2024-08-01"):
-    """Get comprehensive trades history since specified date with detailed P&L"""
+    """Get REAL trades history since specified date - NO FAKE TRADES"""
     try:
         from datetime import datetime
 
         # Convert date to timestamp
         since_timestamp = int(datetime.strptime(since_date, "%Y-%m-%d").timestamp() * 1000)
 
-        # Get current prices for mark-to-market calculations
-        current_prices = {}
-        try:
-            if exchange_client:
-                symbols = ["BTCUSDT", "ETHUSDT", "ADAUSDT", "BNBUSDT", "SOLUSDT"]
-                for symbol in symbols:
-                    try:
-                        ticker = exchange_client.fetch_ticker(symbol)
-                        current_prices[symbol] = ticker["last"]
-                    except Exception:
-                        pass
-        except Exception:
-            pass
-
-        # Fallback current prices
-        if not current_prices:
-            current_prices = {
-                "BTCUSDT": 45000,
-                "ETHUSDT": 2800,
-                "ADAUSDT": 0.45,
-                "BNBUSDT": 320,
-                "SOLUSDT": 95,
-            }
-
-        # Generate comprehensive demo trades since August 1st
-        import random
-
-        demo_trades = []
-
-        # Create realistic trade history
-        trade_templates = [
-            {"symbol": "BTCUSDT", "base_price": 44000, "volatility": 0.15},
-            {"symbol": "ETHUSDT", "base_price": 2750, "volatility": 0.18},
-            {"symbol": "ADAUSDT", "base_price": 0.42, "volatility": 0.25},
-            {"symbol": "BNBUSDT", "base_price": 310, "volatility": 0.20},
-            {"symbol": "SOLUSDT", "base_price": 88, "volatility": 0.30},
-        ]
-
-        # Generate trades from August 1st to now
-        start_time = since_timestamp / 1000
-        current_time = time.time()
-
-        trade_id = 1
-        positions = {}  # Track positions for P&L calculations
-
-        # Generate 50-100 realistic trades
-        num_trades = random.randint(50, 100)
-
-        for _i in range(num_trades):
-            # Random time between start and now
-            trade_time = start_time + (current_time - start_time) * random.random()
-
-            # Pick random symbol
-            template = random.choice(trade_templates)
-            symbol = template["symbol"]
-
-            # Generate realistic price movement
-            days_from_start = (trade_time - start_time) / (24 * 3600)
-            trend = 1 + (days_from_start / 100) * random.uniform(-0.5, 1.2)  # Overall upward trend
-            trend = max(0.05, trend)
-            price_variation = random.uniform(1 - template["volatility"], 1 + template["volatility"])
-            trade_price = template["base_price"] * trend * price_variation
-
-            # Determine side (slightly more buys than sells for growth)
-            side = "buy" if random.random() > 0.45 else "sell"
-
-            # Generate realistic amounts
-            if symbol == "BTCUSDT":
-                amount = random.uniform(0.0001, 0.01)
-            elif symbol == "ETHUSDT":
-                amount = random.uniform(0.001, 0.1)
-            elif symbol in ["ADAUSDT"]:
-                amount = random.uniform(1, 1000)
-            else:
-                amount = random.uniform(0.01, 10)
-
-            cost = abs(amount * trade_price)
-            fee_rate = 0.001  # 0.1% fee
-            fee_cost = abs(cost * fee_rate)
-
-            # Calculate P&L
-            current_price = current_prices.get(symbol, trade_price)
-
-            # For closed positions, calculate realized P&L
-            if symbol not in positions:
-                positions[symbol] = {"quantity": 0, "total_cost": 0, "trades": []}
-
-            # Track position
-            if side == "buy":
-                positions[symbol]["quantity"] += amount
-                positions[symbol]["total_cost"] += cost + fee_cost
-            else:
-                positions[symbol]["quantity"] -= amount
-                positions[symbol]["total_cost"] -= cost - fee_cost
-
-            # Calculate P&L for this trade
-            if side == "buy":
-                # For buy trades, P&L is current value minus cost
-                unrealized_pnl = (current_price - trade_price) * abs(amount) - fee_cost
-            else:
-                # For sell trades, P&L is proceeds minus average cost
-                avg_cost = abs(positions[symbol]["total_cost"]) / max(
-                    abs(positions[symbol]["quantity"]), 0.0001
-                )
-                unrealized_pnl = (trade_price - avg_cost) * abs(amount) - fee_cost
-
-            trade = {
-                "id": f"trade_{trade_id}",
-                "symbol": symbol,
-                "side": side,
-                "amount": round(amount, 6),
-                "price": round(trade_price, 4),
-                "cost": round(cost, 2),
-                "fee": {"cost": round(fee_cost, 4), "currency": "USDT", "rate": fee_rate},
-                "timestamp": int(trade_time * 1000),
-                "datetime": datetime.fromtimestamp(trade_time).isoformat(),
-                "status": "closed",
-                "current_price": round(current_price, 4),
-                "unrealized_pnl": round(unrealized_pnl, 4),
-                "pnl_percentage": round((unrealized_pnl / cost) * 100, 2) if cost > 0 else 0,
-                "net_proceeds": round(cost - fee_cost if side == "sell" else -(cost + fee_cost), 2),
-            }
-
-            demo_trades.append(trade)
-            positions[symbol]["trades"].append(trade)
-            trade_id += 1
+        # Get ONLY real trades from the execution loop - NO FAKE DATA
+        real_trades = []
+        for trade in _trade_log:
+            trade_timestamp = int(trade.get("t", time.time()) * 1000)
+            
+            # Only include trades since the specified date
+            if trade_timestamp >= since_timestamp:
+                real_trades.append({
+                    "id": trade.get("order_id", f"R{int(trade.get('t', time.time()))}"),
+                    "symbol": trade.get("symbol", ""),
+                    "side": trade.get("side", "").upper(),
+                    "amount": round(trade.get("qty", 0), 6),
+                    "price": round(trade.get("px", 0), 4),
+                    "cost": round(trade.get("qty", 0) * trade.get("px", 0), 2),
+                    "fee": {
+                        "cost": round(trade.get("qty", 0) * trade.get("px", 0) * 0.001, 4),
+                        "currency": "USDT",
+                        "rate": 0.001
+                    },
+                    "timestamp": trade_timestamp,
+                    "datetime": datetime.fromtimestamp(trade.get("t", time.time())).isoformat(),
+                    "status": "completed",
+                    "confidence": round(trade.get("conf", 0), 3),
+                    "source": "real_execution",
+                    "unrealized_pnl": trade.get("pnl", 0),
+                    "pnl_percentage": round((trade.get("pnl", 0) / max(trade.get("qty", 0) * trade.get("px", 0), 0.01)) * 100, 2),
+                    "net_proceeds": round(trade.get("qty", 0) * trade.get("px", 0), 2)
+                })
 
         # Sort by timestamp (newest first)
-        demo_trades.sort(key=lambda x: x["timestamp"], reverse=True)
+        real_trades.sort(key=lambda x: x["timestamp"], reverse=True)
 
-        # Calculate summary statistics
-        total_trades = len(demo_trades)
-        total_fees = sum(trade["fee"]["cost"] for trade in demo_trades)
-        total_pnl = sum(trade["unrealized_pnl"] for trade in demo_trades)
-        total_volume = sum(trade["cost"] for trade in demo_trades)
+        # Calculate summary statistics from REAL trades only
+        if real_trades:
+            total_trades = len(real_trades)
+            total_fees = sum(trade["fee"]["cost"] for trade in real_trades)
+            total_pnl = sum(trade.get("unrealized_pnl", 0) for trade in real_trades)
+            total_volume = sum(trade["cost"] for trade in real_trades)
 
-        winning_trades = [t for t in demo_trades if t["unrealized_pnl"] > 0]
-        losing_trades = [t for t in demo_trades if t["unrealized_pnl"] < 0]
+            winning_trades = [t for t in real_trades if t.get("unrealized_pnl", 0) > 0]
+            losing_trades = [t for t in real_trades if t.get("unrealized_pnl", 0) < 0]
 
-        win_rate = (len(winning_trades) / total_trades * 100) if total_trades > 0 else 0
-        avg_win = (
-            sum(t["unrealized_pnl"] for t in winning_trades) / len(winning_trades)
-            if winning_trades
-            else 0
-        )
-        avg_loss = (
-            sum(t["unrealized_pnl"] for t in losing_trades) / len(losing_trades)
-            if losing_trades
-            else 0
-        )
+            win_rate = (len(winning_trades) / total_trades * 100) if total_trades > 0 else 0
+            avg_win = (
+                sum(t["unrealized_pnl"] for t in winning_trades) / len(winning_trades)
+                if winning_trades
+                else 0
+            )
+            avg_loss = (
+                sum(t["unrealized_pnl"] for t in losing_trades) / len(losing_trades)
+                if losing_trades
+                else 0
+            )
 
-        largest_win = max((t["unrealized_pnl"] for t in winning_trades), default=0)
-        largest_loss = min((t["unrealized_pnl"] for t in losing_trades), default=0)
+            largest_win = max((t["unrealized_pnl"] for t in winning_trades), default=0)
+            largest_loss = min((t["unrealized_pnl"] for t in losing_trades), default=0)
+        else:
+            total_trades = 0
+            total_fees = 0
+            total_pnl = 0
+            total_volume = 0
+            win_rate = 0
+            avg_win = 0
+            avg_loss = 0
+            winning_trades = []
+            losing_trades = []
+            largest_win = 0
+            largest_loss = 0
 
         summary = {
             "total_trades": total_trades,
@@ -1952,12 +1867,14 @@ def trades_history(since_date: str = "2024-08-01"):
             "avg_loss": round(avg_loss, 2),
             "largest_win": round(largest_win, 2),
             "largest_loss": round(largest_loss, 2),
+            "profit_factor": round(abs(avg_win / avg_loss), 2) if avg_loss != 0 else 0,
             "period": f"Since {since_date}",
-            "current_prices": current_prices,
+            "data_source": "real_trades_only",
+            "note": "Only showing actual executed trades - no demo data"
         }
 
         return {
-            "trades": demo_trades,
+            "trades": real_trades,
             "summary": summary,
             "count": total_trades,
             "since_date": since_date,
@@ -1972,7 +1889,7 @@ def trades_table():
     """Detailed trades data for table display with enhanced visualization"""
     try:
         # Get trade history data
-        trade_data = trades_history()
+        trade_data = trades_history()  # Now returns only real trades
         trades = trade_data.get("trades", [])
         
         # Enhance trades for table display
