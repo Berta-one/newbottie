@@ -91,7 +91,54 @@ startup_logs = []
 # Trading execution variables
 _signals = []
 _logs = []
-_trade_log = []
+# Trading execution variables - CLEARED OF FAKE DATA
+_trade_log = []  # Only real trades from actual execution
+
+def validate_trade_data(trade_data):
+    """Validate that trade data is realistic and recent"""
+    try:
+        # Check timestamp - must be after Aug 1, 2025
+        aug_1_2025 = datetime(2025, 8, 1).timestamp()
+        trade_time = trade_data.get("t", 0)
+        
+        if trade_time < aug_1_2025:
+            print(f"⚠️ Rejecting old trade from {datetime.fromtimestamp(trade_time)}")
+            return False
+        
+        # Check price reasonableness
+        symbol = trade_data.get("symbol", "")
+        price = trade_data.get("px", 0)
+        
+        # Realistic price ranges (as of 2025)
+        price_ranges = {
+            "BTCUSDT": (20000, 150000),    # BTC: $20k - $150k
+            "ETHUSDT": (1000, 10000),      # ETH: $1k - $10k  
+            "ADAUSDT": (0.1, 5.0),         # ADA: $0.1 - $5
+            "BNBUSDT": (100, 1000),        # BNB: $100 - $1k
+            "SOLUSDT": (10, 500),          # SOL: $10 - $500
+        }
+        
+        if symbol in price_ranges:
+            min_price, max_price = price_ranges[symbol]
+            if not (min_price <= price <= max_price):
+                print(f"⚠️ Rejecting unrealistic price for {symbol}: ${price}")
+                return False
+        
+        return True
+        
+    except Exception as e:
+        print(f"⚠️ Trade validation error: {e}")
+        return False
+
+def add_real_trade(trade_data):
+    """Add a trade to _trade_log only if it passes validation"""
+    global _trade_log
+    
+    if validate_trade_data(trade_data):
+        _trade_log.append(trade_data)
+        print(f"✅ Added valid trade: {trade_data.get('symbol')} at ${trade_data.get('px')}")
+    else:
+        print(f"❌ Rejected invalid trade: {trade_data.get('symbol')} at ${trade_data.get('px')}")
 _open_spend = {}
 
 # WebSocket connection management
@@ -1436,9 +1483,35 @@ def recent_trades():
     # Sort by timestamp (newest first)
     real_trades.sort(key=lambda x: x["timestamp"], reverse=True)
     
-    # Filter to only show trades since Aug 1, 2025
+    # Filter to only show trades since Aug 1, 2025 - BE VERY STRICT
     aug_1_2025 = datetime(2025, 8, 1).timestamp()
-    filtered_trades = [t for t in real_trades if t["timestamp"] >= aug_1_2025]
+    
+    # Also filter out unrealistic prices
+    def is_valid_trade(trade):
+        # Date check
+        if trade["timestamp"] < aug_1_2025:
+            return False
+        
+        # Price reasonableness check
+        symbol = trade.get("symbol", "")
+        price = trade.get("price", 0)
+        
+        price_ranges = {
+            "BTCUSDT": (20000, 150000),
+            "ETHUSDT": (1000, 10000),  
+            "ADAUSDT": (0.1, 5.0),
+            "BNBUSDT": (100, 1000),
+            "SOLUSDT": (10, 500),
+        }
+        
+        if symbol in price_ranges:
+            min_price, max_price = price_ranges[symbol]
+            if not (min_price <= price <= max_price):
+                return False
+        
+        return True
+    
+    filtered_trades = [t for t in real_trades if is_valid_trade(t)]
     
     all_trades = filtered_trades
 
@@ -1749,6 +1822,33 @@ def get_logs():
     """Get recent system logs"""
     return {"logs": _logs[-100:], "count": len(_logs)}
 
+
+
+@app.get("/admin/clear-fake-trades")
+def clear_fake_trades():
+    """ADMIN: Clear fake trades from _trade_log"""
+    global _trade_log
+    
+    original_count = len(_trade_log)
+    
+    # Filter out trades before Aug 1, 2025
+    aug_1_2025 = datetime(2025, 8, 1).timestamp()
+    valid_trades = []
+    
+    for trade in _trade_log:
+        if validate_trade_data(trade):
+            valid_trades.append(trade)
+    
+    _trade_log = valid_trades
+    removed_count = original_count - len(_trade_log)
+    
+    return {
+        "message": "Fake trades cleared",
+        "original_count": original_count,
+        "removed_count": removed_count,
+        "remaining_count": len(_trade_log),
+        "cleared_at": datetime.now().isoformat()
+    }
 
 @app.get("/trades/recent")
 def get_recent_trades():
@@ -2107,8 +2207,7 @@ async def execution_loop():
                         order = exchange_client.create_order(
                             sym, type="market", side=side, amount=qty
                         )
-                        _trade_log.append(
-                            {
+                        add_real_trade({
                                 "t": int(time.time()),
                                 "symbol": sym,
                                 "side": side,
@@ -2116,8 +2215,7 @@ async def execution_loop():
                                 "px": px,
                                 "conf": conf,
                                 "order_id": order.get("id", "unknown"),
-                            }
-                        )
+                            })
                         if side == "buy":
                             _open_spend[sym] = _open_spend.get(sym, 0.0) + qty * px
                         else:
