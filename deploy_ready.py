@@ -17,21 +17,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 import uvicorn
 
-# Apply WebSocket fixes
-try:
-    from websocket_fix import apply_websocket_fix
-    apply_websocket_fix()
-    logger.info("✅ WebSocket fixes applied")
-except Exception as e:
-    logger.warning(f"⚠️ Could not apply WebSocket fixes: {e}")
-
-# Configure logging for deployment
+# Configure logging for deployment FIRST
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
     handlers=[logging.StreamHandler(sys.stdout)]
 )
 logger = logging.getLogger(__name__)
+
+# Apply WebSocket fixes AFTER logger is defined
+try:
+    from websocket_fix import apply_websocket_fix
+    apply_websocket_fix()
+    logger.info("✅ WebSocket fixes applied")
+except Exception as e:
+    logger.warning(f"⚠️ Could not apply WebSocket fixes: {e}")
 
 # Load environment variables safely
 def get_env(key: str, default: str = "") -> str:
