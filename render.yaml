@@ -1,78 +1,44 @@
 services:
   - type: web
-    name: bottie-lightweight
+    name: bottie-trading-system
     env: python
     region: oregon
     plan: free  # 512MB memory limit
     
-    # Minimal build process to save memory
+    # Build process with minimal dependencies
     buildCommand: |
-      pip install --no-cache-dir -r requirements-lightweight.txt
+      pip install --no-cache-dir -r requirements-deploy.txt
       python -c "import gc; gc.collect()"
     
-    startCommand: python bottie_complete.py
+    startCommand: python3 deploy_ready.py
     
-    # Memory optimization environment variables
+    # Environment variables for deployment
     envVars:
       # Core settings
       - key: PORT
         value: "8000"
+      - key: HOST
+        value: "0.0.0.0"
       - key: DEMO_MODE
-        value: "1"  # Enable demo mode for testing
+        value: "1"  # Safe demo mode for deployment
       - key: PYTHONUNBUFFERED
         value: "1"
       
-      # Memory management
-      - key: MAX_MEMORY_MB
-        value: "400"  # Stay well under 512MB limit
-      - key: MEMORY_CHECK_INTERVAL
-        value: "30"
-      - key: CLEANUP_INTERVAL
-        value: "300"
-      - key: GC_INTERVAL
-        value: "60"
-      
-      # Data limits (reduced for memory efficiency)
-      - key: MAX_STORED_RECORDS
-        value: "10000"   # ML-scale as requested
-      - key: MAX_LOG_ENTRIES
-        value: "1000"    # Detailed logging as requested
-      - key: MAX_CANDLE_CACHE
-        value: "50"      # Reduced cache
-      - key: MAX_POSITION_CACHE
-        value: "25"      # Reduced cache
-      
-      # Trading settings (optimized for low API usage)
-      - key: UPDATE_INTERVAL
-        value: "60"      # Update every 60 seconds
-      - key: BALANCE_UPDATE_INTERVAL
-        value: "600"     # Balance update every 10 minutes
-      - key: WEBSOCKET_BROADCAST_INTERVAL
-        value: "15"      # Broadcast every 15 seconds
-      
-      # Database settings
-      - key: USE_MEMORY_DB
-        value: "0"       # Use disk-based SQLite to save RAM
-      - key: DB_PATH
-        value: "/tmp/bottie_lite.db"
-      
-      # WebSocket settings
-      - key: MAX_WEBSOCKET_CONNECTIONS
-        value: "10"      # Limit concurrent connections
-      - key: WEBSOCKET_TIMEOUT
-        value: "30"
-      
-      # Logging settings
-      - key: LOG_LEVEL
-        value: "INFO"    # Detailed logging as requested
-      - key: DISABLE_ACCESS_LOG
+      # Trading settings
+      - key: TRADE_ENABLED
         value: "1"
+      - key: EXECUTION_INTERVAL_S
+        value: "30"
+      - key: TRADE_QUOTE_PER_ORDER
+        value: "50"
       
-      # Python optimization
-      - key: PYTHONOPTIMIZE
-        value: "2"       # Enable optimizations
-      - key: PYTHONDONTWRITEBYTECODE
-        value: "1"       # Don't create .pyc files
+      # Dashboard
+      - key: DASHBOARD_PASSWORD
+        value: "bottie2024"
+      
+      # Logging
+      - key: LOG_LEVEL
+        value: "INFO"
 
     # Health check configuration
     healthCheckPath: /health
