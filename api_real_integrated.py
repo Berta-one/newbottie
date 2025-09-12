@@ -1,11 +1,10 @@
 """Compatibility shim for legacy deployments.
 
-This module exposes the FastAPI `app` object from `api.app` so that
-older `uvicorn` start commands referencing `api_real_integrated:app`
-continue to work.
+This module exposes the FastAPI `app` object from the working deployment script.
 """
 
-from api.app import app
+# Import from our working deployment script instead
+from deploy_ready import app
 
 __all__ = ["app"]
 

@@ -1529,9 +1529,11 @@ def recent_trades():
         "count": 0,
         "status": "RESET",
         "message": "All trades cleared - starting fresh with real trades only"
-    },
+    }
+    
+    return {
         "count": len(all_trades),
-        "data_source": "real_trades_only_since_aug_2025",
+        "data_source": "real_trades_only_since_aug_2025", 
         "note": "Only showing real executed trades since Aug 1, 2025"
     }
 
