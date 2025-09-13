@@ -120,17 +120,122 @@ def status():
         "time": time.time()
     }
 
+def get_cross_pair_opportunities():
+    """Find atomic swap and cross-pair trading opportunities"""
+    try:
+        import ccxt
+        
+        # Get real portfolio positions
+        api_key = os.getenv('BINANCE_API_KEY', '')
+        api_secret = os.getenv('BINANCE_API_SECRET', '')
+        
+        if not api_key or not api_secret:
+            return []
+        
+        exchange = ccxt.binance({
+            'apiKey': api_key,
+            'secret': api_secret,
+            'sandbox': False,
+            'enableRateLimit': True,
+        })
+        
+        # Get real balance
+        balance = exchange.fetch_balance()
+        portfolio_assets = []
+        
+        for asset, amount in balance.get('total', {}).items():
+            if amount > 0.001 and asset not in ['USDT', 'NFT', 'ETHW']:
+                portfolio_assets.append(asset)
+        
+        # Find cross-pair opportunities between portfolio assets
+        cross_opportunities = []
+        
+        for i, asset1 in enumerate(portfolio_assets):
+            for asset2 in portfolio_assets[i+1:]:
+                try:
+                    # Try direct pair (e.g., BTC/ETH)
+                    symbol = f"{asset1}/{asset2}"
+                    try:
+                        ticker = exchange.fetch_ticker(symbol)
+                        price = ticker['last']
+                        change_24h = ticker.get('percentage', 0)
+                        volume = ticker.get('baseVolume', 0)
+                        
+                        # Generate atomic swap signal
+                        if abs(change_24h) > 2:  # Significant movement
+                            direction = 'sell' if change_24h > 2 else 'buy'
+                            confidence = min(0.9, 0.6 + abs(change_24h) * 0.02)
+                            
+                            opportunity = {
+                                'symbol': symbol,
+                                'type': 'atomic_swap',
+                                'from_asset': asset1,
+                                'to_asset': asset2,
+                                'signal': 'SWAP_TO_' + asset2 if direction == 'sell' else 'SWAP_TO_' + asset1,
+                                'conf': confidence,
+                                'price': price,
+                                'change': change_24h / 100,
+                                'volume_24h': volume,
+                                't': int(time.time()),
+                                'reason': f'Atomic swap opportunity - {change_24h:+.1f}% movement'
+                            }
+                            
+                            cross_opportunities.append(opportunity)
+                            print(f"⚛️ ATOMIC SWAP: {symbol} {direction.upper()} ({confidence:.0%}) @ ${price:,.4f}")
+                            
+                    except Exception:
+                        # Try reverse pair (e.g., ETH/BTC)
+                        symbol = f"{asset2}/{asset1}"
+                        try:
+                            ticker = exchange.fetch_ticker(symbol)
+                            price = ticker['last']
+                            change_24h = ticker.get('percentage', 0)
+                            
+                            if abs(change_24h) > 2:
+                                direction = 'sell' if change_24h > 2 else 'buy'
+                                confidence = min(0.9, 0.6 + abs(change_24h) * 0.02)
+                                
+                                opportunity = {
+                                    'symbol': symbol,
+                                    'type': 'atomic_swap',
+                                    'from_asset': asset2,
+                                    'to_asset': asset1,
+                                    'signal': 'SWAP_TO_' + asset1 if direction == 'sell' else 'SWAP_TO_' + asset2,
+                                    'conf': confidence,
+                                    'price': price,
+                                    'change': change_24h / 100,
+                                    't': int(time.time()),
+                                    'reason': f'Atomic swap opportunity - {change_24h:+.1f}% movement'
+                                }
+                                
+                                cross_opportunities.append(opportunity)
+                                print(f"⚛️ ATOMIC SWAP: {symbol} {direction.upper()} ({confidence:.0%}) @ ${price:,.4f}")
+                                
+                        except Exception:
+                            continue  # No direct pair available
+                            
+                except Exception as e:
+                    print(f"❌ Cross-pair error {asset1}/{asset2}: {e}")
+        
+        return cross_opportunities
+        
+    except Exception as e:
+        print(f"❌ Cross-pair opportunities error: {e}")
+        return []
+
 def generate_signals():
-    """Generate real trading signals"""
+    """Generate real trading signals INCLUDING atomic swaps"""
     try:
         import ccxt
         
         # Create exchange client for real prices
         exchange = ccxt.binance({'enableRateLimit': True})
         
+        # Traditional USDT pairs
         symbols = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'ADA/USDT']
         new_signals = []
         
+        # Generate traditional signals
         for symbol in symbols:
             try:
                 ticker = exchange.fetch_ticker(symbol)
@@ -155,6 +260,7 @@ def generate_signals():
                     'price': price,
                     'change': change_24h / 100,  # Convert to decimal
                     't': int(time.time()),
+                    'type': 'traditional',
                     'reason': f'Real market analysis - {change_24h:+.1f}% 24h'
                 }
                 
@@ -164,9 +270,15 @@ def generate_signals():
             except Exception as e:
                 print(f"❌ Signal error for {symbol}: {e}")
         
+        # Generate cross-pair/atomic swap signals
+        cross_opportunities = get_cross_pair_opportunities()
+        new_signals.extend(cross_opportunities)
+        
         # Update trading state
         trading_state['signals'] = new_signals
         trading_state['last_signal_time'] = time.time()
+        
+        print(f"✅ Generated {len(new_signals)} signals ({len(cross_opportunities)} atomic swaps)")
         
         return new_signals
         
@@ -339,6 +451,43 @@ def sentiment():
 @app.get("/quantum/analysis")
 def quantum():
     return generate_quantum_analysis()
+
+@app.get("/cross-pairs/opportunities")
+def cross_pair_opportunities():
+    """Get atomic swap and cross-pair opportunities"""
+    try:
+        opportunities = get_cross_pair_opportunities()
+        
+        traditional_signals = [s for s in trading_state['signals'] if s.get('type') == 'traditional']
+        atomic_swaps = [s for s in trading_state['signals'] if s.get('type') == 'atomic_swap']
+        
+        return {
+            "traditional_pairs": len(traditional_signals),
+            "atomic_swaps": len(atomic_swaps),
+            "total_opportunities": len(trading_state['signals']),
+            "cross_pair_signals": atomic_swaps,
+            "portfolio_rebalancing": opportunities,
+            "timestamp": time.time(),
+            "status": "active" if opportunities else "no_opportunities"
+        }
+    except Exception as e:
+        return {"error": f"Cross-pair analysis failed: {e}"}
+
+@app.get("/atomic-swaps")
+def atomic_swaps():
+    """Get specific atomic swap opportunities"""
+    try:
+        atomic_signals = [s for s in trading_state['signals'] if s.get('type') == 'atomic_swap']
+        
+        return {
+            "atomic_swaps": atomic_signals,
+            "count": len(atomic_signals),
+            "available_pairs": list(set(s['symbol'] for s in atomic_signals)),
+            "last_scan": trading_state['last_signal_time'],
+            "status": "active" if atomic_signals else "no_swaps_available"
+        }
+    except Exception as e:
+        return {"error": f"Atomic swap analysis failed: {e}"}
 
 @app.get("/bulletin")
 def get_bulletin():

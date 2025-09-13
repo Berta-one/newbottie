@@ -112,6 +112,16 @@
         </div>
 
         <div class="section">
+            <h3>⚛️ ATOMIC SWAPS <span class="timestamp" id="atomic-time">--:--</span></h3>
+            <div id="atomic-data" class="data loading">Loading...</div>
+        </div>
+
+        <div class="section">
+            <h3>🔄 CROSS-PAIRS <span class="timestamp" id="cross-time">--:--</span></h3>
+            <div id="cross-data" class="data loading">Loading...</div>
+        </div>
+
+        <div class="section">
             <h3>🔧 SYSTEM HEALTH <span class="timestamp" id="health-time">--:--</span></h3>
             <div id="health-data" class="data loading">Loading...</div>
         </div>
@@ -256,6 +266,54 @@ Timestamp: ${new Date(data.time * 1000).toLocaleString()}`;
             }
         }
 
+        async function loadAtomic() {
+            try {
+                const response = await fetch(`${API}/atomic-swaps`);
+                const data = await response.json();
+                
+                let output = `Status: ${data.status.toUpperCase()}\nAtomic Swaps: ${data.count}\n\n`;
+                
+                if (data.atomic_swaps && data.atomic_swaps.length > 0) {
+                    data.atomic_swaps.forEach(swap => {
+                        output += `${swap.symbol}: ${swap.signal}\n`;
+                        output += `  From: ${swap.from_asset} → To: ${swap.to_asset}\n`;
+                        output += `  Confidence: ${(swap.conf * 100).toFixed(0)}%\n`;
+                        output += `  Price: ${swap.price.toFixed(6)}\n\n`;
+                    });
+                } else {
+                    output += 'No atomic swap opportunities found';
+                }
+                
+                document.getElementById('atomic-data').textContent = output;
+                document.getElementById('atomic-time').textContent = new Date().toLocaleTimeString();
+            } catch (e) {
+                document.getElementById('atomic-data').textContent = 'Error: ' + e.message;
+            }
+        }
+
+        async function loadCrossPairs() {
+            try {
+                const response = await fetch(`${API}/cross-pairs/opportunities`);
+                const data = await response.json();
+                
+                let output = `Traditional Pairs: ${data.traditional_pairs}\nAtomic Swaps: ${data.atomic_swaps}\nTotal: ${data.total_opportunities}\n\n`;
+                
+                if (data.cross_pair_signals && data.cross_pair_signals.length > 0) {
+                    output += 'Cross-Pair Opportunities:\n';
+                    data.cross_pair_signals.forEach(signal => {
+                        output += `${signal.symbol}: ${signal.signal} (${(signal.conf * 100).toFixed(0)}%)\n`;
+                    });
+                } else {
+                    output += 'No cross-pair opportunities';
+                }
+                
+                document.getElementById('cross-data').textContent = output;
+                document.getElementById('cross-time').textContent = new Date().toLocaleTimeString();
+            } catch (e) {
+                document.getElementById('cross-data').textContent = 'Error: ' + e.message;
+            }
+        }
+
         async function loadHealth() {
             try {
                 const response = await fetch(`${API}/health`);
@@ -277,13 +335,15 @@ Positions: ${data.positions}`;
             // Update main stats
             document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
             
-            // Load all sections
+            // Load all sections including atomic swaps
             await Promise.all([
                 loadSignals(),
                 loadML(), 
                 loadSentiment(),
                 loadQuantum(),
                 loadStatus(),
+                loadAtomic(),
+                loadCrossPairs(),
                 loadHealth()
             ]);
         }
