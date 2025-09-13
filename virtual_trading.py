@@ -255,7 +255,7 @@ class VirtualPortfolio:
                 'total_pnl': self.performance_metrics['total_pnl'],  # Unrealized from positions
                 'realized_pnl': total_realized_pnl,
                 'roi': ((self.current_balance + self.performance_metrics['total_pnl'] - self.starting_balance) / self.starting_balance) * 100,
-                'total_portfolio_value': self.current_balance + sum(pos.get('market_value', 0) for pos in self.virtual_positions.values())
+                'total_portfolio_value': round(self.current_balance + sum(pos.get('market_value', 0) for pos in self.virtual_positions.values()), 2)
             })
             
             return self.performance_metrics
@@ -274,7 +274,7 @@ class VirtualPortfolio:
                     'starting_balance': self.starting_balance,
                     'current_cash': round(self.current_balance, 2),
                     'position_value': round(sum(pos.get('market_value', 0) for pos in self.virtual_positions.values()), 2),
-                    'total_portfolio_value': round(self.performance_metrics['total_portfolio_value'], 2)
+                    'total_portfolio_value': round(self.current_balance + sum(pos.get('market_value', 0) for pos in self.virtual_positions.values()), 2)
                 },
                 'positions': dict(self.virtual_positions),
                 'performance': self.performance_metrics,

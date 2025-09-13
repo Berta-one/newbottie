@@ -8,9 +8,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 import uvicorn
 
-# Import AI bulletin system and virtual trading
+# Import AI bulletin system and simple virtual trading
 from ai_bulletin import bulletin_generator
-from virtual_trading import virtual_engine
+from simple_virtual import simple_virtual
 
 # Trading state with ML-based adaptive thresholds
 trading_state = {
@@ -819,21 +819,23 @@ def force_execute_best_signal():
         if not executable_signals:
             return {"ok": False, "message": "No signals above 60% confidence"}
         
-        # Execute virtual trade on best signal
+        # Execute simple virtual trade
         best_signal = max(executable_signals, key=lambda x: x.get('conf', 0))
-        result = virtual_engine.execute_virtual_signal(best_signal)
+        trade = simple_virtual.execute_virtual_trade(best_signal)
         
-        if result['executed']:
+        if trade:
+            summary = simple_virtual.get_summary()
             return {
                 "ok": True,
-                "message": f"Virtual trade executed: {best_signal['symbol']} {best_signal['signal']}",
-                "trade": result['trade'],
-                "portfolio_value": result['portfolio_after'],
-                "positions": result['positions_count'],
+                "message": f"Virtual trade: {best_signal['symbol']} {best_signal['signal']} ({best_signal['conf']:.0%})",
+                "trade": trade,
+                "portfolio_balance": summary['balance'],
+                "total_trades": summary['total_trades'],
+                "win_rate": summary['win_rate'],
                 "virtual": True
             }
         else:
-            return {"ok": False, "message": result.get('reason', 'Virtual execution failed')}
+            return {"ok": False, "message": "Virtual trade conditions not met"}
         
     except Exception as e:
         return {"ok": False, "error": str(e)}
@@ -927,17 +929,21 @@ def simulator_competition():
 
 @app.get("/virtual/portfolio")
 def virtual_portfolio():
-    """Get virtual portfolio performance with real market data"""
+    """Get simple virtual portfolio"""
     try:
-        return virtual_engine.portfolio.get_portfolio_summary()
+        return simple_virtual.get_summary()
     except Exception as e:
         return {"error": f"Virtual portfolio failed: {e}"}
 
 @app.get("/virtual/performance")
 def virtual_performance():
-    """Get virtual trading performance comparison"""
+    """Get virtual trading performance"""
     try:
-        return virtual_engine.get_performance_comparison()
+        summary = simple_virtual.get_summary()
+        return {
+            "virtual_performance": summary,
+            "status": "simple_virtual_tracking"
+        }
     except Exception as e:
         return {"error": f"Virtual performance failed: {e}"}
 
@@ -945,12 +951,12 @@ def virtual_performance():
 def virtual_trades():
     """Get virtual executed trades"""
     try:
-        portfolio_summary = virtual_engine.portfolio.get_portfolio_summary()
+        summary = simple_virtual.get_summary()
         return {
-            "virtual_trades": portfolio_summary['recent_trades'],
-            "total_virtual_trades": len(virtual_engine.portfolio.executed_trades),
-            "portfolio_performance": portfolio_summary['performance'],
-            "current_positions": portfolio_summary['positions']
+            "virtual_trades": summary.get('recent_trades', []),
+            "total_virtual_trades": summary.get('total_trades', 0),
+            "portfolio_balance": summary.get('balance', 10000),
+            "win_rate": summary.get('win_rate', 0)
         }
     except Exception as e:
         return {"error": f"Virtual trades failed: {e}"}
