@@ -15,10 +15,10 @@ logger = logging.getLogger(__name__)
 def main():
     """Main startup function"""
     try:
-        logger.info("🚀 Starting Bottie Trading System...")
+        logger.info("🚨 Starting Emergency Stable System...")
         
-        # Import and run the deployment-ready app
-        from deploy_ready import app
+        # Use emergency system that always works
+        from emergency_fix import app
         import uvicorn
         
         port = int(os.getenv("PORT", "8000"))
