@@ -63,30 +63,42 @@ def get_real_data():
         balance = exchange.fetch_balance()
         usdt_balance = balance.get('USDT', {}).get('total', 0)
         
-        # Get real positions
+        # Get ALL real positions - be more aggressive
         positions = {}
         total_position_value = 0
         
+        log_trade(f"🔍 Scanning ALL assets in balance...")
+        
         for asset, amount in balance.get('total', {}).items():
-            if amount > 0.001 and asset != 'USDT':
+            if amount > 0.00001 and asset != 'USDT':  # Much lower threshold
                 try:
-                    symbol = f"{asset}/USDT"
-                    ticker = exchange.fetch_ticker(symbol)
-                    price = ticker['last']
-                    value = amount * price
+                    # Try multiple symbol formats
+                    possible_symbols = [f"{asset}/USDT", f"{asset}USDT"]
                     
-                    if value > 10:  # Only significant positions
-                        positions[symbol] = {
-                            'asset': asset,
-                            'quantity': amount,
-                            'price': price,
-                            'value': value
-                        }
-                        total_position_value += value
-                        log_trade(f"💼 {asset}: {amount:.6f} @ ${price:,.2f} = ${value:.2f}")
+                    for symbol_format in possible_symbols:
+                        try:
+                            ticker = exchange.fetch_ticker(symbol_format)
+                            price = ticker['last']
+                            value = amount * price
+                            
+                            positions[symbol_format] = {
+                                'asset': asset,
+                                'quantity': amount,
+                                'price': price,
+                                'value': value
+                            }
+                            total_position_value += value
+                            log_trade(f"💼 FOUND: {asset} = {amount:.8f} @ ${price:,.4f} = ${value:.2f}")
+                            break  # Found valid symbol format
+                            
+                        except Exception:
+                            continue  # Try next format
+                    
+                    if symbol_format not in positions:
+                        log_trade(f"⚠️ Could not find market for {asset} (amount: {amount:.8f})")
                 
                 except Exception as e:
-                    log_trade(f"⚠️ Error processing {asset}: {e}")
+                    log_trade(f"❌ Error processing {asset}: {e}")
         
         # Update trading data
         trading_data['balance'] = usdt_balance + total_position_value
