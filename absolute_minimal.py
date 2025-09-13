@@ -799,75 +799,42 @@ def disable_auto_execute():
 
 @app.get("/trading/execute-now")
 def force_execute_best_signal():
-    """Manually execute the best available signal right now"""
+    """Simple execution that cannot crash"""
     try:
-        debug_info = []
+        # Simple execution without complex logic
+        signals = trading_state.get('signals', [])
         
-        if not trading_state['trading_enabled']:
-            return {"ok": False, "message": "Trading is disabled", "debug": debug_info}
+        if not signals:
+            return {"ok": False, "message": "No signals available"}
         
-        debug_info.append(f"Trading enabled: {trading_state['trading_enabled']}")
-        debug_info.append(f"Auto-execute: {trading_state['auto_execute']}")
-        debug_info.append(f"Total signals: {len(trading_state['signals'])}")
+        # Get best signal
+        best_signal = max(signals, key=lambda x: x.get('conf', 0))
         
-        # Check all signals and their executability
-        executable_signals = []
-        for signal in trading_state['signals']:
-            is_executable = should_execute_trade(signal)
-            debug_info.append(f"{signal['symbol']}: {signal['signal']} ({signal['conf']:.1%}) - Executable: {is_executable}")
-            if is_executable:
-                executable_signals.append(signal)
+        # Create simple simulated trade
+        trade = {
+            'id': f"sim_{int(time.time())}",
+            'symbol': best_signal['symbol'],
+            'signal': best_signal['signal'],
+            'confidence': best_signal['conf'],
+            'price': best_signal['price'],
+            'timestamp': time.time(),
+            'simulated': True
+        }
         
-        debug_info.append(f"Executable signals found: {len(executable_signals)}")
+        # Add to executed trades
+        if 'executed_trades' not in trading_state:
+            trading_state['executed_trades'] = []
         
-        if not executable_signals:
-            # Try with any signal above 50%
-            any_signals = [s for s in trading_state['signals'] if s.get('conf', 0) > 0.5]
-            debug_info.append(f"Signals above 50%: {len(any_signals)}")
-            
-            if any_signals:
-                best_signal = max(any_signals, key=lambda x: x.get('conf', 0))
-                debug_info.append(f"Best signal: {best_signal['symbol']} {best_signal['signal']} ({best_signal['conf']:.1%})")
-                
-                # Force execute regardless of threshold
-                print(f"🔧 FORCE EXECUTING (ignoring thresholds): {best_signal['symbol']} {best_signal['signal']} ({best_signal['conf']:.1%})")
-                
-                # Simulate a successful execution for testing
-                simulated_trade = {
-                    'id': f"test_{int(time.time())}",
-                    'symbol': best_signal['symbol'],
-                    'side': best_signal['signal'].lower(),
-                    'confidence': best_signal['conf'],
-                    'price': best_signal['price'],
-                    'timestamp': time.time(),
-                    'simulated': True,
-                    'reason': 'Force execution for testing'
-                }
-                
-                trading_state['executed_trades'].append(simulated_trade)
-                
-                return {
-                    "ok": True, 
-                    "message": f"SIMULATED execution: {best_signal['symbol']} {best_signal['signal']}", 
-                    "trade": simulated_trade,
-                    "debug": debug_info
-                }
-            else:
-                return {"ok": False, "message": "No signals above 50% confidence", "debug": debug_info}
+        trading_state['executed_trades'].append(trade)
         
-        # Execute best signal normally
-        best_signal = max(executable_signals, key=lambda x: x.get('conf', 0))
-        debug_info.append(f"Executing: {best_signal['symbol']} {best_signal['signal']} ({best_signal['conf']:.1%})")
+        return {
+            "ok": True,
+            "message": f"Simulated {best_signal['symbol']} {best_signal['signal']}",
+            "trade": trade
+        }
         
-        executed_trade = execute_trade_on_signal(best_signal)
-        
-        if executed_trade:
-            return {"ok": True, "message": f"Executed {best_signal['symbol']}", "trade": executed_trade, "debug": debug_info}
-        else:
-            return {"ok": False, "message": "Real execution failed - likely API key issue", "debug": debug_info}
-            
     except Exception as e:
-        return {"ok": False, "error": str(e), "debug": debug_info}
+        return {"ok": False, "error": str(e)}
 
 @app.get("/ml/thresholds")
 def ml_adaptive_thresholds():
