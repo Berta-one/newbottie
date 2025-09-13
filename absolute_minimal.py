@@ -37,20 +37,21 @@ async def options_handler():
 
 @app.get("/")
 def root():
-    """Serve the SIMPLE dashboard HTML"""
-    try:
-        # Serve the ultra-basic dashboard
-        with open('basic.html', 'r') as f:
-            return HTMLResponse(content=f.read())
-    except Exception as e:
-        # Fallback to API info if HTML not found
-        return {
-            "status": "working_v2", 
-            "balance": 7548.0, 
-            "version": "2025-09-13-updated",
-            "endpoints": ["signals", "trading", "bulletin"],
-            "error": f"Dashboard HTML not found: {e}"
+    """NO HTML - Pure JSON data only"""
+    return {
+        "status": "operational",
+        "balance": 7548.0,
+        "message": "Trading system active - use /data for all info",
+        "endpoints": {
+            "signals": "/signals",
+            "ml": "/ml/status", 
+            "sentiment": "/sentiment",
+            "quantum": "/quantum/analysis",
+            "bulletin": "/bulletin",
+            "start_trading": "POST /trading/start",
+            "stop_trading": "POST /trading/stop"
         }
+    }
 
 @app.get("/api")
 def api_info():
@@ -64,14 +65,37 @@ def api_info():
         "bulletin": "https://bottie-1.onrender.com/bulletin/page"
     }
 
-@app.get("/test")
-def test_page():
-    """Serve test page for debugging trading controls"""
+@app.get("/data")
+def all_data():
+    """Get ALL trading data in one endpoint"""
     try:
-        with open('test_trading_controls.html', 'r') as f:
-            return HTMLResponse(content=f.read())
-    except:
-        return HTMLResponse(content="<h1>Test page not found</h1>")
+        # Get all data
+        signals_data = trading_state['signals']
+        ml_data = generate_ml_analysis()
+        sentiment_data = generate_sentiment_analysis()
+        quantum_data = generate_quantum_analysis()
+        
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "balance": 7548.0,
+            "positions": 11,
+            "signals": {
+                "count": len(signals_data),
+                "data": signals_data,
+                "buy": len([s for s in signals_data if s.get('signal') == 'BUY']),
+                "sell": len([s for s in signals_data if s.get('signal') == 'SELL']),
+                "hold": len([s for s in signals_data if s.get('signal') == 'HOLD'])
+            },
+            "ml": ml_data,
+            "sentiment": sentiment_data,
+            "quantum": quantum_data,
+            "trading_controls": {
+                "start": "POST /trading/start",
+                "stop": "POST /trading/stop"
+            }
+        }
+    except Exception as e:
+        return {"error": f"Data fetch failed: {e}"}
 
 @app.get("/health") 
 def health():
