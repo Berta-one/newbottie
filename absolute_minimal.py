@@ -76,9 +76,9 @@ def calculate_adaptive_threshold_for_pair(symbol: str) -> tuple:
             sell_threshold = 0.20
             readiness = "LEARNING"
         else:
-            # New pair - moderate threshold to allow initial trading
-            buy_threshold = 0.65   # Moderate for new pairs
-            sell_threshold = 0.35
+            # New pair - lower threshold to allow initial learning
+            buy_threshold = 0.60   # Lower for new pairs to start trading
+            sell_threshold = 0.40
             readiness = "NEW"
         
         # Apply adaptive adjustment based on recent performance
@@ -175,10 +175,12 @@ def should_execute_trade(signal) -> bool:
         else:
             meets_threshold = False  # HOLD signals don't execute
         
+        required_threshold = buy_threshold if signal_type in ['BUY'] or signal_type.startswith('SWAP_TO_') else sell_threshold
+        
         if meets_threshold:
-            print(f"✅ {symbol} {signal_type} signal ({confidence:.1%}) EXCEEDS threshold ({buy_threshold if signal_type in ['BUY', 'SWAP_TO_'] else sell_threshold:.1%}) - READY TO EXECUTE")
+            print(f"✅ {symbol} {signal_type} signal ({confidence:.1%}) EXCEEDS threshold ({required_threshold:.1%}) - READY TO EXECUTE")
         else:
-            print(f"⚠️ {symbol} {signal_type} signal ({confidence:.1%}) below threshold ({buy_threshold if signal_type in ['BUY', 'SWAP_TO_'] else sell_threshold:.1%}) - {readiness}")
+            print(f"⚠️ {symbol} {signal_type} signal ({confidence:.1%}) below threshold ({required_threshold:.1%}) - {readiness} - Need {required_threshold - confidence:.1%} more")
         
         return meets_threshold
         
