@@ -18,14 +18,26 @@ class AIMarketBulletin:
         self.bulletin_cache = {}
         self.bulletin_history = []
     
-    def analyze_portfolio_performance(self, positions: Dict, balance: float) -> Dict:
+    def analyze_portfolio_performance(self, positions, balance: float) -> Dict:
         """Analyze portfolio performance"""
         try:
-            if not positions:
+            # Handle case where positions might be int (position count) instead of dict
+            if isinstance(positions, int):
+                return {
+                    'status': 'position_count_only',
+                    'message': f'Detected {positions} positions but no details available',
+                    'total_equity': balance,
+                    'position_count': positions,
+                    'diversification_score': min(10, positions)
+                }
+            
+            if not positions or not isinstance(positions, dict):
                 return {
                     'status': 'no_positions',
                     'message': 'No active positions to analyze',
-                    'total_equity': balance
+                    'total_equity': balance,
+                    'position_count': 0,
+                    'diversification_score': 0
                 }
             
             total_value = balance

@@ -25,9 +25,15 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
+# Handle preflight OPTIONS requests
+@app.options("/trading/start")
+@app.options("/trading/stop")
+async def options_handler():
+    return {"message": "CORS preflight OK"}
 
 @app.get("/")
 def root():
