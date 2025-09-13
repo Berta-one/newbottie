@@ -83,6 +83,53 @@
         <button class="btn stop" onclick="stopTrading()">🔴 STOP TRADING</button>
         <button class="btn" onclick="refreshAll()">🔄 REFRESH ALL</button>
         <button class="btn" onclick="window.open('/bulletin/page', '_blank')">🤖 AI BULLETIN</button>
+        <button class="btn" onclick="toggleEndpoints()">📋 ENDPOINTS</button>
+    </div>
+
+    <div id="endpoints-panel" style="display:none; background:#222; border:1px solid #333; padding:10px; margin:10px 0; font-size:10px;">
+        <h4 style="color:#ff0; margin-bottom:10px;">📋 ALL API ENDPOINTS</h4>
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:10px;">
+            <div>
+                <strong style="color:#0ff;">Core Trading:</strong><br>
+                <a href="/health" target="_blank" style="color:#0f0;">/health</a> - System status<br>
+                <a href="/status" target="_blank" style="color:#0f0;">/status</a> - Portfolio & equity<br>
+                <a href="/signals" target="_blank" style="color:#0f0;">/signals</a> - Trading signals<br>
+                <a href="/positions" target="_blank" style="color:#0f0;">/positions</a> - Current positions<br>
+                <a href="/trades" target="_blank" style="color:#0f0;">/trades</a> - Trade history<br>
+                <a href="/logs" target="_blank" style="color:#0f0;">/logs</a> - System logs<br>
+            </div>
+            <div>
+                <strong style="color:#0ff;">AI & Analysis:</strong><br>
+                <a href="/ml/status" target="_blank" style="color:#0f0;">/ml/status</a> - ML performance<br>
+                <a href="/ml/thresholds" target="_blank" style="color:#0f0;">/ml/thresholds</a> - Adaptive thresholds<br>
+                <a href="/sentiment" target="_blank" style="color:#0f0;">/sentiment</a> - Market sentiment<br>
+                <a href="/quantum/analysis" target="_blank" style="color:#0f0;">/quantum/analysis</a> - Quantum predictions<br>
+                <a href="/bulletin" target="_blank" style="color:#0f0;">/bulletin</a> - AI market bulletin<br>
+                <a href="/bulletin/page" target="_blank" style="color:#0f0;">/bulletin/page</a> - Bulletin HTML<br>
+            </div>
+            <div>
+                <strong style="color:#0ff;">Cross-Pair & Swaps:</strong><br>
+                <a href="/atomic-swaps" target="_blank" style="color:#0f0;">/atomic-swaps</a> - Atomic swap opportunities<br>
+                <a href="/cross-pairs/opportunities" target="_blank" style="color:#0f0;">/cross-pairs/opportunities</a> - Cross-pair trades<br>
+                <a href="/trades/executed" target="_blank" style="color:#0f0;">/trades/executed</a> - Executed trades<br>
+            </div>
+            <div>
+                <strong style="color:#0ff;">Trading Controls:</strong><br>
+                <span style="color:#fa0;">POST /trading/start</span> - Start trading<br>
+                <span style="color:#fa0;">POST /trading/stop</span> - Stop trading<br>
+                <span style="color:#fa0;">POST /trading/auto-execute/enable</span> - Enable auto-execution<br>
+                <span style="color:#fa0;">POST /trading/auto-execute/disable</span> - Disable auto-execution<br>
+            </div>
+            <div>
+                <strong style="color:#0ff;">Data & Debug:</strong><br>
+                <a href="/data" target="_blank" style="color:#0f0;">/data</a> - All data in one call<br>
+                <a href="/api" target="_blank" style="color:#0f0;">/api</a> - API information<br>
+                <a href="/view" target="_blank" style="color:#0f0;">/view</a> - This data viewer<br>
+            </div>
+        </div>
+        <div style="margin-top:10px; color:#888; font-size:9px;">
+            💡 Click any link to open endpoint in new tab | POST endpoints require tools like curl or Postman
+        </div>
     </div>
 
     <div class="grid">
@@ -346,6 +393,15 @@ Positions: ${data.positions}`;
                 loadCrossPairs(),
                 loadHealth()
             ]);
+        }
+
+        function toggleEndpoints() {
+            const panel = document.getElementById('endpoints-panel');
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+            } else {
+                panel.style.display = 'none';
+            }
         }
 
         // Auto-refresh every 30 seconds
