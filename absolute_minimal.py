@@ -583,32 +583,52 @@ def execute_trade_on_signal(signal):
         return None
 
 def check_and_execute_signals():
-    """Check signals and execute trades when conditions are met"""
+    """Check ALL signals (traditional + atomic swaps + cross-pairs) and execute trades"""
     try:
         if not trading_state['trading_enabled'] or not trading_state['auto_execute']:
             return
         
         # Don't execute too frequently
-        if time.time() - trading_state['last_execution_time'] < 300:  # 5 minute cooldown
+        if time.time() - trading_state['last_execution_time'] < 60:  # 1 minute cooldown (faster for atomic swaps)
             return
         
-        # Get high confidence signals
-        high_conf_signals = [s for s in trading_state['signals'] if s.get('conf', 0) > 0.75]
+        # Get ALL signals that meet their adaptive thresholds
+        executable_signals = []
         
-        if not high_conf_signals:
+        for signal in trading_state['signals']:
+            if should_execute_trade(signal):  # Uses ML-adaptive thresholds per pair
+                executable_signals.append(signal)
+        
+        if not executable_signals:
+            print("⚠️ No signals meet their adaptive thresholds")
             return
         
-        print(f"🎯 Found {len(high_conf_signals)} high-confidence signals - checking for execution...")
+        # Categorize signals by type
+        traditional_signals = [s for s in executable_signals if s.get('type') == 'traditional']
+        atomic_swaps = [s for s in executable_signals if s.get('type') == 'atomic_swap']
         
-        # Execute the highest confidence signal
-        best_signal = max(high_conf_signals, key=lambda x: x.get('conf', 0))
+        print(f"🎯 Found {len(executable_signals)} executable signals:")
+        print(f"   • {len(traditional_signals)} traditional (BUY/SELL vs USDT)")
+        print(f"   • {len(atomic_swaps)} atomic swaps (direct asset-to-asset)")
+        
+        # Prioritize atomic swaps (they're often more profitable due to no USDT conversion)
+        if atomic_swaps:
+            best_signal = max(atomic_swaps, key=lambda x: x.get('conf', 0))
+            print(f"🚀 Prioritizing atomic swap: {best_signal['symbol']} {best_signal['signal']} ({best_signal['conf']:.1%})")
+        else:
+            best_signal = max(traditional_signals, key=lambda x: x.get('conf', 0))
+            print(f"🎯 Executing traditional signal: {best_signal['symbol']} {best_signal['signal']} ({best_signal['conf']:.1%})")
         
         executed_trade = execute_trade_on_signal(best_signal)
         
         if executed_trade:
             print(f"✅ Trade executed successfully: {executed_trade['id']}")
+            
+            # Update ML performance for this pair
+            symbol = best_signal['symbol']
+            update_pair_performance(symbol, best_signal['conf'], executed_trade)
         else:
-            print("⚠️ No trade executed - conditions not met")
+            print("⚠️ Trade execution failed - check funds/conditions")
             
     except Exception as e:
         print(f"❌ Signal execution check error: {e}")
@@ -625,8 +645,29 @@ def signals():
     if time.time() - trading_state['last_signal_time'] > 300:  # 5 minutes
         generate_signals()
     
+    # Categorize signals and check executability
+    traditional_signals = [s for s in trading_state['signals'] if s.get('type') == 'traditional']
+    atomic_swaps = [s for s in trading_state['signals'] if s.get('type') == 'atomic_swap']
+    
+    # Check which signals are executable
+    executable_signals = []
+    for signal in trading_state['signals']:
+        if should_execute_trade(signal):
+            signal['executable'] = True
+            executable_signals.append(signal)
+        else:
+            signal['executable'] = False
+    
     return {
         "signals": trading_state['signals'],
+        "signal_breakdown": {
+            "traditional_pairs": len(traditional_signals),
+            "atomic_swaps": len(atomic_swaps),
+            "total_signals": len(trading_state['signals']),
+            "executable_signals": len(executable_signals)
+        },
+        "executable_now": executable_signals,
+        "auto_execute_enabled": trading_state['auto_execute'],
         "status": "active",
         "timestamp": time.time()
     }
