@@ -74,17 +74,105 @@ def log_message(message: str):
         trading_state['logs'] = trading_state['logs'][-50:]
     logger.info(message)
 
+def get_binance_client():
+    """Get authenticated Binance client"""
+    try:
+        import ccxt
+        
+        api_key = get_env('BINANCE_API_KEY', '')
+        api_secret = get_env('BINANCE_API_SECRET', '')
+        
+        if api_key and api_secret:
+            return ccxt.binance({
+                'apiKey': api_key,
+                'secret': api_secret,
+                'sandbox': False,
+                'enableRateLimit': True,
+            })
+        else:
+            # Return public client for prices only
+            return ccxt.binance({
+                'sandbox': False,
+                'enableRateLimit': True,
+            })
+    except Exception as e:
+        log_message(f"❌ Binance client error: {e}")
+        return None
+
+def get_real_positions():
+    """Get REAL positions from your Binance account"""
+    try:
+        client = get_binance_client()
+        if not client:
+            log_message("❌ No Binance client - cannot fetch real positions")
+            return {}
+        
+        # Check if we have API keys for account data
+        api_key = get_env('BINANCE_API_KEY', '')
+        if not api_key:
+            log_message("⚠️ No API keys - cannot fetch real positions")
+            return {}
+        
+        # Get real account balance
+        balance = client.fetch_balance()
+        positions = {}
+        
+        log_message(f"🔍 Checking real Binance account balance...")
+        
+        for asset, data in balance.get('total', {}).items():
+            if data > 0.001:  # Only assets with significant balance
+                try:
+                    if asset == 'USDT':
+                        continue  # Skip USDT itself
+                    
+                    symbol = f"{asset}/USDT"
+                    ticker = client.fetch_ticker(symbol)
+                    current_price = ticker['last']
+                    market_value = data * current_price
+                    
+                    if market_value > 10:  # Only positions worth more than $10
+                        positions[symbol] = {
+                            'quantity': data,
+                            'current_price': current_price,
+                            'market_value': market_value,
+                            'asset': asset,
+                            'source': 'real_binance_account'
+                        }
+                        
+                        log_message(f"💼 REAL POSITION: {data:.6f} {asset} = ${market_value:.2f}")
+                        
+                except Exception as e:
+                    log_message(f"⚠️ Could not process {asset}: {e}")
+                    continue
+        
+        # Update trading state with real positions
+        trading_state['positions'] = positions
+        
+        # Get real USDT balance
+        usdt_balance = balance.get('USDT', {}).get('total', 0)
+        total_position_value = sum(pos['market_value'] for pos in positions.values())
+        total_equity = usdt_balance + total_position_value
+        
+        trading_state['balance'] = {
+            'total_usdt': total_equity,
+            'free_usdt': usdt_balance,
+            'position_value': total_position_value
+        }
+        
+        log_message(f"💰 REAL EQUITY: ${total_equity:.2f} (${usdt_balance:.2f} USDT + ${total_position_value:.2f} positions)")
+        
+        return positions
+        
+    except Exception as e:
+        log_message(f"❌ Error fetching real positions: {e}")
+        return {}
+
 def get_real_market_data():
     """Get REAL market data from Binance API"""
     try:
-        # Import ccxt for real API calls
-        import ccxt
-        
-        # Create Binance client for real data
-        exchange = ccxt.binance({
-            'sandbox': False,
-            'enableRateLimit': True,
-        })
+        client = get_binance_client()
+        if not client:
+            return {}
         
         symbols = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'ADA/USDT']
         real_prices = {}
@@ -110,12 +198,15 @@ def get_real_market_data():
 
 def update_trading_data():
     """Update trading data with REAL API data only"""
-    log_message("🔄 Fetching REAL market data from Binance API...")
+    log_message("🔄 Fetching REAL data from Binance API...")
     
-    # Get real market prices
+    # First, get real positions from your account
+    real_positions = get_real_positions()
+    
+    # Then get real market prices
     real_data = get_real_market_data()
     
-    if real_data:
+    if real_data and real_positions:
         # Update positions with real prices
         for symbol, position in trading_state['positions'].items():
             if symbol in real_data:
@@ -401,19 +492,31 @@ async def background_updater():
 async def startup_event():
     """Initialize the system"""
     try:
-        log_message("🚀 Deployment-ready Trading System starting...")
-        log_message(f"🌐 Mode: {'DEMO' if DEMO_MODE else 'LIVE'}")
+        log_message("🚀 LIVE Trading System starting - REAL DATA ONLY")
+        log_message(f"🌐 Mode: LIVE (Demo disabled)")
         log_message(f"🔧 Port: {PORT}")
         log_message(f"🎯 Trading Enabled: {TRADE_ENABLED}")
+        
+        # Immediately fetch real positions and data
+        log_message("🔍 Fetching your REAL Binance positions...")
+        real_positions = get_real_positions()
+        
+        if real_positions:
+            log_message(f"✅ Found {len(real_positions)} REAL positions")
+            for symbol, pos in real_positions.items():
+                log_message(f"💼 {symbol}: {pos['quantity']:.6f} = ${pos['market_value']:.2f}")
+        else:
+            log_message("⚠️ No positions found - check API keys or account balance")
         
         # Start background updater
         asyncio.create_task(background_updater())
         
-        log_message("✅ System ready for deployment")
-        logger.info(f"🎯 System ready - Dashboard available at http://{HOST}:{PORT}")
+        log_message("✅ LIVE system ready with REAL data")
+        logger.info(f"🎯 LIVE System ready - Dashboard at http://{HOST}:{PORT}")
         
     except Exception as e:
         logger.error(f"Startup error: {e}")
+        log_message(f"❌ Startup error: {e}")
 
 # Main entry point
 if __name__ == "__main__":
