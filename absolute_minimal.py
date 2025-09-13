@@ -533,8 +533,24 @@ def execute_trade_on_signal(signal):
         api_secret = os.getenv('BINANCE_API_SECRET', '')
         
         if not api_key or not api_secret:
-            print("⚠️ No API keys - cannot execute real trades")
-            return None
+            print("⚠️ No API keys - executing SIMULATED trade")
+            # Create simulated trade for testing
+            simulated_trade = {
+                'id': f"sim_{int(time.time())}",
+                'symbol': symbol,
+                'side': signal_type.lower(),
+                'quantity': 0.1,
+                'price': price,
+                'value': 100.0,
+                'confidence': confidence,
+                'timestamp': time.time(),
+                'real_trade': False,
+                'simulated': True
+            }
+            
+            trading_state['executed_trades'].append(simulated_trade)
+            print(f"🧪 SIMULATED TRADE: {signal_type} {symbol} @ ${price:,.2f}")
+            return simulated_trade
         
         # Create authenticated exchange client
         exchange = ccxt.binance({
