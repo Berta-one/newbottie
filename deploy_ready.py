@@ -42,69 +42,27 @@ def get_env(key: str, default: str = "") -> str:
         logger.warning(f"Error getting env var {key}: {e}")
         return default
 
-# Configuration
-DEMO_MODE = get_env('DEMO_MODE', '1') == '1'
+# Configuration - FORCE LIVE MODE ONLY
+DEMO_MODE = False  # ALWAYS LIVE - NO DEMO DATA
 TRADE_ENABLED = get_env('TRADE_ENABLED', '1') == '1'
 PORT = int(get_env('PORT', '8000'))
 HOST = get_env('HOST', '0.0.0.0')
 
-# Global state for trading system
+# CLEAR ALL DEMO DATA - FORCE REAL API DATA ONLY
 trading_state = {
-    'positions': {
-        'BTC/USDT': {'quantity': 0.02, 'avg_price': 45000, 'current_price': 45200, 'pnl': 4.0},
-        'ETH/USDT': {'quantity': 0.5, 'avg_price': 2800, 'current_price': 2820, 'pnl': 10.0}
-    },
-    'balance': {'total_usdt': 9986.0},
-    'trades': [
-        {
-            'id': 'trade_1',
-            'symbol': 'BTC/USDT',
-            'side': 'buy',
-            'quantity': 0.02,
-            'price': 45000,
-            'value': 900,
-            'timestamp': time.time() - 3600,
-            'real_trade': False
-        },
-        {
-            'id': 'trade_2', 
-            'symbol': 'ETH/USDT',
-            'side': 'buy',
-            'quantity': 0.5,
-            'price': 2800,
-            'value': 1400,
-            'timestamp': time.time() - 1800,
-            'real_trade': False
-        }
-    ],
-    'signals': [
-        {
-            'symbol': 'BTC/USDT',
-            'signal': 'HOLD',
-            'confidence': 0.75,
-            'price': 45200,
-            'timestamp': time.time() - 300,
-            'reason': 'Technical analysis - 75% confidence'
-        },
-        {
-            'symbol': 'ETH/USDT', 
-            'signal': 'BUY',
-            'confidence': 0.82,
-            'price': 2820,
-            'timestamp': time.time() - 180,
-            'reason': 'Technical analysis - 82% confidence'
-        }
-    ],
+    'positions': {},  # Will be populated from REAL Binance API
+    'balance': {'total_usdt': 0.0},  # Will be fetched from REAL Binance API
+    'trades': [],  # Only REAL trades will be stored
+    'signals': [],  # Only REAL signals based on current market data
     'logs': [
-        '[18:00:00] 🚀 Deployment-ready Trading System started',
-        '[18:00:01] 💰 DEMO TRADE: BUY 0.02 BTC/USDT @ $45000',
-        '[18:00:30] 💰 DEMO TRADE: BUY 0.5 ETH/USDT @ $2800',
-        '[18:01:00] 🎯 Signal: HOLD BTC/USDT (75%)',
-        '[18:01:30] 🎯 Signal: BUY ETH/USDT (82%)'
+        f'[{datetime.now().strftime("%H:%M:%S")}] 🚀 LIVE Trading System started - REAL DATA ONLY',
+        f'[{datetime.now().strftime("%H:%M:%S")}] 🧹 ALL DEMO DATA CLEARED - Using REAL API',
+        f'[{datetime.now().strftime("%H:%M:%S")}] 🎯 BTC Expected: ~$115,000 (Real Market Price)'
     ],
     'last_update': time.time(),
     'trading_enabled': True,
-    'system_status': 'operational'
+    'system_status': 'live_data_only',
+    'data_source': 'binance_api_real'
 }
 
 def log_message(message: str):
@@ -116,38 +74,93 @@ def log_message(message: str):
         trading_state['logs'] = trading_state['logs'][-50:]
     logger.info(message)
 
+def get_real_market_data():
+    """Get REAL market data from Binance API"""
+    try:
+        # Import ccxt for real API calls
+        import ccxt
+        
+        # Create Binance client for real data
+        exchange = ccxt.binance({
+            'sandbox': False,
+            'enableRateLimit': True,
+        })
+        
+        symbols = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'ADA/USDT']
+        real_prices = {}
+        
+        for symbol in symbols:
+            try:
+                ticker = exchange.fetch_ticker(symbol)
+                real_prices[symbol] = {
+                    'price': ticker['last'],
+                    'change_24h': ticker['percentage'],
+                    'volume': ticker['baseVolume'],
+                    'timestamp': time.time()
+                }
+                log_message(f"📊 REAL {symbol}: ${ticker['last']:,.2f} ({ticker['percentage']:+.1f}%)")
+            except Exception as e:
+                log_message(f"❌ Failed to get real price for {symbol}: {e}")
+        
+        return real_prices
+        
+    except Exception as e:
+        log_message(f"❌ Real market data error: {e}")
+        return {}
+
 def update_trading_data():
-    """Update trading data with realistic changes"""
-    import random
+    """Update trading data with REAL API data only"""
+    log_message("🔄 Fetching REAL market data from Binance API...")
     
-    # Update prices slightly
-    for symbol, position in trading_state['positions'].items():
-        price_change = random.uniform(-0.02, 0.02)  # ±2% change
-        position['current_price'] = position['current_price'] * (1 + price_change)
-        
-        # Update P&L
-        pnl = (position['current_price'] - position['avg_price']) * position['quantity']
-        position['pnl'] = round(pnl, 2)
+    # Get real market prices
+    real_data = get_real_market_data()
     
-    # Add occasional new signal
-    if random.random() < 0.3:  # 30% chance
-        symbols = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT']
-        symbol = random.choice(symbols)
-        signal = random.choice(['BUY', 'SELL', 'HOLD'])
-        confidence = random.uniform(0.6, 0.9)
+    if real_data:
+        # Update positions with real prices
+        for symbol, position in trading_state['positions'].items():
+            if symbol in real_data:
+                real_price = real_data[symbol]['price']
+                position['current_price'] = real_price
+                
+                # Calculate real P&L
+                pnl = (real_price - position['avg_price']) * position['quantity']
+                position['pnl'] = round(pnl, 2)
+                
+                log_message(f"💰 {symbol}: ${real_price:,.2f} | P&L: ${pnl:+.2f}")
         
-        new_signal = {
-            'symbol': symbol,
-            'signal': signal,
-            'confidence': confidence,
-            'price': random.uniform(100, 50000),
-            'timestamp': time.time(),
-            'reason': f'Technical analysis - {confidence:.0%} confidence'
-        }
+        # Generate signals based on real price movements
+        for symbol, data in real_data.items():
+            price_change = data['change_24h']
+            real_price = data['price']
+            
+            # Generate signal based on real market movement
+            if price_change > 5:
+                signal = 'SELL'  # Strong up move, consider selling
+                confidence = min(0.9, 0.6 + (price_change - 5) * 0.02)
+            elif price_change < -5:
+                signal = 'BUY'  # Strong down move, consider buying
+                confidence = min(0.9, 0.6 + abs(price_change + 5) * 0.02)
+            else:
+                signal = 'HOLD'
+                confidence = 0.5 + abs(price_change) * 0.02
+            
+            new_signal = {
+                'symbol': symbol,
+                'signal': signal,
+                'confidence': confidence,
+                'price': real_price,
+                'timestamp': time.time(),
+                'reason': f'Real market analysis - {price_change:+.1f}% 24h change'
+            }
+            
+            trading_state['signals'].append(new_signal)
         
-        trading_state['signals'].append(new_signal)
-        if len(trading_state['signals']) > 20:
-            trading_state['signals'] = trading_state['signals'][-10:]
+        # Keep only recent signals
+        if len(trading_state['signals']) > 50:
+            trading_state['signals'] = trading_state['signals'][-25:]
+    
+    else:
+        log_message("❌ Could not get real market data - check API connection")
     
     trading_state['last_update'] = time.time()
 

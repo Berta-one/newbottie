@@ -54,10 +54,10 @@ def validate_real_data():
     real_btc = get_real_btc_price()
     
     if real_btc:
-        if real_btc < 40000 or real_btc > 80000:
-            logger.warning(f"⚠️ BTC price {real_btc} seems unusual - double check")
+        if real_btc < 100000 or real_btc > 130000:
+            logger.warning(f"⚠️ BTC price {real_btc} seems unusual for current market - expected ~$115K")
         else:
-            logger.info(f"✅ BTC price {real_btc} looks realistic")
+            logger.info(f"✅ BTC price {real_btc} looks realistic for current bull market")
         
         return real_btc
     else:
