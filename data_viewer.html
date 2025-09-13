@@ -179,11 +179,7 @@
 
         async function startTrading() {
             try {
-                const response = await fetch(`${API}/trading/start`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: '{}'
-                });
+                const response = await fetch(`${API}/trading/start`);
                 const data = await response.json();
                 alert(data.ok ? '✅ Trading Started!' : '❌ Failed to start');
             } catch (e) {
@@ -194,16 +190,23 @@
         async function stopTrading() {
             if (confirm('Stop trading?')) {
                 try {
-                    const response = await fetch(`${API}/trading/stop`, {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: '{}'
-                    });
+                    const response = await fetch(`${API}/trading/stop`);
                     const data = await response.json();
                     alert(data.ok ? '🛑 Trading Stopped!' : '❌ Failed to stop');
                 } catch (e) {
                     alert('❌ Stop Error: ' + e.message);
                 }
+            }
+        }
+
+        async function executeNow() {
+            try {
+                const response = await fetch(`${API}/trading/execute-now`);
+                const data = await response.json();
+                alert(data.ok ? `✅ ${data.message}` : `❌ ${data.message}`);
+                refreshAll(); // Refresh to see executed trade
+            } catch (e) {
+                alert('❌ Error: ' + e.message);
             }
         }
 

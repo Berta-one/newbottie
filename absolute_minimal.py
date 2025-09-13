@@ -672,11 +672,14 @@ def logs():
 def trading_status():
     return {"trading_enabled": True, "mode": "MINIMAL"}
 
-@app.post("/trading/start")
+@app.get("/trading/start")
 def start_trading():
-    return {"ok": True, "message": "Started"}
+    trading_state['trading_enabled'] = True
+    trading_state['auto_execute'] = True
+    print("🟢 Trading and auto-execution ENABLED")
+    return {"ok": True, "message": "Trading started with auto-execution"}
 
-@app.post("/trading/stop")
+@app.get("/trading/stop")
 def stop_trading():
     trading_state['trading_enabled'] = False
     trading_state['auto_execute'] = False
@@ -694,21 +697,21 @@ def executed_trades():
         "trading_enabled": trading_state['trading_enabled']
     }
 
-@app.post("/trading/auto-execute/enable")
+@app.get("/trading/auto-execute/enable")
 def enable_auto_execute():
     """Enable automatic trade execution on signals"""
     trading_state['auto_execute'] = True
     print("🤖 Auto-execution ENABLED - will trade on high-confidence signals")
     return {"ok": True, "message": "Auto-execution enabled", "auto_execute": True}
 
-@app.post("/trading/auto-execute/disable") 
+@app.get("/trading/auto-execute/disable") 
 def disable_auto_execute():
     """Disable automatic trade execution"""
     trading_state['auto_execute'] = False
     print("⏸️ Auto-execution DISABLED - signals only, no trades")
     return {"ok": True, "message": "Auto-execution disabled", "auto_execute": False}
 
-@app.post("/trading/execute-now")
+@app.get("/trading/execute-now")
 def force_execute_best_signal():
     """Manually execute the best available signal right now"""
     try:
