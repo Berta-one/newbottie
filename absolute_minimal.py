@@ -5,7 +5,11 @@ import random
 from datetime import datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 import uvicorn
+
+# Import AI bulletin system
+from ai_bulletin import bulletin_generator
 
 # Trading state with real signal generation
 trading_state = {
@@ -263,6 +267,68 @@ def sentiment():
 def quantum():
     return generate_quantum_analysis()
 
+@app.get("/bulletin")
+def get_bulletin():
+    """Get AI-generated market bulletin"""
+    try:
+        bulletin = bulletin_generator.get_latest_bulletin(trading_state)
+        return bulletin
+    except Exception as e:
+        return {"error": f"Bulletin generation failed: {e}"}
+
+@app.get("/bulletin/page")
+def bulletin_page():
+    """Serve AI bulletin as HTML page"""
+    try:
+        bulletin = bulletin_generator.get_latest_bulletin(trading_state)
+        
+        if 'error' in bulletin:
+            content = f"<h1>Error</h1><p>{bulletin['error']}</p>"
+        else:
+            # Convert bulletin to HTML
+            content = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>AI Market Bulletin</title>
+                <meta charset="utf-8">
+                <style>
+                    body {{ font-family: 'Courier New', monospace; background: #0a0a0a; color: #00ff00; padding: 20px; }}
+                    .bulletin {{ max-width: 800px; margin: 0 auto; background: #111; padding: 20px; border: 1px solid #333; }}
+                    .title {{ color: #ffff00; font-size: 24px; margin-bottom: 20px; }}
+                    .section {{ margin-bottom: 15px; }}
+                    .timestamp {{ color: #888; font-size: 12px; }}
+                    pre {{ background: #000; padding: 10px; border: 1px solid #333; white-space: pre-wrap; }}
+                </style>
+            </head>
+            <body>
+                <div class="bulletin">
+                    <div class="title">{bulletin.get('title', 'AI Market Bulletin')}</div>
+                    <div class="timestamp">Generated: {bulletin.get('timestamp', 'Unknown')}</div>
+                    <pre>{bulletin.get('content', 'No content available')}</pre>
+                    <div class="timestamp">Next update: {bulletin.get('next_update', 'Unknown')}</div>
+                </div>
+            </body>
+            </html>
+            """
+        
+        return HTMLResponse(content=content)
+        
+    except Exception as e:
+        return HTMLResponse(content=f"<h1>Error</h1><p>Bulletin page error: {e}</p>")
+
+@app.get("/bulletin/history")
+def bulletin_history():
+    """Get bulletin history"""
+    try:
+        return {
+            "bulletins": bulletin_generator.bulletin_history[-10:],
+            "total": len(bulletin_generator.bulletin_history),
+            "latest": bulletin_generator.bulletin_cache
+        }
+    except Exception as e:
+        return {"error": f"History fetch failed: {e}"}
+
 async def signal_generator():
     """Background signal generation"""
     while True:
@@ -274,14 +340,28 @@ async def signal_generator():
             print(f"❌ Signal generator error: {e}")
             await asyncio.sleep(60)
 
+async def bulletin_generator_task():
+    """Background bulletin generation"""
+    while True:
+        try:
+            print("📰 Generating AI market bulletin...")
+            bulletin_generator.get_latest_bulletin(trading_state)
+            await asyncio.sleep(14400)  # Every 4 hours
+        except Exception as e:
+            print(f"❌ Bulletin generator error: {e}")
+            await asyncio.sleep(3600)  # Retry in 1 hour
+
 @app.on_event("startup")
 async def startup():
-    print("🚀 Starting signal generation...")
+    print("🚀 Starting AI trading system...")
     # Generate initial signals
     generate_signals()
-    # Start background signal generation
+    # Generate initial bulletin
+    bulletin_generator.get_latest_bulletin(trading_state)
+    # Start background tasks
     asyncio.create_task(signal_generator())
-    print("✅ Signal generation active")
+    asyncio.create_task(bulletin_generator_task())
+    print("✅ AI system active - signals + bulletins running")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8000")))
