@@ -364,6 +364,7 @@
                 </div>
                 <button onclick="startTrading()" class="trading-control start-trading">▶️ Start Trading</button>
                 <button onclick="stopTrading()" class="trading-control stop-trading">⏹️ Stop Trading</button>
+                <button onclick="window.open('/bulletin/page', '_blank')" class="trading-control" style="background: linear-gradient(45deg, #64ffda, #4caf50); color: #0f1419;">🤖 AI Bulletin</button>
                 <button onclick="logout()" class="trading-control" style="background: rgba(255, 107, 107, 0.2); color: #ff6b6b;">🚪 Logout</button>
             </div>
         </div>
@@ -762,12 +763,13 @@
         // Trading Controls
         async function startTrading() {
             try {
+                console.log('🔧 Starting trading...');
                 const response = await fetch(`${API_BASE}/trading/start`, { 
                     method: 'POST',
                     headers: { 
-                        'Content-Type': 'application/json',
-                        'X-Dashboard-Password': DASHBOARD_PASSWORD 
-                    }
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})
                 });
                 
                 if (!response.ok) {
@@ -793,12 +795,13 @@
         async function stopTrading() {
             if (confirm('⚠️ Stop trading execution?')) {
                 try {
+                    console.log('🔧 Stopping trading...');
                     const response = await fetch(`${API_BASE}/trading/stop`, {
                         method: 'POST',
                         headers: { 
-                            'Content-Type': 'application/json',
-                            'X-Dashboard-Password': DASHBOARD_PASSWORD 
-                        }
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({})
                     });
                     
                     if (!response.ok) {
