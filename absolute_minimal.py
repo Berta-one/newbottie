@@ -37,7 +37,12 @@ async def options_handler():
 
 @app.get("/")
 def root():
-    return {"status": "working", "balance": 7548.0}
+    return {
+        "status": "working_v2", 
+        "balance": 7548.0, 
+        "version": "2025-09-13-updated",
+        "endpoints": ["signals", "trading", "bulletin"]
+    }
 
 @app.get("/test")
 def test_page():
