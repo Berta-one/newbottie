@@ -37,11 +37,31 @@ async def options_handler():
 
 @app.get("/")
 def root():
+    """Serve the main dashboard HTML"""
+    try:
+        # Serve the dashboard HTML file
+        with open('index.html', 'r') as f:
+            return HTMLResponse(content=f.read())
+    except Exception as e:
+        # Fallback to API info if HTML not found
+        return {
+            "status": "working_v2", 
+            "balance": 7548.0, 
+            "version": "2025-09-13-updated",
+            "endpoints": ["signals", "trading", "bulletin"],
+            "error": f"Dashboard HTML not found: {e}"
+        }
+
+@app.get("/api")
+def api_info():
+    """API information endpoint"""
     return {
         "status": "working_v2", 
         "balance": 7548.0, 
         "version": "2025-09-13-updated",
-        "endpoints": ["signals", "trading", "bulletin"]
+        "endpoints": ["signals", "trading", "bulletin", "health", "status"],
+        "dashboard": "https://bottie-1.onrender.com/",
+        "bulletin": "https://bottie-1.onrender.com/bulletin/page"
     }
 
 @app.get("/test")
