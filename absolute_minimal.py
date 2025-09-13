@@ -8,9 +8,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 import uvicorn
 
-# Import AI bulletin system and adaptive simulators
+# Import AI bulletin system only (adaptive simulators causing crash)
 from ai_bulletin import bulletin_generator
-from adaptive_simulators import adaptive_manager
+# from adaptive_simulators import adaptive_manager  # DISABLED - causing 502
 
 # Trading state with ML-based adaptive thresholds
 trading_state = {
@@ -434,14 +434,8 @@ def generate_signals():
                 quantum_signal = generate_quantum_signal(symbol, price, change_24h)
                 sentiment_signal = 0.6 if change_24h > 0 else 0.4
                 
-                # Use ADAPTIVE weights from simulator performance
-                current_weights = adaptive_manager.current_weights
-                weights = {
-                    "ema": current_weights['traditional'], 
-                    "ml": current_weights['ml'], 
-                    "quantum": current_weights['quantum'], 
-                    "sentiment": current_weights['sentiment']
-                }
+                # Use FIXED weights (adaptive simulators disabled due to 502)
+                weights = {"ema": 0.4, "ml": 0.3, "quantum": 0.2, "sentiment": 0.1}
                 
                 final_prob = (
                     weights["ema"] * ema_signal +
@@ -485,10 +479,8 @@ def generate_signals():
                 new_signals.append(signal_data)
                 print(f"🎯 SIGNAL: {symbol} {signal} ({confidence:.0%}) @ ${price:,.2f}")
                 
-                # Run adaptive simulators on this data
-                simulation_results = adaptive_manager.run_simulations(symbol, price, change_24h)
-                if simulation_results:
-                    print(f"🧪 Simulated trades: {len(simulation_results)} simulators executed")
+                # Adaptive simulators disabled due to 502 error
+                # simulation_results = adaptive_manager.run_simulations(symbol, price, change_24h)
                 
             except Exception as e:
                 print(f"❌ Signal error for {symbol}: {e}")
@@ -505,10 +497,10 @@ def generate_signals():
         
         print(f"✅ Generated {len(all_signals)} UNIFIED signals (traditional + atomic swaps)")
         
-        # Adapt weights every 10 signal generations (every ~hour)
-        if len(trading_state['signals']) % 50 == 0:  # Every 50 signals
-            print("🔄 Checking for weight adaptation...")
-            adaptive_manager.adapt_weights()
+        # Weight adaptation disabled due to 502 error
+        # if len(trading_state['signals']) % 50 == 0:  # Every 50 signals
+        #     print("🔄 Checking for weight adaptation...")
+        #     adaptive_manager.adapt_weights()
         
         return all_signals
         
