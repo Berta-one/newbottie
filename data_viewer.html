@@ -115,6 +115,12 @@
                 <a href="/trades/executed" target="_blank" style="color:#0f0;">/trades/executed</a> - Executed trades<br>
             </div>
             <div>
+                <strong style="color:#0ff;">Virtual Trading:</strong><br>
+                <a href="/virtual/portfolio" target="_blank" style="color:#0f0;">/virtual/portfolio</a> - Virtual portfolio with real P&L<br>
+                <a href="/virtual/performance" target="_blank" style="color:#0f0;">/virtual/performance</a> - Signal type performance comparison<br>
+                <a href="/virtual/trades" target="_blank" style="color:#0f0;">/virtual/trades</a> - Virtual executed trades<br>
+            </div>
+            <div>
                 <strong style="color:#0ff;">Trading Controls:</strong><br>
                 <span style="color:#fa0;">POST /trading/start</span> - Start trading<br>
                 <span style="color:#fa0;">POST /trading/stop</span> - Stop trading<br>
@@ -174,6 +180,16 @@
         <div class="section">
             <h3>🔄 CROSS-PAIRS <span class="timestamp" id="cross-time">--:--</span></h3>
             <div id="cross-data" class="data loading">Loading...</div>
+        </div>
+
+        <div class="section">
+            <h3>💰 VIRTUAL PORTFOLIO <span class="timestamp" id="virtual-time">--:--</span></h3>
+            <div id="virtual-data" class="data loading">Loading...</div>
+        </div>
+
+        <div class="section">
+            <h3>📊 VIRTUAL PERFORMANCE <span class="timestamp" id="performance-time">--:--</span></h3>
+            <div id="performance-data" class="data loading">Loading...</div>
         </div>
 
         <div class="section">
@@ -372,6 +388,71 @@ Timestamp: ${new Date(data.time * 1000).toLocaleString()}`;
             }
         }
 
+        async function loadVirtual() {
+            try {
+                const response = await fetch(`${API}/virtual/portfolio`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    document.getElementById('virtual-data').textContent = 'Error: ' + data.error;
+                    return;
+                }
+                
+                const balance = data.balance || {};
+                const performance = data.performance || {};
+                
+                let output = `Portfolio Value: $${balance.total_portfolio_value?.toLocaleString() || '10,000'}\n`;
+                output += `Cash: $${balance.current_cash?.toLocaleString() || '10,000'}\n`;
+                output += `Positions: $${balance.position_value?.toLocaleString() || '0'}\n`;
+                output += `Total Trades: ${performance.total_trades || 0}\n`;
+                output += `Win Rate: ${performance.win_rate?.toFixed(1) || '0'}%\n`;
+                output += `ROI: ${performance.roi?.toFixed(1) || '0'}%\n\n`;
+                
+                if (data.recent_trades && data.recent_trades.length > 0) {
+                    output += 'Recent Virtual Trades:\n';
+                    data.recent_trades.slice(-3).forEach(trade => {
+                        output += `${trade.symbol}: ${trade.side.toUpperCase()} (${(trade.confidence * 100).toFixed(0)}%)\n`;
+                        output += `  P&L: $${trade.pnl?.toFixed(2) || '0'} (${trade.pnl_percentage?.toFixed(1) || '0'}%)\n`;
+                    });
+                }
+                
+                document.getElementById('virtual-data').textContent = output;
+                document.getElementById('virtual-time').textContent = new Date().toLocaleTimeString();
+            } catch (e) {
+                document.getElementById('virtual-data').textContent = 'Error: ' + e.message;
+            }
+        }
+
+        async function loadPerformance() {
+            try {
+                const response = await fetch(`${API}/virtual/performance`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    document.getElementById('performance-data').textContent = 'Error: ' + data.error;
+                    return;
+                }
+                
+                let output = 'Signal Type Performance:\n\n';
+                
+                if (data.performance_rankings) {
+                    data.performance_rankings.forEach((rank, i) => {
+                        output += `${i + 1}. ${rank.signal_type.toUpperCase()}\n`;
+                        output += `   ROI: ${rank.roi?.toFixed(1) || '0'}%\n`;
+                        output += `   Win Rate: ${rank.win_rate?.toFixed(1) || '0'}%\n`;
+                        output += `   Trades: ${rank.total_trades || 0}\n\n`;
+                    });
+                } else {
+                    output += 'No performance data yet - need more virtual trades';
+                }
+                
+                document.getElementById('performance-data').textContent = output;
+                document.getElementById('performance-time').textContent = new Date().toLocaleTimeString();
+            } catch (e) {
+                document.getElementById('performance-data').textContent = 'Error: ' + e.message;
+            }
+        }
+
         async function loadHealth() {
             try {
                 const response = await fetch(`${API}/health`);
@@ -393,7 +474,7 @@ Positions: ${data.positions}`;
             // Update main stats
             document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
             
-            // Load all sections including atomic swaps
+            // Load all sections including virtual trading
             await Promise.all([
                 loadSignals(),
                 loadML(), 
@@ -402,6 +483,8 @@ Positions: ${data.positions}`;
                 loadStatus(),
                 loadAtomic(),
                 loadCrossPairs(),
+                loadVirtual(),
+                loadPerformance(),
                 loadHealth()
             ]);
         }
