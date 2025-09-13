@@ -760,32 +760,34 @@
             }
         }
 
-        // Trading Controls
+        // Trading Controls - Fixed Version
         async function startTrading() {
             try {
                 console.log('🔧 Starting trading...');
+                console.log('API_BASE:', API_BASE);
+                
                 const response = await fetch(`${API_BASE}/trading/start`, { 
                     method: 'POST',
                     headers: { 
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
                     },
                     body: JSON.stringify({})
                 });
                 
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
+                console.log('Response status:', response.status);
+                console.log('Response ok:', response.ok);
                 
-                // Check if response is JSON
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    const text = await response.text();
-                    throw new Error(`Expected JSON response but got ${contentType}`);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
                 }
                 
                 const data = await response.json();
+                console.log('Response data:', data);
                 alert(data.ok ? '✅ Trading started!' : '❌ Failed to start trading');
                 if (dashboard) dashboard.updateTradingStatus();
+                
             } catch (error) {
                 console.error('Trading start error:', error);
                 alert('❌ Error: ' + error.message);
@@ -796,28 +798,30 @@
             if (confirm('⚠️ Stop trading execution?')) {
                 try {
                     console.log('🔧 Stopping trading...');
+                    console.log('API_BASE:', API_BASE);
+                    
                     const response = await fetch(`${API_BASE}/trading/stop`, {
                         method: 'POST',
                         headers: { 
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
                         },
                         body: JSON.stringify({})
                     });
                     
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                    }
+                    console.log('Stop response status:', response.status);
+                    console.log('Stop response ok:', response.ok);
                     
-                    // Check if response is JSON
-                    const contentType = response.headers.get('content-type');
-                    if (!contentType || !contentType.includes('application/json')) {
-                        const text = await response.text();
-                        throw new Error(`Expected JSON response but got ${contentType}`);
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        throw new Error(`HTTP ${response.status}: ${errorText}`);
                     }
                     
                     const data = await response.json();
+                    console.log('Stop response data:', data);
                     alert(data.ok ? '🛑 Trading stopped!' : '❌ Failed to stop trading');
                     if (dashboard) dashboard.updateTradingStatus();
+                    
                 } catch (error) {
                     console.error('Trading stop error:', error);
                     alert('❌ Error: ' + error.message);
