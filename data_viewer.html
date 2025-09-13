@@ -20,8 +20,10 @@
         }
         .grid { 
             display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); 
-            gap: 15px; 
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); 
+            gap: 20px; 
+            max-width: 1200px;
+            margin: 0 auto;
         }
         .section { 
             border: 1px solid #333; 
@@ -147,54 +149,46 @@
     </div>
 
     <div class="grid">
+        <!-- TRADING SIGNALS & EXECUTION -->
         <div class="section">
-            <h3>🎯 TRADING SIGNALS <span class="timestamp" id="signals-time">--:--</span></h3>
+            <h3>🎯 TRADING & SIGNALS <span class="timestamp" id="signals-time">--:--</span></h3>
             <div id="signals-data" class="data loading">Loading...</div>
-        </div>
-
-        <div class="section">
-            <h3>🧠 ML PERFORMANCE <span class="timestamp" id="ml-time">--:--</span></h3>
-            <div id="ml-data" class="data loading">Loading...</div>
-        </div>
-
-        <div class="section">
-            <h3>📰 SENTIMENT ANALYSIS <span class="timestamp" id="sentiment-time">--:--</span></h3>
-            <div id="sentiment-data" class="data loading">Loading...</div>
-        </div>
-
-        <div class="section">
-            <h3>⚛️ QUANTUM ANALYSIS <span class="timestamp" id="quantum-time">--:--</span></h3>
-            <div id="quantum-data" class="data loading">Loading...</div>
-        </div>
-
-        <div class="section">
-            <h3>💰 PORTFOLIO STATUS <span class="timestamp" id="status-time">--:--</span></h3>
-            <div id="status-data" class="data loading">Loading...</div>
-        </div>
-
-        <div class="section">
-            <h3>⚛️ ATOMIC SWAPS <span class="timestamp" id="atomic-time">--:--</span></h3>
+            <hr style="border:1px solid #333; margin:10px 0;">
+            <h4 style="color:#0ff; font-size:12px;">⚛️ ATOMIC SWAPS & CROSS-PAIRS</h4>
             <div id="atomic-data" class="data loading">Loading...</div>
         </div>
 
+        <!-- AI ANALYSIS SUITE -->
         <div class="section">
-            <h3>🔄 CROSS-PAIRS <span class="timestamp" id="cross-time">--:--</span></h3>
-            <div id="cross-data" class="data loading">Loading...</div>
+            <h3>🧠 AI ANALYSIS SUITE <span class="timestamp" id="ml-time">--:--</span></h3>
+            <div id="ml-data" class="data loading">Loading...</div>
+            <hr style="border:1px solid #333; margin:10px 0;">
+            <h4 style="color:#0ff; font-size:12px;">📰 SENTIMENT</h4>
+            <div id="sentiment-data" class="data loading">Loading...</div>
+            <hr style="border:1px solid #333; margin:10px 0;">
+            <h4 style="color:#0ff; font-size:12px;">⚛️ QUANTUM</h4>
+            <div id="quantum-data" class="data loading">Loading...</div>
         </div>
 
+        <!-- PORTFOLIO & PERFORMANCE -->
         <div class="section">
-            <h3>💰 VIRTUAL PORTFOLIO <span class="timestamp" id="virtual-time">--:--</span></h3>
+            <h3>💰 PORTFOLIO & PERFORMANCE <span class="timestamp" id="status-time">--:--</span></h3>
+            <div id="status-data" class="data loading">Loading...</div>
+            <hr style="border:1px solid #333; margin:10px 0;">
+            <h4 style="color:#0ff; font-size:12px;">💰 VIRTUAL TRADING</h4>
             <div id="virtual-data" class="data loading">Loading...</div>
-        </div>
-
-        <div class="section">
-            <h3>📊 VIRTUAL PERFORMANCE <span class="timestamp" id="performance-time">--:--</span></h3>
+            <hr style="border:1px solid #333; margin:10px 0;">
+            <h4 style="color:#0ff; font-size:12px;">📊 PERFORMANCE COMPARISON</h4>
             <div id="performance-data" class="data loading">Loading...</div>
         </div>
 
+        <!-- SYSTEM STATUS -->
         <div class="section">
-            <h3>🔧 SYSTEM HEALTH <span class="timestamp" id="health-time">--:--</span></h3>
+            <h3>🔧 SYSTEM STATUS <span class="timestamp" id="health-time">--:--</span></h3>
             <div id="health-data" class="data loading">Loading...</div>
+            <hr style="border:1px solid #333; margin:10px 0;">
+            <h4 style="color:#0ff; font-size:12px;">🔄 CROSS-PAIR OPPORTUNITIES</h4>
+            <div id="cross-data" class="data loading">Loading...</div>
         </div>
     </div>
 
