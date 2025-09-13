@@ -65,6 +65,15 @@ def api_info():
         "bulletin": "https://bottie-1.onrender.com/bulletin/page"
     }
 
+@app.get("/view")
+def data_viewer():
+    """Serve the data viewer page"""
+    try:
+        with open('data_viewer.html', 'r') as f:
+            return HTMLResponse(content=f.read())
+    except Exception as e:
+        return {"error": f"Data viewer not found: {e}"}
+
 @app.get("/data")
 def all_data():
     """Get ALL trading data in one endpoint"""
