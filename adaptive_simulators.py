@@ -278,11 +278,11 @@ class AdaptiveWeightManager:
         self.quantum_sim = QuantumSimulator()
         
         self.current_weights = {
-            'traditional': 0.4,
-            'sentiment': 0.1,
-            'quantum': 0.2,
-            'ml': 0.3  # ML weight stays fixed for now
-        }
+            'traditional': 0.4,  # 40%
+            'sentiment': 0.1,     # 10% 
+            'quantum': 0.2,       # 20%
+            'ml': 0.3             # 30%
+        }  # Total = 100%
         
         self.weight_history = []
         self.last_adaptation = time.time()
@@ -333,12 +333,16 @@ class AdaptiveWeightManager:
             total_score = traditional_score + sentiment_score + quantum_score
             
             if total_score > 0:
-                # Redistribute weights based on performance (keep ML at 30%)
-                available_weight = 0.7  # 70% to distribute (30% reserved for ML)
+                # Redistribute ALL weights based on performance (total = 100%)
+                # Include ML in the competition
+                ml_score = 0.6  # Give ML a baseline score
+                total_score_with_ml = traditional_score + sentiment_score + quantum_score + ml_score
                 
-                new_traditional = (traditional_score / total_score) * available_weight
-                new_sentiment = (sentiment_score / total_score) * available_weight
-                new_quantum = (quantum_score / total_score) * available_weight
+                # Calculate new weights (total = 100%)
+                new_traditional = (traditional_score / total_score_with_ml)
+                new_sentiment = (sentiment_score / total_score_with_ml)
+                new_quantum = (quantum_score / total_score_with_ml)
+                new_ml = (ml_score / total_score_with_ml)
                 
                 # Apply gradual adaptation (don't change too quickly)
                 adaptation_rate = 0.1  # 10% adaptation per cycle
@@ -346,14 +350,13 @@ class AdaptiveWeightManager:
                 self.current_weights['traditional'] = self.current_weights['traditional'] * (1 - adaptation_rate) + new_traditional * adaptation_rate
                 self.current_weights['sentiment'] = self.current_weights['sentiment'] * (1 - adaptation_rate) + new_sentiment * adaptation_rate
                 self.current_weights['quantum'] = self.current_weights['quantum'] * (1 - adaptation_rate) + new_quantum * adaptation_rate
+                self.current_weights['ml'] = self.current_weights['ml'] * (1 - adaptation_rate) + new_ml * adaptation_rate
                 
-                # Normalize to ensure total = 0.7 (excluding ML)
-                total_new = self.current_weights['traditional'] + self.current_weights['sentiment'] + self.current_weights['quantum']
-                if total_new > 0:
-                    factor = 0.7 / total_new
-                    self.current_weights['traditional'] *= factor
-                    self.current_weights['sentiment'] *= factor
-                    self.current_weights['quantum'] *= factor
+                # Ensure weights total exactly 100%
+                total_weight = sum(self.current_weights.values())
+                if total_weight > 0:
+                    for key in self.current_weights:
+                        self.current_weights[key] /= total_weight
             
             # Record weight change
             self.weight_history.append({
