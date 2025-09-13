@@ -69,8 +69,11 @@ def get_real_data():
         
         log_trade(f"🔍 Scanning ALL assets in balance...")
         
+        # Assets to exclude from monitoring
+        excluded_assets = ['NFT', 'ETHW', 'NFTUSDT', 'ETHWUSDT']
+        
         for asset, amount in balance.get('total', {}).items():
-            if amount > 0.00001 and asset != 'USDT':  # Much lower threshold
+            if amount > 0.00001 and asset != 'USDT' and asset not in excluded_assets:
                 try:
                     # Try multiple symbol formats
                     possible_symbols = [f"{asset}/USDT", f"{asset}USDT"]
@@ -99,6 +102,11 @@ def get_real_data():
                 
                 except Exception as e:
                     log_trade(f"❌ Error processing {asset}: {e}")
+        
+        # Log excluded assets
+        for asset, amount in balance.get('total', {}).items():
+            if asset in excluded_assets and amount > 0:
+                log_trade(f"🚫 EXCLUDED: {asset} = {amount:.8f} (filtered out)")
         
         # Update trading data
         trading_data['balance'] = usdt_balance + total_position_value
