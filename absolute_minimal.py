@@ -11,12 +11,16 @@ import uvicorn
 # Import AI bulletin system
 from ai_bulletin import bulletin_generator
 
-# Trading state with real signal generation
+# Trading state with real execution
 trading_state = {
     'signals': [],
     'last_signal_time': 0,
     'balance': 7548.0,
-    'positions': 11
+    'positions': 11,
+    'trading_enabled': True,
+    'auto_execute': True,
+    'executed_trades': [],
+    'last_execution_time': 0
 }
 
 app = FastAPI()
@@ -286,6 +290,190 @@ def generate_signals():
         print(f"❌ Signal generation failed: {e}")
         return []
 
+def execute_trade_on_signal(signal):
+    """ACTUALLY EXECUTE TRADES when signals are strong enough"""
+    try:
+        if not trading_state['trading_enabled'] or not trading_state['auto_execute']:
+            return None
+        
+        # Only execute on high confidence signals
+        confidence = signal.get('conf', 0)
+        if confidence < 0.75:  # Require 75% confidence
+            return None
+        
+        import ccxt
+        
+        # Get API credentials
+        api_key = os.getenv('BINANCE_API_KEY', '')
+        api_secret = os.getenv('BINANCE_API_SECRET', '')
+        
+        if not api_key or not api_secret:
+            print("⚠️ No API keys - cannot execute real trades")
+            return None
+        
+        # Create authenticated exchange client
+        exchange = ccxt.binance({
+            'apiKey': api_key,
+            'secret': api_secret,
+            'sandbox': False,  # LIVE TRADING
+            'enableRateLimit': True,
+        })
+        
+        symbol = signal['symbol']
+        signal_type = signal['signal']
+        price = signal['price']
+        
+        # Calculate trade size based on available funds
+        balance = exchange.fetch_balance()
+        
+        if signal_type == 'BUY':
+            # Buy with USDT
+            usdt_available = balance.get('USDT', {}).get('free', 0)
+            if usdt_available < 50:  # Minimum $50 trade
+                print(f"⚠️ Insufficient USDT for {symbol} BUY: ${usdt_available:.2f}")
+                return None
+            
+            # Use 10% of available USDT or $100, whichever is smaller
+            trade_amount_usdt = min(100, usdt_available * 0.1)
+            quantity = trade_amount_usdt / price
+            
+            # Execute BUY order
+            order = exchange.create_market_buy_order(symbol, quantity)
+            
+            trade_record = {
+                'id': order['id'],
+                'symbol': symbol,
+                'side': 'buy',
+                'quantity': quantity,
+                'price': price,
+                'value': trade_amount_usdt,
+                'confidence': confidence,
+                'timestamp': time.time(),
+                'real_trade': True,
+                'order_info': order
+            }
+            
+            print(f"🔥 EXECUTED BUY: {quantity:.6f} {symbol} @ ${price:,.2f} (${trade_amount_usdt:.2f})")
+            
+        elif signal_type == 'SELL':
+            # Sell asset for USDT
+            asset = symbol.split('/')[0]  # Get base asset (BTC from BTC/USDT)
+            asset_available = balance.get(asset, {}).get('free', 0)
+            
+            if asset_available < 0.001:  # Minimum asset amount
+                print(f"⚠️ No {asset} to sell for {symbol}")
+                return None
+            
+            # Sell 25% of available asset
+            quantity = asset_available * 0.25
+            
+            # Execute SELL order
+            order = exchange.create_market_sell_order(symbol, quantity)
+            
+            trade_record = {
+                'id': order['id'],
+                'symbol': symbol,
+                'side': 'sell',
+                'quantity': quantity,
+                'price': price,
+                'value': quantity * price,
+                'confidence': confidence,
+                'timestamp': time.time(),
+                'real_trade': True,
+                'order_info': order
+            }
+            
+            print(f"🔥 EXECUTED SELL: {quantity:.6f} {symbol} @ ${price:,.2f} (${quantity * price:.2f})")
+            
+        elif signal_type.startswith('SWAP_TO_'):
+            # Execute atomic swap
+            to_asset = signal_type.replace('SWAP_TO_', '')
+            from_asset = signal['from_asset']
+            
+            # Get available amount of from_asset
+            from_available = balance.get(from_asset, {}).get('free', 0)
+            
+            if from_available < 0.001:
+                print(f"⚠️ No {from_asset} available for atomic swap")
+                return None
+            
+            # Swap 20% of from_asset to to_asset
+            swap_quantity = from_available * 0.2
+            
+            # Execute atomic swap (sell from_asset, buy to_asset)
+            order = exchange.create_market_sell_order(signal['symbol'], swap_quantity)
+            
+            trade_record = {
+                'id': order['id'],
+                'symbol': signal['symbol'],
+                'side': 'atomic_swap',
+                'quantity': swap_quantity,
+                'price': price,
+                'from_asset': from_asset,
+                'to_asset': to_asset,
+                'confidence': confidence,
+                'timestamp': time.time(),
+                'real_trade': True,
+                'swap_type': 'atomic',
+                'order_info': order
+            }
+            
+            print(f"⚛️ EXECUTED ATOMIC SWAP: {swap_quantity:.6f} {from_asset} → {to_asset} @ {price:.6f}")
+        
+        else:
+            return None  # HOLD signals don't execute
+        
+        # Record the executed trade
+        trading_state['executed_trades'].append(trade_record)
+        trading_state['last_execution_time'] = time.time()
+        
+        # Keep only recent trades
+        if len(trading_state['executed_trades']) > 100:
+            trading_state['executed_trades'] = trading_state['executed_trades'][-50:]
+        
+        return trade_record
+        
+    except Exception as e:
+        print(f"❌ Trade execution error: {e}")
+        return None
+
+def check_and_execute_signals():
+    """Check signals and execute trades when conditions are met"""
+    try:
+        if not trading_state['trading_enabled'] or not trading_state['auto_execute']:
+            return
+        
+        # Don't execute too frequently
+        if time.time() - trading_state['last_execution_time'] < 300:  # 5 minute cooldown
+            return
+        
+        # Get high confidence signals
+        high_conf_signals = [s for s in trading_state['signals'] if s.get('conf', 0) > 0.75]
+        
+        if not high_conf_signals:
+            return
+        
+        print(f"🎯 Found {len(high_conf_signals)} high-confidence signals - checking for execution...")
+        
+        # Execute the highest confidence signal
+        best_signal = max(high_conf_signals, key=lambda x: x.get('conf', 0))
+        
+        executed_trade = execute_trade_on_signal(best_signal)
+        
+        if executed_trade:
+            print(f"✅ Trade executed successfully: {executed_trade['id']}")
+        else:
+            print("⚠️ No trade executed - conditions not met")
+            
+    except Exception as e:
+        print(f"❌ Signal execution check error: {e}")
+
+        return new_signals
+        
+    except Exception as e:
+        print(f"❌ Signal generation failed: {e}")
+        return []
+
 @app.get("/signals")
 def signals():
     # Generate fresh signals if needed
@@ -320,7 +508,35 @@ def start_trading():
 
 @app.post("/trading/stop")
 def stop_trading():
-    return {"ok": True, "message": "Stopped"}
+    trading_state['trading_enabled'] = False
+    trading_state['auto_execute'] = False
+    print("🔴 Trading and auto-execution DISABLED")
+    return {"ok": True, "message": "Trading stopped - no more auto-execution"}
+
+@app.get("/trades/executed")
+def executed_trades():
+    """Get all executed trades"""
+    return {
+        "executed_trades": trading_state['executed_trades'],
+        "total_executed": len(trading_state['executed_trades']),
+        "last_execution": trading_state['last_execution_time'],
+        "auto_execute_enabled": trading_state['auto_execute'],
+        "trading_enabled": trading_state['trading_enabled']
+    }
+
+@app.post("/trading/auto-execute/enable")
+def enable_auto_execute():
+    """Enable automatic trade execution on signals"""
+    trading_state['auto_execute'] = True
+    print("🤖 Auto-execution ENABLED - will trade on high-confidence signals")
+    return {"ok": True, "message": "Auto-execution enabled", "auto_execute": True}
+
+@app.post("/trading/auto-execute/disable") 
+def disable_auto_execute():
+    """Disable automatic trade execution"""
+    trading_state['auto_execute'] = False
+    print("⏸️ Auto-execution DISABLED - signals only, no trades")
+    return {"ok": True, "message": "Auto-execution disabled", "auto_execute": False}
 
 def generate_ml_analysis():
     """Generate real ML performance data"""
@@ -552,11 +768,17 @@ def bulletin_history():
         return {"error": f"History fetch failed: {e}"}
 
 async def signal_generator():
-    """Background signal generation"""
+    """Background signal generation AND trade execution"""
     while True:
         try:
             print("🔄 Generating trading signals...")
             generate_signals()
+            
+            # Check for trade execution opportunities
+            if trading_state['auto_execute']:
+                print("🎯 Checking for trade execution opportunities...")
+                check_and_execute_signals()
+            
             await asyncio.sleep(300)  # Generate every 5 minutes
         except Exception as e:
             print(f"❌ Signal generator error: {e}")
