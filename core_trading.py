@@ -107,16 +107,20 @@ def generate_trading_signals():
     try:
         import ccxt
         
-        # Public client for price data
+        # Create exchange client inside function
         exchange = ccxt.binance({'enableRateLimit': True})
         
         symbols = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT']
         
         for symbol in symbols:
             try:
+                # Get real ticker data
                 ticker = exchange.fetch_ticker(symbol)
                 price = ticker['last']
                 change_24h = ticker.get('percentage', 0)
+                
+                # Log real price data
+                log_trade(f"📊 REAL {symbol}: ${price:,.2f} ({change_24h:+.1f}%)")
                 
                 # Simple signal logic based on real price movement
                 if change_24h > 5:
@@ -139,7 +143,7 @@ def generate_trading_signals():
                 }
                 
                 trading_data['signals'].append(signal_data)
-                log_trade(f"🎯 {symbol}: {signal} ({confidence:.0%}) @ ${price:,.2f} ({change_24h:+.1f}%)")
+                log_trade(f"🎯 {symbol}: {signal} ({confidence:.0%}) @ ${price:,.2f}")
                 
             except Exception as e:
                 log_trade(f"❌ Signal error for {symbol}: {e}")
