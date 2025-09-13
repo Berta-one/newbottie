@@ -8,9 +8,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 import uvicorn
 
-# Import AI bulletin system only (adaptive simulators causing crash)
+# Import AI bulletin system and virtual trading
 from ai_bulletin import bulletin_generator
-# from adaptive_simulators import adaptive_manager  # DISABLED - causing 502
+from virtual_trading import virtual_engine
 
 # Trading state with ML-based adaptive thresholds
 trading_state = {
@@ -799,39 +799,41 @@ def disable_auto_execute():
 
 @app.get("/trading/execute-now")
 def force_execute_best_signal():
-    """Simple execution that cannot crash"""
+    """Execute virtual trade with real market data"""
     try:
-        # Simple execution without complex logic
         signals = trading_state.get('signals', [])
         
         if not signals:
             return {"ok": False, "message": "No signals available"}
         
-        # Get best signal
-        best_signal = max(signals, key=lambda x: x.get('conf', 0))
+        # Get executable signals (using ML thresholds)
+        executable_signals = []
+        for signal in signals:
+            if should_execute_trade(signal):
+                executable_signals.append(signal)
         
-        # Create simple simulated trade
-        trade = {
-            'id': f"sim_{int(time.time())}",
-            'symbol': best_signal['symbol'],
-            'signal': best_signal['signal'],
-            'confidence': best_signal['conf'],
-            'price': best_signal['price'],
-            'timestamp': time.time(),
-            'simulated': True
-        }
+        if not executable_signals:
+            # Use best signal above 60% confidence
+            executable_signals = [s for s in signals if s.get('conf', 0) > 0.6]
         
-        # Add to executed trades
-        if 'executed_trades' not in trading_state:
-            trading_state['executed_trades'] = []
+        if not executable_signals:
+            return {"ok": False, "message": "No signals above 60% confidence"}
         
-        trading_state['executed_trades'].append(trade)
+        # Execute virtual trade on best signal
+        best_signal = max(executable_signals, key=lambda x: x.get('conf', 0))
+        result = virtual_engine.execute_virtual_signal(best_signal)
         
-        return {
-            "ok": True,
-            "message": f"Simulated {best_signal['symbol']} {best_signal['signal']}",
-            "trade": trade
-        }
+        if result['executed']:
+            return {
+                "ok": True,
+                "message": f"Virtual trade executed: {best_signal['symbol']} {best_signal['signal']}",
+                "trade": result['trade'],
+                "portfolio_value": result['portfolio_after'],
+                "positions": result['positions_count'],
+                "virtual": True
+            }
+        else:
+            return {"ok": False, "message": result.get('reason', 'Virtual execution failed')}
         
     except Exception as e:
         return {"ok": False, "error": str(e)}
@@ -922,6 +924,36 @@ def simulator_competition():
         
     except Exception as e:
         return {"error": f"Competition analysis failed: {e}"}
+
+@app.get("/virtual/portfolio")
+def virtual_portfolio():
+    """Get virtual portfolio performance with real market data"""
+    try:
+        return virtual_engine.portfolio.get_portfolio_summary()
+    except Exception as e:
+        return {"error": f"Virtual portfolio failed: {e}"}
+
+@app.get("/virtual/performance")
+def virtual_performance():
+    """Get virtual trading performance comparison"""
+    try:
+        return virtual_engine.get_performance_comparison()
+    except Exception as e:
+        return {"error": f"Virtual performance failed: {e}"}
+
+@app.get("/virtual/trades")
+def virtual_trades():
+    """Get virtual executed trades"""
+    try:
+        portfolio_summary = virtual_engine.portfolio.get_portfolio_summary()
+        return {
+            "virtual_trades": portfolio_summary['recent_trades'],
+            "total_virtual_trades": len(virtual_engine.portfolio.executed_trades),
+            "portfolio_performance": portfolio_summary['performance'],
+            "current_positions": portfolio_summary['positions']
+        }
+    except Exception as e:
+        return {"error": f"Virtual trades failed: {e}"}
 
 def generate_ml_analysis():
     """Generate real ML performance data"""
