@@ -39,8 +39,8 @@ async def options_handler():
 def root():
     """Serve the SIMPLE dashboard HTML"""
     try:
-        # Serve the clean, simple dashboard
-        with open('simple_dashboard.html', 'r') as f:
+        # Serve the ultra-basic dashboard
+        with open('basic.html', 'r') as f:
             return HTMLResponse(content=f.read())
     except Exception as e:
         # Fallback to API info if HTML not found
