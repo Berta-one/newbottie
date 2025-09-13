@@ -1,1 +1,1 @@
-web: python3 bulletproof.py
+web: python3 simple.py

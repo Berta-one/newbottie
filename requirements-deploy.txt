@@ -1,18 +1,2 @@
-# Minimal requirements for deployment
 fastapi==0.116.1
 uvicorn[standard]==0.35.0
-python-dotenv==1.0.1
-psutil==5.9.8
-
-# Trading libraries (optional - only if using real API)
-ccxt==4.3.74
-numpy==2.3.2
-pandas==2.3.2
-
-# Security
-passlib[bcrypt]==1.7.4
-PyJWT==2.8.0
-
-# HTTP client
-httpx==0.28.1
-requests==2.32.5
