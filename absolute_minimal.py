@@ -37,10 +37,10 @@ async def options_handler():
 
 @app.get("/")
 def root():
-    """Serve the main dashboard HTML"""
+    """Serve the SIMPLE dashboard HTML"""
     try:
-        # Serve the dashboard HTML file
-        with open('index.html', 'r') as f:
+        # Serve the clean, simple dashboard
+        with open('simple_dashboard.html', 'r') as f:
             return HTMLResponse(content=f.read())
     except Exception as e:
         # Fallback to API info if HTML not found

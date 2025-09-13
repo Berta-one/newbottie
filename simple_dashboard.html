@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bottie Trading - Simple Dashboard</title>
+    <meta charset="utf-8">
+    <style>
+        body { 
+            font-family: monospace; 
+            background: #000; 
+            color: #0f0; 
+            padding: 20px; 
+            margin: 0;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { 
+            text-align: center; 
+            border-bottom: 2px solid #0f0; 
+            padding-bottom: 10px; 
+            margin-bottom: 20px; 
+        }
+        .section { 
+            margin-bottom: 20px; 
+            border: 1px solid #333; 
+            padding: 15px; 
+            background: #111; 
+        }
+        .section h3 { 
+            color: #ff0; 
+            margin: 0 0 10px 0; 
+            border-bottom: 1px solid #333; 
+            padding-bottom: 5px; 
+        }
+        .controls { 
+            text-align: center; 
+            margin: 20px 0; 
+        }
+        .btn { 
+            background: #333; 
+            color: #0f0; 
+            border: 1px solid #0f0; 
+            padding: 10px 20px; 
+            margin: 5px; 
+            cursor: pointer; 
+            font-family: monospace; 
+        }
+        .btn:hover { background: #0f0; color: #000; }
+        .btn.start { background: #060; }
+        .btn.stop { background: #600; }
+        .data { font-size: 12px; line-height: 1.4; }
+        .signal { margin: 5px 0; }
+        .buy { color: #0f0; }
+        .sell { color: #f00; }
+        .hold { color: #fa0; }
+        .price { color: #0ff; }
+        .refresh { float: right; font-size: 10px; color: #888; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 BOTTIE TRADING SYSTEM</h1>
+            <div>Balance: $<span id="balance">7548</span> | Positions: <span id="positions">11</span></div>
+        </div>
+
+        <div class="controls">
+            <button class="btn start" onclick="startTrading()">START TRADING</button>
+            <button class="btn stop" onclick="stopTrading()">STOP TRADING</button>
+            <button class="btn" onclick="refreshAll()">REFRESH ALL</button>
+            <button class="btn" onclick="window.open('/bulletin/page')">AI BULLETIN</button>
+        </div>
+
+        <div class="section">
+            <h3>🎯 TRADING SIGNALS <span class="refresh" id="signals-time">--:--</span></h3>
+            <div id="signals" class="data">Loading...</div>
+        </div>
+
+        <div class="section">
+            <h3>🧠 ML PERFORMANCE <span class="refresh" id="ml-time">--:--</span></h3>
+            <div id="ml" class="data">Loading...</div>
+        </div>
+
+        <div class="section">
+            <h3>📰 SENTIMENT <span class="refresh" id="sentiment-time">--:--</span></h3>
+            <div id="sentiment" class="data">Loading...</div>
+        </div>
+
+        <div class="section">
+            <h3>⚛️ QUANTUM <span class="refresh" id="quantum-time">--:--</span></h3>
+            <div id="quantum" class="data">Loading...</div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://bottie-1.onrender.com';
+
+        async function startTrading() {
+            try {
+                const response = await fetch(`${API_BASE}/trading/start`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: '{}'
+                });
+                const data = await response.json();
+                alert(data.ok ? '✅ Trading Started' : '❌ Failed');
+            } catch (e) {
+                alert('❌ Error: ' + e.message);
+            }
+        }
+
+        async function stopTrading() {
+            if (confirm('Stop trading?')) {
+                try {
+                    const response = await fetch(`${API_BASE}/trading/stop`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: '{}'
+                    });
+                    const data = await response.json();
+                    alert(data.ok ? '🛑 Trading Stopped' : '❌ Failed');
+                } catch (e) {
+                    alert('❌ Error: ' + e.message);
+                }
+            }
+        }
+
+        async function loadSignals() {
+            try {
+                const response = await fetch(`${API_BASE}/signals`);
+                const data = await response.json();
+                
+                let html = '';
+                data.signals.forEach(s => {
+                    const cls = s.signal.toLowerCase();
+                    html += `<div class="signal ${cls}">
+                        ${s.symbol}: <strong>${s.signal}</strong> (${(s.conf * 100).toFixed(0)}%) 
+                        @ <span class="price">$${s.price.toLocaleString()}</span>
+                    </div>`;
+                });
+                
+                document.getElementById('signals').innerHTML = html || 'No signals';
+                document.getElementById('signals-time').textContent = new Date().toLocaleTimeString();
+            } catch (e) {
+                document.getElementById('signals').innerHTML = 'Error: ' + e.message;
+            }
+        }
+
+        async function loadML() {
+            try {
+                const response = await fetch(`${API_BASE}/ml/status`);
+                const data = await response.json();
+                
+                document.getElementById('ml').innerHTML = `
+                    Accuracy: ${(data.accuracy * 100).toFixed(1)}%<br>
+                    Confidence: ${(data.confidence * 100).toFixed(1)}%<br>
+                    Predictions: ${data.predictions_count}<br>
+                    Status: ${data.model_status}
+                `;
+                document.getElementById('ml-time').textContent = new Date().toLocaleTimeString();
+            } catch (e) {
+                document.getElementById('ml').innerHTML = 'Error: ' + e.message;
+            }
+        }
+
+        async function loadSentiment() {
+            try {
+                const response = await fetch(`${API_BASE}/sentiment`);
+                const data = await response.json();
+                
+                let html = `Overall: ${data.overall.toUpperCase()}<br>`;
+                Object.entries(data.symbols).forEach(([symbol, info]) => {
+                    html += `${symbol}: ${info.sentiment.toUpperCase()} (${info.score})<br>`;
+                });
+                
+                document.getElementById('sentiment').innerHTML = html;
+                document.getElementById('sentiment-time').textContent = new Date().toLocaleTimeString();
+            } catch (e) {
+                document.getElementById('sentiment').innerHTML = 'Error: ' + e.message;
+            }
+        }
+
+        async function loadQuantum() {
+            try {
+                const response = await fetch(`${API_BASE}/quantum/analysis`);
+                const data = await response.json();
+                
+                let html = `Status: ${data.status.toUpperCase()}<br>`;
+                data.predictions.slice(0, 3).forEach(p => {
+                    html += `${p.symbol}: ${p.prediction} (${(p.confidence * 100).toFixed(0)}%)<br>`;
+                });
+                
+                document.getElementById('quantum').innerHTML = html;
+                document.getElementById('quantum-time').textContent = new Date().toLocaleTimeString();
+            } catch (e) {
+                document.getElementById('quantum').innerHTML = 'Error: ' + e.message;
+            }
+        }
+
+        async function refreshAll() {
+            document.getElementById('signals').innerHTML = 'Loading...';
+            document.getElementById('ml').innerHTML = 'Loading...';
+            document.getElementById('sentiment').innerHTML = 'Loading...';
+            document.getElementById('quantum').innerHTML = 'Loading...';
+            
+            await Promise.all([loadSignals(), loadML(), loadSentiment(), loadQuantum()]);
+        }
+
+        // Auto-refresh every 30 seconds
+        setInterval(refreshAll, 30000);
+        
+        // Load on startup
+        refreshAll();
+    </script>
+</body>
+</html>
