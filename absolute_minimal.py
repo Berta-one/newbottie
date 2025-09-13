@@ -11,7 +11,7 @@ import uvicorn
 # Import AI bulletin system
 from ai_bulletin import bulletin_generator
 
-# Trading state with real execution
+# Trading state with ML-based adaptive thresholds
 trading_state = {
     'signals': [],
     'last_signal_time': 0,
@@ -20,8 +20,16 @@ trading_state = {
     'trading_enabled': True,
     'auto_execute': True,
     'executed_trades': [],
-    'last_execution_time': 0
+    'last_execution_time': 0,
+    'pair_performance': {},  # Track per-pair ML performance
+    'adaptive_thresholds': {}  # Per-pair dynamic thresholds
 }
+
+# ML-based trading configuration
+TRADE_CONF_ADAPT = True
+TRADE_BASE_MIN_CONF = 0.55
+TRADE_CONF_FLOOR = 0.50
+TRADE_CONF_CEIL = 0.80
 
 app = FastAPI()
 
@@ -38,6 +46,144 @@ app.add_middleware(
 @app.options("/trading/stop")
 async def options_handler():
     return {"message": "CORS preflight OK"}
+
+def calculate_adaptive_threshold_for_pair(symbol: str) -> tuple:
+    """Calculate dynamic buy/sell thresholds for specific trading pair based on ML performance"""
+    try:
+        pair_perf = trading_state['pair_performance'].get(symbol, {})
+        
+        # Get recent performance metrics for this pair
+        win_rate = pair_perf.get('win_rate', 0.5)
+        confidence_avg = pair_perf.get('avg_confidence', 0.5)
+        total_trades = pair_perf.get('total_trades', 0)
+        recent_accuracy = pair_perf.get('recent_accuracy', 0.5)
+        
+        # Adaptive threshold logic based on pair performance
+        if total_trades >= 20 and win_rate > 0.7 and confidence_avg > 0.8:
+            # High performing pair - more aggressive thresholds
+            buy_threshold = 0.55   # More aggressive
+            sell_threshold = 0.45
+            readiness = "AUTONOMOUS"
+        elif total_trades >= 10 and win_rate > 0.6 and confidence_avg > 0.6:
+            # Medium performing pair - balanced thresholds
+            buy_threshold = 0.65   # Balanced
+            sell_threshold = 0.35
+            readiness = "READY"
+        elif total_trades >= 5:
+            # Low confidence pair - conservative thresholds
+            buy_threshold = 0.80   # Very conservative
+            sell_threshold = 0.20
+            readiness = "LEARNING"
+        else:
+            # New pair - very conservative
+            buy_threshold = 0.85   # Extremely conservative
+            sell_threshold = 0.15
+            readiness = "NEW"
+        
+        # Apply adaptive adjustment based on recent performance
+        if TRADE_CONF_ADAPT and recent_accuracy > 0:
+            adjustment = (recent_accuracy - 0.5) * 0.1  # Max ±5% adjustment
+            buy_threshold = max(TRADE_CONF_FLOOR, min(TRADE_CONF_CEIL, buy_threshold + adjustment))
+            sell_threshold = max(0.1, min(0.49, sell_threshold - adjustment))
+        
+        # Store calculated thresholds
+        trading_state['adaptive_thresholds'][symbol] = {
+            'buy_threshold': buy_threshold,
+            'sell_threshold': sell_threshold,
+            'readiness': readiness,
+            'win_rate': win_rate,
+            'confidence_avg': confidence_avg,
+            'total_trades': total_trades,
+            'last_calculated': time.time()
+        }
+        
+        return buy_threshold, sell_threshold, readiness
+        
+    except Exception as e:
+        print(f"❌ Threshold calculation error for {symbol}: {e}")
+        return 0.75, 0.25, "ERROR"
+
+def update_pair_performance(symbol: str, signal_conf: float, trade_result: dict = None):
+    """Update ML performance tracking for a specific pair"""
+    try:
+        if symbol not in trading_state['pair_performance']:
+            trading_state['pair_performance'][symbol] = {
+                'total_trades': 0,
+                'winning_trades': 0,
+                'total_confidence': 0.0,
+                'confidence_history': [],
+                'win_rate': 0.0,
+                'avg_confidence': 0.0,
+                'recent_accuracy': 0.5,
+                'last_updated': time.time()
+            }
+        
+        pair_data = trading_state['pair_performance'][symbol]
+        
+        # Update confidence tracking
+        pair_data['confidence_history'].append(signal_conf)
+        pair_data['total_confidence'] += signal_conf
+        
+        # Keep only recent confidence history (last 100 signals)
+        if len(pair_data['confidence_history']) > 100:
+            pair_data['confidence_history'] = pair_data['confidence_history'][-50:]
+        
+        # Update average confidence
+        pair_data['avg_confidence'] = sum(pair_data['confidence_history']) / len(pair_data['confidence_history'])
+        
+        # Update trade results if provided
+        if trade_result:
+            pair_data['total_trades'] += 1
+            if trade_result.get('profitable', False):
+                pair_data['winning_trades'] += 1
+            
+            # Calculate win rate
+            pair_data['win_rate'] = pair_data['winning_trades'] / pair_data['total_trades'] if pair_data['total_trades'] > 0 else 0
+            
+            # Update recent accuracy (simplified)
+            pair_data['recent_accuracy'] = pair_data['win_rate']
+        
+        pair_data['last_updated'] = time.time()
+        
+        print(f"📊 {symbol} Performance: {pair_data['win_rate']:.1%} win rate, {pair_data['avg_confidence']:.1%} avg confidence, {pair_data['total_trades']} trades")
+        
+    except Exception as e:
+        print(f"❌ Performance update error for {symbol}: {e}")
+
+def should_execute_trade(signal) -> bool:
+    """Determine if trade should be executed based on ML-adaptive thresholds"""
+    try:
+        symbol = signal['symbol']
+        signal_type = signal['signal']
+        confidence = signal.get('conf', 0)
+        
+        # Calculate adaptive thresholds for this pair
+        buy_threshold, sell_threshold, readiness = calculate_adaptive_threshold_for_pair(symbol)
+        
+        # Update performance tracking
+        update_pair_performance(symbol, confidence)
+        
+        # Check if signal meets adaptive threshold
+        if signal_type == 'BUY':
+            meets_threshold = confidence >= buy_threshold
+        elif signal_type == 'SELL':
+            meets_threshold = confidence >= sell_threshold
+        elif signal_type.startswith('SWAP_TO_'):
+            # For atomic swaps, use buy threshold
+            meets_threshold = confidence >= buy_threshold
+        else:
+            meets_threshold = False  # HOLD signals don't execute
+        
+        if meets_threshold:
+            print(f"✅ {symbol} {signal_type} signal ({confidence:.1%}) EXCEEDS threshold ({buy_threshold if signal_type in ['BUY', 'SWAP_TO_'] else sell_threshold:.1%}) - READY TO EXECUTE")
+        else:
+            print(f"⚠️ {symbol} {signal_type} signal ({confidence:.1%}) below threshold ({buy_threshold if signal_type in ['BUY', 'SWAP_TO_'] else sell_threshold:.1%}) - {readiness}")
+        
+        return meets_threshold
+        
+    except Exception as e:
+        print(f"❌ Threshold check error: {e}")
+        return False
 
 @app.get("/")
 def root():
@@ -291,14 +437,13 @@ def generate_signals():
         return []
 
 def execute_trade_on_signal(signal):
-    """ACTUALLY EXECUTE TRADES when signals are strong enough"""
+    """ACTUALLY EXECUTE TRADES using ML-adaptive thresholds per pair"""
     try:
         if not trading_state['trading_enabled'] or not trading_state['auto_execute']:
             return None
         
-        # Only execute on high confidence signals
-        confidence = signal.get('conf', 0)
-        if confidence < 0.75:  # Require 75% confidence
+        # Check if signal meets ML-adaptive threshold for this specific pair
+        if not should_execute_trade(signal):
             return None
         
         import ccxt
@@ -537,6 +682,45 @@ def disable_auto_execute():
     trading_state['auto_execute'] = False
     print("⏸️ Auto-execution DISABLED - signals only, no trades")
     return {"ok": True, "message": "Auto-execution disabled", "auto_execute": False}
+
+@app.get("/ml/thresholds")
+def ml_adaptive_thresholds():
+    """Get ML-based adaptive thresholds for each trading pair"""
+    try:
+        threshold_summary = {}
+        
+        # Get thresholds for all pairs that have signals
+        symbols_with_signals = list(set(s['symbol'] for s in trading_state['signals']))
+        
+        for symbol in symbols_with_signals:
+            buy_threshold, sell_threshold, readiness = calculate_adaptive_threshold_for_pair(symbol)
+            pair_perf = trading_state['pair_performance'].get(symbol, {})
+            
+            threshold_summary[symbol] = {
+                'buy_threshold': round(buy_threshold, 3),
+                'sell_threshold': round(sell_threshold, 3),
+                'readiness_level': readiness,
+                'win_rate': round(pair_perf.get('win_rate', 0), 3),
+                'avg_confidence': round(pair_perf.get('avg_confidence', 0), 3),
+                'total_trades': pair_perf.get('total_trades', 0),
+                'autonomous_ready': readiness == "AUTONOMOUS"
+            }
+        
+        return {
+            "adaptive_thresholds": threshold_summary,
+            "total_pairs": len(threshold_summary),
+            "autonomous_pairs": len([t for t in threshold_summary.values() if t['autonomous_ready']]),
+            "ml_config": {
+                "base_min_conf": TRADE_BASE_MIN_CONF,
+                "conf_floor": TRADE_CONF_FLOOR,
+                "conf_ceil": TRADE_CONF_CEIL,
+                "adaptation_enabled": TRADE_CONF_ADAPT
+            },
+            "timestamp": time.time()
+        }
+        
+    except Exception as e:
+        return {"error": f"Threshold analysis failed: {e}"}
 
 def generate_ml_analysis():
     """Generate real ML performance data"""
