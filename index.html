@@ -764,7 +764,10 @@
             try {
                 const response = await fetch(`${API_BASE}/trading/start`, { 
                     method: 'POST',
-                    headers: { 'X-Dashboard-Password': DASHBOARD_PASSWORD }
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-Dashboard-Password': DASHBOARD_PASSWORD 
+                    }
                 });
                 
                 if (!response.ok) {
@@ -792,7 +795,10 @@
                 try {
                     const response = await fetch(`${API_BASE}/trading/stop`, {
                         method: 'POST',
-                        headers: { 'X-Dashboard-Password': DASHBOARD_PASSWORD }
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'X-Dashboard-Password': DASHBOARD_PASSWORD 
+                        }
                     });
                     
                     if (!response.ok) {
