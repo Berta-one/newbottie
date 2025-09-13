@@ -1,1 +1,1 @@
-web: python3 core_trading.py
+web: python3 bulletproof_final.py
