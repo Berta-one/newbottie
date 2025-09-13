@@ -75,9 +75,9 @@ def calculate_adaptive_threshold_for_pair(symbol: str) -> tuple:
             sell_threshold = 0.20
             readiness = "LEARNING"
         else:
-            # New pair - very conservative
-            buy_threshold = 0.85   # Extremely conservative
-            sell_threshold = 0.15
+            # New pair - moderate threshold to allow initial trading
+            buy_threshold = 0.65   # Moderate for new pairs
+            sell_threshold = 0.35
             readiness = "NEW"
         
         # Apply adaptive adjustment based on recent performance
@@ -707,6 +707,46 @@ def disable_auto_execute():
     trading_state['auto_execute'] = False
     print("⏸️ Auto-execution DISABLED - signals only, no trades")
     return {"ok": True, "message": "Auto-execution disabled", "auto_execute": False}
+
+@app.post("/trading/execute-now")
+def force_execute_best_signal():
+    """Manually execute the best available signal right now"""
+    try:
+        if not trading_state['trading_enabled']:
+            return {"ok": False, "message": "Trading is disabled"}
+        
+        # Get all signals that meet thresholds
+        executable_signals = [s for s in trading_state['signals'] if should_execute_trade(s)]
+        
+        if not executable_signals:
+            # If no signals meet threshold, lower the bar temporarily
+            print("⚠️ No signals meet thresholds - trying with lower requirements...")
+            relaxed_signals = [s for s in trading_state['signals'] if s.get('conf', 0) > 0.6]
+            
+            if relaxed_signals:
+                best_signal = max(relaxed_signals, key=lambda x: x.get('conf', 0))
+                print(f"🔧 FORCE EXECUTING: {best_signal['symbol']} {best_signal['signal']} ({best_signal['conf']:.1%})")
+                
+                executed_trade = execute_trade_on_signal(best_signal)
+                
+                if executed_trade:
+                    return {"ok": True, "message": f"Force executed {best_signal['symbol']}", "trade": executed_trade}
+                else:
+                    return {"ok": False, "message": "Force execution failed"}
+            else:
+                return {"ok": False, "message": "No signals above 60% confidence"}
+        
+        # Execute best signal normally
+        best_signal = max(executable_signals, key=lambda x: x.get('conf', 0))
+        executed_trade = execute_trade_on_signal(best_signal)
+        
+        if executed_trade:
+            return {"ok": True, "message": f"Executed {best_signal['symbol']}", "trade": executed_trade}
+        else:
+            return {"ok": False, "message": "Execution failed"}
+            
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 @app.get("/ml/thresholds")
 def ml_adaptive_thresholds():
