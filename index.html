@@ -364,6 +364,7 @@
                 </div>
                 <button onclick="startTrading()" class="trading-control start-trading">▶️ Start Trading</button>
                 <button onclick="stopTrading()" class="trading-control stop-trading">⏹️ Stop Trading</button>
+                <button onclick="testTradingDirect()" class="trading-control" style="background: #ffa726; color: #000;">🔧 Test Direct</button>
                 <button onclick="window.open('/bulletin/page', '_blank')" class="trading-control" style="background: linear-gradient(45deg, #64ffda, #4caf50); color: #0f1419;">🤖 AI Bulletin</button>
                 <button onclick="logout()" class="trading-control" style="background: rgba(255, 107, 107, 0.2); color: #ff6b6b;">🚪 Logout</button>
             </div>
@@ -826,6 +827,36 @@
                     console.error('Trading stop error:', error);
                     alert('❌ Error: ' + error.message);
                 }
+            }
+        }
+
+        // Direct trading test function
+        async function testTradingDirect() {
+            try {
+                console.log('🔧 Testing direct API call...');
+                
+                // Use XMLHttpRequest as fallback
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', `${API_BASE}/trading/start`, true);
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4) {
+                        console.log('XHR Status:', xhr.status);
+                        console.log('XHR Response:', xhr.responseText);
+                        if (xhr.status === 200) {
+                            alert('✅ Direct API call successful!');
+                        } else {
+                            alert(`❌ Direct API failed: ${xhr.status} - ${xhr.responseText}`);
+                        }
+                    }
+                };
+                
+                xhr.send('{}');
+                
+            } catch (error) {
+                console.error('Direct test error:', error);
+                alert('❌ Direct test error: ' + error.message);
             }
         }
 
