@@ -8,8 +8,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 import uvicorn
 
-# Import AI bulletin system
+# Import AI bulletin system and adaptive simulators
 from ai_bulletin import bulletin_generator
+from adaptive_simulators import adaptive_manager
 
 # Trading state with ML-based adaptive thresholds
 trading_state = {
@@ -431,8 +432,14 @@ def generate_signals():
                 quantum_signal = generate_quantum_signal(symbol, price, change_24h)
                 sentiment_signal = 0.6 if change_24h > 0 else 0.4
                 
-                # Weighted combination (from your original system)
-                weights = {"ema": 0.4, "ml": 0.3, "quantum": 0.2, "sentiment": 0.1}
+                # Use ADAPTIVE weights from simulator performance
+                current_weights = adaptive_manager.current_weights
+                weights = {
+                    "ema": current_weights['traditional'], 
+                    "ml": current_weights['ml'], 
+                    "quantum": current_weights['quantum'], 
+                    "sentiment": current_weights['sentiment']
+                }
                 
                 final_prob = (
                     weights["ema"] * ema_signal +
@@ -476,6 +483,11 @@ def generate_signals():
                 new_signals.append(signal_data)
                 print(f"🎯 SIGNAL: {symbol} {signal} ({confidence:.0%}) @ ${price:,.2f}")
                 
+                # Run adaptive simulators on this data
+                simulation_results = adaptive_manager.run_simulations(symbol, price, change_24h)
+                if simulation_results:
+                    print(f"🧪 Simulated trades: {len(simulation_results)} simulators executed")
+                
             except Exception as e:
                 print(f"❌ Signal error for {symbol}: {e}")
         
@@ -490,6 +502,11 @@ def generate_signals():
         trading_state['last_signal_time'] = time.time()
         
         print(f"✅ Generated {len(all_signals)} UNIFIED signals (traditional + atomic swaps)")
+        
+        # Adapt weights every 10 signal generations (every ~hour)
+        if len(trading_state['signals']) % 50 == 0:  # Every 50 signals
+            print("🔄 Checking for weight adaptation...")
+            adaptive_manager.adapt_weights()
         
         return all_signals
         
@@ -848,6 +865,54 @@ def ml_adaptive_thresholds():
         
     except Exception as e:
         return {"error": f"Threshold analysis failed: {e}"}
+
+@app.get("/simulators/performance")
+def simulator_performance():
+    """Get performance comparison of all three simulators"""
+    try:
+        return adaptive_manager.get_simulation_summary()
+    except Exception as e:
+        return {"error": f"Simulator performance failed: {e}"}
+
+@app.get("/simulators/weights")
+def current_weights():
+    """Get current adaptive weights"""
+    try:
+        return {
+            "current_weights": adaptive_manager.current_weights,
+            "weight_evolution": adaptive_manager.weight_history[-10:],
+            "last_adaptation": adaptive_manager.last_adaptation,
+            "adaptation_frequency": "Every 50 signals (~1 hour)"
+        }
+    except Exception as e:
+        return {"error": f"Weight fetch failed: {e}"}
+
+@app.get("/simulators/competition")
+def simulator_competition():
+    """Get head-to-head simulator comparison"""
+    try:
+        traditional_perf = adaptive_manager.traditional_sim.calculate_performance()
+        sentiment_perf = adaptive_manager.sentiment_sim.calculate_performance()
+        quantum_perf = adaptive_manager.quantum_sim.calculate_performance()
+        
+        # Rank by performance score
+        rankings = [
+            {"name": "Traditional", "score": traditional_perf['performance_score'], "win_rate": traditional_perf['win_rate'], "roi": traditional_perf['roi']},
+            {"name": "Sentiment", "score": sentiment_perf['performance_score'], "win_rate": sentiment_perf['win_rate'], "roi": sentiment_perf['roi']},
+            {"name": "Quantum", "score": quantum_perf['performance_score'], "win_rate": quantum_perf['win_rate'], "roi": quantum_perf['roi']}
+        ]
+        
+        rankings.sort(key=lambda x: x['score'], reverse=True)
+        
+        return {
+            "competition_rankings": rankings,
+            "winner": rankings[0]['name'] if rankings else "None",
+            "current_weights": adaptive_manager.current_weights,
+            "total_simulations": len(adaptive_manager.weight_history)
+        }
+        
+    except Exception as e:
+        return {"error": f"Competition analysis failed: {e}"}
 
 def generate_ml_analysis():
     """Generate real ML performance data"""
