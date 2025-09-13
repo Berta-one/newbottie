@@ -39,6 +39,15 @@ async def options_handler():
 def root():
     return {"status": "working", "balance": 7548.0}
 
+@app.get("/test")
+def test_page():
+    """Serve test page for debugging trading controls"""
+    try:
+        with open('test_trading_controls.html', 'r') as f:
+            return HTMLResponse(content=f.read())
+    except:
+        return HTMLResponse(content="<h1>Test page not found</h1>")
+
 @app.get("/health") 
 def health():
     return {"status": "healthy", "balance": 7548.0, "positions": 11}
