@@ -10,7 +10,7 @@ services:
       pip install --no-cache-dir -r requirements-deploy.txt
       python -c "import gc; gc.collect()"
     
-    startCommand: python3 minimal_fix.py
+    startCommand: python3 bulletproof.py
     
     # Environment variables for deployment
     envVars:
