@@ -1,1 +1,1 @@
-web: python3 emergency_fix.py
+web: python3 minimal_fix.py
