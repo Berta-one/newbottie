@@ -1,1 +1,1 @@
-web: python3 bulletproof_final.py
+web: python3 absolute_minimal.py
