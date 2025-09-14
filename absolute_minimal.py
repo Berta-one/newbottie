@@ -560,15 +560,20 @@ def execute_trade_on_signal(signal):
         balance = exchange.fetch_balance()
         
         if signal_type == 'BUY':
-            # Buy with USDT
+            # Buy with USDT - ensure minimum notional value
             usdt_available = balance.get('USDT', {}).get('free', 0)
-            if usdt_available < 50:  # Minimum $50 trade
+            if usdt_available < 25:  # Minimum $25 trade
                 print(f"⚠️ Insufficient USDT for {symbol} BUY: ${usdt_available:.2f}")
                 return None
             
-            # Use 10% of available USDT or $100, whichever is smaller
-            trade_amount_usdt = min(100, usdt_available * 0.1)
+            # Use minimum $25 or 5% of available USDT, whichever is larger
+            trade_amount_usdt = max(25, min(200, usdt_available * 0.05))
             quantity = trade_amount_usdt / price
+            
+            # Ensure minimum notional value (Binance requires ~$10-20 minimum)
+            if trade_amount_usdt < 20:
+                print(f"⚠️ Trade amount ${trade_amount_usdt:.2f} below minimum notional")
+                return None
             
             # Execute BUY order
             order = exchange.create_market_buy_order(symbol, quantity)
@@ -589,7 +594,7 @@ def execute_trade_on_signal(signal):
             print(f"🔥 EXECUTED BUY: {quantity:.6f} {symbol} @ ${price:,.2f} (${trade_amount_usdt:.2f})")
             
         elif signal_type == 'SELL':
-            # Sell asset for USDT
+            # Sell asset for USDT - ensure minimum notional value
             asset = symbol.split('/')[0]  # Get base asset (BTC from BTC/USDT)
             asset_available = balance.get(asset, {}).get('free', 0)
             
@@ -597,8 +602,17 @@ def execute_trade_on_signal(signal):
                 print(f"⚠️ No {asset} to sell for {symbol}")
                 return None
             
-            # Sell 25% of available asset
-            quantity = asset_available * 0.25
+            # Calculate quantity to meet minimum $25 notional
+            min_quantity_for_notional = 25 / price  # Minimum quantity for $25
+            max_quantity_available = asset_available * 0.5  # Max 50% of holdings
+            
+            quantity = max(min_quantity_for_notional, min(max_quantity_available, asset_available * 0.25))
+            
+            # Check if we have enough for minimum notional
+            trade_value = quantity * price
+            if trade_value < 20:
+                print(f"⚠️ {symbol} position too small for minimum notional: ${trade_value:.2f}")
+                return None
             
             # Execute SELL order
             order = exchange.create_market_sell_order(symbol, quantity)
