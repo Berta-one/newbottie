@@ -288,12 +288,12 @@ def _min_notional_and_step(symbol: str) -> tuple:
     try:
         if exchange_client and hasattr(exchange_client, 'markets'):
             market = exchange_client.markets.get(symbol, {})
-            min_notional = market.get('limits', {}).get('cost', {}).get('min', 20.0)
+            min_notional = market.get('limits', {}).get('cost', {}).get('min', 25.0)
             qty_step = market.get('precision', {}).get('amount', 0.001)
-            return max(min_notional, 20.0), qty_step  # Ensure at least $20 minimum
+            return max(min_notional, 25.0), qty_step  # Ensure at least $25 minimum
     except:
         pass
-    return 20.0, 0.001  # Set to exactly $20 USDT minimum
+    return 25.0, 0.001  # Set to exactly $25 USDT minimum for safety
 
 def _round_step(qty: float, step: float) -> float:
     """Round quantity to the exchange's step size"""
@@ -1275,9 +1275,9 @@ async def execution_loop():
                 if conf < 0.6:  # Require 60% confidence
                     continue
 
-                # Calculate position size (ensure minimum 20 USDT)
-                quote_budget = max(TRADE_QUOTE_PER_ORDER * conf, 20.0)
-                if quote_budget < 20.0:  # Ensure minimum 20 USDT order size
+                # Calculate position size (ensure minimum 25 USDT for safety)
+                quote_budget = max(TRADE_QUOTE_PER_ORDER * conf, 25.0)
+                if quote_budget < 25.0:  # Ensure minimum 25 USDT order size
                     add_log(f"⚠️ Skipping {sym} - quote budget too small: ${quote_budget:.2f}")
                     continue
 
@@ -1285,9 +1285,10 @@ async def execution_loop():
                 qty = quote_budget / px
                 qty = _round_step(qty, qty_step)
 
-                if qty * px < min_notional:
-                    qty = _round_step(min_notional / px, qty_step)
-                    add_log(f"📈 Adjusted {sym} buy quantity to meet 20 USDT minimum: {qty:.6f} @ ${px:.4f} = ${qty * px:.2f}")
+                # Ensure order meets minimum notional (25 USDT minimum)
+                if qty * px < max(min_notional, 25.0):
+                    qty = _round_step(max(min_notional, 25.0) / px, qty_step)
+                    add_log(f"📈 Adjusted {sym} buy quantity to meet ${max(min_notional, 25.0):.0f} USDT minimum: {qty:.6f} @ ${px:.4f} = ${qty * px:.2f}")
 
                 if qty <= 0:
                     add_log(f"⚠️ Skipping {sym} BUY - calculated quantity is zero")
@@ -1321,16 +1322,17 @@ async def execution_loop():
                     if sell_qty <= 0:
                         continue
                     
-                    # Check minimum notional requirement (ensure at least 20 USDT)
+                    # Check minimum notional requirement (ensure at least 25 USDT)
                     sell_value = sell_qty * px
-                    if sell_value < min_notional:
-                        # If partial sell is too small, sell minimum notional amount (20 USDT)
-                        min_sell_qty = _round_step(min_notional / px, qty_step)
+                    min_required = max(min_notional, 25.0)
+                    if sell_value < min_required:
+                        # If partial sell is too small, sell minimum notional amount (25 USDT)
+                        min_sell_qty = _round_step(min_required / px, qty_step)
                         if min_sell_qty <= have:  # Only if we have enough to sell
                             sell_qty = min_sell_qty
-                            add_log(f"📈 Adjusted {sym} sell quantity to meet 20 USDT minimum: {sell_qty:.6f} @ ${px:.4f} = ${sell_qty * px:.2f}")
+                            add_log(f"📈 Adjusted {sym} sell quantity to meet ${min_required:.0f} USDT minimum: {sell_qty:.6f} @ ${px:.4f} = ${sell_qty * px:.2f}")
                         else:
-                            add_log(f"⚠️ Skipping {sym} - position too small for 20 USDT minimum order (have: {have:.6f}, need: {min_sell_qty:.6f})")
+                            add_log(f"⚠️ Skipping {sym} - position too small for ${min_required:.0f} USDT minimum order (have: {have:.6f}, need: {min_sell_qty:.6f})")
                             continue  # Skip if we don't have enough for minimum order
                     
                     qty = sell_qty
