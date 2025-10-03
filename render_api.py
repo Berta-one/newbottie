@@ -116,6 +116,9 @@ FEE_CURRENCY = "USDT"   # Fee currency
 # Atomic swap configuration
 ATOMIC_SWAP_MIN_USD = float(os.getenv("ATOMIC_SWAP_MIN_USD", "20"))
 ATOMIC_SWAP_FRACTION = float(os.getenv("ATOMIC_SWAP_FRACTION", "0.2"))
+MAJOR_CRYPTOS = [s.strip().upper() for s in os.getenv("MAJOR_CRYPTOS", "BTC,ETH,BNB,ADA,SOL,AVAX,DOT,LINK,XRP,MATIC").split(",") if s.strip()]
+CROSS_PAIR_ENABLED = os.getenv("CROSS_PAIR_ENABLED", "1").lower() in ("1","true","yes")
+CROSS_PAIR_SCAN_PAIRS = int(os.getenv("CROSS_PAIR_SCAN_PAIRS", "8"))
 
 # Enhanced trade tracking with P&L
 _trading_pnl = {
@@ -392,6 +395,76 @@ def _extract_market_constraints(symbol: str) -> Dict[str, float]:
         }
     except Exception:
         return defaults
+
+def _generate_atomic_swap_signals() -> List[Dict[str, Any]]:
+    """Generate a small set of atomic swap signals using public market data.
+    Minimizes API usage by checking only a handful of major cross pairs.
+    """
+    if not CROSS_PAIR_ENABLED:
+        return []
+    try:
+        global public_exchange
+        if public_exchange is None:
+            import ccxt
+            public_exchange = ccxt.binance({'enableRateLimit': True})
+        # Ensure markets loaded for symbol existence checks
+        try:
+            public_exchange.load_markets()
+        except Exception:
+            pass
+
+        # Pick a few cross pairs among majors (non-USDT)
+        pairs: List[str] = []
+        majors = MAJOR_CRYPTOS[:]
+        # Construct pairs like A/B where market exists
+        for i in range(len(majors)):
+            for j in range(i+1, len(majors)):
+                a, b = majors[i], majors[j]
+                sym1 = f"{a}/{b}"
+                sym2 = f"{b}/{a}"
+                if sym1 in getattr(public_exchange, 'markets', {}):
+                    pairs.append(sym1)
+                elif sym2 in getattr(public_exchange, 'markets', {}):
+                    pairs.append(sym2)
+                if len(pairs) >= CROSS_PAIR_SCAN_PAIRS:
+                    break
+            if len(pairs) >= CROSS_PAIR_SCAN_PAIRS:
+                break
+
+        signals: List[Dict[str, Any]] = []
+        for sym in pairs:
+            try:
+                tkr = public_exchange.fetch_ticker(sym)
+                last = tkr.get('last') or tkr.get('close')
+                change_pct = float(tkr.get('percentage') or 0.0)
+                if not last:
+                    continue
+                base, quote = sym.split('/')
+                # Simple heuristic: if 24h change positive, rotate into base; else into quote
+                to_asset = base if change_pct >= 0 else quote
+                from_asset = quote if to_asset == base else base
+                conf = min(0.9, 0.6 + abs(change_pct) * 0.01)  # 0.6–0.9
+                signals.append({
+                    'symbol': sym,
+                    'type': 'atomic_swap',
+                    'signal': f'SWAP_TO_{to_asset}',
+                    'from_asset': from_asset,
+                    'to_asset': to_asset,
+                    'conf': conf,
+                    'price': float(last),
+                    'change': (change_pct or 0.0) / 100.0,
+                    't': int(time.time()),
+                    'reason': f'Atomic swap opportunity - {change_pct:+.1f}% 24h'
+                })
+            except Exception:
+                continue
+
+        if signals:
+            add_log(f"⚛️ Generated {len(signals)} atomic swap signals")
+        return signals
+    except Exception as e:
+        add_log(f"⚠️ Atomic swap signal generation failed: {e}")
+        return []
 
 # Initialize exchange if possible
 def initialize_exchange():
@@ -1790,6 +1863,14 @@ async def signals_loop():
                 except Exception as e:
                     add_log(f"Signal error for {symbol}: {e}")
                     
+            # Also append lightweight atomic swap signals to drive cross-pair execution
+            atomic_signals = _generate_atomic_swap_signals()
+            if atomic_signals:
+                _signals.extend(atomic_signals)
+                # Keep signals bounded
+                if len(_signals) > 1000:
+                    _signals[:] = _signals[-500:]
+
         except Exception as e:
             add_log(f"❌ ERROR signals_loop: {e}")
         
