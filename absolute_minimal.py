@@ -633,26 +633,67 @@ def execute_trade_on_signal(signal):
             print(f"🔥 EXECUTED SELL: {quantity:.6f} {symbol} @ ${price:,.2f} (${quantity * price:.2f})")
             
         elif signal_type.startswith('SWAP_TO_'):
-            # Execute atomic swap
+            # Execute atomic swap with availability and $20 USD threshold
             to_asset = signal_type.replace('SWAP_TO_', '')
-            from_asset = signal['from_asset']
+            from_asset = signal.get('from_asset')
+            symbol = signal['symbol']
+            
+            # Validate assets
+            try:
+                base_asset, quote_asset = symbol.split('/')
+            except Exception:
+                print(f"⚠️ Malformed symbol for atomic swap: {symbol}")
+                return None
+            if not from_asset:
+                # Infer from_asset by target asset
+                target = to_asset
+                if target == base_asset:
+                    from_asset = quote_asset
+                elif target == quote_asset:
+                    from_asset = base_asset
+            if not from_asset:
+                print(f"⚠️ Unable to resolve from_asset for atomic swap {symbol}")
+                return None
             
             # Get available amount of from_asset
             from_available = balance.get(from_asset, {}).get('free', 0)
-            
-            if from_available < 0.001:
+            if from_available <= 0:
                 print(f"⚠️ No {from_asset} available for atomic swap")
                 return None
             
-            # Swap 20% of from_asset to to_asset
-            swap_quantity = from_available * 0.2
+            # Get USD price for from_asset
+            try:
+                if from_asset == 'USDT':
+                    from_usd = 1.0
+                else:
+                    t_usdt = exchange.fetch_ticker(f"{from_asset}/USDT")
+                    from_usd = float(t_usdt.get('last') or t_usdt.get('close') or 0)
+            except Exception as e:
+                print(f"⚠️ Could not price {from_asset} in USDT: {e}")
+                return None
+            if from_usd <= 0:
+                print(f"⚠️ Missing USD price for {from_asset}, skipping atomic swap")
+                return None
+            
+            # Enforce $20 minimum notional and use 20% fraction
+            ATOMIC_SWAP_MIN_USD = float(os.getenv('ATOMIC_SWAP_MIN_USD', '20'))
+            ATOMIC_SWAP_FRACTION = float(os.getenv('ATOMIC_SWAP_FRACTION', '0.2'))
+            min_qty = ATOMIC_SWAP_MIN_USD / from_usd
+            target_qty = from_available * ATOMIC_SWAP_FRACTION
+            swap_quantity = min(from_available, max(min_qty, target_qty))
+            
+            # Verify threshold
+            trade_value_usd = swap_quantity * from_usd
+            if trade_value_usd < ATOMIC_SWAP_MIN_USD:
+                print(f"⚠️ Atomic swap below ${ATOMIC_SWAP_MIN_USD:.0f} threshold (≈${trade_value_usd:.2f}), skipping")
+                return None
             
             # Execute atomic swap (sell from_asset, buy to_asset)
-            order = exchange.create_market_sell_order(signal['symbol'], swap_quantity)
+            order = exchange.create_market_sell_order(symbol, swap_quantity)
             
             trade_record = {
                 'id': order['id'],
-                'symbol': signal['symbol'],
+                'symbol': symbol,
                 'side': 'atomic_swap',
                 'quantity': swap_quantity,
                 'price': price,
@@ -662,10 +703,11 @@ def execute_trade_on_signal(signal):
                 'timestamp': time.time(),
                 'real_trade': True,
                 'swap_type': 'atomic',
+                'notional_usd': trade_value_usd,
                 'order_info': order
             }
             
-            print(f"⚛️ EXECUTED ATOMIC SWAP: {swap_quantity:.6f} {from_asset} → {to_asset} @ {price:.6f}")
+            print(f"⚛️ EXECUTED ATOMIC SWAP: {swap_quantity:.6f} {from_asset} → {to_asset} ≈ ${trade_value_usd:.2f}")
         
         else:
             return None  # HOLD signals don't execute
