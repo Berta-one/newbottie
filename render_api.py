@@ -109,6 +109,10 @@ MAKER_FEE_RATE = 0.001  # 0.1% maker fee
 TAKER_FEE_RATE = 0.001  # 0.1% taker fee (market orders)
 FEE_CURRENCY = "USDT"   # Fee currency
 
+# Atomic swap configuration
+ATOMIC_SWAP_MIN_USD = float(os.getenv("ATOMIC_SWAP_MIN_USD", "20"))
+ATOMIC_SWAP_FRACTION = float(os.getenv("ATOMIC_SWAP_FRACTION", "0.2"))
+
 # Enhanced trade tracking with P&L
 _trading_pnl = {
     'total_realized_pnl': 0.0,
@@ -321,7 +325,13 @@ def initialize_exchange():
             'sandbox': False,  # Use LIVE trading (not testnet)
             'enableRateLimit': True,
         })
-        
+        # Preload markets to access limits/precision and reduce lazy calls
+        try:
+            exchange_client.load_markets()
+            logging.info("✅ Exchange markets loaded")
+        except Exception as e:
+            logging.warning(f"⚠️ Could not load markets upfront: {e}")
+
         logging.info("✅ Exchange client created (no API calls to prevent bans)")
         return True
 
@@ -1263,6 +1273,10 @@ async def execution_loop():
             for s in _signals[-100:]:
                 latest[s["symbol"]] = s
 
+            # Reuse balance and USD prices within a cycle to save API calls
+            balance_cache = None
+            usdt_price_cache: Dict[str, float] = {}
+
             for sym, s in latest.items():
                 signal = s.get("signal")
                 conf = float(s.get("conf", 0.0))
@@ -1275,9 +1289,108 @@ async def execution_loop():
                 if conf < 0.6:  # Require 60% confidence
                     continue
                 
-                # Skip atomic swap signals for now (they need special handling)
+                # Handle atomic swaps with availability and $20 USD threshold
                 if s.get("type") == "atomic_swap":
-                    add_log(f"⚠️ Skipping atomic swap {sym} - requires special execution logic")
+                    signal_str = s.get("signal", "")
+                    from_asset = s.get("from_asset")
+                    to_asset = s.get("to_asset")
+                    try:
+                        base_asset, quote_asset = sym.split("/")
+                    except Exception:
+                        add_log(f"⚠️ Malformed symbol for atomic swap: {sym}")
+                        continue
+
+                    # Infer assets from signal if missing
+                    if not from_asset or not to_asset:
+                        if signal_str.startswith("SWAP_TO_"):
+                            target = signal_str.replace("SWAP_TO_", "")
+                            if target == base_asset:
+                                from_asset, to_asset = quote_asset, base_asset
+                            elif target == quote_asset:
+                                from_asset, to_asset = base_asset, quote_asset
+
+                    if not from_asset or not to_asset:
+                        add_log(f"⚠️ Skipping {sym} atomic swap - unable to resolve from/to assets")
+                        continue
+
+                    # Fetch balances once per cycle
+                    if exchange_client:
+                        if balance_cache is None:
+                            try:
+                                balance_cache = exchange_client.fetch_balance()
+                            except Exception as e:
+                                add_log(f"⚠️ Balance fetch failed: {e}")
+                                continue
+                        from_available = (
+                            balance_cache.get(from_asset, {}).get("free", 0)
+                            or balance_cache.get("free", {}).get(from_asset, 0)
+                            or 0.0
+                        )
+                    else:
+                        from_available = 0.0
+
+                    if from_available <= 0:
+                        add_log(f"⚠️ No {from_asset} available for atomic swap {sym}")
+                        continue
+
+                    # Get USD price for from_asset (cache per cycle)
+                    if from_asset == "USDT":
+                        from_usd_price = 1.0
+                    else:
+                        if from_asset in usdt_price_cache:
+                            from_usd_price = usdt_price_cache[from_asset]
+                        else:
+                            try:
+                                t_usdt = exchange_client.fetch_ticker(f"{from_asset}/USDT")
+                                from_usd_price = float(t_usdt.get("last") or t_usdt.get("close") or 0)
+                                usdt_price_cache[from_asset] = from_usd_price
+                            except Exception as e:
+                                add_log(f"⚠️ Could not price {from_asset} in USDT: {e}")
+                                continue
+
+                    if from_usd_price <= 0:
+                        add_log(f"⚠️ Missing USD price for {from_asset}, skipping atomic swap")
+                        continue
+
+                    # Compute minimum qty to satisfy USD threshold
+                    min_qty_usd = ATOMIC_SWAP_MIN_USD / from_usd_price
+                    _, qty_step = _min_notional_and_step(sym)
+                    target_qty = from_available * ATOMIC_SWAP_FRACTION
+                    qty = max(min_qty_usd, target_qty)
+                    qty = min(qty, from_available)
+                    qty = _round_step(qty, qty_step)
+
+                    trade_value_usd = qty * from_usd_price
+                    if qty <= 0 or trade_value_usd < ATOMIC_SWAP_MIN_USD:
+                        add_log(
+                            f"⚠️ Skipping {sym} atomic swap - below ${ATOMIC_SWAP_MIN_USD:.0f} threshold (≈${trade_value_usd:.2f})"
+                        )
+                        continue
+
+                    # Execute sell on cross pair to perform swap (sell from_asset to buy to_asset)
+                    try:
+                        if exchange_client:
+                            order = exchange_client.create_order(sym, type="market", side="sell", amount=qty)
+                            fee_est = calculate_trading_fee(trade_value_usd)
+                            _trade_log.append({
+                                "t": int(time.time()),
+                                "symbol": sym,
+                                "side": "atomic_swap",
+                                "qty": qty,
+                                "px": px,
+                                "conf": conf,
+                                "from_asset": from_asset,
+                                "to_asset": to_asset,
+                                "trade_value_usd": round(trade_value_usd, 2),
+                                "fee_est_usd": round(fee_est, 4),
+                                "order_id": order.get("id", "unknown"),
+                            })
+                            add_log(
+                                f"⚛️ ATOMIC SWAP {from_asset}→{to_asset} {sym} qty={qty:.6f} ≈${trade_value_usd:.2f} conf={conf:.3f}"
+                            )
+                    except Exception as e:
+                        add_log(f"❌ ATOMIC SWAP order error {sym} {qty}: {e}")
+                    # Move to next signal after handling atomic swap
                     continue
                 
                 # Only trade standard USDT pairs for now
