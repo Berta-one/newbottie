@@ -89,6 +89,9 @@ real_time_data = {
     'last_update': 0
 }
 
+# Execution state
+LOOPS_STARTED = False
+
 # Trading execution variables
 _signals = []
 _logs = []
@@ -1868,8 +1871,8 @@ def pnl_slate():
 @app.get("/trading/status")
 def trading_status():
     """Get current trading status and controls"""
-    # Determine mode based on whether execution loops are running
-    mode = "FULL" if (TRADE_ENABLED and EXECUTION_RUNTIME_ENABLED and len(_signals) > 0) else "MINIMAL"
+    # Determine mode based on loop start or presence of signals
+    mode = "FULL" if (TRADE_ENABLED and EXECUTION_RUNTIME_ENABLED and (LOOPS_STARTED or len(_signals) > 0)) else "MINIMAL"
     
     return {
         "trade_enabled": TRADE_ENABLED,
@@ -1944,6 +1947,10 @@ async def startup_event():
         asyncio.create_task(signals_loop())
         logging.info("✅ Signals loop started")
         add_log("✅ Signals loop started")
+        
+        # Mark loops started for status reporting
+        global LOOPS_STARTED
+        LOOPS_STARTED = True
         
         # Start auto-reporting
         start_auto_reporting()
