@@ -23,5 +23,5 @@ COPY . .
 ENV PORT=8000
 EXPOSE 8000
 
-# Stamp the image with Render commit SHA and start API
-CMD ["sh", "-c", "v=${RENDER_GIT_COMMIT:-unknown}; echo $v > /app/VERSION; echo \"Running commit: $v\"; echo \"Starting on port ${PORT}\"; uvicorn api.app:app --host 0.0.0.0 --port ${PORT}"] 
+# Stamp the image with Render commit SHA and start API (render_api)
+CMD ["sh", "-c", "v=${RENDER_GIT_COMMIT:-unknown}; echo $v > /app/VERSION; echo \"Running commit: $v\"; echo \"Starting on port ${PORT}\"; uvicorn render_api:app --host 0.0.0.0 --port ${PORT}"]
