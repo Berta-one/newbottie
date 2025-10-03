@@ -1274,6 +1274,16 @@ async def execution_loop():
                 # Only trade on strong signals
                 if conf < 0.6:  # Require 60% confidence
                     continue
+                
+                # Skip atomic swap signals for now (they need special handling)
+                if s.get("type") == "atomic_swap":
+                    add_log(f"⚠️ Skipping atomic swap {sym} - requires special execution logic")
+                    continue
+                
+                # Only trade standard USDT pairs for now
+                if not sym.endswith("/USDT"):
+                    add_log(f"⚠️ Skipping non-USDT pair {sym} - only trading USDT pairs")
+                    continue
 
                 # Calculate position size (ensure minimum 25 USDT for safety)
                 quote_budget = max(TRADE_QUOTE_PER_ORDER * conf, 25.0)
