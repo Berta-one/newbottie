@@ -288,22 +288,89 @@ def _last_px(symbol: str) -> Optional[float]:
     return None
 
 def _min_notional_and_step(symbol: str) -> tuple:
-    """Get minimum notional and quantity step for a symbol"""
+    """Get minimum notional (in quote units) and quantity step for a symbol.
+    For USDT pairs, enforce a conservative $25 USD minimum. For non-USDT pairs,
+    return the exchange-provided min cost without forcing a USD floor.
+    """
     try:
         if exchange_client and hasattr(exchange_client, 'markets'):
-            market = exchange_client.markets.get(symbol, {})
-            min_notional = market.get('limits', {}).get('cost', {}).get('min', 25.0)
-            qty_step = market.get('precision', {}).get('amount', 0.001)
-            return max(min_notional, 25.0), qty_step  # Ensure at least $25 minimum
-    except:
+            market = exchange_client.markets.get(symbol, {}) or {}
+            min_cost = (market.get('limits', {}) or {}).get('cost', {}) or {}
+            min_notional = float(min_cost.get('min') or 0.0)
+            qty_step = (market.get('precision', {}) or {}).get('amount', 0.001)
+            if isinstance(qty_step, int):
+                # Fallback if precision returned as digits (rare in our usage)
+                qty_step = 10 ** (-qty_step) if qty_step > 0 else 0.001
+            if symbol.endswith('/USDT'):
+                return max(min_notional, 25.0), float(qty_step)
+            else:
+                return float(min_notional), float(qty_step)
+    except Exception:
         pass
-    return 25.0, 0.001  # Set to exactly $25 USDT minimum for safety
+    # Fallbacks
+    if symbol.endswith('/USDT'):
+        return 25.0, 0.001
+    return 0.0, 0.001
 
 def _round_step(qty: float, step: float) -> float:
     """Round quantity to the exchange's step size"""
     if step <= 0:
         return qty
     return math.floor(qty / step) * step
+
+def _extract_market_constraints(symbol: str) -> Dict[str, float]:
+    """Extract market constraints for a symbol from ccxt markets.
+    Returns dict with: step_size, min_qty, min_notional_quote.
+    Safe defaults are returned if markets are unavailable.
+    """
+    defaults = {"step_size": 0.001, "min_qty": 0.0, "min_notional_quote": 0.0}
+    try:
+        if not exchange_client or not hasattr(exchange_client, "markets"):
+            return defaults
+        market = exchange_client.markets.get(symbol, {}) or {}
+        limits = (market.get("limits", {}) or {})
+        precision = (market.get("precision", {}) or {})
+        info = market.get("info", {}) or {}
+
+        # Step size
+        step_size = precision.get("amount")
+        if isinstance(step_size, int):
+            step_size = 10 ** (-step_size) if step_size > 0 else 0.001
+        if not step_size:
+            # Try LOT_SIZE filter
+            for f in (info.get("filters", []) or []):
+                if f.get("filterType") == "LOT_SIZE":
+                    step_size = float(f.get("stepSize") or 0.001)
+                    break
+        step_size = float(step_size or 0.001)
+
+        # Min qty
+        min_qty = (limits.get("amount", {}) or {}).get("min")
+        if min_qty is None:
+            for f in (info.get("filters", []) or []):
+                if f.get("filterType") == "LOT_SIZE":
+                    min_qty = float(f.get("minQty") or 0.0)
+                    break
+        min_qty = float(min_qty or 0.0)
+
+        # Min notional (quote)
+        min_notional_quote = (limits.get("cost", {}) or {}).get("min")
+        if min_notional_quote is None or float(min_notional_quote or 0.0) == 0.0:
+            for f in (info.get("filters", []) or []):
+                if f.get("filterType") in ("MIN_NOTIONAL", "NOTIONAL"):
+                    v = f.get("minNotional") or f.get("notional")
+                    if v is not None:
+                        min_notional_quote = float(v)
+                        break
+        min_notional_quote = float(min_notional_quote or 0.0)
+
+        return {
+            "step_size": step_size,
+            "min_qty": min_qty,
+            "min_notional_quote": min_notional_quote,
+        }
+    except Exception:
+        return defaults
 
 # Initialize exchange if possible
 def initialize_exchange():
@@ -1354,13 +1421,38 @@ async def execution_loop():
 
                     # Compute minimum qty to satisfy USD threshold
                     min_qty_usd = ATOMIC_SWAP_MIN_USD / from_usd_price
+                    # Exchange limits for this specific cross pair
+                    market = (exchange_client.markets or {}).get(sym, {}) if exchange_client else {}
+                    limits = market.get('limits', {}) if market else {}
+                    amount_limits = limits.get('amount', {}) if limits else {}
+                    cost_limits = limits.get('cost', {}) if limits else {}
+                    amount_min = float(amount_limits.get('min') or 0.0)
+                    min_notional_quote = float(cost_limits.get('min') or 0.0)  # in quote currency
+
                     _, qty_step = _min_notional_and_step(sym)
                     target_qty = from_available * ATOMIC_SWAP_FRACTION
-                    qty = max(min_qty_usd, target_qty)
+                    min_qty_usd = ATOMIC_SWAP_MIN_USD / from_usd_price
+                    min_qty_cost = (min_notional_quote / px) if (min_notional_quote and px) else 0.0
+                    qty = max(q for q in [target_qty, min_qty_usd, min_qty_cost, amount_min] if q > 0)
                     qty = min(qty, from_available)
                     qty = _round_step(qty, qty_step)
 
                     trade_value_usd = qty * from_usd_price
+                    # Ensure exchange NOTIONAL (quote) filter is met
+                    trade_value_quote = qty * px
+                    if min_notional_quote and trade_value_quote < min_notional_quote:
+                        # Bump to min required by exchange
+                        needed_qty = _round_step(min_notional_quote / px, qty_step)
+                        if needed_qty <= from_available:
+                            qty = needed_qty
+                            trade_value_usd = qty * from_usd_price
+                            trade_value_quote = qty * px
+                        else:
+                            add_log(
+                                f"⚠️ Skipping {sym} atomic swap - holding too small for exchange min notional"
+                            )
+                            continue
+
                     if qty <= 0 or trade_value_usd < ATOMIC_SWAP_MIN_USD:
                         add_log(
                             f"⚠️ Skipping {sym} atomic swap - below ${ATOMIC_SWAP_MIN_USD:.0f} threshold (≈${trade_value_usd:.2f})"
