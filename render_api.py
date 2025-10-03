@@ -79,6 +79,7 @@ except Exception as e:
 
 # Global variables
 exchange_client = None
+public_exchange = None  # unauthenticated for public market data
 websocket_manager = None
 real_time_data = {
     'positions': {},
@@ -280,9 +281,26 @@ def _position_qty(symbol: str) -> float:
 def _last_px(symbol: str) -> Optional[float]:
     """Get last price for a symbol"""
     try:
+        # Prefer authenticated client
         if exchange_client:
-            ticker = exchange_client.fetch_ticker(symbol)
-            return ticker.get('last')
+            try:
+                ticker = exchange_client.fetch_ticker(symbol)
+                v = ticker.get('last') or ticker.get('close')
+                if v:
+                    return v
+            except Exception:
+                pass
+        # Fallback to public client to avoid MINIMAL mode due to missing creds/geo issues
+        global public_exchange
+        if public_exchange is None:
+            try:
+                import ccxt
+                public_exchange = ccxt.binance({'enableRateLimit': True})
+            except Exception:
+                public_exchange = None
+        if public_exchange:
+            ticker = public_exchange.fetch_ticker(symbol)
+            return ticker.get('last') or ticker.get('close')
     except:
         pass
     return None
@@ -1419,52 +1437,118 @@ async def execution_loop():
                         add_log(f"⚠️ Missing USD price for {from_asset}, skipping atomic swap")
                         continue
 
-                    # Compute minimum qty to satisfy USD threshold
-                    min_qty_usd = ATOMIC_SWAP_MIN_USD / from_usd_price
                     # Exchange limits for this specific cross pair
                     constraints = _extract_market_constraints(sym)
                     qty_step = constraints.get("step_size", 0.001)
-                    amount_min = constraints.get("min_qty", 0.0)
+                    min_qty_base = constraints.get("min_qty", 0.0)
                     min_notional_quote = constraints.get("min_notional_quote", 0.0)  # in quote currency
-                    target_qty = from_available * ATOMIC_SWAP_FRACTION
-                    min_qty_usd = ATOMIC_SWAP_MIN_USD / from_usd_price
-                    min_qty_cost = (min_notional_quote / px) if (min_notional_quote and px) else 0.0
-                    qty = max(q for q in [target_qty, min_qty_usd, min_qty_cost, amount_min] if q > 0)
-                    qty = min(qty, from_available)
-                    qty = _round_step(qty, qty_step)
 
-                    trade_value_usd = qty * from_usd_price
-                    # Ensure exchange NOTIONAL (quote) filter is met
-                    trade_value_quote = qty * px
-                    if min_notional_quote and trade_value_quote < min_notional_quote:
-                        # Bump to min required by exchange
-                        needed_qty = _round_step((min_notional_quote * 1.02) / px, qty_step)  # small buffer
-                        if needed_qty <= from_available:
-                            qty = needed_qty
-                            trade_value_usd = qty * from_usd_price
-                            trade_value_quote = qty * px
-                        else:
-                            add_log(
-                                f"⚠️ Skipping {sym} atomic swap - holding too small for exchange min notional"
-                            )
-                            continue
+                    # Fetch USD prices for both legs (cache within cycle)
+                    def usd_px(asset: str) -> float:
+                        if asset == "USDT":
+                            return 1.0
+                        if asset in usdt_price_cache:
+                            return usdt_price_cache[asset]
+                        try:
+                            t = exchange_client.fetch_ticker(f"{asset}/USDT")
+                            p = float(t.get("last") or t.get("close") or 0)
+                            usdt_price_cache[asset] = p
+                            return p
+                        except Exception:
+                            return 0.0
 
-                    if qty <= 0 or trade_value_usd < ATOMIC_SWAP_MIN_USD:
-                        add_log(
-                            f"⚠️ Skipping {sym} atomic swap - below ${ATOMIC_SWAP_MIN_USD:.0f} threshold (≈${trade_value_usd:.2f})"
-                        )
+                    base_usd = usd_px(base_asset)
+                    quote_usd = usd_px(quote_asset)
+                    if base_usd <= 0 or quote_usd <= 0:
+                        add_log(f"⚠️ Missing USD price (base={base_asset}:{base_usd}, quote={quote_asset}:{quote_usd}) - skipping {sym}")
                         continue
 
-                    # Execute sell on cross pair to perform swap (sell from_asset to buy to_asset)
+                    # Decide side based on target asset
+                    target_is_base = (to_asset == base_asset)
+                    params = {}
+
+                    if target_is_base:
+                        # Buying base with quote: spend quote asset (from_asset should be quote)
+                        if from_asset != quote_asset:
+                            # Safety: realign
+                            from_asset = quote_asset
+
+                        # Determine quote spend
+                        spend_fraction = from_available * ATOMIC_SWAP_FRACTION
+                        min_spend_usd_in_quote = ATOMIC_SWAP_MIN_USD / quote_usd
+                        min_spend_notional = (min_notional_quote * 1.02) if min_notional_quote else 0.0
+                        base_est_from_fraction = spend_fraction / px
+                        min_spend_for_min_qty = (min_qty_base * px) if min_qty_base else 0.0
+
+                        quote_spend_candidates = [spend_fraction, min_spend_usd_in_quote, min_spend_notional, min_spend_for_min_qty]
+                        quote_spend = max(q for q in quote_spend_candidates if q and q > 0)
+                        quote_spend = min(quote_spend, from_available)
+
+                        # Validate thresholds
+                        trade_value_usd = quote_spend * quote_usd
+                        base_est = quote_spend / px
+                        if base_est < min_qty_base:
+                            # Increase spend to satisfy min base qty
+                            needed_spend = min_qty_base * px
+                            if needed_spend <= from_available:
+                                quote_spend = needed_spend
+                                trade_value_usd = quote_spend * quote_usd
+                                base_est = quote_spend / px
+                            else:
+                                add_log(f"⚠️ Skipping {sym} atomic swap - not enough quote to reach min qty")
+                                continue
+
+                        if trade_value_usd < ATOMIC_SWAP_MIN_USD:
+                            add_log(f"⚠️ Skipping {sym} atomic swap - below ${ATOMIC_SWAP_MIN_USD:.0f} threshold (≈${trade_value_usd:.2f})")
+                            continue
+
+                        # Place buy with quoteOrderQty to spend quote asset
+                        params = {"quoteOrderQty": quote_spend}
+                        side = "buy"
+                        amount = None  # using quoteOrderQty
+
+                    else:
+                        # Selling base to receive quote: sell base asset (from_asset should be base)
+                        if from_asset != base_asset:
+                            from_asset = base_asset
+
+                        base_qty_fraction = from_available * ATOMIC_SWAP_FRACTION
+                        min_qty_by_usd = ATOMIC_SWAP_MIN_USD / base_usd
+                        min_qty_by_notional = (min_notional_quote / px) if (min_notional_quote and px) else 0.0
+                        base_qty_candidates = [base_qty_fraction, min_qty_base, min_qty_by_usd, min_qty_by_notional]
+                        base_qty = max(q for q in base_qty_candidates if q and q > 0)
+                        base_qty = min(base_qty, from_available)
+                        base_qty = _round_step(base_qty, qty_step)
+
+                        trade_value_quote = base_qty * px
+                        trade_value_usd = base_qty * base_usd
+                        if min_notional_quote and trade_value_quote < min_notional_quote:
+                            needed_qty = _round_step((min_notional_quote * 1.02) / px, qty_step)
+                            if needed_qty <= from_available:
+                                base_qty = needed_qty
+                                trade_value_quote = base_qty * px
+                                trade_value_usd = base_qty * base_usd
+                            else:
+                                add_log(f"⚠️ Skipping {sym} atomic swap - holding too small for exchange min notional")
+                                continue
+
+                        if trade_value_usd < ATOMIC_SWAP_MIN_USD:
+                            add_log(f"⚠️ Skipping {sym} atomic swap - below ${ATOMIC_SWAP_MIN_USD:.0f} threshold (≈${trade_value_usd:.2f})")
+                            continue
+
+                        side = "sell"
+                        amount = base_qty
+
+                    # Execute order
                     try:
                         if exchange_client:
-                            order = exchange_client.create_order(sym, type="market", side="sell", amount=qty)
+                            order = exchange_client.create_order(sym, type="market", side=side, amount=amount, params=params)
                             fee_est = calculate_trading_fee(trade_value_usd)
                             _trade_log.append({
                                 "t": int(time.time()),
                                 "symbol": sym,
                                 "side": "atomic_swap",
-                                "qty": qty,
+                                "qty": amount if amount is not None else 0.0,
                                 "px": px,
                                 "conf": conf,
                                 "from_asset": from_asset,
@@ -1472,12 +1556,13 @@ async def execution_loop():
                                 "trade_value_usd": round(trade_value_usd, 2),
                                 "fee_est_usd": round(fee_est, 4),
                                 "order_id": order.get("id", "unknown"),
+                                "params": {k: ("***" if k.lower().endswith("key") else v) for k, v in params.items()} if params else {},
                             })
                             add_log(
-                                f"⚛️ ATOMIC SWAP {from_asset}→{to_asset} {sym} qty={qty:.6f} ≈${trade_value_usd:.2f} conf={conf:.3f}"
+                                f"⚛️ ATOMIC SWAP {from_asset}→{to_asset} {sym} {side} notional≈${trade_value_usd:.2f} conf={conf:.3f}"
                             )
                     except Exception as e:
-                        add_log(f"❌ ATOMIC SWAP order error {sym} {qty}: {e}")
+                        add_log(f"❌ ATOMIC SWAP order error {sym} {side} {amount}: {e}")
                     # Move to next signal after handling atomic swap
                     continue
                 
@@ -1837,40 +1922,40 @@ def get_recent_trades():
 async def startup_event():
     logging.info("🚀 Sntax Trading API starting...")
     
-    # Initialize exchange
+    # Initialize exchange (optional)
     if initialize_exchange():
         logging.info("✅ Exchange client initialized")
         add_log("✅ Exchange client ready")
-        
-        # Start background trading loops if enabled
-        if TRADE_ENABLED and EXECUTION_RUNTIME_ENABLED:
-            logging.info("🚀 Starting execution loops...")
-            add_log("🚀 Starting execution loops...")
-            
-            # Start execution loop
-            asyncio.create_task(execution_loop())
-            logging.info("✅ Execution loop started")
-            add_log("✅ Execution loop started")
-            
-            # Start signals loop  
-            asyncio.create_task(signals_loop())
-            logging.info("✅ Signals loop started")
-            add_log("✅ Signals loop started")
-            
-            # Start auto-reporting
-            start_auto_reporting()
-            logging.info("✅ Auto-reporting started")
-            add_log("✅ Auto-reporting started")
-            
-            logging.info("🎯 Bot in FULL execution mode")
-            add_log("🎯 Bot in FULL execution mode")
-        else:
-            logging.warning("⚠️ Trading loops disabled - staying in MINIMAL mode")
-            add_log("⚠️ Trading loops disabled - staying in MINIMAL mode")
     else:
         logging.warning("⚠️ Exchange client initialization skipped (no credentials)")
-        add_log("⚠️ Exchange client not available - API will serve cached/demo data")
-    
+        add_log("⚠️ Exchange client not available - using public market data for signals")
+
+    # Start background loops regardless of exchange availability
+    if TRADE_ENABLED and EXECUTION_RUNTIME_ENABLED:
+        logging.info("🚀 Starting execution & signal loops...")
+        add_log("🚀 Starting execution & signal loops...")
+        
+        # Start execution loop
+        asyncio.create_task(execution_loop())
+        logging.info("✅ Execution loop started")
+        add_log("✅ Execution loop started")
+        
+        # Start signals loop
+        asyncio.create_task(signals_loop())
+        logging.info("✅ Signals loop started")
+        add_log("✅ Signals loop started")
+        
+        # Start auto-reporting
+        start_auto_reporting()
+        logging.info("✅ Auto-reporting started")
+        add_log("✅ Auto-reporting started")
+        
+        logging.info("🎯 Bot in FULL execution mode")
+        add_log("🎯 Bot in FULL execution mode")
+    else:
+        logging.warning("⚠️ Trading loops disabled - staying in MINIMAL mode")
+        add_log("⚠️ Trading loops disabled - staying in MINIMAL mode")
+
     logging.info("✅ Sntax API ready")
 
 if __name__ == "__main__":
