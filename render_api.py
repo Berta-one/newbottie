@@ -1422,14 +1422,10 @@ async def execution_loop():
                     # Compute minimum qty to satisfy USD threshold
                     min_qty_usd = ATOMIC_SWAP_MIN_USD / from_usd_price
                     # Exchange limits for this specific cross pair
-                    market = (exchange_client.markets or {}).get(sym, {}) if exchange_client else {}
-                    limits = market.get('limits', {}) if market else {}
-                    amount_limits = limits.get('amount', {}) if limits else {}
-                    cost_limits = limits.get('cost', {}) if limits else {}
-                    amount_min = float(amount_limits.get('min') or 0.0)
-                    min_notional_quote = float(cost_limits.get('min') or 0.0)  # in quote currency
-
-                    _, qty_step = _min_notional_and_step(sym)
+                    constraints = _extract_market_constraints(sym)
+                    qty_step = constraints.get("step_size", 0.001)
+                    amount_min = constraints.get("min_qty", 0.0)
+                    min_notional_quote = constraints.get("min_notional_quote", 0.0)  # in quote currency
                     target_qty = from_available * ATOMIC_SWAP_FRACTION
                     min_qty_usd = ATOMIC_SWAP_MIN_USD / from_usd_price
                     min_qty_cost = (min_notional_quote / px) if (min_notional_quote and px) else 0.0
@@ -1442,7 +1438,7 @@ async def execution_loop():
                     trade_value_quote = qty * px
                     if min_notional_quote and trade_value_quote < min_notional_quote:
                         # Bump to min required by exchange
-                        needed_qty = _round_step(min_notional_quote / px, qty_step)
+                        needed_qty = _round_step((min_notional_quote * 1.02) / px, qty_step)  # small buffer
                         if needed_qty <= from_available:
                             qty = needed_qty
                             trade_value_usd = qty * from_usd_price
