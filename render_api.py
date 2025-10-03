@@ -1570,9 +1570,13 @@ def pnl_slate():
 @app.get("/trading/status")
 def trading_status():
     """Get current trading status and controls"""
+    # Determine mode based on whether execution loops are running
+    mode = "FULL" if (TRADE_ENABLED and EXECUTION_RUNTIME_ENABLED and len(_signals) > 0) else "MINIMAL"
+    
     return {
         "trade_enabled": TRADE_ENABLED,
         "execution_enabled": EXECUTION_RUNTIME_ENABLED,
+        "mode": mode,
         "execution_interval": EXECUTION_INTERVAL_S,
         "quote_per_order": TRADE_QUOTE_PER_ORDER,
         "max_spend_per_symbol": MAX_SPEND_PER_SYMBOL,
@@ -1620,10 +1624,36 @@ def get_recent_trades():
 async def startup_event():
     logging.info("🚀 Sntax Trading API starting...")
     
-    # Initialize exchange but don't start trading loops (prevents startup crashes)
+    # Initialize exchange
     if initialize_exchange():
         logging.info("✅ Exchange client initialized")
         add_log("✅ Exchange client ready")
+        
+        # Start background trading loops if enabled
+        if TRADE_ENABLED and EXECUTION_RUNTIME_ENABLED:
+            logging.info("🚀 Starting execution loops...")
+            add_log("🚀 Starting execution loops...")
+            
+            # Start execution loop
+            asyncio.create_task(execution_loop())
+            logging.info("✅ Execution loop started")
+            add_log("✅ Execution loop started")
+            
+            # Start signals loop  
+            asyncio.create_task(signals_loop())
+            logging.info("✅ Signals loop started")
+            add_log("✅ Signals loop started")
+            
+            # Start auto-reporting
+            start_auto_reporting()
+            logging.info("✅ Auto-reporting started")
+            add_log("✅ Auto-reporting started")
+            
+            logging.info("🎯 Bot in FULL execution mode")
+            add_log("🎯 Bot in FULL execution mode")
+        else:
+            logging.warning("⚠️ Trading loops disabled - staying in MINIMAL mode")
+            add_log("⚠️ Trading loops disabled - staying in MINIMAL mode")
     else:
         logging.warning("⚠️ Exchange client initialization skipped (no credentials)")
         add_log("⚠️ Exchange client not available - API will serve cached/demo data")
