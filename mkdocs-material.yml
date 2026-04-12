@@ -2,7 +2,7 @@
 # On Windows, if mkdocs-material install fails (Errno 22 / Invalid argument), use mkdocs.yml or mkdocs-lite.yml instead.
 site_name: Bottie — Build the Trading Stack
 site_description: Chapter-based guide to the Bottie Python trading system (Berta Chapters style).
-site_url: ""
+site_url: https://newbot.berta.one
 repo_url: ""
 edit_uri: ""
 

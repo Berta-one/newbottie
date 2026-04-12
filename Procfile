@@ -1,1 +1,0 @@
-web: python3 absolute_minimal.py

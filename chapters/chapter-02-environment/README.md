@@ -5,6 +5,8 @@
 
 **Next:** [Chapter 3 — API](../chapter-03-api/README.md)
 
+> **Repository note:** Steps below assume you cloned the **Bottie application** repository (with `render_api.py`, `requirements.txt`, `scripts/smoke.py`). This **docs-only** site does not include that code—see [Getting started](../GETTING_STARTED.md).
+
 ---
 
 ## 1. Purpose

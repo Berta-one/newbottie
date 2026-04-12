@@ -1,14 +1,16 @@
 # Bottie — build the trading stack
 
-Welcome to the **in-repo course** for Bottie: a chapter-based path through a real **FastAPI** backend, **execution engine**, **ML hooks**, optional **quantum-inspired** portfolio code, and **sentiment** integration. You read, you run the code on your machine, and you extend the system with a clear picture of how the pieces connect.
+Welcome to the **course book** for Bottie: a chapter-based path through a real **FastAPI** backend, **execution engine**, **ML hooks**, optional **quantum-inspired** portfolio code, and **sentiment** integration—as documented here. **This repository holds only these chapters and MkDocs**; the runnable application lives in a **separate codebase** (see [Getting started](GETTING_STARTED.md)).
 
-**The tool is the repository as it is.** The codebase is provided **as-is**: this course teaches you to **run it, understand it, and adapt it** when exchanges, APIs, or libraries change. It does **not** promise that every external URL or provider rule will stay frozen forever—**[when things change, use this playbook](ADAPTING_WHEN_THINGS_CHANGE.md)** to sort them out systematically.
+**The material is provided as-is:** when exchanges, APIs, or libraries change, use **[when things change — adapting](ADAPTING_WHEN_THINGS_CHANGE.md)** (paths refer to the full Bottie project layout).
 
 **Never used Python or unsure what an “API” is?** Start with **[Chapter 0 — New to Python and APIs](chapter-00-beginners-apis-and-keys/README.md)** (where to install Python, what an API is, and where to get Binance / Finnhub keys on the real websites). It is written to be **self-contained**.
 
 Publishing or selling this material? See **[Note for creators — pricing and donations](NOTE_FOR_CREATORS.md)**.
 
-The **folder layout** mirrors the [Berta Chapters](https://chapters.berta.one/) idea: each chapter has a `README.md` as the spine, room for **Jupyter notebooks**, **exercises**, and pointers into the **production code** at the repository root. You can still use **[Berta AI](https://berta.one/)** to draft additional notebooks or chapters and merge them here the same way you grow the main Berta curriculum.
+**Hosted docs (MkDocs):** [https://newbot.berta.one](https://newbot.berta.one)
+
+The **folder layout** mirrors the [Berta Chapters](https://chapters.berta.one/) idea: each chapter has a `README.md` as the spine, room for **Jupyter notebooks**, **exercises**, and pointers into the **production code** in the **application** repository. You can still use **[Berta AI](https://berta.one/)** to draft additional notebooks or chapters and merge them here the same way you grow the main Berta curriculum.
 
 **Disclaimer:** This material is **software engineering education**, not investment, tax, or legal advice. Cryptocurrency markets are volatile. **If you ever decide to use it** for live trading or real funds, start with **testnet** and **paper mode**, keep **size small**, and only scale once you trust your setup and your own risk controls.
 
@@ -89,7 +91,7 @@ The “guided hours” assume you type the commands, break things once or twice,
 
 ## Building this site locally
 
-See [Getting started — Build this documentation site](GETTING_STARTED.md#documentation-site).
+See [Getting started](GETTING_STARTED.md) to build this documentation site locally.
 
 ---
 

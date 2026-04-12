@@ -2,6 +2,7 @@
 # Use mkdocs.yml + requirements-docs.txt for Material theme (chapters.berta.one–style UI).
 site_name: Bottie — Build the Trading Stack
 site_description: Chapter-based Bottie guide
+site_url: https://newbot.berta.one
 docs_dir: chapters
 
 theme:

@@ -3,7 +3,7 @@
 # For Material UI (Berta-like): pip install -r requirements-docs.txt && mkdocs serve -f mkdocs-material.yml
 site_name: Bottie — Build the Trading Stack
 site_description: Chapter-based guide to the Bottie Python trading system (Berta Chapters style).
-site_url: ""
+site_url: https://newbot.berta.one
 repo_url: ""
 edit_uri: ""
 

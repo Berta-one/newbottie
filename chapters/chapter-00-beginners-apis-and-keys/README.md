@@ -155,7 +155,7 @@ Those are for **other experiments** in those folders, not for the minimal “Pyt
 2. You put them in a **`.env`** file in your project folder (or in your host’s secret store for production)—**never commit** `.env` to Git.
 3. The Python code reads `os.environ["BINANCE_API_KEY"]` etc., or `python-dotenv` loads `.env` at startup.
 
-See [Getting started — Environment variables](../GETTING_STARTED.md#4-environment-variables-env) for the exact pattern.
+See [Getting started — full application repo](../GETTING_STARTED.md#environment-variables-full-app) for where `.env` lives when you run the stack (this **docs** repo has no app entry point).
 
 ---
 
@@ -164,10 +164,10 @@ See [Getting started — Environment variables](../GETTING_STARTED.md#4-environm
 | Day | You do |
 |-----|--------|
 | 1 | Install Python; verify `python --version`. |
-| 2 | Clone repo; create venv; `pip install -r requirements.txt` (from Getting started). |
-| 3 | Run `scripts/smoke.py` **without** any exchange keys. |
-| 4 | (Optional) Create **Binance testnet** keys; add to `.env`; explore read-only endpoints. |
-| 5 | (Optional) Add Finnhub key; enable sentiment per repo docs. |
+| 2 | Clone **this docs** repo; venv; `pip install -r requirements-docs.txt`; run `mkdocs serve` and read Chapter 1. |
+| 3 | When ready for hands-on code: clone the **application** repo; venv; `pip install -r requirements.txt`; run `scripts/smoke.py` without exchange keys. |
+| 4 | (Optional) Create **Binance testnet** keys; add `.env` in the **application** repo; explore read-only endpoints. |
+| 5 | (Optional) Add Finnhub key; enable sentiment per application repo docs. |
 
 ---
 

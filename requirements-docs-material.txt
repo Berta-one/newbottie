@@ -1,0 +1,4 @@
+# Optional — for mkdocs-material.yml (chapters.berta.one–style UI).
+mkdocs>=1.6.0
+pymdown-extensions>=10.0.0
+mkdocs-material>=9.5.0

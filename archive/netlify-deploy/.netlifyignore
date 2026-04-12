@@ -1,7 +1,0 @@
-*.py
-*.pyc
-__pycache__/
-.python-version
-requirements*.txt
-node_modules/
-.git/

@@ -1,6 +1,6 @@
 # The tool as it is — and how to sort things out when the world changes
 
-This page states a **contract** between you and this repository, then teaches a **repeatable process** for when Binance, Finnhub, Python packages, or URLs **change** without warning.
+This page describes how to adapt the **full Bottie application** (FastAPI, engine, dependencies)—which you clone from the **application repository**, not from this **docs-only** repo. The **process** below still applies; search paths like `render_api.py` and `engine/` refer to that codebase.
 
 ---
 

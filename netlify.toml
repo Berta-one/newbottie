@@ -1,38 +1,7 @@
+# Docs-only site: MkDocs course in chapters/ → output site/
 [build]
-  publish = "build"
-  command = "npm run build"
+  publish = "site"
+  command = "pip install -r requirements-docs.txt && mkdocs build -f mkdocs.yml --strict"
 
-# Pin Python: Netlify’s global mise may default to an unreleased 3.14.x — override here and in .mise.toml / .python-version.
-# If deploys still pick 3.14, set PYTHON_VERSION=3.12.4 in the Netlify UI (Site settings → Environment variables).
 [build.environment]
   PYTHON_VERSION = "3.12.4"
-
-[[redirects]]
-  from = "/api/trades"
-  to = "https://bottie-1.onrender.com/trades"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/api/ml/status"
-  to = "https://bottie-1.onrender.com/ml/status"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/api/status"
-  to = "https://bottie-1.onrender.com/status"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/api/health"
-  to = "https://bottie-1.onrender.com/health"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/api/*"
-  to = "https://bottie-1.onrender.com/:splat"
-  status = 200
-  force = true
