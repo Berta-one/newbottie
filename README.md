@@ -320,7 +320,7 @@ curl https://your-render-app.onrender.com/analytics/advanced
 
 If Bottie or the [`chapters/`](chapters/index.md) course is useful, use the **Sponsor** button on this repository — it is wired through **[GitHub Sponsors](https://github.com/sponsors)** via [`.github/FUNDING.yml`](.github/FUNDING.yml) (no third-party donation links).
 
-That supports the open codebase and docs — not financial advice or guaranteed updates when exchanges change APIs. If the Sponsor button is missing, [enable GitHub Sponsors](https://github.com/sponsors) for your profile.
+That supports the open codebase and docs — not financial advice or guaranteed updates when exchanges change APIs. If the Sponsor button is missing, the repository owner needs to [enable GitHub Sponsors](https://github.com/sponsors) for their account.
 
 ## 🤝 **Contributing**
 
