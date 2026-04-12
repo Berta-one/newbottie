@@ -1,0 +1,4 @@
+# Netlify (Noble) runs mise; the image global config may request a bleeding-edge Python.
+# Pin a real release so mise can install it; qiskit-aer then gets wheels.
+[tools]
+python = "3.12.4"

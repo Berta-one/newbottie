@@ -7,7 +7,15 @@ Minimal end-to-end smoke test:
 """
 
 import logging
+import os
+import sys
 import time
+
+# Repo root (parent of scripts/) must be on path when run as a file
+_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+
 from engine.integrated_portfolio_engine import IntegratedPortfolioEngine
 
 logging.basicConfig(

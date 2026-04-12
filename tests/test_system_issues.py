@@ -13,8 +13,8 @@ import sys
 
 BASE_URL = "http://localhost:8000"
 
-def test_endpoint(endpoint, description):
-    """Test an endpoint and return the response"""
+def check_api_endpoint(endpoint, description):
+    """Probe an endpoint and return the response (manual script helper; not a pytest test)."""
     print(f"\n{'='*60}")
     print(f"Testing: {description}")
     print(f"Endpoint: {endpoint}")
@@ -42,7 +42,7 @@ def analyze_trades_timing():
     print(f"{'*'*80}")
     
     # Check current trades
-    trades_data = test_endpoint("/trades", "Current Trades")
+    trades_data = check_api_endpoint("/trades", "Current Trades")
     if trades_data:
         trades = trades_data.get("trades", [])
         if trades:
@@ -81,7 +81,7 @@ def analyze_trades_timing():
             print("⚠️  No trades found")
     
     # Check execution status
-    status_data = test_endpoint("/status", "System Status")
+    status_data = check_api_endpoint("/status", "System Status")
     if status_data:
         exec_enabled = status_data.get("execution_enabled", False)
         print(f"\nExecution enabled: {exec_enabled}")
@@ -95,7 +95,7 @@ def analyze_ml_data():
     print(f"{'*'*80}")
     
     # Check ML status
-    ml_status = test_endpoint("/ml/status", "ML Status")
+    ml_status = check_api_endpoint("/ml/status", "ML Status")
     if ml_status:
         samples = ml_status.get("samples", 0)
         print(f"ML Samples: {samples}")
@@ -103,7 +103,7 @@ def analyze_ml_data():
             print("⚠️  WARNING: No ML samples - this explains 'insufficient data'")
     
     # Check ML performance
-    ml_performance = test_endpoint("/ml/performance", "ML Performance")
+    ml_performance = check_api_endpoint("/ml/performance", "ML Performance")
     if ml_performance:
         timeframes = ml_performance.get("timeframes", {})
         print(f"Available timeframes: {list(timeframes.keys())}")
@@ -115,7 +115,7 @@ def analyze_ml_data():
                 print(f"    ⚠️  No data for {tf}")
     
     # Check signals for ML component
-    signals_data = test_endpoint("/signals", "Signals")
+    signals_data = check_api_endpoint("/signals", "Signals")
     if signals_data:
         signals = signals_data.get("signals", [])
         if signals:
@@ -131,7 +131,7 @@ def analyze_sentiment_status():
     print(f"{'*'*80}")
     
     # Check health endpoint for sentiment status
-    health_data = test_endpoint("/health", "Health Check")
+    health_data = check_api_endpoint("/health", "Health Check")
     if health_data:
         sentiment_status = health_data.get("sentiment", {})
         enabled = sentiment_status.get("enabled", False)
@@ -142,13 +142,13 @@ def analyze_sentiment_status():
         print(f"Quantum enabled in health: {quantum_enabled}")
     
     # Check sentiment endpoint
-    sentiment_data = test_endpoint("/sentiment", "Sentiment Data")
+    sentiment_data = check_api_endpoint("/sentiment", "Sentiment Data")
     if sentiment_data:
         snapshot = sentiment_data.get("snapshot", {})
         print(f"Sentiment snapshot keys: {list(snapshot.keys())}")
     
     # Check sentiment articles
-    articles_data = test_endpoint("/sentiment/articles", "Sentiment Articles")
+    articles_data = check_api_endpoint("/sentiment/articles", "Sentiment Articles")
     if articles_data:
         articles = articles_data.get("articles", [])
         print(f"Available articles: {len(articles)}")
@@ -159,7 +159,7 @@ def analyze_sentiment_status():
                 print(f"  Article {i+1}: {article.get('headline', 'No headline')[:50]}...")
     
     # Check if sentiment appears in signals
-    signals_data = test_endpoint("/signals", "Signals for Sentiment")
+    signals_data = check_api_endpoint("/signals", "Signals for Sentiment")
     if signals_data:
         signals = signals_data.get("signals", [])
         if signals:
@@ -175,7 +175,7 @@ def main():
     print(f"Testing server at: {BASE_URL}")
     
     # Test basic connectivity
-    health_data = test_endpoint("/health", "Basic Health Check")
+    health_data = check_api_endpoint("/health", "Basic Health Check")
     if not health_data:
         print("❌ Cannot connect to server!")
         sys.exit(1)

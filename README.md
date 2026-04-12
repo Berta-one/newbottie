@@ -3,6 +3,13 @@
 **Advanced AI-powered cryptocurrency trading system with adaptive machine learning, quantum-inspired algorithms, and real-time sentiment analysis.**
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+Public, **MIT-licensed** software — provided **“as is”** (see [LICENSE](LICENSE)). This repo is **education and engineering**, not a managed service: exchanges and APIs change; use the in-repo guide **[When things change — adapting](chapters/ADAPTING_WHEN_THINGS_CHANGE.md)** when something breaks after an upgrade.
+
+**Before you clone:** never commit **API keys**, **`.env`**, or **`.venv`** — copy [`.env.example`](.env.example) to `.env` locally and keep secrets out of git.
+
+**Security:** report vulnerabilities **privately** — see the [security policy](.github/SECURITY.md) (also shown under the repo **Security** tab on GitHub).
 
 ## Quick Start
 
@@ -13,6 +20,17 @@ python render_api.py
 ```
 
 `render_api.py` is the official entry point for the Bottie system.
+
+## Build the bot (chapter course)
+
+A **Berta Chapters–style** curriculum lives in [`chapters/`](chapters/index.md): guided READMEs, exercises, and notebook slots. Serve it locally with MkDocs:
+
+```bash
+pip install mkdocs pymdown-extensions
+mkdocs serve -f mkdocs.yml -a 127.0.0.1:8001
+```
+
+Optional Material theme (if `pip install -r requirements-docs.txt` succeeds on your OS): `mkdocs serve -f mkdocs-material.yml`. On Windows, if `mkdocs-material` fails to install, use `mkdocs.yml` or `mkdocs-lite.yml`—same content.
 
 ## 🚀 **Key Features**
 
@@ -56,25 +74,29 @@ python render_api.py
 ## 🛠️ **Installation & Setup**
 
 ### **Prerequisites**
-- Python 3.8+
-- Binance account with API access
-- Finnhub API key (for sentiment analysis)
+- **Python 3.11** (recommended; see [`chapters/GETTING_STARTED.md`](chapters/GETTING_STARTED.md))
+- **Binance** API key + secret — use **testnet** / minimal permissions while learning
+- **Finnhub** API key — optional until you enable sentiment features (`FINNHUB_API_KEY`)
 
 ### **Local Development**
 ```bash
-# Clone repository
-git clone <repository-url>
-cd bottie-trading-bot
+# Clone (replace with your fork URL if different)
+git clone https://github.com/luigipascal/newbottie.git
+cd newbottie
 
-# Install dependencies
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# macOS/Linux: source .venv/bin/activate
+
 pip install -r requirements.txt
 
-# Set environment variables
-export BINANCE_API_KEY="your_binance_api_key"
-export BINANCE_API_SECRET="your_binance_secret"
-export FINNHUB_API_KEY="your_finnhub_key"
+# Copy and edit — do not commit .env
+copy .env.example .env   # Windows
+# cp .env.example .env     # macOS/Linux
 
-# Run locally
+# Set keys in .env or export in the shell, e.g.:
+# BINANCE_API_KEY, BINANCE_API_SECRET, FINNHUB_API_KEY
+
 python render_api.py
 ```
 
@@ -294,6 +316,12 @@ curl https://your-render-app.onrender.com/analytics/advanced
 - **Risk scoring**: Confidence-based opportunity ranking
 - **Execution recommendations**: When and how to trade
 
+## ☕ **Support this project**
+
+If Bottie or the [`chapters/`](chapters/index.md) course is useful, use the **Sponsor** button on this repository — it is wired through **[GitHub Sponsors](https://github.com/sponsors)** via [`.github/FUNDING.yml`](.github/FUNDING.yml) (no third-party donation links).
+
+That supports the open codebase and docs — not financial advice or guaranteed updates when exchanges change APIs. If the Sponsor button is missing, [enable GitHub Sponsors](https://github.com/sponsors) for your profile.
+
 ## 🤝 **Contributing**
 
 ### **Development Workflow**
@@ -315,13 +343,13 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## ⚠️ **Disclaimer**
 
-**IMPORTANT**: This is an autonomous trading system that can execute real trades with real money. 
+**IMPORTANT:** This software can connect to exchanges and may execute **real trades** with **real money** if you configure it that way.
 
-- **Use at your own risk**: Cryptocurrency trading involves substantial risk
-- **Test thoroughly**: Use testnet/sandbox mode before live trading
-- **Monitor actively**: Even autonomous systems need supervision
-- **Understand fees**: All trading involves costs that affect profitability
-- **Start small**: Begin with small amounts to verify system behavior
+- **Not financial, tax, or legal advice** — software engineering and experimentation only.
+- **Use at your own risk** — cryptocurrency markets are volatile.
+- **Test first** — testnet / paper / small size before live funds.
+- **Supervise** — autonomous does not mean “walk away forever.”
+- **Fees matter** — costs affect real P&L.
 
 **Past performance does not guarantee future results. Only trade with money you can afford to lose.**
 

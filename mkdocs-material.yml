@@ -1,0 +1,53 @@
+# Optional Material theme (chapters.berta.one–style). Requires: pip install -r requirements-docs.txt
+# On Windows, if mkdocs-material install fails (Errno 22 / Invalid argument), use mkdocs.yml or mkdocs-lite.yml instead.
+site_name: Bottie — Build the Trading Stack
+site_description: Chapter-based guide to the Bottie Python trading system (Berta Chapters style).
+site_url: ""
+repo_url: ""
+edit_uri: ""
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - content.code.copy
+
+markdown_extensions:
+  - attr_list
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Chapter 0 — New to Python & APIs: chapter-00-beginners-apis-and-keys/README.md
+  - Curriculum: CURRICULUM.md
+  - Getting started: GETTING_STARTED.md
+  - "Tool as-is — when APIs change": ADAPTING_WHEN_THINGS_CHANGE.md
+  - Note for creators (pricing): NOTE_FOR_CREATORS.md
+  - Chapter 1 — Overview: chapter-01-overview/README.md
+  - Chapter 2 — Environment: chapter-02-environment/README.md
+  - Chapter 3 — API & services: chapter-03-api/README.md
+  - Chapter 4 — Engine & execution: chapter-04-engine/README.md
+  - Chapter 5 — ML & signals: chapter-05-ml/README.md
+  - Chapter 6 — Quantum & sentiment: chapter-06-quantum-sentiment/README.md
+  - Chapter 7 — Hardening & ops: chapter-07-hardening/README.md
+
+docs_dir: chapters

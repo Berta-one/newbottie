@@ -1,0 +1,125 @@
+# Curriculum — Bottie build path
+
+This page is the **syllabus**: what each chapter covers, how long to budget, what you should **produce** as evidence of understanding, and how to combine chapters into **learning paths**.
+
+---
+
+## Chapter index
+
+| # | Chapter | Guided time | You can demonstrate |
+|---|---------|-------------|---------------------|
+| 0 | [New to Python & APIs — keys for Binance, Finnhub, …](chapter-00-beginners-apis-and-keys/README.md) | 2–4 h | Python installed; know where API keys are created on provider sites. |
+| 1 | [Overview & architecture](chapter-01-overview/README.md) | 3–4 h | A diagram and a spoken walkthrough from HTTP to engine. |
+| 2 | [Environment & first run](chapter-02-environment/README.md) | 4–6 h | Clean venv, import `render_api`, `/health` 200, smoke exit 0. |
+| 3 | [API & backend services](chapter-03-api/README.md) | 5–7 h | TestClient script hitting 3+ routes; explain CORS. |
+| 4 | [Engine & execution](chapter-04-engine/README.md) | 6–8 h | Trace one bar in logs; explain HOLD vs BUY thresholds. |
+| 5 | [ML & ensemble](chapter-05-ml/README.md) | 6–8 h | Load or stub a model; change env path; compare logs. |
+| 6 | [Quantum & sentiment](chapter-06-quantum-sentiment/README.md) | 4–5 h | Toggle `ENABLE_QUANTUM`; find sentiment route + env keys. |
+| 7 | [Hardening & operations](chapter-07-hardening/README.md) | 5–7 h | Security checklist + green `pytest` on your machine. |
+
+**Full track:** roughly **35–50 hours** with Chapter 0 included, or **33–45 hours** if you skip Chapter 0 (read + labs + note-taking), not counting optional notebooks you author yourself.
+
+**Meta:** [Note for creators — pricing and donations](NOTE_FOR_CREATORS.md)
+
+**When providers change:** [The tool as-is — adapting when things change](ADAPTING_WHEN_THINGS_CHANGE.md) (expect URLs and API rules to drift; learn the process, not one frozen screenshot).
+
+---
+
+## Outcomes by chapter (detail)
+
+### Chapter 1 — Overview
+
+- **Concepts:** clients (dashboard, curl), FastAPI surface, engine loop, ML as a plug-in, external data.
+- **Deliverable:** your own architecture sketch (Mermaid, Excalidraw, or paper).
+
+### Chapter 2 — Environment
+
+- **Concepts:** venv isolation, `requirements.txt`, Windows vs Unix activation, `.env` hygiene.
+- **Deliverable:** screenshot or log snippet proving `import render_api` and `scripts/smoke.py` success.
+
+### Chapter 3 — API
+
+- **Concepts:** `render_api.py` vs `api/app.py`, routers, `TestClient`, representative JSON payloads.
+- **Deliverable:** small Python file or notebook with 3 documented API calls.
+
+### Chapter 4 — Engine
+
+- **Concepts:** `SignalGenerator`, `ExecutionManager`, portfolio targets, paper executor, cooldowns.
+- **Deliverable:** annotated log transcript for10+ smoke iterations.
+
+### Chapter 5 — ML
+
+- **Concepts:** `predict_proba` contract, 3-class vector, `SafeModel`, optional on-disk model.
+- **Deliverable:** before/after comparison of signal logs with model present vs absent.
+
+### Chapter 6 — Quantum & sentiment
+
+- **Concepts:** optional Qiskit stack, classical fallback, Finnhub / sentiment configuration.
+- **Deliverable:** one-page note on what you enable in production vs dev.
+
+### Chapter 7 — Hardening
+
+- **Concepts:** secrets, testnet, rate limits, logging, tests, deployment smoke.
+- **Deliverable:** personal runbook (bullet list) for “start safe session”.
+
+---
+
+## Learning paths
+
+### Path A — “Dashboard and API only”
+
+**Chapters:** 1 → 2 → 3 → 7  
+
+**Goal:** Run and harden the HTTP layer; understand routes the frontend calls; minimal engine depth.
+
+**Stretch:** Add one read-only diagnostic route and document it in Chapter 3 style.
+
+### Path B — “Signals and paper trading”
+
+**Chapters:** 1 → 2 → 4 → 5 → 7  
+
+**Goal:** Deep engine + ML path; treat API as a thin client unless you need Path A depth.
+
+**Stretch:** Change feature extraction in `signal_generator.py` (carefully) and re-run smoke.
+
+### Path C — “Full stack”
+
+**Chapters:** 1 → 7 in order.
+
+**Goal:** Teach or productize a “build the bot” narrative end-to-end.
+
+**Stretch:** One new chapter (e.g. “Chapter 8 — Backtesting hook”) using the same folder pattern.
+
+### Path D — “Ops and teaching”
+
+**Chapters:** 1 → 2 → 7 → then 3–6 as reference.
+
+**Goal:** Prioritize safe operations and documentation for students; implement features only when needed.
+
+---
+
+## How this pairs with Berta Chapters
+
+For each new topic you want Berta to help write:
+
+1. Create `chapters/chapter-NN-slug/README.md` with **objectives** and **file pointers** (Berta works best when the repo context is explicit).
+2. Ask for **notebooks** under `chapters/chapter-NN-slug/notebooks/` with progressive difficulty (intro → intermediate → stretch).
+3. Add **exercises** with a `solutions/` folder if you sell a solutions pack.
+4. Keep **canonical code** in the repo root; chapters **link** to it—avoid duplicating large code blocks that drift.
+
+Attribute generated prose if you publish it: *Generated by Berta AI* plus human review for accuracy against this repo.
+
+---
+
+## Suggested weekly pace (self-study)
+
+| Week | Chapters | Notes |
+|------|----------|--------|
+| 1 | 1–2 | Solid footing beats rushing. |
+| 2 | 3–4 | Heaviest reading; re-run smoke often. |
+| 3 | 5–6 | ML + optional features; expect dependency friction. |
+| 4 | 7 + review | Tests, checklist, your own appendix chapter. |
+
+---
+
+Next: [Getting started](GETTING_STARTED.md) or [Chapter 1](chapter-01-overview/README.md).

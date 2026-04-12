@@ -1,0 +1,5 @@
+# Documentation site (MkDocs). Core: mkdocs + pymdown-extensions (see mkdocs.yml).
+# mkdocs-material is optional — use mkdocs-material.yml; on some Windows setups pip fails (Errno 22); use mkdocs.yml or mkdocs-lite.yml.
+mkdocs>=1.6.0
+pymdown-extensions>=10.0.0
+mkdocs-material>=9.5.0

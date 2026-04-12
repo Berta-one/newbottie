@@ -3,6 +3,8 @@
 Real Trading API for Bottie - Live positions, real prices, actual equity
 """
 
+from __future__ import annotations
+
 import asyncio
 import json
 import math
@@ -10,6 +12,8 @@ import os
 import random
 import time
 import logging
+from datetime import datetime
+from typing import List, Optional, Set
 
 from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -201,7 +205,7 @@ connected_websockets = set()
 
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: set[WebSocket] = set()
+        self.active_connections: Set[WebSocket] = set()
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
@@ -266,7 +270,7 @@ def _position_qty(symbol: str) -> float:
         return 0.0
 
 
-def _last_px(symbol: str) -> float | None:
+def _last_px(symbol: str) -> Optional[float]:
     """Get last price for a symbol"""
     try:
         if exchange_client:
@@ -297,7 +301,7 @@ def _round_step(qty: float, step: float) -> float:
     return math.floor(qty / step) * step
 
 
-def _find_tradable_symbol_for_base(base_asset: str) -> str | None:
+def _find_tradable_symbol_for_base(base_asset: str) -> Optional[str]:
     """Return a tradable symbol like "BASE/USDT" if available on the exchange.
 
     Tries preferred USD-like quotes to avoid requesting nonexistent markets
@@ -1882,9 +1886,6 @@ def trades_history(since_date: str = "2024-08-01"):
         "status": "RESET"
     }
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.get("/trades/table")
 def trades_table():
@@ -1898,13 +1899,8 @@ def trades_table():
         },
         "total_count": 0,
         "status": "RESET",
-        "message": "Trade table cleared - starting fresh"
-    }),
-            "total_count": len(enhanced_trades)
-        }
-        
-    except Exception as e:
-        return {"trades": [], "error": str(e)}
+        "message": "Trade table cleared - starting fresh",
+    }
 
 
 @app.get("/arbitrage/opportunities")
@@ -2274,60 +2270,6 @@ async def startup_event():
             logging.warning("❌ Exchange connection failed - running in simulation mode")
         logging.info(f"🚀 Real trading initialization: {mode}")
 
-        
-            # Initialize WebSocket BEFORE trading loops to prevent rate limits
-            try:
-                import os
-                from engine.free_websocket_manager import get_free_websocket_manager, initialize_free_websocket_data
-                
-                # Get API credentials
-                api_key = os.getenv('BINANCE_API_KEY')
-                api_secret = os.getenv('BINANCE_API_SECRET')
-                
-                if api_key and api_secret:
-                    # Initialize WebSocket with trading symbols
-                    trading_symbols = [
-                        'BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT', 
-                        'DOT/USDT', 'SOL/USDT', 'MATIC/USDT', 'LINK/USDT'
-                    ]
-                    
-                    ws_success = await initialize_free_websocket_data(
-                        symbols=trading_symbols,
-                        kline_symbols=trading_symbols[:4],  # Limit klines
-                        api_key=api_key,
-                        api_secret=api_secret
-                    )
-                    
-                    if ws_success:
-                        startup_logs.append(
-                            f"{time.strftime('%Y-%m-%d %H:%M:%S')} - 🚀 WebSocket initialized successfully - Rate limits prevented!"
-                        )
-                        logging.info("🚀 WebSocket initialized - Balance and price data will stream in real-time")
-                        
-                        # Give WebSocket time to connect and get initial data
-                        await asyncio.sleep(3)
-                        
-                        # Check connection status
-                        ws_manager = get_free_websocket_manager()
-                        if ws_manager.is_connected():
-                            logging.info(f"✅ WebSocket connected - {len(ws_manager.tickers)} tickers, balance: {bool(ws_manager.account_balance)}")
-                        else:
-                            logging.warning("⚠️ WebSocket connection issues detected")
-                    else:
-                        startup_logs.append(
-                            f"{time.strftime('%Y-%m-%d %H:%M:%S')} - ❌ WebSocket initialization failed - Will use REST API"
-                        )
-                        logging.error("❌ WebSocket initialization failed - Rate limits may occur")
-                else:
-                    logging.warning("⚠️ No API keys found - WebSocket will work for public data only")
-                    
-            except Exception as e:
-                startup_logs.append(
-                    f"{time.strftime('%Y-%m-%d %H:%M:%S')} - ❌ WebSocket setup error: {e}"
-                )
-                logging.error(f"❌ WebSocket setup error: {e}")
-            
-            # Start trading loops
         if TRADE_ENABLED:
             add_log("🚀 Starting trading background tasks...")
             asyncio.create_task(signals_loop())
@@ -2357,9 +2299,9 @@ def test_connection():
     return FileResponse("web/test_connection.html")
 
 
-def _symbols_to_scan() -> list[str]:
+def _symbols_to_scan() -> List[str]:
     """Get list of symbols to scan for trading opportunities"""
-    syms: set[str] = set()
+    syms: Set[str] = set()
 
     # from positions
     positions = get_real_positions()

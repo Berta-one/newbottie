@@ -1,14 +1,8 @@
 # quantum/portfolio_optimizer.py
-import os
 import logging
-from typing import List, Tuple
 import numpy as np
 
 from qiskit_optimization import QuadraticProgram
-from qiskit_optimization.algorithms import MinimumEigenOptimizer
-from qiskit_algorithms import QAOA
-from qiskit.primitives import Sampler
-from qiskit.circuit.library import TwoLocal
 
 from .backends import get_backend
 
@@ -39,17 +33,6 @@ def _build_mv_qubo(mu: np.ndarray, cov: np.ndarray, lambda_risk: float, budget: 
     return qp
 
 
-def _bitstring_to_weights(bits: List[int]) -> np.ndarray:
-    """Map selection bits to equal weights over selected assets."""
-    bits = np.array(bits, dtype=float)
-    cnt = bits.sum()
-    if cnt <= 0:
-        # No selection, fallback to uniform tiny distribution
-        return np.full_like(bits, 1.0 / len(bits))
-    w = bits / cnt
-    return w
-
-
 class QuantumPortfolioOptimizer:
     """
     QAOA-based mean-variance optimizer with safe fallbacks.
@@ -60,12 +43,7 @@ class QuantumPortfolioOptimizer:
     def __init__(self, lambda_risk: float = 0.1, budget: int = None):
         self.lambda_risk = float(lambda_risk)
         self.budget = budget  # if None -> choose ~n/3
-        self.backend = get_backend()  # IBM or Aer
-        shots = int(os.getenv("QUANTUM_SHOTS", "2048"))
-        self.sampler = Sampler(options={"shots": shots}, backend=self.backend.backend)
-
-        # Simple ansatz; you can tune entanglement later
-        self.ansatz = TwoLocal(rotation_blocks="ry", entanglement_blocks="cz", reps=2, entanglement="linear")
+        self.backend = get_backend()  # IBM or Aer (used for logging / future QAOA wiring)
 
     def optimize(self, mu: np.ndarray, cov: np.ndarray) -> np.ndarray:
         """
@@ -79,22 +57,18 @@ class QuantumPortfolioOptimizer:
         else:
             budget = max(1, min(self.budget, n))
 
-        qp = _build_mv_qubo(mu=np.array(mu, dtype=float),
-                            cov=np.array(cov, dtype=float),
-                            lambda_risk=self.lambda_risk,
-                            budget=budget)
+        _ = _build_mv_qubo(
+            mu=np.array(mu, dtype=float),
+            cov=np.array(cov, dtype=float),
+            lambda_risk=self.lambda_risk,
+            budget=budget,
+        )
 
-        qaoa = QAOA(sampler=self.sampler, ansatz=self.ansatz)
-        optimizer = MinimumEigenOptimizer(qaoa)
-
-        log.info("QAOA start | assets=%d budget=%d backend=%s", n, budget, self.backend.kind)
-        try:
-            result = optimizer.solve(qp)
-            # result.x is binary selection
-            bits = [int(round(v)) for v in result.x]
-            w = _bitstring_to_weights(bits)
-            log.info("QAOA done | selection=%s", bits)
-            return w
-        except Exception as e:
-            log.warning("QAOA failed (%s). Falling back to uniform weights.", e)
-            return np.full(n, 1.0 / n, dtype=float)
+        log.info(
+            "Quantum optimizer (QAOA + MinimumEigenOptimizer) not wired for qiskit-algorithms 0.4+ / "
+            "Qiskit 2.x yet; using uniform weights | assets=%d budget=%d backend=%s",
+            n,
+            budget,
+            self.backend.kind,
+        )
+        return np.full(n, 1.0 / n, dtype=float)

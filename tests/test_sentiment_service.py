@@ -3,41 +3,44 @@
 Test script for the new resilient sentiment service
 """
 
+import importlib
 import os
 import sys
-import time
 import threading
+import time
+
 sys.path.append('.')
 
-# Set test environment variables
-os.environ["SENTIMENT_ENABLED"] = "1"
-os.environ["FINNHUB_API_KEY"] = "test_key_here"  # Replace with actual key for real testing
-os.environ["SENTIMENT_WINDOW_S"] = "300"  # 5 minutes for testing
-os.environ["SENTIMENT_POLL_S"] = "10"     # 10 seconds for testing
-os.environ["SENTIMENT_TOP_N"] = "5"
+
+def _apply_sentiment_test_env() -> None:
+    os.environ["SENTIMENT_ENABLED"] = "1"
+    os.environ["FINNHUB_API_KEY"] = "test_key_here"
+    os.environ["SENTIMENT_WINDOW_S"] = "300"
+    os.environ["SENTIMENT_POLL_S"] = "10"
+    os.environ["SENTIMENT_TOP_N"] = "5"
+
 
 def test_sentiment_service_config():
     """Test sentiment service configuration"""
     print("🧪 Testing sentiment service configuration...")
-    
-    from sentiment.sentiment_service import (
-        SENTIMENT_ENABLED, SENTIMENT_SOURCE, SENTIMENT_WINDOW_S, 
-        SENTIMENT_ASSETS, SENTIMENT_TOP_N, SENTIMENT_POLL_S
-    )
-    
-    print(f"  SENTIMENT_ENABLED: {SENTIMENT_ENABLED}")
-    print(f"  SENTIMENT_SOURCE: {SENTIMENT_SOURCE}")
-    print(f"  SENTIMENT_WINDOW_S: {SENTIMENT_WINDOW_S}")
-    print(f"  SENTIMENT_ASSETS: {SENTIMENT_ASSETS}")
-    print(f"  SENTIMENT_TOP_N: {SENTIMENT_TOP_N}")
-    print(f"  SENTIMENT_POLL_S: {SENTIMENT_POLL_S}")
-    
-    assert SENTIMENT_ENABLED == True
-    assert SENTIMENT_SOURCE == "finnhub"
-    assert SENTIMENT_WINDOW_S == 300
-    assert "BTC" in SENTIMENT_ASSETS
-    assert "ETH" in SENTIMENT_ASSETS
-    
+    _apply_sentiment_test_env()
+    import sentiment.sentiment_service as ss
+
+    importlib.reload(ss)
+
+    print(f"  SENTIMENT_ENABLED: {ss.SENTIMENT_ENABLED}")
+    print(f"  SENTIMENT_SOURCE: {ss.SENTIMENT_SOURCE}")
+    print(f"  SENTIMENT_WINDOW_S: {ss.SENTIMENT_WINDOW_S}")
+    print(f"  SENTIMENT_ASSETS: {ss.SENTIMENT_ASSETS}")
+    print(f"  SENTIMENT_TOP_N: {ss.SENTIMENT_TOP_N}")
+    print(f"  SENTIMENT_POLL_S: {ss.SENTIMENT_POLL_S}")
+
+    assert ss.SENTIMENT_ENABLED is True
+    assert ss.SENTIMENT_SOURCE == "finnhub"
+    assert ss.SENTIMENT_WINDOW_S == 300
+    assert "BTC" in ss.SENTIMENT_ASSETS
+    assert "ETH" in ss.SENTIMENT_ASSETS
+
     print("✅ Configuration tests passed")
 
 def test_sentiment_functions():

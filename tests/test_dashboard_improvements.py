@@ -10,8 +10,8 @@ import os
 
 API_BASE = "http://localhost:8000"
 
-def test_endpoint(endpoint, description):
-    """Test an API endpoint and display results"""
+def check_api_endpoint(endpoint, description):
+    """Probe an API endpoint and display results (manual script helper; not a pytest test)."""
     print(f"\n{'='*60}")
     print(f"Testing: {description}")
     print(f"Endpoint: {endpoint}")
@@ -87,21 +87,21 @@ def main():
     print("• Real trades only (no demo data)")
     
     # Test ML Status with dynamic samples and Brier scores
-    test_endpoint("/ml/status", "Enhanced ML Status with Brier Score Calculation")
+    check_api_endpoint("/ml/status", "Enhanced ML Status with Brier Score Calculation")
     
     # Test Performance Analysis with multiple timeframes
     for timeframe in ["1h", "24h", "7d"]:
-        test_endpoint(f"/performance/analysis?timeframe={timeframe}", 
+        check_api_endpoint(f"/performance/analysis?timeframe={timeframe}",
                      f"Performance Analysis - {timeframe.upper()} Timeframe")
     
     # Test Real Trades Only endpoint
-    test_endpoint("/trades", "Real Trades Only with Enhanced P&L")
+    check_api_endpoint("/trades", "Real Trades Only with Enhanced P&L")
     
     # Test Quantum Analysis
-    test_endpoint("/quantum/analysis", "Quantum Circuit Analysis")
+    check_api_endpoint("/quantum/analysis", "Quantum Circuit Analysis")
     
     # Test Sentiment Analysis
-    test_endpoint("/sentiment", "Enhanced Sentiment Analysis with Articles")
+    check_api_endpoint("/sentiment", "Enhanced Sentiment Analysis with Articles")
     
     print(f"\n{'='*60}")
     print("🎯 Test Summary:")

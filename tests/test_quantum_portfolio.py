@@ -1,35 +1,37 @@
 # tests/test_quantum_portfolio.py
 
 import unittest
-from quantum.portfolio_optimizer import QuantumPortfolioOptimizer
-from engine.portfolio_manager import HybridPortfolioManager
+
 import numpy as np
 
-class TestPortfolioOptimizer(unittest.TestCase):
+from engine.portfolio_manager import HybridPortfolioManager
+from quantum.portfolio_optimizer import QuantumPortfolioOptimizer
 
+
+class TestPortfolioOptimizer(unittest.TestCase):
     def test_quantum_optimizer_runs(self):
-        returns = [0.05, 0.02, 0.03]
-        cov = [
-            [0.001, 0.0001, 0.0002],
-            [0.0001, 0.002, 0.0003],
-            [0.0002, 0.0003, 0.001]
-        ]
-        qp = QuantumPortfolioOptimizer(num_assets=3)
-        weights = qp.optimize(returns, cov)
+        mu = np.array([0.05, 0.02, 0.03], dtype=float)
+        cov = np.array(
+            [
+                [0.001, 0.0001, 0.0002],
+                [0.0001, 0.002, 0.0003],
+                [0.0002, 0.0003, 0.001],
+            ],
+            dtype=float,
+        )
+        qp = QuantumPortfolioOptimizer(lambda_risk=0.1, budget=1)
+        weights = qp.optimize(mu, cov)
         self.assertEqual(len(weights), 3)
-        self.assertAlmostEqual(sum(weights), 1.0, delta=0.1)
+        self.assertAlmostEqual(float(sum(weights)), 1.0, delta=0.1)
 
     def test_hybrid_fallback_runs(self):
-        returns = [0.01, 0.02, 0.04]
-        cov = np.identity(3).tolist()
-        hp = HybridPortfolioManager(num_assets=3)
-        weights = hp.rebalance(returns, cov)
-
-        # Rebalance should yield a weight vector (list of length == num_assets)
+        symbols = ["A", "B", "C"]
+        conf_map = {"A": 0.3, "B": 0.5, "C": 0.2}
+        hp = HybridPortfolioManager(max_pos_pct=0.5)
+        weights = hp.target_weights(symbols, conf_map)
         self.assertEqual(len(weights), 3)
+        self.assertAlmostEqual(sum(weights.values()), 1.0, delta=0.01)
 
-        # Ensure the portfolio is fully invested (weights sum to ~1)
-        self.assertAlmostEqual(sum(weights), 1.0, delta=0.1)
 
 if __name__ == "__main__":
     unittest.main()

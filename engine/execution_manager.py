@@ -45,13 +45,13 @@ class ExecutionManager:
     ) -> None:
         self.symbols = symbols
         self.signal_gen = SignalGenerator()
-        self.portfolio = HybridPortfolioManager(num_assets=len(symbols), initial_capital=initial_capital)
-        self.executor = TradeExecutor(mode=mode or os.getenv("BOT_MODE", "paper"))
-
-        # Tunables (env overrides)
+        # Tunables (env overrides) — needed before HybridPortfolioManager
         self.min_trade_conf = float(os.getenv("MIN_TRADE_CONF", min_trade_conf if min_trade_conf is not None else 0.15))
         self.trade_cooldown_s = float(os.getenv("TRADE_COOLDOWN_S", trade_cooldown_s if trade_cooldown_s is not None else 30.0))
         self.max_pos_per_symbol = float(os.getenv("MAX_POS_PCT", max_pos_per_symbol if max_pos_per_symbol is not None else 0.5))  # of equity
+        _lambda_risk = float(os.getenv("PORTFOLIO_LAMBDA_RISK", "0.1"))
+        self.portfolio = HybridPortfolioManager(max_pos_pct=self.max_pos_per_symbol, lambda_risk=_lambda_risk)
+        self.executor = TradeExecutor(mode=mode or os.getenv("BOT_MODE", "paper"))
 
         self.state: Dict[str, SymbolState] = {sym: SymbolState() for sym in symbols}
 
@@ -108,9 +108,13 @@ class ExecutionManager:
             st.last_signal, st.last_conf = signal, conf
             return
 
-        # 3) Convert signals to target weights for all symbols (simple one-bar update)
-        # Here we pass only the latest symbol’s signal; portfolio manager can be extended to multi-sym aggregation.
-        weights = self.portfolio.target_weights({sym: (signal, conf)})
+        # 3) Map latest bar to per-symbol confidence (others → 0) for weighting
+        conf_map = {s: 0.0 for s in self.symbols}
+        if signal == "BUY":
+            conf_map[sym] = float(conf)
+        elif signal == "SELL":
+            conf_map[sym] = 0.0
+        weights = self.portfolio.target_weights(self.symbols, conf_map)
 
         # 4) Cap per-symbol max exposure
         for s, w in list(weights.items()):

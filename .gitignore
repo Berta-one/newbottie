@@ -2,6 +2,9 @@
 .netlify
 netlify-deploy/
 
+# MkDocs output
+site/
+
 # Environment variables with secrets
 .env*
 *.env

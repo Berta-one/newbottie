@@ -7,10 +7,12 @@ from qiskit import qasm3
 from qiskit_aer import Aer
 from qiskit.providers.backend import BackendV2
 
-# IBM Provider (account-managed, not runtime primitives)
-from qiskit_ibm_provider import IBMProvider
-
 log = logging.getLogger("QuantumBackends")
+
+try:
+    from qiskit_ibm_provider import IBMProvider
+except ImportError:
+    IBMProvider = None  # optional; Aer fallback always available
 
 
 class QuantumBackend:
@@ -37,8 +39,8 @@ def get_backend() -> QuantumBackend:
     desired = _resolve_backend_name(os.getenv("QUANTUM_BACKEND"))
     token = os.getenv("QISKIT_RUNTIME_TOKEN") or os.getenv("IBMQ_API_KEY") or os.getenv("IBMQ_TOKEN")
 
-    # 1) IBMProvider path
-    if token:
+    # 1) IBMProvider path (optional package)
+    if token and IBMProvider is not None:
         try:
             # Save and load account
             provider = IBMProvider(token=token)

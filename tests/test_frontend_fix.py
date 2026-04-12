@@ -9,8 +9,8 @@ import time
 
 API_BASE = "https://bottie-1.onrender.com"
 
-def test_endpoint(endpoint, method="GET", data=None):
-    """Test an API endpoint"""
+def check_api_endpoint(endpoint, method="GET", data=None):
+    """Probe an API endpoint (manual script helper; not a pytest test)."""
     try:
         url = f"{API_BASE}{endpoint}"
         print(f"Testing {method} {url}")
@@ -37,18 +37,18 @@ def main():
     print("=" * 50)
     
     # Test basic endpoints
-    test_endpoint("/")
-    test_endpoint("/health")
-    test_endpoint("/status")
+    check_api_endpoint("/")
+    check_api_endpoint("/health")
+    check_api_endpoint("/status")
     
     # Test debug endpoints that frontend needs
-    test_endpoint("/debug/auth")
+    check_api_endpoint("/debug/auth")
     
     # Test authentication with correct password
-    test_endpoint("/auth/login", "POST", {"username": "admin", "password": "Diego1234!"})
+    check_api_endpoint("/auth/login", "POST", {"username": "admin", "password": "Diego1234!"})
     
     # Test grid matrix
-    test_endpoint("/grid/matrix")
+    check_api_endpoint("/grid/matrix")
     
     print("\n🔍 Frontend Tests Complete!")
 
