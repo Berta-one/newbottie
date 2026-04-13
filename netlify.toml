@@ -1,7 +1,7 @@
 # Docs-only site: MkDocs course in chapters/ → output site/
 [build]
   publish = "site"
-  command = "pip install -r requirements-docs.txt && mkdocs build -f mkdocs.yml --strict"
+  command = "pip install -r requirements-docs.txt && mkdocs build -f mkdocs-material.yml --strict"
 
 [build.environment]
   PYTHON_VERSION = "3.12.4"

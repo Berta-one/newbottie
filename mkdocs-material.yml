@@ -3,8 +3,9 @@
 site_name: Bottie — Build the Trading Stack
 site_description: Chapter-based guide to the Bottie Python trading system (Berta Chapters style).
 site_url: https://newbot.berta.one
-repo_url: ""
-edit_uri: ""
+repo_url: https://github.com/luigipascal/newbottie
+repo_name: luigipascal/newbottie
+edit_uri: edit/main/chapters/
 
 theme:
   name: material
@@ -51,3 +52,9 @@ nav:
   - Chapter 7 — Hardening & ops: chapter-07-hardening/README.md
 
 docs_dir: chapters
+
+extra:
+  social:
+    - icon: simple/githubsponsors
+      link: https://github.com/sponsors/luigipascal
+      name: Sponsor on GitHub

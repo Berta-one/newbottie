@@ -14,4 +14,4 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements-docs.txt
-      - run: mkdocs build -f mkdocs.yml --strict
+      - run: mkdocs build -f mkdocs-material.yml --strict

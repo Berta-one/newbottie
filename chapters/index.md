@@ -1,5 +1,7 @@
 # Bottie — build the trading stack
 
+**Course source (clone, download ZIP, or open a PR):** [github.com/luigipascal/newbottie](https://github.com/luigipascal/newbottie) · **Support maintenance:** [GitHub Sponsors](https://github.com/sponsors/luigipascal)
+
 Welcome to the **course book** for Bottie: a chapter-based path through a real **FastAPI** backend, **execution engine**, **ML hooks**, optional **quantum-inspired** portfolio code, and **sentiment** integration—as documented here. **This repository holds only these chapters and MkDocs**; the runnable application lives in a **separate codebase** (see [Getting started](GETTING_STARTED.md)).
 
 **The material is provided as-is:** when exchanges, APIs, or libraries change, use **[when things change — adapting](ADAPTING_WHEN_THINGS_CHANGE.md)** (paths refer to the full Bottie project layout).

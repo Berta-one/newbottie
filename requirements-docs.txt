@@ -1,4 +1,4 @@
-# MkDocs site (default: mkdocs.yml + ReadTheDocs theme — no Material required).
+# MkDocs site — Material theme for production (Netlify/CI); mkdocs.yml stays ReadTheDocs for lightweight local builds.
 mkdocs>=1.6.0
 pymdown-extensions>=10.0.0
-# Optional Material UI: pip install -r requirements-docs-material.txt && mkdocs serve -f mkdocs-material.yml
+mkdocs-material>=9.5.0
