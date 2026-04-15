@@ -9,6 +9,7 @@ edit_uri: edit/main/chapters/
 
 theme:
   name: material
+  custom_dir: overrides
   palette:
     - scheme: default
       primary: indigo
@@ -54,9 +55,6 @@ nav:
 docs_dir: chapters
 
 extra:
-  analytics:
-    provider: google
-    property: G-CPG0TC71YT
   social:
     - icon: simple/githubsponsors
       link: https://github.com/sponsors/luigipascal

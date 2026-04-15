@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{# Explicit gtag so GA4 is present in static HTML regardless of extra.analytics wiring. #}
+{% block extrahead %}
+  {{ super() }}
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CPG0TC71YT"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-CPG0TC71YT');
+  </script>
+{% endblock %}
