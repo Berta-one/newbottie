@@ -54,6 +54,9 @@ nav:
 docs_dir: chapters
 
 extra:
+  analytics:
+    provider: google
+    property: G-CPG0TC71YT
   social:
     - icon: simple/githubsponsors
       link: https://github.com/sponsors/luigipascal
