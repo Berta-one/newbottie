@@ -1,13 +1,17 @@
 {% extends "base.html" %}
 
-{# Explicit gtag so GA4 is present in static HTML regardless of extra.analytics wiring. #}
+{# GA4 via PlainConsent only — gtag loads after Accept analytics (UK GDPR/PECR). #}
 {% block extrahead %}
   {{ super() }}
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CPG0TC71YT"></script>
+  <link rel="stylesheet" href="https://plainconsent.berta.one/dist/plainconsent.css" />
   <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-CPG0TC71YT');
+    window.plainConsentConfig = {
+      privacyUrl: "https://rondanini.com/privacy",
+      storageKey: "rondaninidotcom-consent",
+      googleAnalyticsId: "G-CPG0TC71YT",
+      projectUrl: "https://plainconsent.berta.one",
+      credit: { show: false }
+    };
   </script>
+  <script src="https://plainconsent.berta.one/dist/plainconsent.js" defer></script>
 {% endblock %}
