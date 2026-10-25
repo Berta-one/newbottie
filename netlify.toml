@@ -5,3 +5,5 @@
 
 [build.environment]
   PYTHON_VERSION = "3.12.4"
+  # Netlify mise: python@3.12.4 often lacks GitHub attestations → install fails
+  MISE_PYTHON_GITHUB_ATTESTATIONS = "0"
